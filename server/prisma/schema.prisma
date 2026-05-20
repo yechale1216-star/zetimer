@@ -1,0 +1,241 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id                  String               @id @default(uuid())
+  name                String               @unique
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  attendance          Attendance[]
+  parentNotifications ParentNotification[]
+  settings            SchoolSettings?
+  students            Student[]
+  teachers            Teacher[]
+  assignments         TeacherAssignment[]
+  users               User[]
+}
+
+model User {
+  id               String              @id @default(uuid())
+  email            String              @unique
+  password_hash    String
+  full_name        String
+  role             String
+  phone            String?
+  is_active        Boolean             @default(true)
+  teacher_id       String?
+  school_id        String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  experience_years Int?
+  qualification    String?
+  subject          String?
+  profile_photo    String?
+  parentStudents   ParentStudentLink[]
+  school           School?             @relation(fields: [school_id], references: [id])
+
+  @@index([email])
+  @@index([school_id])
+}
+
+model Teacher {
+  id               String              @id @default(uuid())
+  name             String
+  email            String?             @unique
+  schoolId         String
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  experience_years Int?
+  is_active        Boolean             @default(true)
+  phone            String?
+  qualification    String?
+  subject          String?
+  user_id          String?             @unique
+  profile_photo    String?
+  attendance       Attendance[]
+  school           School              @relation(fields: [schoolId], references: [id])
+  assignments      TeacherAssignment[]
+
+  @@index([schoolId])
+}
+
+model TeacherAssignment {
+  id         String   @id @default(uuid())
+  teacher_id String
+  school_id  String
+  grade      String
+  section    String
+  subject    String?
+  stream     String?
+  createdAt  DateTime @default(now())
+  school     School   @relation(fields: [school_id], references: [id])
+  teacher    Teacher  @relation(fields: [teacher_id], references: [id])
+
+  @@index([school_id])
+  @@index([teacher_id])
+}
+
+model SchoolSettings {
+  id                   String   @id @default(uuid())
+  school_id            String   @unique
+  school_name          String?
+  school_phone         String?
+  school_address       String?
+  academic_year        String?
+  attendance_mode      String   @default("daily")
+  attendance_ui_type   String   @default("card_based")
+  attendance_threshold Int      @default(75)
+  allow_late_mark      Boolean  @default(true)
+  email_notifications  Boolean  @default(true)
+  sms_notifications    Boolean  @default(false)
+  notification_time    String   @default("16:00")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  school               School   @relation(fields: [school_id], references: [id])
+}
+
+model Grade {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  students Student[]
+}
+
+model Section {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  students Student[]
+}
+
+model Stream {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  students Student[]
+}
+
+model Student {
+  id                  String               @id @default(uuid())
+  student_id          String               @unique
+  parent_email        String
+  parent_phone        String
+  parent_name         String
+  gender              String?
+  date_of_birth       String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  fullName            String
+  gradeId             String
+  schoolId            String
+  sectionId           String
+  streamId            String?
+  attendance          Attendance[]
+  parentNotifications ParentNotification[]
+  parentStudents      ParentStudentLink[]
+  grade               Grade                @relation(fields: [gradeId], references: [id])
+  school              School               @relation(fields: [schoolId], references: [id])
+  section             Section              @relation(fields: [sectionId], references: [id])
+  stream              Stream?              @relation(fields: [streamId], references: [id])
+
+  @@index([schoolId])
+  @@index([gradeId])
+  @@index([sectionId])
+  @@index([streamId])
+}
+
+model Attendance {
+  id        String   @id @default(uuid())
+  studentId String
+  date      DateTime @default(now())
+  status    String
+  session   String?
+  remarks   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  schoolId  String
+  teacherId String?
+  school    School   @relation(fields: [schoolId], references: [id])
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher   Teacher? @relation(fields: [teacherId], references: [id])
+
+  @@index([studentId])
+  @@index([schoolId])
+  @@index([date])
+  @@index([session])
+  @@index([status])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  user_id     String?
+  action      String
+  entity_type String
+  entity_id   String?
+  old_values  Json?
+  new_values  Json?
+  created_at  DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model AttendanceReport {
+  id                    String   @id @default(uuid())
+  student_id            String
+  class_id              String
+  month                 Int
+  year                  Int
+  total_days            Int      @default(0)
+  present_days          Int      @default(0)
+  absent_days           Int      @default(0)
+  late_days             Int      @default(0)
+  leave_days            Int      @default(0)
+  attendance_percentage Decimal  @default(0.00) @db.Decimal(5, 2)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@unique([student_id, month, year])
+  @@map("attendance_reports")
+}
+
+model ParentStudentLink {
+  id               String   @id @default(uuid())
+  parentId         String
+  studentId        String
+  relationshipType String?  @default("Guardian")
+  createdAt        DateTime @default(now())
+  parent           User     @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+  @@index([parentId])
+  @@index([studentId])
+}
+
+model ParentNotification {
+  id        String   @id @default(uuid())
+  schoolId  String
+  studentId String?
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  school    School   @relation(fields: [schoolId], references: [id])
+  student   Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([studentId])
+}
+
+model ParentPreferences {
+  id                 String   @id @default(uuid())
+  parentPhone        String   @unique
+  emailNotifications Boolean  @default(true)
+  smsNotifications   Boolean  @default(false)
+  pushNotifications  Boolean  @default(true)
+  updatedAt          DateTime @updatedAt
+}

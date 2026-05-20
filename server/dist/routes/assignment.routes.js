@@ -1,0 +1,76 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const assignmentService = __importStar(require("../services/assignment.service"));
+const router = (0, express_1.Router)();
+// Get assignments for a school (optionally filtered by teacherId)
+router.get('/', async (req, res, next) => {
+    try {
+        const schoolId = req.headers['x-school-id'];
+        if (!schoolId)
+            return res.status(400).json({ success: false, message: 'x-school-id header required' });
+        const { teacherId } = req.query;
+        const assignments = await assignmentService.getAssignments(schoolId, teacherId);
+        res.status(200).json({ success: true, data: assignments });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Create assignment
+router.post('/', async (req, res, next) => {
+    try {
+        const schoolId = req.headers['x-school-id'];
+        if (!schoolId)
+            return res.status(400).json({ success: false, message: 'x-school-id header required' });
+        const assignment = await assignmentService.createAssignment({ ...req.body, school_id: schoolId });
+        res.status(201).json({ success: true, data: assignment });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Delete assignment
+router.delete('/:id', async (req, res, next) => {
+    try {
+        await assignmentService.deleteAssignment(req.params.id);
+        res.status(200).json({ success: true, message: 'Assignment removed' });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+exports.default = router;

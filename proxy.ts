@@ -12,7 +12,7 @@ const PUBLIC_ROOT_FILES = new Set([
   "/school_login_illustration_1778883405545.png",
 ])
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   if (PUBLIC_ROOT_FILES.has(pathname)) {

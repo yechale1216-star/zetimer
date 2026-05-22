@@ -42,6 +42,7 @@ const getStudents = async (req, res, next) => {
         res.status(200).json({ success: true, data: students });
     }
     catch (error) {
+        console.error(`[controller] getStudents Error for school: ${req.headers['x-school-id']}:`, error);
         next(error);
     }
 };

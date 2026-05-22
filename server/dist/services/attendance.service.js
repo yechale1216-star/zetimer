@@ -90,7 +90,7 @@ exports.markAttendance = markAttendance;
 const getAttendance = async (filters) => {
     const defaultSchoolId = await getDefaultSchoolId();
     const schoolId = filters.schoolId || defaultSchoolId;
-    const { studentId, date, session, grade, section } = filters;
+    const { studentId, date, session, grade, section, startDate: filterStartDate, endDate: filterEndDate } = filters;
     const where = { schoolId };
     if (studentId)
         where.studentId = studentId;
@@ -102,6 +102,17 @@ const getAttendance = async (filters) => {
             gte: startDate,
             lte: endDate,
         };
+    }
+    else if (filterStartDate || filterEndDate) {
+        where.date = {};
+        if (filterStartDate) {
+            const dateStr = typeof filterStartDate === 'string' ? filterStartDate.split("T")[0] : filterStartDate;
+            where.date.gte = new Date(`${dateStr}T00:00:00.000Z`);
+        }
+        if (filterEndDate) {
+            const dateStr = typeof filterEndDate === 'string' ? filterEndDate.split("T")[0] : filterEndDate;
+            where.date.lte = new Date(`${dateStr}T23:59:59.999Z`);
+        }
     }
     if (session)
         where.session = session;

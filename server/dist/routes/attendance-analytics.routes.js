@@ -33,40 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAttendanceByStudent = exports.getAttendance = exports.markAttendance = void 0;
-const attendanceService = __importStar(require("../services/attendance.service"));
-const markAttendance = async (req, res, next) => {
-    try {
-        const schoolId = req.headers['x-school-id'];
-        const attendance = await attendanceService.markAttendance({ ...req.body, schoolId });
-        res.status(201).json({ success: true, data: attendance });
-    }
-    catch (error) {
-        next(error);
-    }
-};
-exports.markAttendance = markAttendance;
-const getAttendance = async (req, res, next) => {
-    try {
-        const schoolId = req.headers['x-school-id'];
-        const { studentId, date, session, grade, section, startDate, endDate } = req.query;
-        const attendance = await attendanceService.getAttendance({
-            studentId, date, session, grade, section, startDate, endDate, schoolId
-        });
-        res.status(200).json({ success: true, data: attendance });
-    }
-    catch (error) {
-        next(error);
-    }
-};
-exports.getAttendance = getAttendance;
-const getAttendanceByStudent = async (req, res, next) => {
-    try {
-        const attendance = await attendanceService.getAttendanceByStudent(req.params.studentId);
-        res.status(200).json({ success: true, data: attendance });
-    }
-    catch (error) {
-        next(error);
-    }
-};
-exports.getAttendanceByStudent = getAttendanceByStudent;
+const express_1 = require("express");
+const analyticsController = __importStar(require("../controllers/attendance-analytics.controller"));
+const router = (0, express_1.Router)();
+router.get('/summary', analyticsController.getAttendanceSummary);
+router.get('/grade-stats', analyticsController.getGradeStats);
+router.get('/trends', analyticsController.getAttendanceTrends);
+router.get('/drill-down/:gradeId', analyticsController.getDrillDownStats);
+router.get('/export', analyticsController.exportAttendance);
+exports.default = router;

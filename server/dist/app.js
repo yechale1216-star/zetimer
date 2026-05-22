@@ -13,6 +13,7 @@ const user_routes_1 = __importDefault(require("./routes/user.routes"));
 const assignment_routes_1 = __importDefault(require("./routes/assignment.routes"));
 const settings_routes_1 = __importDefault(require("./routes/settings.routes"));
 const parent_routes_1 = __importDefault(require("./routes/parent.routes"));
+const attendance_analytics_routes_1 = __importDefault(require("./routes/attendance-analytics.routes"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 // Middleware
@@ -27,6 +28,7 @@ app.use('/api/users', user_routes_1.default);
 app.use('/api/assignments', assignment_routes_1.default);
 app.use('/api/settings', settings_routes_1.default);
 app.use('/api/parent', parent_routes_1.default);
+app.use('/api/attendance-analytics', attendance_analytics_routes_1.default);
 // Health check
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', message: 'Server is running' });

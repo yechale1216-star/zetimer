@@ -10,8 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress"
 import { db } from "@/lib/db/database"
 import { notifications } from "@/lib/utils/notifications"
+import { Suspense } from "react"
 
-export default function GradeDrillDownPage() {
+function GradeDrillDownContent() {
   const params = useParams()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -160,5 +161,18 @@ export default function GradeDrillDownPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function GradeDrillDownPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-[400px] gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <p className="text-muted-foreground font-medium">Loading analytics...</p>
+      </div>
+    }>
+      <GradeDrillDownContent />
+    </Suspense>
   )
 }

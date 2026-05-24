@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS = {
     email_notifications: true,
     sms_notifications: false,
     notification_time: '16:00',
+    school_logo: '',
 };
 const getSettings = async (schoolId) => {
     let settings = await db_1.default.schoolSettings.findUnique({ where: { school_id: schoolId } });

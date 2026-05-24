@@ -21,6 +21,7 @@ import {
 import { cn } from '@/lib/utils/utils'
 import { authService } from '@/lib/auth/auth'
 import { useRouter } from 'next/navigation'
+import { Logo } from '@/components/logo'
 
 const navigationItems = [
   {
@@ -105,12 +106,7 @@ export function Sidebar() {
       >
         {/* Logo Section */}
         <div className="flex items-center justify-between p-4 border-b border-border mt-12 lg:mt-0">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">Z</span>
-            </div>
-            <span className="font-semibold text-foreground">Zetime</span>
-          </div>
+          <Logo size="sm" href="/super-admin" />
           <button
             onClick={() => setIsOpen(false)}
             className="p-1 hover:bg-secondary rounded-lg transition-colors lg:hidden"

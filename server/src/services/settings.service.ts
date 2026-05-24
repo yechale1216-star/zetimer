@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   email_notifications: true,
   sms_notifications: false,
   notification_time: '16:00',
+  school_logo: '',
 };
 
 export const getSettings = async (schoolId: string) => {

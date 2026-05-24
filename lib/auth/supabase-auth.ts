@@ -2,7 +2,10 @@ import { createBrowserClient } from "@supabase/ssr"
 import { hash, compare } from "bcryptjs"
 import { createServerSupabaseClient } from "@/lib/utils/supabase-server"
 
-const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy-key',
+)
 
 export async function hashPassword(password: string): Promise<string> {
   return hash(password, 12)

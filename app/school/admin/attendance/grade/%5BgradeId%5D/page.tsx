@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useSearchParams, useRouter } from "next/navigation"
-import { ArrowLeft, User, TrendingUp, Calendar, AlertCircle } from "lucide-react"
+import { ArrowLeft, User, TrendingUp, Calendar, AlertCircle, MessageSquare } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -107,6 +107,7 @@ function GradeDrillDownContent() {
                   <TableHead className="text-center">{settings?.attendance_mode === 'session' ? "Present Sessions" : "Present"}</TableHead>
                   <TableHead className="text-center">{settings?.attendance_mode === 'session' ? "Absent Sessions" : "Absent"}</TableHead>
                   <TableHead className="text-right">Rate %</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -121,6 +122,17 @@ function GradeDrillDownContent() {
                         <span className="text-xs font-bold">{student.attendanceRate}%</span>
                         <Progress value={student.attendanceRate} className="h-1 w-20" />
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-primary hover:bg-primary/10"
+                        onClick={() => router.push(`/school/admin/messages?studentId=${student.id}&parentName=${encodeURIComponent(student.parent_name || '')}`)}
+                        title="Message Parent"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -147,7 +159,17 @@ function GradeDrillDownContent() {
                       <span className="text-sm font-bold">{student.fullName}</span>
                       <span className="text-[10px] text-muted-foreground uppercase">{student.studentId}</span>
                     </div>
-                    <Badge variant="destructive" className="font-black">{student.absent} Days</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="destructive" className="font-black">{student.absent} Days</Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-primary hover:bg-primary/10 rounded-full"
+                        onClick={() => router.push(`/school/admin/messages?studentId=${student.id}&parentName=${encodeURIComponent(student.parent_name || '')}`)}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               {students.filter(s => s.absent > 3).length === 0 && (

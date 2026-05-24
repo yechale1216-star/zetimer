@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import studentRoutes from './routes/student.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import schoolRoutes from './routes/school.routes';
@@ -9,8 +11,7 @@ import assignmentRoutes from './routes/assignment.routes';
 import settingsRoutes from './routes/settings.routes';
 import parentRoutes from './routes/parent.routes';
 import attendanceAnalyticsRoutes from './routes/attendance-analytics.routes';
-
-dotenv.config();
+import messageRoutes from './routes/message.routes';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/parent', parentRoutes);
 app.use('/api/attendance-analytics', attendanceAnalyticsRoutes);
+app.use('/api/messages', messageRoutes);
 
 
 

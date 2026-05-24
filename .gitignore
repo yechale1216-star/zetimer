@@ -6,10 +6,13 @@ __zetime_jsx-dev-runtime.ts
 .__zetime_devtools-trash/
 .vercel/
 
-# Environment variables
-.env*.local
+
+
 
 # Common ignores
 node_modules
 .next/
 .DS_Store
+.env
+.env.*
+!.env.example

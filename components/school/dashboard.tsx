@@ -134,8 +134,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return "Good evening"
   }
 
-  const user = authService.getCurrentUser()
-  const firstName = user?.name?.split(' ')[0] || "User"
+  const [firstName, setFirstName] = useState("User")
+
+  useEffect(() => {
+    const user = authService.getCurrentUser()
+    if (user?.name) {
+      setFirstName(user.name.split(' ')[0])
+    }
+  }, [])
 
   useEffect(() => {
     if (!rawData) return

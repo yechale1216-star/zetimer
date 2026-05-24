@@ -25,8 +25,10 @@ const mapStudentToFlat = (student: any) => {
 };
 
 export const getAllStudents = async (schoolId?: string) => {
-  const defaultSchoolId = await getDefaultSchoolId();
-  const targetSchoolId = schoolId || defaultSchoolId;
+  let targetSchoolId = schoolId;
+  if (!targetSchoolId) {
+    targetSchoolId = await getDefaultSchoolId();
+  }
   const students = await prisma.student.findMany({
     where: { schoolId: targetSchoolId },
     include: {
@@ -39,8 +41,10 @@ export const getAllStudents = async (schoolId?: string) => {
 };
 
 export const createStudent = async (data: any, schoolIdFromHeader?: string) => {
-  const defaultSchoolId = await getDefaultSchoolId();
-  const schoolId = schoolIdFromHeader || data.schoolId || defaultSchoolId;
+  let schoolId = schoolIdFromHeader || data.schoolId;
+  if (!schoolId) {
+    schoolId = await getDefaultSchoolId();
+  }
 
   // Make sure school exists in Postgres to prevent constraint errors
   let school = await prisma.school.findUnique({ where: { id: schoolId } });

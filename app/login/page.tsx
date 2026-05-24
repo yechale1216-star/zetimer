@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authService } from '@/lib/auth/auth'
 import { CheckCircle2, Clock, ShieldCheck, Users } from 'lucide-react'
+import { Logo } from '@/components/logo'
 
 export default function LoginPage() {
   const [view, setView] = useState<'login' | 'admin-signup' | 'forgot-password' | 'reset-password'>('login')
@@ -35,10 +36,7 @@ export default function LoginPage() {
         <div className="relative z-10 max-w-lg">
           <div className="mb-12">
             <div className="flex items-center gap-3 mb-6 animate-in slide-in-from-left duration-700">
-              <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-                <span className="text-primary-foreground font-black text-2xl">Z</span>
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">Zetime</h1>
+              <Logo size="md" href="/" />
             </div>
             
             <h2 className="text-4xl xl:text-5xl font-black text-foreground leading-[1.1] mb-6 animate-in slide-in-from-left duration-700 delay-100">
@@ -96,11 +94,8 @@ export default function LoginPage() {
         <div className="max-w-md w-full py-8 md:py-0 animate-in fade-in slide-in-from-bottom-4 duration-1000">
           {/* Mobile/Tablet Logo Section */}
           <div className="md:hidden flex flex-col items-center mb-10">
-            <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20 mb-4 scale-90 sm:scale-100">
-              <span className="text-primary-foreground font-black text-2xl">Z</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight">Zetime</h1>
-            <p className="text-sm text-muted-foreground">Attendance Management System</p>
+            <Logo size="md" href="/" className="scale-90 sm:scale-100" />
+            <p className="text-sm text-muted-foreground mt-2">Attendance Management System</p>
           </div>
 
           <div className="w-full relative px-1 sm:px-0">

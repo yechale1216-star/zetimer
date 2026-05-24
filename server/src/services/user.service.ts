@@ -15,6 +15,37 @@ export const getUsers = async (schoolId?: string) => {
   return await prisma.user.findMany({ where });
 };
 
+export const getContacts = async (schoolId: string) => {
+  const users = await prisma.user.findMany({
+    where: {
+      OR: [
+        { school_id: schoolId },
+        { parentStudents: { some: { student: { schoolId } } } }
+      ],
+      role: { in: ['admin', 'school_admin', 'teacher', 'parent'] },
+      is_active: true
+    },
+    select: {
+      id: true,
+      full_name: true,
+      profile_photo: true,
+      role: true,
+      phone: true,
+    }
+  });
+
+  // Strict de-duplication by phone then ID to handle messy data
+  const uniqueUsers = new Map();
+  for (const u of users) {
+    const key = u.phone ? u.phone.replace(/\s+/g, '') : u.id;
+    if (!uniqueUsers.has(key)) {
+      uniqueUsers.set(key, u);
+    }
+  }
+
+  return Array.from(uniqueUsers.values());
+};
+
 export const createUser = async (data: any) => {
   let teacherId = data.teacher_id || null;
 

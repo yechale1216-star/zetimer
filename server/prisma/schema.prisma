@@ -40,6 +40,12 @@ model User {
   profile_photo    String?
   parentStudents   ParentStudentLink[]
   school           School?             @relation(fields: [school_id], references: [id])
+  conversations    ConversationMember[]
+  messages         Message[]
+  messageReads     MessageRead[]
+  messageReactions MessageReaction[]
+  callSessions     CallParticipant[]
+  callHistory      CallHistory[]
 
   @@index([email])
   @@index([school_id])
@@ -96,6 +102,7 @@ model SchoolSettings {
   email_notifications  Boolean  @default(true)
   sms_notifications    Boolean  @default(false)
   notification_time    String   @default("16:00")
+  school_logo          String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   school               School   @relation(fields: [school_id], references: [id])
@@ -239,4 +246,126 @@ model ParentPreferences {
   smsNotifications   Boolean  @default(false)
   pushNotifications  Boolean  @default(true)
   updatedAt          DateTime @updatedAt
+}
+
+model Conversation {
+  id        String               @id @default(uuid())
+  name      String?
+  isGroup   Boolean              @default(false)
+  avatar    String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  members   ConversationMember[]
+  messages  Message[]
+}
+
+model ConversationMember {
+  id             String       @id @default(uuid())
+  conversationId String
+  userId         String
+  role           String       @default("MEMBER") // ADMIN, MEMBER
+  joinedAt       DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([conversationId])
+  @@index([userId])
+}
+
+model Message {
+  id             String            @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String?
+  type           String            @default("TEXT") // TEXT, IMAGE, FILE, VOICE
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  readBy         MessageRead[]
+  reactions      MessageReaction[]
+  attachments    Attachment[]
+  replyToId      String?
+  replyTo        Message?          @relation("Replies", fields: [replyToId], references: [id])
+  replies        Message[]         @relation("Replies")
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+model MessageRead {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  messageId String
+  url       String
+  name      String
+  type      String
+  size      Int
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model CallSession {
+  id             String            @id @default(uuid())
+  conversationId String?
+  type           String            @default("VOICE") // VOICE, VIDEO
+  status         String            @default("ONGOING") // ONGOING, ENDED, MISSED
+  startTime      DateTime          @default(now())
+  endTime        DateTime?
+  participants   CallParticipant[]
+  history        CallHistory[]
+  createdAt      DateTime          @default(now())
+}
+
+model CallParticipant {
+  id            String      @id @default(uuid())
+  callSessionId String
+  userId        String
+  joinedAt      DateTime    @default(now())
+  leftAt        DateTime?
+  callSession   CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([callSessionId, userId])
+}
+
+model CallHistory {
+  id            String      @id @default(uuid())
+  userId        String
+  callSessionId String
+  type          String // INCOMING, OUTGOING, MISSED
+  status        String // COMPLETED, MISSED, REJECTED
+  duration      Int? // in seconds
+  createdAt     DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callSession   CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
 }

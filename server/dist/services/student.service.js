@@ -29,8 +29,10 @@ const mapStudentToFlat = (student) => {
     };
 };
 const getAllStudents = async (schoolId) => {
-    const defaultSchoolId = await getDefaultSchoolId();
-    const targetSchoolId = schoolId || defaultSchoolId;
+    let targetSchoolId = schoolId;
+    if (!targetSchoolId) {
+        targetSchoolId = await getDefaultSchoolId();
+    }
     const students = await db_1.default.student.findMany({
         where: { schoolId: targetSchoolId },
         include: {
@@ -43,8 +45,10 @@ const getAllStudents = async (schoolId) => {
 };
 exports.getAllStudents = getAllStudents;
 const createStudent = async (data, schoolIdFromHeader) => {
-    const defaultSchoolId = await getDefaultSchoolId();
-    const schoolId = schoolIdFromHeader || data.schoolId || defaultSchoolId;
+    let schoolId = schoolIdFromHeader || data.schoolId;
+    if (!schoolId) {
+        schoolId = await getDefaultSchoolId();
+    }
     // Make sure school exists in Postgres to prevent constraint errors
     let school = await db_1.default.school.findUnique({ where: { id: schoolId } });
     if (!school) {

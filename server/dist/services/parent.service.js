@@ -72,6 +72,7 @@ const loginParent = async (phone, password) => {
     }));
     return {
         success: true,
+        id: user.id,
         parentName: user.full_name || students[0]?.parent_name || "Parent",
         parentPhone: cleanPhone,
         students: mappedStudents

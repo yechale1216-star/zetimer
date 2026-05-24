@@ -65,14 +65,20 @@ class AuthService {
 
       const dbUser = verifyData.data
 
-      // Get school name
+      // Get school name and logo from settings
       let schoolName = "My School"
+      let schoolLogo = ""
       if (dbUser.school_id) {
         try {
-          const schoolRes = await fetch(`${API_URL}/api/schools/${dbUser.school_id}`)
-          const schoolData = await schoolRes.json()
-          if (schoolData.success && schoolData.data) schoolName = schoolData.data.name
-        } catch { /* school lookup is non-fatal */ }
+          const settingsRes = await fetch(`${API_URL}/api/settings`, {
+            headers: { 'x-school-id': dbUser.school_id }
+          })
+          const settingsData = await settingsRes.json()
+          if (settingsData.success && settingsData.data) {
+            schoolName = settingsData.data.school_name || schoolName
+            schoolLogo = settingsData.data.school_logo || ""
+          }
+        } catch { /* lookup is non-fatal */ }
       }
 
       const user: User = {
@@ -83,6 +89,7 @@ class AuthService {
         role: dbUser.role,
         schoolId: dbUser.school_id || "",
         schoolName,
+        schoolLogo,
         teacherId: dbUser.teacher_id || "",
         isSuperAdmin: dbUser.role === "super_admin",
         profile_photo: dbUser.profile_photo || "",
@@ -144,10 +151,10 @@ class AuthService {
       }
 
       const user: User = {
-        id: `parent-${phone}`,
+        id: data.id,
         email: `parent-${phone}@zetime.com`,
         phone: phone,
-        name: parentName,
+        name: data.parentName || parentName,
         role: "parent",
         schoolId: schoolId,
         schoolName,
@@ -283,10 +290,22 @@ class AuthService {
       if (schoolId) {
         // Update existing school name in PostgreSQL
         await fetch(`${API_URL}/api/schools`, {
-          method: "POST",
+          method: "POST", // The backend uses POST for upsert/create school
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: schoolId, name }),
         })
+
+        // Save logo to settings in PostgreSQL
+        if (_logo) {
+          await fetch(`${API_URL}/api/settings`, {
+            method: "PUT",
+            headers: { 
+              "Content-Type": "application/json",
+              "x-school-id": schoolId
+            },
+            body: JSON.stringify({ school_logo: _logo }),
+          })
+        }
       } else {
         // Create new school
         const res = await fetch(`${API_URL}/api/schools`, {
@@ -304,9 +323,21 @@ class AuthService {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ school_id: schoolId }),
         })
+
+        // Save initial logo if provided
+        if (_logo) {
+          await fetch(`${API_URL}/api/settings`, {
+            method: "PUT",
+            headers: { 
+              "Content-Type": "application/json",
+              "x-school-id": schoolId
+            },
+            body: JSON.stringify({ school_logo: _logo }),
+          })
+        }
       }
 
-      const updatedUser: User = { ...user, schoolId, schoolName: name }
+      const updatedUser: User = { ...user, schoolId, schoolName: name, schoolLogo: _logo || user.schoolLogo }
       if (this.isClient()) {
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(updatedUser))
       }

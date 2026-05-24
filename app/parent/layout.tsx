@@ -15,12 +15,15 @@ import {
   X, 
   GraduationCap,
   Settings,
-  ChevronRight
+  ChevronRight,
+  MessageSquare
 } from "lucide-react"
 import { parentDb } from "@/lib/db/parent-db"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Logo } from "@/components/logo"
+import { TopNav } from "@/components/layout/top-nav"
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -124,6 +127,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
   const navLinks = [
     { href: "/parent/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/parent/communication", label: "Communication", icon: MessageSquare },
     { href: "/parent/attendance", label: "Attendance History", icon: Calendar },
     { href: "/parent/profile", label: "Student Profile", icon: User },
     { 
@@ -150,14 +154,9 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border/40 shrink-0 select-none">
         
         {/* Header/Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-border/40 gap-2.5">
-          <div className="bg-emerald-600 dark:bg-emerald-500 p-2 rounded-xl text-white">
-            <GraduationCap className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-black tracking-tight text-foreground leading-none">ZETIME</h1>
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-widest mt-0.5 block">Parent Portal</span>
-          </div>
+        <div className="h-20 flex items-center px-6 border-b border-border/40 gap-2.5">
+          <Logo size="md" href="/parent/dashboard" />
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-widest mt-0.5 block opacity-70">Parent Portal</span>
         </div>
 
         {/* Dynamic Multi-Child Selector */}
@@ -225,12 +224,12 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
                 href={link.href}
                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all relative group ${
                   isActive
-                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/15"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-foreground"
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <Icon className="w-4.5 h-4.5 shrink-0" />
+                  <Icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
                   <span>{link.label}</span>
                 </div>
                 {link.badge !== undefined && (
@@ -265,69 +264,52 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       </aside>
 
       {/* ─── MOBILE CONTAINER ─────────────────────────────────────────────── */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
+        <TopNav showMenuButton onMenuClick={() => setIsSidebarOpen(true)} />
         
-        {/* Sticky Mobile Top Header */}
-        <header className="md:hidden h-16 flex items-center justify-between px-4 bg-card border-b border-border/40 z-30 select-none">
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg transition-colors"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="bg-emerald-600 p-1.5 rounded-lg text-white">
-                <GraduationCap className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-xs font-black tracking-tight leading-none block">ZETIME</span>
-                <span className="text-[8px] text-emerald-600 font-bold uppercase tracking-widest">Portal</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile Student Switcher Toggle */}
+        {/* Student Switcher Bar (Mobile & Desktop subset) */}
+        <div className="md:hidden flex items-center justify-between p-2 px-4 bg-muted/20 border-b border-border/40">
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
-              className="flex items-center gap-1.5 p-1 px-2.5 bg-muted/40 hover:bg-muted/80 rounded-full border border-border/10 text-left transition-all"
-            >
-              <Avatar className="h-5 w-5">
-                <AvatarFallback className="bg-emerald-100 text-emerald-700 font-bold text-[9px]">
-                  {getInitials(selectedStudent.fullName)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-[10px] font-bold max-w-[80px] truncate">{selectedStudent.fullName.split(" ")[0]}</span>
-              <ChevronDown className="w-3 h-3 text-muted-foreground" />
-            </button>
-            
-            {/* Mobile Switcher Drawer */}
-            {isStudentDropdownOpen && (
-              <div className="absolute top-14 right-4 bg-card border border-border/40 rounded-xl shadow-xl z-50 overflow-hidden py-1 w-44 animate-in fade-in slide-in-from-top-1 duration-200">
-                {students.map((student) => (
-                  <button
-                    key={student.id}
-                    onClick={() => handleSelectStudent(student)}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted text-left transition-colors"
-                  >
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="bg-emerald-50 text-emerald-600 font-bold text-[9px]">
-                        {getInitials(student.fullName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-bold truncate text-foreground">{student.fullName}</p>
-                      <p className="text-[8px] text-muted-foreground">Grade {student.grade}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-            
-            <ModeToggle />
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Switch Student</span>
           </div>
-        </header>
+          <div className="relative">
+            <button
+                onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
+                className="flex items-center gap-1.5 p-1 px-2.5 bg-background hover:bg-muted rounded-full border border-border/40 text-left transition-all shadow-sm"
+              >
+                <Avatar className="h-5 w-5">
+                  <AvatarFallback className="bg-emerald-100 text-emerald-700 font-bold text-[9px]">
+                    {getInitials(selectedStudent.fullName)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-[10px] font-bold max-w-[80px] truncate">{selectedStudent.fullName.split(" ")[0]}</span>
+                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+              </button>
+              
+              {/* Mobile Switcher Drawer */}
+              {isStudentDropdownOpen && (
+                <div className="absolute top-8 right-0 bg-card border border-border/40 rounded-xl shadow-xl z-50 overflow-hidden py-1 w-44 animate-in fade-in slide-in-from-top-1 duration-200">
+                  {students.map((student) => (
+                    <button
+                      key={student.id}
+                      onClick={() => handleSelectStudent(student)}
+                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted text-left transition-colors"
+                    >
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="bg-emerald-50 text-emerald-600 font-bold text-[9px]">
+                          {getInitials(student.fullName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold truncate text-foreground">{student.fullName}</p>
+                        <p className="text-[8px] text-muted-foreground">Grade {student.grade}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+          </div>
+        </div>
 
         {/* Mobile Slide-over Sidebar Drawer */}
         {isSidebarOpen && (

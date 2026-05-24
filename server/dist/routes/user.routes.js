@@ -60,6 +60,20 @@ router.get('/', async (req, res, next) => {
         next(error);
     }
 });
+// Get all contacts for a school (admin, teacher, parent, no students)
+router.get('/contacts', async (req, res, next) => {
+    try {
+        const schoolId = req.headers['x-school-id'];
+        if (!schoolId) {
+            return res.status(400).json({ success: false, message: 'School ID required' });
+        }
+        const contacts = await userService.getContacts(schoolId);
+        res.status(200).json({ success: true, data: contacts });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 // Create user — used by auth signup
 router.post('/', async (req, res, next) => {
     try {

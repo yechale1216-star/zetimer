@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyPassword = exports.deleteUser = exports.updateUser = exports.createUser = exports.getUsers = exports.getUserById = exports.getUserByEmail = void 0;
+exports.verifyPassword = exports.deleteUser = exports.updateUser = exports.createUser = exports.getContacts = exports.getUsers = exports.getUserById = exports.getUserByEmail = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const getUserByEmail = async (email) => {
@@ -21,6 +21,35 @@ const getUsers = async (schoolId) => {
     return await db_1.default.user.findMany({ where });
 };
 exports.getUsers = getUsers;
+const getContacts = async (schoolId) => {
+    const users = await db_1.default.user.findMany({
+        where: {
+            OR: [
+                { school_id: schoolId },
+                { parentStudents: { some: { student: { schoolId } } } }
+            ],
+            role: { in: ['admin', 'school_admin', 'teacher', 'parent'] },
+            is_active: true
+        },
+        select: {
+            id: true,
+            full_name: true,
+            profile_photo: true,
+            role: true,
+            phone: true,
+        }
+    });
+    // Strict de-duplication by phone then ID to handle messy data
+    const uniqueUsers = new Map();
+    for (const u of users) {
+        const key = u.phone ? u.phone.replace(/\s+/g, '') : u.id;
+        if (!uniqueUsers.has(key)) {
+            uniqueUsers.set(key, u);
+        }
+    }
+    return Array.from(uniqueUsers.values());
+};
+exports.getContacts = getContacts;
 const createUser = async (data) => {
     let teacherId = data.teacher_id || null;
     // Automatically create a corresponding Teacher record if role is 'teacher'

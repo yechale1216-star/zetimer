@@ -17,8 +17,13 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [studentCount, setStudentCount] = useState(0)
   const { toast } = useToast()
-  const isAdmin = authService.isAdmin()
-  const user = authService.getCurrentUser()
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [user, setUser] = useState<any>(null)
+
+  useEffect(() => {
+    setIsAdmin(authService.isAdmin())
+    setUser(authService.getCurrentUser())
+  }, [])
 
   useEffect(() => {
     const loadStudentCount = async () => {

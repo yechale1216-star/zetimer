@@ -284,6 +284,7 @@ class Database {
         emailNotifications: s.email_notifications ?? true,
         smsNotifications: s.sms_notifications ?? false,
         notificationTime: s.notification_time || "16:00",
+        schoolLogo: s.school_logo || "",
       }
     } catch (error) {
       console.error("[pg] getSettings error:", error)
@@ -309,6 +310,7 @@ class Database {
         email_notifications: settings.emailNotifications,
         sms_notifications: settings.smsNotifications,
         notification_time: settings.notificationTime,
+        school_logo: settings.schoolLogo,
       }),
     })
   }

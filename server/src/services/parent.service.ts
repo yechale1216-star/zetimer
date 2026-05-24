@@ -78,6 +78,7 @@ export const loginParent = async (phone: string, password: string) => {
 
   return {
     success: true,
+    id: user.id,
     parentName: user.full_name || students[0]?.parent_name || "Parent",
     parentPhone: cleanPhone,
     students: mappedStudents

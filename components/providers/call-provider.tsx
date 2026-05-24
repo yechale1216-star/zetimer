@@ -1,0 +1,131 @@
+'use client';
+
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useWebRTC } from '@/lib/hooks/use-webrtc';
+import { IncomingCallModal } from '@/components/messaging/calling/IncomingCallModal';
+import { CallOverlay } from '@/components/messaging/calling/CallOverlay';
+import { authService } from '@/lib/auth/auth';
+
+interface CallContextType {
+  initiateCall: (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => void;
+  endCall: () => void;
+  status: 'IDLE' | 'RINGING' | 'CONNECTING' | 'CONNECTED';
+}
+
+const CallContext = createContext<CallContextType | undefined>(undefined);
+
+export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [incomingCallData, setIncomingCallData] = useState<any>(null);
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [callType, setCallType] = useState<'VOICE' | 'VIDEO'>('VOICE');
+
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+    if (user) {
+      setParticipants([{ id: user.id || 'local', name: 'You', avatar: '', isLocal: true }]);
+    }
+  }, []);
+
+  const onIncomingCall = useCallback((data: any) => {
+    setIncomingCallData(data);
+    setCallType(data.type);
+    setParticipants(prev => [
+      ...prev.filter(p => p.isLocal),
+      { id: data.from, name: data.profile.name, avatar: data.profile.avatar }
+    ]);
+  }, []);
+
+  const onCallAccepted = useCallback((userId: string) => {
+    console.log('Call accepted by:', userId);
+  }, []);
+
+  const onCallEnded = useCallback((userId: string) => {
+    setParticipants(prev => prev.filter(p => p.id !== userId));
+    if (participants.length <= 1) { // Only local left
+       setIncomingCallData(null);
+    }
+  }, [participants.length]);
+
+  const webrtc = useWebRTC({
+    userId: currentUser?.id || '',
+    onIncomingCall,
+    onCallAccepted,
+    onCallEnded,
+  });
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    if (webrtc.callStatus === 'RINGING' && incomingCallData) {
+      // Auto-missed call after 30 seconds
+      timeout = setTimeout(() => {
+        handleReject();
+      }, 30000);
+    }
+    return () => clearTimeout(timeout);
+  }, [webrtc.callStatus, incomingCallData]);
+
+  const initiateCall = (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => {
+    setCallType(type);
+    setParticipants(prev => [
+      ...prev.filter(p => p.isLocal),
+      { id: toId, name: profile.name, avatar: profile.avatar }
+    ]);
+    webrtc.startCall(toId, type, profile);
+  };
+
+  const handleAccept = () => {
+    if (incomingCallData) {
+      webrtc.answerCall(incomingCallData.from, incomingCallData.offer, incomingCallData.type);
+      setIncomingCallData(null);
+    }
+  };
+
+  const handleReject = () => {
+    webrtc.endCall();
+    setIncomingCallData(null);
+    setParticipants(prev => prev.filter(p => p.isLocal));
+  };
+
+  const activeCaller = participants.find(p => !p.isLocal);
+
+  return (
+    <CallContext.Provider value={{ initiateCall, endCall: webrtc.endCall, status: webrtc.callStatus }}>
+      {children}
+      
+      {/* Global Modals */}
+      <IncomingCallModal
+        isOpen={!!incomingCallData}
+        caller={activeCaller || { name: 'Unknown' }}
+        type={callType}
+        onAccept={handleAccept}
+        onReject={handleReject}
+      />
+
+      {webrtc.callStatus !== 'IDLE' && !incomingCallData && (
+        <CallOverlay
+          status={webrtc.callStatus === 'RINGING' ? 'RINGING' : webrtc.callStatus}
+          type={callType}
+          isMuted={webrtc.isMuted}
+          isCameraOff={webrtc.isCameraOff}
+          localStream={webrtc.localStream}
+          remoteStreams={webrtc.remoteStreams}
+          participants={participants}
+          caller={activeCaller || { name: 'Unknown' }}
+          onEndCall={webrtc.endCall}
+          onToggleMute={webrtc.toggleMute}
+          onToggleCamera={webrtc.toggleCamera}
+        />
+      )}
+    </CallContext.Provider>
+  );
+};
+
+export const useCall = () => {
+  const context = useContext(CallContext);
+  if (!context) {
+    throw new Error('useCall must be used within a CallProvider');
+  }
+  return context;
+};

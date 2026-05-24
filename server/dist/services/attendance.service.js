@@ -88,8 +88,7 @@ const markAttendance = async (data) => {
 };
 exports.markAttendance = markAttendance;
 const getAttendance = async (filters) => {
-    const defaultSchoolId = await getDefaultSchoolId();
-    const schoolId = filters.schoolId || defaultSchoolId;
+    const schoolId = filters.schoolId || await getDefaultSchoolId();
     const { studentId, date, session, grade, section, startDate: filterStartDate, endDate: filterEndDate } = filters;
     const where = { schoolId };
     if (studentId)

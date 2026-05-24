@@ -11,6 +11,25 @@ export const markAttendance = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+export const bulkMarkAttendance = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const schoolId = req.headers['x-school-id'] as string;
+    const { records } = req.body;
+    
+    if (!Array.isArray(records)) {
+      return res.status(400).json({ success: false, message: 'Records must be an array' });
+    }
+
+    const results = await Promise.all(records.map(record => 
+      attendanceService.markAttendance({ ...record, schoolId })
+    ));
+
+    res.status(201).json({ success: true, data: results });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAttendance = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.headers['x-school-id'] as string;

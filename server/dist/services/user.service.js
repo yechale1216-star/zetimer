@@ -22,11 +22,20 @@ const getUsers = async (schoolId) => {
 };
 exports.getUsers = getUsers;
 const getContacts = async (schoolId) => {
+    // Extract all parent phones from students in this school for legacy linking
+    const students = await db_1.default.student.findMany({
+        where: { schoolId },
+        select: { parent_phone: true }
+    });
+    const parentPhones = students
+        .map(s => s.parent_phone ? s.parent_phone.replace(/\s+/g, '') : '')
+        .filter(p => p !== '');
     const users = await db_1.default.user.findMany({
         where: {
             OR: [
                 { school_id: schoolId },
-                { parentStudents: { some: { student: { schoolId } } } }
+                { parentStudents: { some: { student: { schoolId } } } },
+                { phone: { in: parentPhones }, role: 'parent' }
             ],
             role: { in: ['admin', 'school_admin', 'teacher', 'parent'] },
             is_active: true
@@ -39,12 +48,11 @@ const getContacts = async (schoolId) => {
             phone: true,
         }
     });
-    // Strict de-duplication by phone then ID to handle messy data
+    // De-duplicate by User ID only, to allow teachers/admins with the same testing phone
     const uniqueUsers = new Map();
     for (const u of users) {
-        const key = u.phone ? u.phone.replace(/\s+/g, '') : u.id;
-        if (!uniqueUsers.has(key)) {
-            uniqueUsers.set(key, u);
+        if (!uniqueUsers.has(u.id)) {
+            uniqueUsers.set(u.id, u);
         }
     }
     return Array.from(uniqueUsers.values());
@@ -52,6 +60,17 @@ const getContacts = async (schoolId) => {
 exports.getContacts = getContacts;
 const createUser = async (data) => {
     let teacherId = data.teacher_id || null;
+    // Prevent duplicate phone for teachers
+    if (data.role === 'teacher' && data.phone) {
+        const cleanPhone = data.phone.trim();
+        const existing = await db_1.default.user.findFirst({
+            where: { phone: cleanPhone, role: 'teacher' }
+        });
+        if (existing) {
+            throw new Error('Phone already registered for another teacher.');
+        }
+        data.phone = cleanPhone;
+    }
     // Automatically create a corresponding Teacher record if role is 'teacher'
     if (data.role === 'teacher' && !teacherId && data.school_id) {
         const teacher = await db_1.default.teacher.create({
@@ -109,8 +128,20 @@ const updateUser = async (id, data) => {
         updateData.full_name = data.full_name;
     if (data.email !== undefined)
         updateData.email = data.email;
-    if (data.phone !== undefined)
-        updateData.phone = data.phone;
+    if (data.phone !== undefined) {
+        const cleanPhone = data.phone.trim();
+        // Prevent duplicate phone for teachers on update
+        const currentUser = await db_1.default.user.findUnique({ where: { id } });
+        if (currentUser?.role === 'teacher' && cleanPhone) {
+            const existing = await db_1.default.user.findFirst({
+                where: { phone: cleanPhone, role: 'teacher', id: { not: id } }
+            });
+            if (existing) {
+                throw new Error('Phone already registered for another teacher.');
+            }
+        }
+        updateData.phone = cleanPhone;
+    }
     if (data.password_hash !== undefined) {
         updateData.password_hash = data.password_hash && !data.password_hash.startsWith('$2')
             ? bcryptjs_1.default.hashSync(data.password_hash, 10)

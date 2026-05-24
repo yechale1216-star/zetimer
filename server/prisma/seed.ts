@@ -74,7 +74,7 @@ async function main() {
       school_phone: '+251911000100',
       school_address: '123 Education Street, Addis Ababa',
       academic_year: '2024/2025',
-      attendance_mode: 'daily',
+      attendance_mode: 'session_based',
       attendance_ui_type: 'card_based',
       attendance_threshold: 75,
       allow_late_mark: true,
@@ -262,7 +262,7 @@ async function main() {
     create: {
       school_id: school2.id,
       school_name: 'Green Valley Academy',
-      attendance_mode: 'session',
+      attendance_mode: 'session_based',
       attendance_ui_type: 'card_based',
       attendance_threshold: 80,
     },

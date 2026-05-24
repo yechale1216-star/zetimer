@@ -31,19 +31,19 @@ export function MessagingCenter() {
       // 1. Fetch all contacts for this school explicitly (Parents, Teachers, Admins)
       const sid = user.schoolId || user.school_id || '';
       const contactsRes = await fetch(`${API_URL}/api/users/contacts`, {
-        headers: { 'x-school-id': sid }
+        headers: { 'x-school-id': sid },
+        cache: 'no-store'
       });
       const contactsData = await contactsRes.json();
       const contacts = contactsData.data || [];
 
       // 2. Fetch existing conversations
-      const convRes = await fetch(`${API_URL}/api/messages/conversations/${user.id}`);
+      const convRes = await fetch(`${API_URL}/api/messages/conversations/${user.id}`, { cache: 'no-store' });
       const convs = await convRes.json();
 
       // 3. Process existing conversations (Groups and 1:1)
       const finalItems: any[] = [];
       const handledUserIds = new Set();
-      const handledPhones = new Set();
 
       if (Array.isArray(convs)) {
         // Sort conversations by most recent message/update first
@@ -62,10 +62,8 @@ export function MessagingCenter() {
               
               // De-duplicate: If we already have a more recent 1:1 with this person, skip
               if (handledUserIds.has(otherMember.id)) continue;
-              if (cleanPhone && handledPhones.has(cleanPhone)) continue;
               
               handledUserIds.add(otherMember.id);
-              if (cleanPhone) handledPhones.add(cleanPhone);
             }
           }
 
@@ -92,11 +90,8 @@ export function MessagingCenter() {
       for (const contact of contacts) {
         if (contact.id === user.id) continue;
         
-        const cleanPhone = contact.phone ? contact.phone.replace(/\s+/g, '') : null;
-        
         // Skip users we already have an active conversation with
         if (handledUserIds.has(contact.id)) continue;
-        if (cleanPhone && handledPhones.has(cleanPhone)) continue;
 
         finalItems.push({
           id: `contact-${contact.id}`,
@@ -117,7 +112,6 @@ export function MessagingCenter() {
 
         // Mark as handled to prevent duplication within directory
         handledUserIds.add(contact.id);
-        if (cleanPhone) handledPhones.add(cleanPhone);
       }
 
       // 5. Final Sort (Telegram Style): 

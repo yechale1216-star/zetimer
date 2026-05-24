@@ -5,7 +5,7 @@ const DEFAULT_SETTINGS = {
   school_phone: '',
   school_address: '',
   academic_year: new Date().getFullYear().toString(),
-  attendance_mode: 'daily',
+  attendance_mode: 'session_based',
   attendance_ui_type: 'card_based',
   attendance_threshold: 75,
   allow_late_mark: true,

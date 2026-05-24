@@ -5,6 +5,7 @@ import { validateAttendance } from '../middleware/validate';
 const router = Router();
 
 router.post('/', validateAttendance, attendanceController.markAttendance);
+router.post('/bulk', attendanceController.bulkMarkAttendance);
 router.get('/', attendanceController.getAttendance);
 router.get('/student/:studentId', attendanceController.getAttendanceByStudent);
 

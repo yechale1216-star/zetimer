@@ -19,7 +19,7 @@ import { authService } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 import { useToast } from "@/hooks/use-toast"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
-import { Lock, Edit2 } from "lucide-react"
+import { Lock, Edit2, Check, Calendar } from "lucide-react"
 
 export function Settings() {
   const [settings, setSettings] = useState<any>({})
@@ -137,6 +137,7 @@ export function Settings() {
         ...settings,
         schoolName: schoolInfo.schoolName,
         schoolId: schoolInfo.schoolCode, // Store the code as schoolId
+        schoolLogo: schoolInfo.schoolLogo,
       }
 
       console.log("[v0] Calling db.updateSettings with:", updatedSettings)
@@ -584,21 +585,52 @@ export function Settings() {
                 />
                 <p className="text-sm text-gray-600 mt-1">Minimum attendance percentage for alerts</p>
               </div>
-              <div>
-                <Label htmlFor="attendanceMode">Attendance Mode</Label>
-                <Select
-                  value={settings.attendance_mode || "daily"}
-                  onValueChange={(value) => setSettings({ ...settings, attendance_mode: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">Daily Attendance</SelectItem>
-                    <SelectItem value="session_based">Session-Based Attendance</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-gray-600 mt-1">Choose between daily or session-based (morning/afternoon) attendance</p>
+              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">Attendance Tracking Mode</h3>
+                    <p className="text-sm text-muted-foreground">Select how your school tracks daily student presence</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div 
+                    onClick={() => setSettings({ ...settings, attendanceMode: "daily" })}
+                    className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${
+                      (settings.attendanceMode || "session_based") === "daily" 
+                        ? "border-primary bg-primary/10 shadow-md" 
+                        : "border-border bg-card hover:border-primary/30"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold">Daily Mode</span>
+                      {(settings.attendanceMode || "session_based") === "daily" && <Check className="h-4 w-4 text-primary" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Single check-in per day. Best for simple attendance tracking where students are marked present once.
+                    </p>
+                  </div>
+
+                  <div 
+                    onClick={() => setSettings({ ...settings, attendanceMode: "session_based" })}
+                    className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${
+                      (settings.attendanceMode || "session_based") === "session_based" 
+                        ? "border-primary bg-primary/10 shadow-md" 
+                        : "border-border bg-card hover:border-primary/30"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold">Session Based</span>
+                      {(settings.attendanceMode || "session_based") === "session_based" && <Check className="h-4 w-4 text-primary" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Split tracking for Morning and Afternoon sessions. Ideal for schools with multiple shifts or precise monitoring.
+                    </p>
+                  </div>
+                </div>
               </div>
               <div>
                 <Label htmlFor="gradeSystem">Grade System</Label>
@@ -630,8 +662,8 @@ export function Settings() {
               <div>
                 <Label htmlFor="attendanceUiType">Attendance UI Type</Label>
                 <Select
-                  value={settings.attendance_ui_type || "card_based"}
-                  onValueChange={(value) => setSettings({ ...settings, attendance_ui_type: value })}
+                  value={settings.attendanceUiType || "card_based"}
+                  onValueChange={(value) => setSettings({ ...settings, attendanceUiType: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />

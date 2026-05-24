@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAttendanceByStudent = exports.getAttendance = exports.markAttendance = void 0;
+exports.getAttendanceByStudent = exports.getAttendance = exports.bulkMarkAttendance = exports.markAttendance = void 0;
 const attendanceService = __importStar(require("../services/attendance.service"));
 const markAttendance = async (req, res, next) => {
     try {
@@ -46,6 +46,21 @@ const markAttendance = async (req, res, next) => {
     }
 };
 exports.markAttendance = markAttendance;
+const bulkMarkAttendance = async (req, res, next) => {
+    try {
+        const schoolId = req.headers['x-school-id'];
+        const { records } = req.body;
+        if (!Array.isArray(records)) {
+            return res.status(400).json({ success: false, message: 'Records must be an array' });
+        }
+        const results = await Promise.all(records.map(record => attendanceService.markAttendance({ ...record, schoolId })));
+        res.status(201).json({ success: true, data: results });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.bulkMarkAttendance = bulkMarkAttendance;
 const getAttendance = async (req, res, next) => {
     try {
         const schoolId = req.headers['x-school-id'];

@@ -58,7 +58,7 @@ export function Reports() {
   const [sessionFilter, setSessionFilter] = useState<"total" | "morning" | "afternoon">("total")
   const [dateValidationErrors, setDateValidationErrors] = useState<string[]>([])
   const { settings } = useSchoolSettings()
-  const isSessionBased = settings?.attendance_mode === "session_based"
+  const isSessionBased = settings?.attendanceMode === "session_based"
 
   useEffect(() => {
     setMounted(true)

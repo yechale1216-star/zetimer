@@ -14,9 +14,10 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
 import { LogOut, User, Bell, Menu } from "lucide-react"
-import { authService } from "@/lib/auth/auth"
+import { useSchoolSettings } from "@/hooks/use-school-settings"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils/utils"
+import { authService } from "@/lib/auth/auth"
 
 interface TopNavProps {
   onMenuClick?: () => void
@@ -25,6 +26,7 @@ interface TopNavProps {
 
 export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
   const router = useRouter()
+  const { settings } = useSchoolSettings()
   const [mounted, setMounted] = React.useState(false)
   const [user, setUser] = React.useState<any>(null)
 

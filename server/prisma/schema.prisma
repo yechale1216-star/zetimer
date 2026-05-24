@@ -95,7 +95,7 @@ model SchoolSettings {
   school_phone         String?
   school_address       String?
   academic_year        String?
-  attendance_mode      String   @default("daily")
+  attendance_mode      String   @default("session_based")
   attendance_ui_type   String   @default("card_based")
   attendance_threshold Int      @default(75)
   allow_late_mark      Boolean  @default(true)

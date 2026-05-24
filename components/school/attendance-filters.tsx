@@ -15,7 +15,7 @@ interface FiltersProps {
   hideSession?: boolean
 }
 
-export function AttendanceFilters({ onFilterChange, initialFilters = {}, attendanceMode = 'daily', hideSession = false }: FiltersProps) {
+export function AttendanceFilters({ onFilterChange, initialFilters = {}, attendanceMode = 'session_based', hideSession = false }: FiltersProps) {
   const [grades, setGrades] = useState<string[]>([])
   const [sections, setSections] = useState<string[]>([])
   const [streams, setStreams] = useState<string[]>([])

@@ -67,10 +67,10 @@ export function AttendanceTracking() {
   const [uiType, setUiType] = useState<"card_based" | "tabular">("card_based")
 
   useEffect(() => {
-    if (settings?.attendance_ui_type) {
-      setUiType(settings.attendance_ui_type)
+    if (settings?.attendanceUiType) {
+      setUiType(settings.attendanceUiType)
     }
-  }, [settings?.attendance_ui_type])
+  }, [settings?.attendanceUiType])
 
   useEffect(() => {
     const user = authService.getCurrentUser()
@@ -80,7 +80,7 @@ export function AttendanceTracking() {
 
   useEffect(() => {
     loadAttendanceForDate()
-  }, [selectedDate, students, selectedSession, settings?.attendance_mode])
+  }, [selectedDate, students, selectedSession, settings?.attendanceMode])
 
   useEffect(() => {
     filterStudents()
@@ -125,7 +125,7 @@ export function AttendanceTracking() {
 
     try {
       const attendanceRecords = await db.getAttendanceByDate(selectedDate)
-      const isSessionBased = settings?.attendance_mode === "session_based"
+      const isSessionBased = settings?.attendanceMode === "session_based"
       const filteredRecords = isSessionBased
         ? attendanceRecords.filter((r: any) => r.session?.toLowerCase() === selectedSession.toLowerCase())
         : attendanceRecords
@@ -293,7 +293,7 @@ export function AttendanceTracking() {
   const saveAttendance = async () => {
     setIsSaving(true)
     try {
-      const isSessionBased = settings?.attendance_mode === "session_based"
+      const isSessionBased = settings?.attendanceMode === "session_based"
       const attendanceRecords = Object.entries(attendanceState)
         .filter(([_, data]) => data.status !== null)
         .map(([studentId, data]) => ({
@@ -725,7 +725,7 @@ export function AttendanceTracking() {
           </CardContent>
         </Card>
 
-        {settings?.attendance_mode === "session_based" && (
+        {settings?.attendanceMode === "session_based" && (
           <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
             <CardHeader className="pb-0 border-none">
               <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Attendance Session</CardTitle>
@@ -816,13 +816,31 @@ export function AttendanceTracking() {
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              onClick={markAllAsPresent}
+              onClick={selectedStudents.size > 0 ? () => {
+                const newAttendanceState: AttendanceState = { ...attendanceState }
+                selectedStudents.forEach((id) => {
+                  newAttendanceState[id] = { status: "present", note: "" }
+                })
+                setAttendanceState(newAttendanceState)
+                setSelectedStudents(new Set())
+                notifications.success("Success", `Marked ${selectedStudents.size} students as present`)
+              } : markAllAsPresent}
               disabled={isSaving}
               variant="outline"
               className="bg-white/95 dark:bg-slate-800/90 border-green-200 dark:border-green-900 hover:bg-green-50 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 h-9 rounded-xl font-bold text-xs uppercase tracking-tight"
             >
-              Mark All Present
+              {selectedStudents.size > 0 ? `Mark Selected Present (${selectedStudents.size})` : "Mark All Present"}
             </Button>
+            {selectedStudents.size > 0 && (
+              <Button
+                onClick={markSelectedAbsent}
+                disabled={isSaving}
+                variant="outline"
+                className="bg-white/95 dark:bg-slate-800/90 border-orange-200 dark:border-orange-900 hover:bg-orange-50 dark:hover:bg-orange-900/30 text-orange-700 dark:text-orange-400 h-9 rounded-xl font-bold text-xs uppercase tracking-tight"
+              >
+                Mark Selected Absent ({selectedStudents.size})
+              </Button>
+            )}
             <Button
               onClick={() => setShowAbsentStudents(true)}
               variant="outline"

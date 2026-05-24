@@ -107,7 +107,10 @@ class Database {
       const schoolId = this.getSchoolId()
       if (!schoolId) return []
       console.log(`[pg] Fetching students from ${API_URL}/api/students with schoolId: ${schoolId}`)
-      const res = await fetch(`${API_URL}/api/students`, { headers: this.getApiHeaders() })
+      const res = await fetch(`${API_URL}/api/students`, { 
+        headers: this.getApiHeaders(),
+        cache: 'no-store'
+      })
       console.log(`[pg] getStudents response status: ${res.status} (${res.statusText})`)
       if (!res.ok) {
         const errorText = await res.text()
@@ -169,7 +172,10 @@ class Database {
     try {
       const schoolId = this.getSchoolId()
       if (!schoolId) return []
-      const res = await fetch(`${API_URL}/api/attendance`, { headers: this.getApiHeaders() })
+      const res = await fetch(`${API_URL}/api/attendance`, { 
+        headers: this.getApiHeaders(),
+        cache: 'no-store'
+      })
       if (!res.ok) throw new Error(res.statusText)
       const result = await res.json()
       return result.data.map((r: any) => this.mapAttendance(r, schoolId))
@@ -183,7 +189,10 @@ class Database {
     try {
       const schoolId = this.getSchoolId()
       if (!schoolId) return []
-      const res = await fetch(`${API_URL}/api/attendance?date=${date}`, { headers: this.getApiHeaders() })
+      const res = await fetch(`${API_URL}/api/attendance?date=${date}`, { 
+        headers: this.getApiHeaders(),
+        cache: 'no-store'
+      })
       if (!res.ok) throw new Error(res.statusText)
       const result = await res.json()
       return result.data.map((r: any) => this.mapAttendance(r, schoolId))
@@ -198,7 +207,8 @@ class Database {
       const schoolId = this.getSchoolId()
       if (!schoolId) return []
       const res = await fetch(`${API_URL}/api/attendance?startDate=${startDate}&endDate=${endDate}`, { 
-        headers: this.getApiHeaders() 
+        headers: this.getApiHeaders(),
+        cache: 'no-store'
       })
       if (!res.ok) throw new Error(res.statusText)
       const result = await res.json()
@@ -216,21 +226,25 @@ class Database {
   async markAttendance(records: Partial<AttendanceRecord>[]): Promise<void> {
     const schoolId = this.getSchoolId()
     if (!schoolId) throw new Error("School ID not found")
-    for (const record of records) {
+    
+    const formattedRecords = records.map(record => {
       const recDate = record.attendance_date || record.date
-      const res = await fetch(`${API_URL}/api/attendance`, {
-        method: "POST",
-        headers: this.getApiHeaders(),
-        body: JSON.stringify({
-          studentId: record.student_id,
-          status: record.status,
-          session: record.session || null,
-          remarks: record.remarks || record.note || "",
-          date: recDate ? new Date(recDate).toISOString() : new Date().toISOString(),
-        }),
-      })
-      if (!res.ok) throw new Error(await res.text())
-    }
+      return {
+        studentId: record.student_id,
+        status: record.status,
+        session: record.session || null,
+        remarks: record.remarks || record.note || "",
+        date: recDate ? new Date(recDate).toISOString() : new Date().toISOString(),
+      }
+    })
+
+    const res = await fetch(`${API_URL}/api/attendance/bulk`, {
+      method: "POST",
+      headers: this.getApiHeaders(),
+      body: JSON.stringify({ records: formattedRecords }),
+    })
+
+    if (!res.ok) throw new Error(await res.text())
   }
 
   async saveAttendance(record: Partial<AttendanceRecord>): Promise<AttendanceRecord> {
@@ -268,7 +282,10 @@ class Database {
     try {
       const schoolId = this.getSchoolId()
       if (!schoolId) return this.defaultSettings()
-      const res = await fetch(`${API_URL}/api/settings`, { headers: this.getApiHeaders() })
+      const res = await fetch(`${API_URL}/api/settings`, { 
+        headers: this.getApiHeaders(),
+        cache: 'no-store'
+      })
       if (!res.ok) return this.defaultSettings()
       const result = await res.json()
       const s = result.data
@@ -277,8 +294,8 @@ class Database {
         schoolPhone: s.school_phone || "",
         schoolAddress: s.school_address || "",
         academicYear: s.academic_year || new Date().getFullYear().toString(),
-        attendance_mode: s.attendance_mode || "daily",
-        attendance_ui_type: s.attendance_ui_type || "card_based",
+        attendanceMode: s.attendance_mode || "session_based",
+        attendanceUiType: s.attendance_ui_type || "card_based",
         attendanceThreshold: s.attendance_threshold ?? 75,
         allowLateMark: s.allow_late_mark ?? true,
         emailNotifications: s.email_notifications ?? true,
@@ -303,8 +320,8 @@ class Database {
         school_phone: settings.schoolPhone,
         school_address: settings.schoolAddress,
         academic_year: settings.academicYear,
-        attendance_mode: settings.attendance_mode,
-        attendance_ui_type: settings.attendance_ui_type,
+        attendance_mode: settings.attendanceMode,
+        attendance_ui_type: settings.attendanceUiType,
         attendance_threshold: settings.attendanceThreshold,
         allow_late_mark: settings.allowLateMark,
         email_notifications: settings.emailNotifications,
@@ -331,8 +348,8 @@ class Database {
       schoolPhone: "",
       schoolAddress: "",
       academicYear: new Date().getFullYear().toString(),
-      attendance_mode: "daily",
-      attendance_ui_type: "card_based",
+      attendanceMode: "session_based",
+      attendanceUiType: "card_based",
       attendanceThreshold: 75,
       allowLateMark: true,
       emailNotifications: true,

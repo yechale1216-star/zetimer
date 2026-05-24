@@ -16,11 +16,22 @@ export const getUsers = async (schoolId?: string) => {
 };
 
 export const getContacts = async (schoolId: string) => {
+  // Extract all parent phones from students in this school for legacy linking
+  const students = await prisma.student.findMany({
+    where: { schoolId },
+    select: { parent_phone: true }
+  });
+  
+  const parentPhones = students
+    .map(s => s.parent_phone ? s.parent_phone.replace(/\s+/g, '') : '')
+    .filter(p => p !== '');
+
   const users = await prisma.user.findMany({
     where: {
       OR: [
         { school_id: schoolId },
-        { parentStudents: { some: { student: { schoolId } } } }
+        { parentStudents: { some: { student: { schoolId } } } },
+        { phone: { in: parentPhones }, role: 'parent' }
       ],
       role: { in: ['admin', 'school_admin', 'teacher', 'parent'] },
       is_active: true
@@ -34,12 +45,11 @@ export const getContacts = async (schoolId: string) => {
     }
   });
 
-  // Strict de-duplication by phone then ID to handle messy data
+  // De-duplicate by User ID only, to allow teachers/admins with the same testing phone
   const uniqueUsers = new Map();
   for (const u of users) {
-    const key = u.phone ? u.phone.replace(/\s+/g, '') : u.id;
-    if (!uniqueUsers.has(key)) {
-      uniqueUsers.set(key, u);
+    if (!uniqueUsers.has(u.id)) {
+      uniqueUsers.set(u.id, u);
     }
   }
 
@@ -48,6 +58,18 @@ export const getContacts = async (schoolId: string) => {
 
 export const createUser = async (data: any) => {
   let teacherId = data.teacher_id || null;
+
+  // Prevent duplicate phone for teachers
+  if (data.role === 'teacher' && data.phone) {
+    const cleanPhone = data.phone.trim();
+    const existing = await prisma.user.findFirst({
+      where: { phone: cleanPhone, role: 'teacher' }
+    });
+    if (existing) {
+      throw new Error('Phone already registered for another teacher.');
+    }
+    data.phone = cleanPhone;
+  }
 
   // Automatically create a corresponding Teacher record if role is 'teacher'
   if (data.role === 'teacher' && !teacherId && data.school_id) {
@@ -107,7 +129,21 @@ export const updateUser = async (id: string, data: any) => {
   const updateData: any = {};
   if (data.full_name !== undefined) updateData.full_name = data.full_name;
   if (data.email !== undefined) updateData.email = data.email;
-  if (data.phone !== undefined) updateData.phone = data.phone;
+  if (data.phone !== undefined) {
+    const cleanPhone = data.phone.trim();
+    
+    // Prevent duplicate phone for teachers on update
+    const currentUser = await prisma.user.findUnique({ where: { id } });
+    if (currentUser?.role === 'teacher' && cleanPhone) {
+      const existing = await prisma.user.findFirst({
+        where: { phone: cleanPhone, role: 'teacher', id: { not: id } }
+      });
+      if (existing) {
+        throw new Error('Phone already registered for another teacher.');
+      }
+    }
+    updateData.phone = cleanPhone;
+  }
   if (data.password_hash !== undefined) {
     updateData.password_hash = data.password_hash && !data.password_hash.startsWith('$2')
       ? bcrypt.hashSync(data.password_hash, 10)

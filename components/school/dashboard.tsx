@@ -58,7 +58,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const { toast } = useToast()
   const { subscription } = useSubscription()
   const { settings } = useSchoolSettings()
-  const isSessionBased = settings?.attendance_mode === "session_based"
+  const isSessionBased = settings?.attendanceMode === "session_based"
 
   // Derive trial info from shared subscription context (no extra API call)
   const trialInfo = (subscription?.status === "trial" || subscription?.status === "expired")

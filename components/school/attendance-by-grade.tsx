@@ -129,7 +129,7 @@ export function AttendanceByGrade() {
             <Download className="w-4 h-4 mr-2" />
             {isExporting ? "Exporting..." : "Export Report"}
           </Button>
-          {(settings?.attendance_mode === 'session' || settings?.attendance_mode === 'session_based') && (
+          {(settings?.attendanceMode === 'session' || settings?.attendanceMode === 'session_based') && (
             <div className="flex gap-1.5 p-1 bg-white/50 dark:bg-slate-800/50 rounded-full border border-slate-200 dark:border-slate-700">
               <Button 
                 variant={filters.session === "total" ? "default" : "ghost"} 
@@ -163,7 +163,7 @@ export function AttendanceByGrade() {
       <AttendanceFilters 
         onFilterChange={setFilters} 
         initialFilters={filters} 
-        attendanceMode={settings?.attendance_mode} 
+        attendanceMode={settings?.attendanceMode} 
         hideSession={true}
       />
 

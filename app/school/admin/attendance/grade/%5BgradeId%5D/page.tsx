@@ -81,7 +81,7 @@ function GradeDrillDownContent() {
           </h2>
           <div className="flex items-center gap-2 mt-1">
             <p className="text-muted-foreground text-sm">Detailed student attendance tracking and trends.</p>
-            {settings?.attendance_mode === 'session' && (
+            {settings?.attendanceMode === 'session_based' && (
               <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider">
                 {session === 'total' ? 'All Sessions' : `${session} Session`}
               </Badge>
@@ -104,8 +104,8 @@ function GradeDrillDownContent() {
                 <TableRow>
                   <TableHead>Student</TableHead>
                   <TableHead className="text-center">ID</TableHead>
-                  <TableHead className="text-center">{settings?.attendance_mode === 'session' ? "Present Sessions" : "Present"}</TableHead>
-                  <TableHead className="text-center">{settings?.attendance_mode === 'session' ? "Absent Sessions" : "Absent"}</TableHead>
+                  <TableHead className="text-center">{settings?.attendanceMode === 'session_based' ? "Present Sessions" : "Present"}</TableHead>
+                  <TableHead className="text-center">{settings?.attendanceMode === 'session_based' ? "Absent Sessions" : "Absent"}</TableHead>
                   <TableHead className="text-right">Rate %</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>

@@ -1,0 +1,50 @@
+# Render Blueprint for Zetime (Frontend + Backend)
+services:
+  # Backend Express Service
+  - type: web
+    name: zetime-backend
+    env: node
+    rootDir: server
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PORT
+        value: 5000
+      - key: DATABASE_URL
+        fromConfigVar: DATABASE_URL
+      - key: DIRECT_URL
+        fromConfigVar: DIRECT_URL
+
+  # Frontend Next.js Service
+  - type: web
+    name: zetime-frontend
+    env: node
+    rootDir: .
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: zetime-backend
+          property: host
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://zetime-frontend.onrender.com # Update with actual Render URL
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: TWILIO_MESSAGING_SERVICE_SID
+        sync: false
+      - key: CHAPA_SECRET_KEY
+        sync: false

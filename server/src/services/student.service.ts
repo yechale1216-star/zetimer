@@ -1,17 +1,6 @@
 import prisma from '../config/db';
 import bcrypt from 'bcryptjs';
 
-// Helper to get or create a default school
-const getDefaultSchoolId = async () => {
-  let school = await prisma.school.findFirst();
-  if (!school) {
-    school = await prisma.school.create({
-      data: { name: 'Main School' }
-    });
-  }
-  return school.id;
-};
-
 // Map database relational model to flat frontend model
 const mapStudentToFlat = (student: any) => {
   if (!student) return null;
@@ -24,13 +13,11 @@ const mapStudentToFlat = (student: any) => {
   };
 };
 
-export const getAllStudents = async (schoolId?: string) => {
-  let targetSchoolId = schoolId;
-  if (!targetSchoolId) {
-    targetSchoolId = await getDefaultSchoolId();
-  }
+export const getAllStudents = async (schoolId: string) => {
+  if (!schoolId) throw new Error('School ID is required');
+  
   const students = await prisma.student.findMany({
-    where: { schoolId: targetSchoolId },
+    where: { schoolId: schoolId },
     include: {
       grade: true,
       section: true,
@@ -40,24 +27,10 @@ export const getAllStudents = async (schoolId?: string) => {
   return students.map(mapStudentToFlat);
 };
 
-export const createStudent = async (data: any, schoolIdFromHeader?: string) => {
-  let schoolId = schoolIdFromHeader || data.schoolId;
-  if (!schoolId) {
-    schoolId = await getDefaultSchoolId();
-  }
+export const createStudent = async (data: any, schoolId: string) => {
+  if (!schoolId) throw new Error('School ID is required');
 
-  // Make sure school exists in Postgres to prevent constraint errors
-  let school = await prisma.school.findUnique({ where: { id: schoolId } });
-  if (!school) {
-    school = await prisma.school.create({
-      data: {
-        id: schoolId,
-        name: data.schoolName || 'PostgreSQL School'
-      }
-    });
-  }
-
-  // Create or connect relations
+  // Create or connect relations with schoolId scoping
   const newStudent = await prisma.student.create({
     data: {
       fullName: data.name,
@@ -70,20 +43,20 @@ export const createStudent = async (data: any, schoolIdFromHeader?: string) => {
       school: { connect: { id: schoolId } },
       grade: {
         connectOrCreate: {
-          where: { name: data.grade },
-          create: { name: data.grade }
+          where: { schoolId_name: { schoolId, name: data.grade } },
+          create: { name: data.grade, schoolId }
         }
       },
       section: {
         connectOrCreate: {
-          where: { name: data.section },
-          create: { name: data.section }
+          where: { schoolId_name: { schoolId, name: data.section } },
+          create: { name: data.section, schoolId }
         }
       },
       stream: data.stream ? {
         connectOrCreate: {
-          where: { name: data.stream },
-          create: { name: data.stream }
+          where: { schoolId_name: { schoolId, name: data.stream } },
+          create: { name: data.stream, schoolId }
         }
       } : undefined
     },
@@ -96,27 +69,26 @@ export const createStudent = async (data: any, schoolIdFromHeader?: string) => {
 
   // Handle Parent User Account creation or linking
   if (data.existingParentId) {
-    // Link existing parent
     await prisma.parentStudentLink.create({
       data: {
         parentId: data.existingParentId,
-        studentId: newStudent.id
+        studentId: newStudent.id,
+        schoolId: schoolId
       }
     });
   } else if (data.parent_phone && data.parent_password) {
-    // Create new parent
     const cleanPhone = data.parent_phone.replace(/\s+/g, '');
     const hashedPassword = await bcrypt.hash(data.parent_password, 10);
     const parentEmail = data.parent_email || `parent-${cleanPhone}@zetime.com`;
 
     const user = await prisma.user.upsert({
-      where: { email: parentEmail }, // Assuming email is unique constraint
+      where: { email: parentEmail },
       update: {
         password_hash: hashedPassword,
         full_name: data.parent_name || 'Parent',
         phone: cleanPhone,
         role: 'parent',
-        school_id: schoolId
+        schoolId: schoolId
       },
       create: {
         email: parentEmail,
@@ -124,7 +96,7 @@ export const createStudent = async (data: any, schoolIdFromHeader?: string) => {
         full_name: data.parent_name || 'Parent',
         phone: cleanPhone,
         role: 'parent',
-        school_id: schoolId,
+        schoolId: schoolId,
         is_active: true
       }
     });
@@ -132,7 +104,8 @@ export const createStudent = async (data: any, schoolIdFromHeader?: string) => {
     await prisma.parentStudentLink.create({
       data: {
         parentId: user.id,
-        studentId: newStudent.id
+        studentId: newStudent.id,
+        schoolId: schoolId
       }
     });
   }
@@ -140,9 +113,9 @@ export const createStudent = async (data: any, schoolIdFromHeader?: string) => {
   return mapStudentToFlat(newStudent);
 };
 
-export const getStudentById = async (id: string) => {
-  const student = await prisma.student.findUnique({
-    where: { id },
+export const getStudentById = async (id: string, schoolId: string) => {
+  const student = await prisma.student.findFirst({
+    where: { id, schoolId },
     include: { 
       attendance: true,
       grade: true,
@@ -153,7 +126,7 @@ export const getStudentById = async (id: string) => {
   return mapStudentToFlat(student);
 };
 
-export const updateStudent = async (id: string, data: any) => {
+export const updateStudent = async (id: string, data: any, schoolId: string) => {
   const updateData: any = {};
   if (data.name) updateData.fullName = data.name;
   if (data.student_id) updateData.student_id = data.student_id;
@@ -166,30 +139,30 @@ export const updateStudent = async (id: string, data: any) => {
   if (data.grade) {
     updateData.grade = {
       connectOrCreate: {
-        where: { name: data.grade },
-        create: { name: data.grade }
+        where: { schoolId_name: { schoolId, name: data.grade } },
+        create: { name: data.grade, schoolId }
       }
     };
   }
   if (data.section) {
     updateData.section = {
       connectOrCreate: {
-        where: { name: data.section },
-        create: { name: data.section }
+        where: { schoolId_name: { schoolId, name: data.section } },
+        create: { name: data.section, schoolId }
       }
     };
   }
   if (data.stream) {
     updateData.stream = {
       connectOrCreate: {
-        where: { name: data.stream },
-        create: { name: data.stream }
+        where: { schoolId_name: { schoolId, name: data.stream } },
+        create: { name: data.stream, schoolId }
       }
     };
   }
 
   const updatedStudent = await prisma.student.update({ 
-    where: { id }, 
+    where: { id, schoolId }, 
     data: updateData,
     include: {
       grade: true,
@@ -198,58 +171,18 @@ export const updateStudent = async (id: string, data: any) => {
     }
   });
 
-  // Handle Parent User Account update
-  if (data.parent_phone && data.parent_password) {
-    const cleanPhone = data.parent_phone.replace(/\s+/g, '');
-    const hashedPassword = await bcrypt.hash(data.parent_password, 10);
-    const parentEmail = data.parent_email || `parent-${cleanPhone}@zetime.com`;
-
-    // Try to find existing parent by phone first
-    const existingParent = await prisma.user.findFirst({
-      where: { phone: cleanPhone, role: 'parent' }
-    });
-
-    if (existingParent) {
-      await prisma.user.update({
-        where: { id: existingParent.id },
-        data: {
-          password_hash: hashedPassword,
-          full_name: data.parent_name || existingParent.full_name,
-          email: parentEmail
-        }
-      });
-    } else {
-      // If not exists, create
-      await prisma.user.upsert({
-        where: { email: parentEmail },
-        update: {
-          password_hash: hashedPassword,
-          full_name: data.parent_name || 'Parent',
-          phone: cleanPhone,
-          role: 'parent',
-        },
-        create: {
-          email: parentEmail,
-          password_hash: hashedPassword,
-          full_name: data.parent_name || 'Parent',
-          phone: cleanPhone,
-          role: 'parent',
-          is_active: true
-        }
-      });
-    }
-  }
-
   return mapStudentToFlat(updatedStudent);
 };
 
-export const deleteStudent = async (id: string) => {
-  return await prisma.student.delete({ where: { id } });
+export const deleteStudent = async (id: string, schoolId: string) => {
+  return await prisma.student.delete({ 
+    where: { id, schoolId } 
+  });
 };
 
-export const getStudentsByParentPhone = async (parentPhone: string) => {
+export const getStudentsByParentPhone = async (parentPhone: string, schoolId: string) => {
   const students = await prisma.student.findMany({
-    where: { parent_phone: parentPhone },
+    where: { parent_phone: parentPhone, schoolId },
     include: {
       grade: true,
       section: true,

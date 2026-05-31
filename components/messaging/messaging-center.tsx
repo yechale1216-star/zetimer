@@ -28,17 +28,28 @@ export function MessagingCenter() {
   const loadData = async () => {
     if (!user) return;
     try {
+      const token = localStorage.getItem('attendance_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       // 1. Fetch all contacts for this school explicitly (Parents, Teachers, Admins)
-      const sid = user.schoolId || user.school_id || '';
+      const sid = user.schoolId || '';
       const contactsRes = await fetch(`${API_URL}/api/users/contacts`, {
-        headers: { 'x-school-id': sid },
+        headers,
         cache: 'no-store'
       });
       const contactsData = await contactsRes.json();
       const contacts = contactsData.data || [];
 
       // 2. Fetch existing conversations
-      const convRes = await fetch(`${API_URL}/api/messages/conversations/${user.id}`, { cache: 'no-store' });
+      const convRes = await fetch(`${API_URL}/api/messages/conversations/${user.id}`, { 
+        headers,
+        cache: 'no-store' 
+      });
       const convs = await convRes.json();
 
       // 3. Process existing conversations (Groups and 1:1)
@@ -114,19 +125,15 @@ export function MessagingCenter() {
         handledUserIds.add(contact.id);
       }
 
-      // 5. Final Sort (Telegram Style): 
-      // Most recent active conversations first, then Alphabetical Directory
-      finalItems.sort((a, b) => {
-        if (a.isNewContact !== b.isNewContact) {
-            return a.isNewContact ? 1 : -1;
-        }
-        if (!a.isNewContact) {
-            return b.updatedAt - a.updatedAt;
-        }
-        return a.name.localeCompare(b.name);
-      });
+      // 5. Separate into two groups
+      const activeChats = finalItems.filter(item => !item.isNewContact);
+      const directory = finalItems.filter(item => item.isNewContact);
 
-      setConversations(finalItems);
+      // Sort Active by recent, Directory by name
+      activeChats.sort((a, b) => b.updatedAt - a.updatedAt);
+      directory.sort((a, b) => a.name.localeCompare(b.name));
+
+      setConversations([...activeChats, ...directory]);
     } catch (error) {
       console.error('Failed to load messaging data', error);
       toast({ title: 'Error', description: 'Could not load messaging data', variant: 'destructive' });
@@ -143,9 +150,13 @@ export function MessagingCenter() {
     // If it's a new contact without conversation, we create the conversation first
     if (chatData?.isNewContact) {
       try {
+        const token = localStorage.getItem('attendance_token');
         const res = await fetch(`${API_URL}/api/messages/conversations`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
           body: JSON.stringify({
             isGroup: false,
             memberIds: [user.id, chatData.realContactId]
@@ -169,7 +180,12 @@ export function MessagingCenter() {
   useEffect(() => {
     if (activeConversationId && activeConversationData) {
       // Fetch messages for this conversation
-      fetch(`${API_URL}/api/messages/${activeConversationId}`)
+      const token = localStorage.getItem('attendance_token');
+      fetch(`${API_URL}/api/messages/${activeConversationId}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      })
         .then(r => r.json())
         .then(msgs => {
           if (Array.isArray(msgs)) {

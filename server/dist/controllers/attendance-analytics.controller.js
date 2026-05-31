@@ -37,7 +37,9 @@ exports.exportAttendance = exports.getDrillDownStats = exports.getAttendanceTren
 const analyticsService = __importStar(require("../services/attendance-analytics.service"));
 const getAttendanceSummary = async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'];
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const stats = await analyticsService.getAttendanceSummary(schoolId, req.query);
         res.status(200).json({ success: true, data: stats });
     }
@@ -48,7 +50,9 @@ const getAttendanceSummary = async (req, res, next) => {
 exports.getAttendanceSummary = getAttendanceSummary;
 const getGradeStats = async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'];
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const stats = await analyticsService.getGradeStats(schoolId, req.query);
         res.status(200).json({ success: true, data: stats });
     }
@@ -59,7 +63,9 @@ const getGradeStats = async (req, res, next) => {
 exports.getGradeStats = getGradeStats;
 const getAttendanceTrends = async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'];
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const trends = await analyticsService.getAttendanceTrends(schoolId, req.query);
         res.status(200).json({ success: true, data: trends });
     }
@@ -70,9 +76,10 @@ const getAttendanceTrends = async (req, res, next) => {
 exports.getAttendanceTrends = getAttendanceTrends;
 const getDrillDownStats = async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'];
-        const { gradeId } = req.params;
-        const stats = await analyticsService.getDrillDownStats(schoolId, gradeId, req.query);
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const stats = await analyticsService.getDrillDownStats(schoolId, req.params.gradeId, req.query);
         res.status(200).json({ success: true, data: stats });
     }
     catch (error) {
@@ -82,28 +89,12 @@ const getDrillDownStats = async (req, res, next) => {
 exports.getDrillDownStats = getDrillDownStats;
 const exportAttendance = async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'];
-        const format = req.query.format || 'csv';
-        const stats = await analyticsService.getGradeStats(schoolId, req.query);
-        if (format === 'csv') {
-            const header = ["Grade", "Section", "Stream", "Total Students", "Present", "Absent", "Late", "Excused", "Attendance Rate %"];
-            const rows = stats.map(s => [
-                s.grade,
-                s.section,
-                s.stream || "",
-                s.totalStudents,
-                s.present,
-                s.absent,
-                s.late,
-                s.excused,
-                `${s.attendanceRate}%`
-            ].join(","));
-            const csv = [header.join(","), ...rows].join("\n");
-            res.setHeader('Content-Type', 'text/csv');
-            res.setHeader('Content-Disposition', 'attachment; filename="attendance-report.csv"');
-            return res.status(200).send(csv);
-        }
-        res.status(400).json({ success: false, message: 'Unsupported format' });
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        // For now, return a raw list or summary that can be converted to CSV on frontend
+        const data = await analyticsService.getAttendanceTrends(schoolId, req.query);
+        res.status(200).json({ success: true, data });
     }
     catch (error) {
         next(error);

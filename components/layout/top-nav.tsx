@@ -73,9 +73,16 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
               <h1 className="font-black text-primary text-lg sm:text-2xl truncate leading-tight tracking-tight">
                 {user?.schoolName || "School Admin"}
               </h1>
-              <span className="text-[10px] text-primary/70 uppercase tracking-[0.2em] font-black">
-                Management Portal
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-primary/70 uppercase tracking-[0.2em] font-black">
+                  Management Portal
+                </span>
+                {user?.customSchoolId && (
+                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 font-bold">
+                    {user.customSchoolId}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

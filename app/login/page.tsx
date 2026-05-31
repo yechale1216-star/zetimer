@@ -4,8 +4,8 @@ import { LoginForm } from '@/components/auth/login-form'
 import { AdminSignupForm } from '@/components/auth/admin-signup-form'
 import { ForgotPasswordForm } from '@/components/auth/forgot-password-form'
 import { ResetPasswordForm } from '@/components/auth/reset-password-form'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { authService } from '@/lib/auth/auth'
 import { CheckCircle2, Clock, ShieldCheck, Users } from 'lucide-react'
 import { Logo } from '@/components/logo'
@@ -13,6 +13,16 @@ import { Logo } from '@/components/logo'
 export default function LoginPage() {
   const [view, setView] = useState<'login' | 'admin-signup' | 'forgot-password' | 'reset-password'>('login')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [token, setToken] = useState<string | null>(null)
+
+  useEffect(() => {
+    const t = searchParams.get('token')
+    if (t) {
+      setToken(t)
+      setView('reset-password')
+    }
+  }, [searchParams])
 
   const handleLoginSuccess = () => {
     const user = authService.getCurrentUser()
@@ -32,13 +42,13 @@ export default function LoginPage() {
         {/* Abstract Background Shapes */}
         <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 rounded-full blur-3xl animate-pulse" />
-        
+
         <div className="relative z-10 max-w-lg">
           <div className="mb-12">
             <div className="flex items-center gap-3 mb-6 animate-in slide-in-from-left duration-700">
               <Logo size="md" href="/" />
             </div>
-            
+
             <h2 className="text-4xl xl:text-5xl font-black text-foreground leading-[1.1] mb-6 animate-in slide-in-from-left duration-700 delay-100">
               Modern Attendance <br />
               <span className="text-primary">Management.</span>
@@ -77,9 +87,9 @@ export default function LoginPage() {
 
           {/* Illustration Container */}
           <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-primary/20 border border-border/50 animate-in zoom-in duration-1000 delay-500">
-            <img 
-              src="/school_login_illustration_1778883405545.png" 
-              alt="School Attendance Illustration" 
+            <img
+              src="/school_login_illustration_1778883405545.png"
+              alt="School Attendance Illustration"
               className="w-full aspect-video object-cover"
             />
           </div>
@@ -90,7 +100,7 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-4 sm:p-8 md:p-12 relative overflow-x-hidden">
         {/* Background Accents (Mobile and Desktop) */}
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/[0.03] to-background" />
-        
+
         <div className="max-w-md w-full py-8 md:py-0 animate-in fade-in slide-in-from-bottom-4 duration-1000">
           {/* Mobile/Tablet Logo Section */}
           <div className="md:hidden flex flex-col items-center mb-10">
@@ -100,26 +110,26 @@ export default function LoginPage() {
 
           <div className="w-full relative px-1 sm:px-0">
             {view === 'login' && (
-              <LoginForm 
+              <LoginForm
                 onLoginSuccess={handleLoginSuccess}
                 onShowAdminSignup={() => setView('admin-signup')}
                 onShowForgotPassword={() => setView('forgot-password')}
               />
             )}
             {view === 'admin-signup' && (
-              <AdminSignupForm 
+              <AdminSignupForm
                 onSignupSuccess={handleLoginSuccess}
                 onBack={() => setView('login')}
               />
             )}
             {view === 'forgot-password' && (
-              <ForgotPasswordForm 
+              <ForgotPasswordForm
                 onBackToLogin={() => setView('login')}
               />
             )}
             {view === 'reset-password' && (
-              <ResetPasswordForm 
-                token="" // This would normally come from URL params
+              <ResetPasswordForm
+                token={token || ""}
                 onResetSuccess={() => setView('login')}
               />
             )}

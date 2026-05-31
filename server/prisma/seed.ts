@@ -26,16 +26,37 @@ const STREAMS  = ['Natural Science','Social Science','General'];
 async function main() {
   console.log('\n🌱  Seeding PostgreSQL database …\n');
 
-  // ── 1. Grades, Sections, Streams ──────────────────────────────────────────
-  console.log('📚  Upserting grades, sections, streams …');
+  // ── 1. Demo School ────────────────────────────────────────────────────────
+  console.log('🏫  Creating Demo School …');
+  const demoSchool = await prisma.school.upsert({
+    where: { name: 'Demo High School' },
+    update: {},
+    create: { name: 'Demo High School' },
+  });
+  console.log(`   ✓ School: "${demoSchool.name}" (id: ${demoSchool.id})\n`);
+
+  // ── 2. Grades, Sections, Streams for Demo School ──────────────────────────
+  console.log('📚  Upserting grades, sections, streams for Demo School …');
   for (const g of GRADES) {
-    await prisma.grade.upsert({ where: { name: g }, update: {}, create: { name: g } });
+    await prisma.grade.upsert({ 
+      where: { schoolId_name: { schoolId: demoSchool.id, name: g } }, 
+      update: {}, 
+      create: { name: g, schoolId: demoSchool.id } 
+    });
   }
   for (const s of SECTIONS) {
-    await prisma.section.upsert({ where: { name: s }, update: {}, create: { name: s } });
+    await prisma.section.upsert({ 
+      where: { schoolId_name: { schoolId: demoSchool.id, name: s } }, 
+      update: {}, 
+      create: { name: s, schoolId: demoSchool.id } 
+    });
   }
   for (const s of STREAMS) {
-    await prisma.stream.upsert({ where: { name: s }, update: {}, create: { name: s } });
+    await prisma.stream.upsert({ 
+      where: { schoolId_name: { schoolId: demoSchool.id, name: s } }, 
+      update: {}, 
+      create: { name: s, schoolId: demoSchool.id } 
+    });
   }
   console.log('   ✓ Grades / Sections / Streams done\n');
 
@@ -55,21 +76,14 @@ async function main() {
   });
   console.log(`   ✓ ${superAdmin.full_name} (${superAdmin.email})\n`);
 
-  // ── 3. Demo School ────────────────────────────────────────────────────────
-  console.log('🏫  Creating Demo School …');
-  const demoSchool = await prisma.school.upsert({
-    where: { name: 'Demo High School' },
-    update: {},
-    create: { name: 'Demo High School' },
-  });
-  console.log(`   ✓ School: "${demoSchool.name}" (id: ${demoSchool.id})\n`);
+  // Demo school already created in Step 1
 
   // School settings
   await prisma.schoolSettings.upsert({
-    where: { school_id: demoSchool.id },
+    where: { schoolId: demoSchool.id },
     update: {},
     create: {
-      school_id: demoSchool.id,
+      schoolId: demoSchool.id,
       school_name: 'Demo High School',
       school_phone: '+251911000100',
       school_address: '123 Education Street, Addis Ababa',
@@ -88,7 +102,7 @@ async function main() {
   console.log('🧑‍💼  Creating School Admin …');
   const admin = await prisma.user.upsert({
     where: { email: 'admin@school.com' },
-    update: { school_id: demoSchool.id },
+    update: { schoolId: demoSchool.id },
     create: {
       email: 'admin@school.com',
       password_hash: hashPassword('admin123456'),
@@ -96,7 +110,7 @@ async function main() {
       role: 'admin',
       phone: '+251911000002',
       is_active: true,
-      school_id: demoSchool.id,
+      schoolId: demoSchool.id,
     },
   });
   console.log(`   ✓ ${admin.full_name} (${admin.email})\n`);
@@ -161,7 +175,7 @@ async function main() {
     // Create User account linked to Teacher
     const userRecord = await prisma.user.upsert({
       where: { email: t.userEmail },
-      update: { teacher_id: teacher.id, school_id: demoSchool.id },
+      update: { teacher_id: teacher.id, schoolId: demoSchool.id },
       create: {
         email: t.userEmail,
         password_hash: hashPassword(t.password),
@@ -169,7 +183,7 @@ async function main() {
         role: 'teacher',
         phone: t.phone,
         is_active: true,
-        school_id: demoSchool.id,
+        schoolId: demoSchool.id,
         teacher_id: teacher.id,
       },
     });
@@ -178,7 +192,7 @@ async function main() {
     const existingAssign = await prisma.teacherAssignment.findFirst({
       where: {
         teacher_id: teacher.id,
-        school_id: demoSchool.id,
+        schoolId: demoSchool.id,
         grade: t.grade,
         section: t.section,
       },
@@ -187,7 +201,7 @@ async function main() {
       await prisma.teacherAssignment.create({
         data: {
           teacher_id: teacher.id,
-          school_id: demoSchool.id,
+          schoolId: demoSchool.id,
           grade: t.grade,
           section: t.section,
           subject: t.subject,
@@ -200,13 +214,13 @@ async function main() {
 
   // ── 6. Demo Students ──────────────────────────────────────────────────────
   console.log('\n👨‍🎓  Creating Students …');
-
-  const grade10 = await prisma.grade.findUnique({ where: { name: '10' } });
-  const grade9  = await prisma.grade.findUnique({ where: { name: '9' } });
-  const grade11 = await prisma.grade.findUnique({ where: { name: '11' } });
-  const sectionA = await prisma.section.findUnique({ where: { name: 'A' } });
-  const sectionB = await prisma.section.findUnique({ where: { name: 'B' } });
-  const streamNat = await prisma.stream.findUnique({ where: { name: 'Natural Science' } });
+  const sid = demoSchool.id;
+  const grade10 = await prisma.grade.findUnique({ where: { schoolId_name: { schoolId: sid, name: '10' } } });
+  const grade9  = await prisma.grade.findUnique({ where: { schoolId_name: { schoolId: sid, name: '9' } } });
+  const grade11 = await prisma.grade.findUnique({ where: { schoolId_name: { schoolId: sid, name: '11' } } });
+  const sectionA = await prisma.section.findUnique({ where: { schoolId_name: { schoolId: sid, name: 'A' } } });
+  const sectionB = await prisma.section.findUnique({ where: { schoolId_name: { schoolId: sid, name: 'B' } } });
+  const streamNat = await prisma.stream.findUnique({ where: { schoolId_name: { schoolId: sid, name: 'Natural Science' } } });
 
   const studentsData = [
     // Grade 10-A
@@ -257,10 +271,10 @@ async function main() {
   });
 
   await prisma.schoolSettings.upsert({
-    where: { school_id: school2.id },
+    where: { schoolId: school2.id },
     update: {},
     create: {
-      school_id: school2.id,
+      schoolId: school2.id,
       school_name: 'Green Valley Academy',
       attendance_mode: 'session_based',
       attendance_ui_type: 'card_based',
@@ -270,7 +284,7 @@ async function main() {
 
   const admin2 = await prisma.user.upsert({
     where: { email: 'admin@greenvalley.com' },
-    update: { school_id: school2.id },
+    update: { schoolId: school2.id },
     create: {
       email: 'admin@greenvalley.com',
       password_hash: hashPassword('admin123456'),
@@ -278,7 +292,7 @@ async function main() {
       role: 'admin',
       phone: '+251911000020',
       is_active: true,
-      school_id: school2.id,
+      schoolId: school2.id,
     },
   });
   console.log(`   ✓ School: "${school2.name}" | Admin: ${admin2.email}\n`);

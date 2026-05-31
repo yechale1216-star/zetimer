@@ -12,11 +12,13 @@ const initSocket = (server) => {
         },
     });
     const userSockets = new Map(); // userId -> socketId
+    const socketData = new Map(); // socketId -> data
     io.on('connection', (socket) => {
         console.log('A user connected:', socket.id);
-        socket.on('authenticate', async (userId) => {
+        socket.on('authenticate', async ({ userId, schoolId }) => {
             userSockets.set(userId, socket.id);
-            console.log(`User ${userId} authenticated with socket ${socket.id}`);
+            socketData.set(socket.id, { userId, schoolId });
+            console.log(`User ${userId} from school ${schoolId} authenticated with socket ${socket.id}`);
             // Notify friends/contacts that user is online
             socket.broadcast.emit('user_online', userId);
         });
@@ -25,10 +27,14 @@ const initSocket = (server) => {
             console.log(`Socket ${socket.id} joined conversation ${conversationId}`);
         });
         socket.on('send_message', async (data) => {
+            const tenant = socketData.get(socket.id);
+            if (!tenant)
+                return;
             try {
                 const messageData = {
                     conversationId: data.conversationId,
                     senderId: data.senderId,
+                    schoolId: tenant.schoolId,
                     content: data.content,
                     type: data.type,
                 };
@@ -52,12 +58,11 @@ const initSocket = (server) => {
                                 profile_photo: true,
                             },
                         },
-                        attachments: true,
                     },
                 });
                 io.to(data.conversationId).emit('new_message', message);
                 await prisma.conversation.update({
-                    where: { id: data.conversationId },
+                    where: { id: data.conversationId, schoolId: tenant.schoolId },
                     data: { updatedAt: new Date() },
                 });
             }
@@ -70,6 +75,9 @@ const initSocket = (server) => {
             socket.to(data.conversationId).emit('user_typing', data);
         });
         socket.on('mark_as_read', async (data) => {
+            const tenant = socketData.get(socket.id);
+            if (!tenant)
+                return;
             try {
                 await prisma.messageRead.upsert({
                     where: {
@@ -82,6 +90,7 @@ const initSocket = (server) => {
                     create: {
                         messageId: data.messageId,
                         userId: data.userId,
+                        schoolId: tenant.schoolId,
                     },
                 });
                 socket.to(data.conversationId).emit('message_read', data);
@@ -92,16 +101,20 @@ const initSocket = (server) => {
         });
         // --- WebRTC Signaling ---
         socket.on('call_user', async (data) => {
+            const tenant = socketData.get(socket.id);
+            if (!tenant)
+                return;
             const targetSocketId = userSockets.get(data.to);
             // Create call session
             const session = await prisma.callSession.create({
                 data: {
+                    schoolId: tenant.schoolId,
                     type: data.type,
                     status: 'RINGING',
                     participants: {
                         create: [
-                            { userId: data.from },
-                            { userId: data.to }
+                            { userId: data.from, schoolId: tenant.schoolId },
+                            { userId: data.to, schoolId: tenant.schoolId }
                         ]
                     }
                 }
@@ -135,6 +148,9 @@ const initSocket = (server) => {
             }
         });
         socket.on('reject_call', async (data) => {
+            const tenant = socketData.get(socket.id);
+            if (!tenant)
+                return;
             const targetSocketId = userSockets.get(data.to);
             if (targetSocketId) {
                 io.to(targetSocketId).emit('call_rejected', { from: data.from });
@@ -144,6 +160,7 @@ const initSocket = (server) => {
                     data: {
                         conversationId: data.conversationId,
                         senderId: data.from,
+                        schoolId: tenant.schoolId,
                         content: 'Missed Call',
                         type: 'CALL_MISSED_VOICE',
                     }
@@ -158,6 +175,9 @@ const initSocket = (server) => {
             }
         });
         socket.on('end_call', async (data) => {
+            const tenant = socketData.get(socket.id);
+            if (!tenant)
+                return;
             const targetSocketId = userSockets.get(data.to);
             if (targetSocketId) {
                 io.to(targetSocketId).emit('call_ended', { from: data.from });
@@ -168,6 +188,7 @@ const initSocket = (server) => {
                     data: {
                         conversationId: data.conversationId,
                         senderId: data.from,
+                        schoolId: tenant.schoolId,
                         content: `Call ended ${durationText}`,
                         type: 'CALL_VOICE',
                     }
@@ -183,14 +204,12 @@ const initSocket = (server) => {
         });
         socket.on('disconnect', () => {
             console.log('User disconnected:', socket.id);
-            // Remove user from the map
-            for (const [userId, socketId] of userSockets.entries()) {
-                if (socketId === socket.id) {
-                    userSockets.delete(userId);
-                    socket.broadcast.emit('user_offline', userId);
-                    break;
-                }
+            const data = socketData.get(socket.id);
+            if (data) {
+                userSockets.delete(data.userId);
+                socket.broadcast.emit('user_offline', data.userId);
             }
+            socketData.delete(socket.id);
         });
     });
     return io;

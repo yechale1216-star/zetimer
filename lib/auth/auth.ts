@@ -14,6 +14,7 @@ export interface User {
   name: string
   role: string
   schoolId: string
+  customSchoolId?: string
   schoolName: string
   schoolLogo?: string
   teacherId: string
@@ -51,43 +52,36 @@ class AuthService {
     try {
       console.log("[pg] Login attempt for:", credentials.email)
 
-      // Verify password against PostgreSQL
-      const verifyRes = await fetch(`${API_URL}/api/users/verify-password`, {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: credentials.email, password: credentials.password }),
       })
-      const verifyData = await verifyRes.json()
+      
+      const data = await res.json()
 
-      if (!verifyData.success || !verifyData.valid) {
-        return { success: false, message: "Invalid credentials", error: "Invalid email or password" }
+      if (!res.ok || !data.success) {
+        return { 
+          success: false, 
+          message: data.message || "Login failed", 
+          error: data.error || data.message || "Invalid credentials" 
+        }
       }
 
-      const dbUser = verifyData.data
+      const { user: dbUser, token } = data.data
 
       // Get school name and logo from settings
-      let schoolName = "My School"
-      let schoolLogo = ""
-      if (dbUser.school_id) {
-        try {
-          const settingsRes = await fetch(`${API_URL}/api/settings`, {
-            headers: { 'x-school-id': dbUser.school_id }
-          })
-          const settingsData = await settingsRes.json()
-          if (settingsData.success && settingsData.data) {
-            schoolName = settingsData.data.school_name || schoolName
-            schoolLogo = settingsData.data.school_logo || ""
-          }
-        } catch { /* lookup is non-fatal */ }
-      }
+      let schoolName = data.data.schoolName || "My School"
+      let schoolLogo = data.data.schoolLogo || ""
 
       const user: User = {
         id: dbUser.id,
         email: dbUser.email,
         phone: dbUser.phone || "",
-        name: dbUser.full_name,
+        name: dbUser.name || dbUser.full_name,
         role: dbUser.role,
-        schoolId: dbUser.school_id || "",
+        schoolId: dbUser.schoolId || "",
+        customSchoolId: dbUser.customSchoolId || data.data.customSchoolId || "",
         schoolName,
         schoolLogo,
         teacherId: dbUser.teacher_id || "",
@@ -97,6 +91,7 @@ class AuthService {
 
       if (this.isClient()) {
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user))
+        localStorage.setItem("attendance_token", token) // Store the JWT token
         if (user.schoolId) {
           const { db } = await import("@/lib/db/database")
           db.initializeSchoolData(user.schoolId)
@@ -209,56 +204,39 @@ class AuthService {
         }
       }
 
-      // Check if user already exists in PostgreSQL
-      const checkRes = await fetch(`${API_URL}/api/users/by-email?email=${encodeURIComponent(credentials.email)}`)
-      const checkData = await checkRes.json()
-      if (checkData.success && checkData.data) {
-        return { success: false, message: "Account exists", error: "Email already registered" }
-      }
-
-      let schoolId = ""
-      let schoolName = credentials.schoolName || "My School"
-
-      // Create school in PostgreSQL first (admin only)
-      if (credentials.role === "admin" && credentials.schoolName) {
-        const schoolRes = await fetch(`${API_URL}/api/schools`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: credentials.schoolName }),
-        })
-        const schoolData = await schoolRes.json()
-        if (!schoolData.success) throw new Error("Failed to create school")
-        schoolId = schoolData.data.id
-        schoolName = schoolData.data.name
-        console.log("[pg] School created in PostgreSQL:", schoolId)
-      }
-
-      // Create user in PostgreSQL
-      const userRes = await fetch(`${API_URL}/api/users`, {
+      const res = await fetch(`${API_URL}/api/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: credentials.email,
-          password_hash: credentials.password,
-          full_name: credentials.name,
+          password: credentials.password,
+          name: credentials.name,
+          schoolName: credentials.schoolName,
           role: credentials.role,
-          phone: credentials.phone,
-          school_id: schoolId || null,
-          is_active: true,
+          phone: credentials.phone
         }),
       })
-      const userData = await userRes.json()
-      if (!userData.success) throw new Error(userData.message || "Failed to create user")
-      const newUser = userData.data
+
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        return { 
+          success: false, 
+          message: data.message || "Signup failed", 
+          error: data.error || data.message || "An error occurred" 
+        }
+      }
+
+      const { user: newUser, token } = data.data
 
       const user: User = {
         id: newUser.id,
         email: newUser.email,
         phone: newUser.phone || "",
-        name: newUser.full_name,
+        name: newUser.name || newUser.full_name,
         role: newUser.role,
-        schoolId: newUser.school_id || "",
-        schoolName,
+        schoolId: newUser.schoolId || "",
+        customSchoolId: newUser.customSchoolId || data.data.customSchoolId || "",
+        schoolName: data.data.schoolName || credentials.schoolName || "My School",
         teacherId: "",
         isSuperAdmin: false,
         profile_photo: newUser.profile_photo || "",
@@ -266,6 +244,7 @@ class AuthService {
 
       if (this.isClient()) {
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user))
+        localStorage.setItem("attendance_token", token)
         if (user.schoolId) {
           const { db } = await import("@/lib/db/database")
           db.initializeSchoolData(user.schoolId)
@@ -277,6 +256,17 @@ class AuthService {
       console.error("[pg] Signup error:", error)
       return { success: false, message: "Signup failed", error: "An error occurred during registration" }
     }
+  }
+
+  private getAuthHeaders(): Record<string, string> {
+    const token = this.isClient() ? localStorage.getItem("attendance_token") : null
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`
+    }
+    return headers
   }
 
   // ─── UPDATE SCHOOL INFO ───────────────────────────────────────────────────
@@ -291,7 +281,7 @@ class AuthService {
         // Update existing school name in PostgreSQL
         await fetch(`${API_URL}/api/schools`, {
           method: "POST", // The backend uses POST for upsert/create school
-          headers: { "Content-Type": "application/json" },
+          headers: this.getAuthHeaders(),
           body: JSON.stringify({ id: schoolId, name }),
         })
 
@@ -299,10 +289,7 @@ class AuthService {
         if (_logo) {
           await fetch(`${API_URL}/api/settings`, {
             method: "PUT",
-            headers: { 
-              "Content-Type": "application/json",
-              "x-school-id": schoolId
-            },
+            headers: this.getAuthHeaders(),
             body: JSON.stringify({ school_logo: _logo }),
           })
         }
@@ -310,7 +297,7 @@ class AuthService {
         // Create new school
         const res = await fetch(`${API_URL}/api/schools`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: this.getAuthHeaders(),
           body: JSON.stringify({ name }),
         })
         const data = await res.json()
@@ -320,7 +307,7 @@ class AuthService {
         // Link user to new school
         await fetch(`${API_URL}/api/users/${user.id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: this.getAuthHeaders(),
           body: JSON.stringify({ school_id: schoolId }),
         })
 
@@ -328,10 +315,7 @@ class AuthService {
         if (_logo) {
           await fetch(`${API_URL}/api/settings`, {
             method: "PUT",
-            headers: { 
-              "Content-Type": "application/json",
-              "x-school-id": schoolId
-            },
+            headers: this.getAuthHeaders(),
             body: JSON.stringify({ school_logo: _logo }),
           })
         }
@@ -371,20 +355,53 @@ class AuthService {
     }
   }
   
-  // ─── PASSWORD RESET (MOCK) ────────────────────────────────────────────────
+  // ─── PASSWORD RESET ───────────────────────────────────────────────────────
   async requestPasswordReset(email: string): Promise<AuthResponse> {
-    console.log("[pg] Mock password reset request for:", email)
-    return new Promise((resolve) => setTimeout(() => resolve({ success: true, message: "Reset link sent if account exists" }), 800))
+    try {
+      const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json()
+      return { 
+        success: res.ok && data.success, 
+        message: data.message || "Request processed" 
+      }
+    } catch (error) {
+      return { success: false, message: "Network error", error: "Failed to connect to server" }
+    }
   }
   
   async verifyResetToken(token: string): Promise<{ success: boolean; valid: boolean; email?: string }> {
-    console.log("[pg] Mock verify reset token:", token)
-    return { success: true, valid: true, email: "demo@user.com" }
+    try {
+      const res = await fetch(`${API_URL}/api/auth/verify-reset-token?token=${token}`)
+      const data = await res.json()
+      return { 
+        success: res.ok && data.success, 
+        valid: data.valid || false, 
+        email: data.email 
+      }
+    } catch (error) {
+      return { success: false, valid: false }
+    }
   }
   
   async resetPassword(token: string, password: string): Promise<AuthResponse> {
-    console.log("[pg] Mock reset password with token:", token, "and password:", password)
-    return { success: true, message: "Password updated successfully" }
+    try {
+      const res = await fetch(`${API_URL}/api/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password }),
+      })
+      const data = await res.json()
+      return { 
+        success: res.ok && data.success, 
+        message: data.message || "Password reset successful" 
+      }
+    } catch (error) {
+      return { success: false, message: "Network error", error: "Failed to connect to server" }
+    }
   }
 
   isAuthenticated(): boolean { return this.getCurrentUser() !== null }

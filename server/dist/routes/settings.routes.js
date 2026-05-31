@@ -39,9 +39,9 @@ const router = (0, express_1.Router)();
 // Get settings for a school
 router.get('/', async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'];
+        const schoolId = req.user?.schoolId;
         if (!schoolId)
-            return res.status(400).json({ success: false, message: 'x-school-id header required' });
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const settings = await settingsService.getSettings(schoolId);
         res.status(200).json({ success: true, data: settings });
     }
@@ -52,9 +52,9 @@ router.get('/', async (req, res, next) => {
 // Update settings for a school
 router.put('/', async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'];
+        const schoolId = req.user?.schoolId;
         if (!schoolId)
-            return res.status(400).json({ success: false, message: 'x-school-id header required' });
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const settings = await settingsService.updateSettings(schoolId, req.body);
         res.status(200).json({ success: true, data: settings });
     }

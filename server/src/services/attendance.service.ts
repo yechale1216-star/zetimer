@@ -1,21 +1,18 @@
 import prisma from '../config/db';
 
-const getDefaultSchoolId = async () => {
-  let school = await prisma.school.findFirst();
-  if (!school) {
-    school = await prisma.school.create({
-      data: { name: 'Main School' }
-    });
-  }
-  return school.id;
-};
-
-export const markAttendance = async (data: any) => {
-  const schoolId = data.schoolId || await getDefaultSchoolId();
+export const markAttendance = async (data: any, schoolId: string) => {
   const { studentId, date, session, status, remarks, teacherId } = data;
 
   if (!studentId || !date) {
     throw new Error("Student ID and Date are required");
+  }
+
+  // Ensure student belongs to this school
+  const student = await prisma.student.findFirst({
+    where: { id: studentId, schoolId }
+  });
+  if (!student) {
+    throw new Error("Student not found in this school");
   }
 
   // Parse the day range in UTC
@@ -26,6 +23,7 @@ export const markAttendance = async (data: any) => {
   // Find if a record already exists for this student on this day and session
   const existing = await prisma.attendance.findFirst({
     where: {
+      schoolId,
       studentId,
       date: {
         gte: startDate,
@@ -60,27 +58,21 @@ export const markAttendance = async (data: any) => {
   // Intercept and create parent notification if status is Absent or Late
   if (status && (status.toLowerCase() === 'absent' || status.toLowerCase() === 'late')) {
     try {
-      const student = await prisma.student.findUnique({
-        where: { id: studentId }
+      const type = status.toLowerCase() === 'absent' ? 'absent' : 'late';
+      const title = status.toLowerCase() === 'absent' ? 'Absent Alert' : 'Late Arrival Alert';
+      const sessionStr = session ? ` (${session} session)` : '';
+      const message = `${student.fullName} has been marked ${status}${sessionStr} on ${dateStr}.`;
+      
+      await prisma.parentNotification.create({
+        data: {
+          schoolId,
+          studentId: student.id,
+          type,
+          title,
+          message,
+          isRead: false
+        }
       });
-      if (student) {
-        const type = status.toLowerCase() === 'absent' ? 'absent' : 'late';
-        const title = status.toLowerCase() === 'absent' ? 'Absent Alert' : 'Late Arrival Alert';
-        const sessionStr = session ? ` (${session} session)` : '';
-        const message = `${student.fullName} has been marked ${status}${sessionStr} on ${dateStr}.`;
-        
-        await prisma.parentNotification.create({
-          data: {
-            schoolId: student.schoolId,
-            studentId: student.id,
-            type,
-            title,
-            message,
-            isRead: false
-          }
-        });
-        console.log(`[Notification Created] Triggered for parent of ${student.fullName} | Status: ${status}`);
-      }
     } catch (notificationError) {
       console.error("Failed to create parent notification:", notificationError);
     }
@@ -89,8 +81,7 @@ export const markAttendance = async (data: any) => {
   return result;
 };
 
-export const getAttendance = async (filters: any) => {
-  const schoolId = filters.schoolId || await getDefaultSchoolId();
+export const getAttendance = async (filters: any, schoolId: string) => {
   const { studentId, date, session, grade, section, startDate: filterStartDate, endDate: filterEndDate } = filters;
   const where: any = { schoolId };
 
@@ -118,7 +109,7 @@ export const getAttendance = async (filters: any) => {
   if (session) where.session = session;
 
   if (grade || section) {
-    where.student = {};
+    where.student = { schoolId }; // Ensure student filtering is also scoped
     if (grade) where.student.grade = { name: grade };
     if (section) where.student.section = { name: section };
   }
@@ -137,9 +128,9 @@ export const getAttendance = async (filters: any) => {
   });
 };
 
-export const getAttendanceByStudent = async (studentId: string) => {
+export const getAttendanceByStudent = async (studentId: string, schoolId: string) => {
   return await prisma.attendance.findMany({
-    where: { studentId },
+    where: { studentId, schoolId },
     orderBy: { date: 'desc' },
   });
 };

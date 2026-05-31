@@ -18,7 +18,7 @@ export interface Student {
   first_name?: string
   last_name?: string
   roll_number?: string
-  school_id?: string
+  schoolId?: string
   class_id?: string
   address?: string
   status?: string
@@ -33,7 +33,7 @@ export interface AttendanceRecord {
   note?: string
   created_at: string
   updated_at?: string
-  school_id?: string
+  schoolId?: string
   date?: string
   class_id?: string
   session?: "morning" | "afternoon" | null
@@ -47,7 +47,7 @@ export interface TeacherAssignment {
   section?: string
   stream?: string
   subject?: string
-  school_id?: string
+  schoolId?: string
   teacher?: {
     id: string
     full_name: string
@@ -71,8 +71,8 @@ class Database {
   private getSchoolId(): string {
     if (!this.currentSchoolId) {
       const user = this.getCurrentUser()
-      if (user?.schoolId || user?.school_id) {
-        this.currentSchoolId = String(user.schoolId || user.school_id)
+      if (user?.schoolId) {
+        this.currentSchoolId = String(user.schoolId)
       } else {
         console.warn("[pg] No schoolId found in user session")
         return ""
@@ -92,13 +92,17 @@ class Database {
   }
 
   private getApiHeaders(): Record<string, string> {
-    const schoolId = this.getSchoolId()
+    const token = typeof window !== "undefined" ? localStorage.getItem("attendance_token") : null
     const user = this.getCurrentUser()
-    return {
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "x-school-id": schoolId,
-      "x-school-name": user?.schoolName || "",
     }
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`
+    }
+    
+    return headers
   }
 
   // ─── STUDENTS ─────────────────────────────────────────────────────────────
@@ -125,7 +129,7 @@ class Database {
         grade: s.grade?.name || s.grade || "",
         section: s.section?.name || s.section || "",
         stream: s.stream?.name || s.stream || "",
-        school_id: schoolId,
+        schoolId: schoolId,
       }))
     } catch (error) {
       console.error("[pg] getStudents error:", error)
@@ -149,7 +153,7 @@ class Database {
       grade: s.grade?.name || s.grade || "",
       section: s.section?.name || s.section || "",
       stream: s.stream?.name || s.stream || "",
-      school_id: schoolId,
+      schoolId: schoolId,
     }
   }
 
@@ -267,12 +271,26 @@ class Database {
     return this.mapAttendance(result.data, schoolId)
   }
 
+  async getAttendanceByStudent(studentId: string, schoolId: string): Promise<AttendanceRecord[]> {
+    try {
+      const res = await fetch(`${API_URL}/api/attendance/student/${studentId}`, {
+        headers: this.getApiHeaders(),
+      })
+      if (!res.ok) return []
+      const result = await res.json()
+      return result.data.map((r: any) => this.mapAttendance(r, schoolId))
+    } catch (error) {
+      console.error("[pg] getAttendanceByStudent error:", error)
+      return []
+    }
+  }
+
   private mapAttendance(r: any, schoolId: string): AttendanceRecord {
     return {
       ...r,
       attendance_date: (r.date || r.attendance_date || "").split("T")[0],
       student_id: r.studentId || r.student_id,
-      school_id: schoolId,
+      schoolId: schoolId,
       created_at: r.createdAt || r.created_at || new Date().toISOString(),
     }
   }
@@ -383,7 +401,7 @@ class Database {
         ...teacherData,
         role: "teacher",
         password_hash: teacherData.password || teacherData.password_hash || "demo123456",
-        school_id: schoolId,
+        schoolId: schoolId,
         is_active: true,
       }),
     })
@@ -413,14 +431,14 @@ class Database {
       if (!sid) return []
       const params = teacherId ? `?teacherId=${teacherId}` : ""
       const res = await fetch(`${API_URL}/api/assignments${params}`, {
-        headers: { ...this.getApiHeaders(), "x-school-id": sid },
+        headers: this.getApiHeaders(),
       })
       if (!res.ok) return []
       const result = await res.json()
       return result.data.map((a: any) => ({
         id: a.id,
         teacher_id: a.teacher_id,
-        school_id: a.school_id,
+        schoolId: a.schoolId,
         grade: a.grade,
         section: a.section,
         subject: a.subject,

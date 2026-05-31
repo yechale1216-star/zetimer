@@ -22,7 +22,7 @@ const getAttendanceSummary = async (schoolId, filters) => {
         db_1.default.student.count({ where: { schoolId } }),
         db_1.default.attendance.groupBy({
             by: ['status'],
-            where,
+            where: { ...where, schoolId },
             _count: {
                 _all: true
             }
@@ -67,7 +67,7 @@ const getGradeStats = async (schoolId, filters) => {
     if (session && session !== 'total') {
         where.session = session;
     }
-    // Get all students grouped by grade, section, stream
+    // Get all students grouped by grade, section, stream, strictly for this school
     const students = await db_1.default.student.findMany({
         where: { schoolId },
         include: {
@@ -76,16 +76,14 @@ const getGradeStats = async (schoolId, filters) => {
             stream: true,
         }
     });
-    // Get attendance records for the period
     const attendance = await db_1.default.attendance.findMany({
-        where,
+        where: { ...where, schoolId },
         select: {
             studentId: true,
             status: true,
             date: true,
         }
     });
-    // Create an attendance map for faster lookup: studentId -> attendanceRecords[]
     const attendanceMap = {};
     attendance.forEach(rec => {
         if (!attendanceMap[rec.studentId]) {
@@ -93,7 +91,6 @@ const getGradeStats = async (schoolId, filters) => {
         }
         attendanceMap[rec.studentId].push(rec);
     });
-    // Group stats
     const groups = {};
     students.forEach(student => {
         const gradeName = student.grade.name;
@@ -114,7 +111,6 @@ const getGradeStats = async (schoolId, filters) => {
             };
         }
         groups[key].totalStudents++;
-        // Use the attendance map for O(1) lookup
         const studentAttendance = attendanceMap[student.id] || [];
         studentAttendance.forEach(rec => {
             const status = rec.status.toLowerCase();
@@ -154,7 +150,7 @@ const getAttendanceTrends = async (schoolId, filters) => {
         where.session = session;
     }
     if (grade || section || stream) {
-        where.student = {};
+        where.student = { schoolId };
         if (grade)
             where.student.grade = { name: grade };
         if (section)
@@ -164,7 +160,7 @@ const getAttendanceTrends = async (schoolId, filters) => {
     }
     const attendance = await db_1.default.attendance.groupBy({
         by: ['date', 'status'],
-        where,
+        where: { ...where, schoolId },
         _count: {
             _all: true
         },
@@ -197,6 +193,7 @@ const getDrillDownStats = async (schoolId, gradeId, filters) => {
     const where = {
         schoolId,
         student: {
+            schoolId,
             gradeId: gradeId,
         }
     };
@@ -223,6 +220,7 @@ const getDrillDownStats = async (schoolId, gradeId, filters) => {
             stream: true,
             attendance: {
                 where: {
+                    schoolId,
                     ...(startDate || endDate ? {
                         date: {
                             ...(startDate ? { gte: new Date(startDate) } : {}),

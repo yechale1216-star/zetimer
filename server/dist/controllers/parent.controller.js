@@ -51,11 +51,14 @@ const loginParent = async (req, res, next) => {
 exports.loginParent = loginParent;
 const searchParent = async (req, res, next) => {
     try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.query;
         if (!phone || typeof phone !== 'string') {
             return res.status(400).json({ success: false, message: "Phone query parameter is required." });
         }
-        const result = await parentService.searchParentByPhone(phone);
+        const result = await parentService.searchParentByPhone(phone, schoolId);
         if (!result.success) {
             return res.status(404).json(result);
         }
@@ -68,11 +71,14 @@ const searchParent = async (req, res, next) => {
 exports.searchParent = searchParent;
 const updatePassword = async (req, res, next) => {
     try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone, currentPassword, newPassword } = req.body;
         if (!phone || !currentPassword || !newPassword) {
             return res.status(400).json({ success: false, message: "Phone, current password, and new password are required." });
         }
-        const result = await parentService.updatePassword(phone, currentPassword, newPassword);
+        const result = await parentService.updatePassword(phone, currentPassword, newPassword, schoolId);
         res.status(200).json(result);
     }
     catch (error) {
@@ -82,8 +88,11 @@ const updatePassword = async (req, res, next) => {
 exports.updatePassword = updatePassword;
 const getNotifications = async (req, res, next) => {
     try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
-        const notifications = await parentService.getNotifications(phone);
+        const notifications = await parentService.getNotifications(phone, schoolId);
         res.status(200).json({ success: true, data: notifications });
     }
     catch (error) {
@@ -93,8 +102,11 @@ const getNotifications = async (req, res, next) => {
 exports.getNotifications = getNotifications;
 const markAsRead = async (req, res, next) => {
     try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { id } = req.params;
-        await parentService.markNotificationAsRead(id);
+        await parentService.markNotificationAsRead(id, schoolId);
         res.status(200).json({ success: true, message: "Notification marked as read." });
     }
     catch (error) {
@@ -104,8 +116,11 @@ const markAsRead = async (req, res, next) => {
 exports.markAsRead = markAsRead;
 const markAllAsRead = async (req, res, next) => {
     try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
-        await parentService.markAllNotificationsAsRead(phone);
+        await parentService.markAllNotificationsAsRead(phone, schoolId);
         res.status(200).json({ success: true, message: "All notifications marked as read." });
     }
     catch (error) {
@@ -137,7 +152,9 @@ const updatePreferences = async (req, res, next) => {
 exports.updatePreferences = updatePreferences;
 const postAnnouncement = async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'] || "Main School";
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const announcement = await parentService.postAnnouncement(schoolId, req.body);
         res.status(201).json({ success: true, data: announcement, message: "Announcement published." });
     }

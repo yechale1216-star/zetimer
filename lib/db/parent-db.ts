@@ -25,9 +25,14 @@ export interface ParentPreferences {
 
 class ParentDatabase {
   private getHeaders(): Record<string, string> {
-    return {
+    const token = typeof window !== "undefined" ? localStorage.getItem("attendance_token") : null
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
-    };
+    }
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`
+    }
+    return headers
   }
 
   // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
@@ -107,10 +112,7 @@ class ParentDatabase {
     try {
       const res = await fetch(`${API_URL}/api/parent/announcements`, {
         method: "POST",
-        headers: {
-          ...this.getHeaders(),
-          "x-school-id": schoolId,
-        },
+        headers: this.getHeaders(),
         body: JSON.stringify(data),
       });
       return res.ok;

@@ -5,20 +5,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAttendanceByStudent = exports.getAttendance = exports.markAttendance = void 0;
 const db_1 = __importDefault(require("../config/db"));
-const getDefaultSchoolId = async () => {
-    let school = await db_1.default.school.findFirst();
-    if (!school) {
-        school = await db_1.default.school.create({
-            data: { name: 'Main School' }
-        });
-    }
-    return school.id;
-};
-const markAttendance = async (data) => {
-    const schoolId = data.schoolId || await getDefaultSchoolId();
+const markAttendance = async (data, schoolId) => {
     const { studentId, date, session, status, remarks, teacherId } = data;
     if (!studentId || !date) {
         throw new Error("Student ID and Date are required");
+    }
+    // Ensure student belongs to this school
+    const student = await db_1.default.student.findFirst({
+        where: { id: studentId, schoolId }
+    });
+    if (!student) {
+        throw new Error("Student not found in this school");
     }
     // Parse the day range in UTC
     const dateStr = typeof date === 'string' ? date.split("T")[0] : new Date(date).toISOString().split("T")[0];
@@ -27,6 +24,7 @@ const markAttendance = async (data) => {
     // Find if a record already exists for this student on this day and session
     const existing = await db_1.default.attendance.findFirst({
         where: {
+            schoolId,
             studentId,
             date: {
                 gte: startDate,
@@ -59,26 +57,20 @@ const markAttendance = async (data) => {
     // Intercept and create parent notification if status is Absent or Late
     if (status && (status.toLowerCase() === 'absent' || status.toLowerCase() === 'late')) {
         try {
-            const student = await db_1.default.student.findUnique({
-                where: { id: studentId }
+            const type = status.toLowerCase() === 'absent' ? 'absent' : 'late';
+            const title = status.toLowerCase() === 'absent' ? 'Absent Alert' : 'Late Arrival Alert';
+            const sessionStr = session ? ` (${session} session)` : '';
+            const message = `${student.fullName} has been marked ${status}${sessionStr} on ${dateStr}.`;
+            await db_1.default.parentNotification.create({
+                data: {
+                    schoolId,
+                    studentId: student.id,
+                    type,
+                    title,
+                    message,
+                    isRead: false
+                }
             });
-            if (student) {
-                const type = status.toLowerCase() === 'absent' ? 'absent' : 'late';
-                const title = status.toLowerCase() === 'absent' ? 'Absent Alert' : 'Late Arrival Alert';
-                const sessionStr = session ? ` (${session} session)` : '';
-                const message = `${student.fullName} has been marked ${status}${sessionStr} on ${dateStr}.`;
-                await db_1.default.parentNotification.create({
-                    data: {
-                        schoolId: student.schoolId,
-                        studentId: student.id,
-                        type,
-                        title,
-                        message,
-                        isRead: false
-                    }
-                });
-                console.log(`[Notification Created] Triggered for parent of ${student.fullName} | Status: ${status}`);
-            }
         }
         catch (notificationError) {
             console.error("Failed to create parent notification:", notificationError);
@@ -87,8 +79,7 @@ const markAttendance = async (data) => {
     return result;
 };
 exports.markAttendance = markAttendance;
-const getAttendance = async (filters) => {
-    const schoolId = filters.schoolId || await getDefaultSchoolId();
+const getAttendance = async (filters, schoolId) => {
     const { studentId, date, session, grade, section, startDate: filterStartDate, endDate: filterEndDate } = filters;
     const where = { schoolId };
     if (studentId)
@@ -116,7 +107,7 @@ const getAttendance = async (filters) => {
     if (session)
         where.session = session;
     if (grade || section) {
-        where.student = {};
+        where.student = { schoolId }; // Ensure student filtering is also scoped
         if (grade)
             where.student.grade = { name: grade };
         if (section)
@@ -136,9 +127,9 @@ const getAttendance = async (filters) => {
     });
 };
 exports.getAttendance = getAttendance;
-const getAttendanceByStudent = async (studentId) => {
+const getAttendanceByStudent = async (studentId, schoolId) => {
     return await db_1.default.attendance.findMany({
-        where: { studentId },
+        where: { studentId, schoolId },
         orderBy: { date: 'desc' },
     });
 };

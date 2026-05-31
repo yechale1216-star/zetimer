@@ -10,9 +10,13 @@ datasource db {
 
 model School {
   id                  String               @id @default(uuid())
+  schoolId            String?              @unique // Format: SCH-XXXX (Optional for migration)
   name                String               @unique
+  subscriptionStatus  String               @default("ACTIVE")
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
+  
+  // Relationships
   attendance          Attendance[]
   parentNotifications ParentNotification[]
   settings            SchoolSettings?
@@ -20,42 +24,61 @@ model School {
   teachers            Teacher[]
   assignments         TeacherAssignment[]
   users               User[]
+  grades              Grade[]
+  sections            Section[]
+  streams             Stream[]
+  auditLogs           AuditLog[]
+  reports             AttendanceReport[]
+  conversations       Conversation[]
+  callSessions        CallSession[]
+  pendingRegistrations PendingRegistration[]
+  parentStudentLinks   ParentStudentLink[]
+  messages             Message[]
+  messageReads         MessageRead[]
+  messageReactions     MessageReaction[]
+  callParticipants     CallParticipant[]
+  callHistories        CallHistory[]
 }
 
 model User {
-  id               String              @id @default(uuid())
-  email            String              @unique
-  password_hash    String
-  full_name        String
-  role             String
-  phone            String?
-  is_active        Boolean             @default(true)
-  teacher_id       String?
-  school_id        String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  experience_years Int?
-  qualification    String?
-  subject          String?
-  profile_photo    String?
-  parentStudents   ParentStudentLink[]
-  school           School?             @relation(fields: [school_id], references: [id])
-  conversations    ConversationMember[]
-  messages         Message[]
-  messageReads     MessageRead[]
-  messageReactions MessageReaction[]
-  callSessions     CallParticipant[]
-  callHistory      CallHistory[]
+  id                         String               @id @default(uuid())
+  email                      String               @unique
+  password_hash              String
+  full_name                  String
+  role                       String
+  phone                      String?
+  is_active                  Boolean              @default(true)
+  teacher_id                 String?
+  schoolId                   String?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  experience_years           Int?
+  qualification              String?
+  subject                    String?
+  profile_photo              String?
+  is_verified                Boolean              @default(false)
+  verification_token         String?
+  verification_token_expires DateTime?
+  reset_password_token       String?   @unique
+  reset_password_expires     DateTime?
+  callHistory                CallHistory[]
+  callSessions               CallParticipant[]
+  conversations              ConversationMember[]
+  messages                   Message[]
+  messageReactions           MessageReaction[]
+  messageReads               MessageRead[]
+  parentStudents             ParentStudentLink[]
+  school                     School?              @relation(fields: [schoolId], references: [id])
 
   @@index([email])
-  @@index([school_id])
+  @@index([schoolId])
 }
 
 model Teacher {
   id               String              @id @default(uuid())
   name             String
   email            String?             @unique
-  schoolId         String
+  schoolId         String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   experience_years Int?
@@ -66,7 +89,7 @@ model Teacher {
   user_id          String?             @unique
   profile_photo    String?
   attendance       Attendance[]
-  school           School              @relation(fields: [schoolId], references: [id])
+  school           School?              @relation(fields: [schoolId], references: [id])
   assignments      TeacherAssignment[]
 
   @@index([schoolId])
@@ -75,22 +98,22 @@ model Teacher {
 model TeacherAssignment {
   id         String   @id @default(uuid())
   teacher_id String
-  school_id  String
+  schoolId   String?
   grade      String
   section    String
   subject    String?
   stream     String?
   createdAt  DateTime @default(now())
-  school     School   @relation(fields: [school_id], references: [id])
+  school     School?  @relation(fields: [schoolId], references: [id])
   teacher    Teacher  @relation(fields: [teacher_id], references: [id])
 
-  @@index([school_id])
+  @@index([schoolId])
   @@index([teacher_id])
 }
 
 model SchoolSettings {
   id                   String   @id @default(uuid())
-  school_id            String   @unique
+  schoolId             String?  @unique
   school_name          String?
   school_phone         String?
   school_address       String?
@@ -102,28 +125,43 @@ model SchoolSettings {
   email_notifications  Boolean  @default(true)
   sms_notifications    Boolean  @default(false)
   notification_time    String   @default("16:00")
-  school_logo          String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
-  school               School   @relation(fields: [school_id], references: [id])
+  school_logo          String?
+  school               School?  @relation(fields: [schoolId], references: [id])
 }
 
 model Grade {
   id       String    @id @default(uuid())
-  name     String    @unique
+  schoolId String?
+  name     String
   students Student[]
+  school   School?  @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
 }
 
 model Section {
   id       String    @id @default(uuid())
-  name     String    @unique
+  schoolId String?
+  name     String
   students Student[]
+  school   School?    @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
 }
 
 model Stream {
   id       String    @id @default(uuid())
-  name     String    @unique
+  schoolId String?
+  name     String
   students Student[]
+  school   School?   @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
 }
 
 model Student {
@@ -138,14 +176,14 @@ model Student {
   updatedAt           DateTime             @updatedAt
   fullName            String
   gradeId             String
-  schoolId            String
+  schoolId            String?
   sectionId           String
   streamId            String?
   attendance          Attendance[]
   parentNotifications ParentNotification[]
   parentStudents      ParentStudentLink[]
   grade               Grade                @relation(fields: [gradeId], references: [id])
-  school              School               @relation(fields: [schoolId], references: [id])
+  school              School?               @relation(fields: [schoolId], references: [id])
   section             Section              @relation(fields: [sectionId], references: [id])
   stream              Stream?              @relation(fields: [streamId], references: [id])
 
@@ -164,9 +202,9 @@ model Attendance {
   remarks   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  schoolId  String
+  schoolId  String?
   teacherId String?
-  school    School   @relation(fields: [schoolId], references: [id])
+  school    School?   @relation(fields: [schoolId], references: [id])
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   teacher   Teacher? @relation(fields: [teacherId], references: [id])
 
@@ -179,6 +217,7 @@ model Attendance {
 
 model AuditLog {
   id          String   @id @default(uuid())
+  schoolId    String?
   user_id     String?
   action      String
   entity_type String
@@ -186,12 +225,15 @@ model AuditLog {
   old_values  Json?
   new_values  Json?
   created_at  DateTime @default(now())
+  school      School?   @relation(fields: [schoolId], references: [id])
 
   @@map("audit_logs")
+  @@index([schoolId])
 }
 
 model AttendanceReport {
   id                    String   @id @default(uuid())
+  schoolId              String?
   student_id            String
   class_id              String
   month                 Int
@@ -204,35 +246,40 @@ model AttendanceReport {
   attendance_percentage Decimal  @default(0.00) @db.Decimal(5, 2)
   created_at            DateTime @default(now())
   updated_at            DateTime @updatedAt
+  school                School?   @relation(fields: [schoolId], references: [id])
 
   @@unique([student_id, month, year])
   @@map("attendance_reports")
+  @@index([schoolId])
 }
 
 model ParentStudentLink {
   id               String   @id @default(uuid())
+  schoolId         String?
   parentId         String
   studentId        String
   relationshipType String?  @default("Guardian")
   createdAt        DateTime @default(now())
   parent           User     @relation(fields: [parentId], references: [id], onDelete: Cascade)
   student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  school           School?   @relation(fields: [schoolId], references: [id])
 
   @@unique([parentId, studentId])
   @@index([parentId])
-  @@index([studentId])
+  // @@index([studentId]) // Fix: ParentStudentLink already has an index on studentId from relations
+  @@index([schoolId])
 }
 
 model ParentNotification {
   id        String   @id @default(uuid())
-  schoolId  String
+  schoolId  String?
   studentId String?
   type      String
   title     String
   message   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
-  school    School   @relation(fields: [schoolId], references: [id])
+  school    School?   @relation(fields: [schoolId], references: [id])
   student   Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([schoolId])
@@ -255,15 +302,19 @@ model Conversation {
   avatar    String?
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
+  schoolId  String?
   members   ConversationMember[]
   messages  Message[]
+  school    School?               @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
 }
 
 model ConversationMember {
   id             String       @id @default(uuid())
   conversationId String
   userId         String
-  role           String       @default("MEMBER") // ADMIN, MEMBER
+  role           String       @default("MEMBER")
   joinedAt       DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -275,97 +326,125 @@ model ConversationMember {
 
 model Message {
   id             String            @id @default(uuid())
+  schoolId       String?
   conversationId String
   senderId       String
   content        String?
-  type           String            @default("TEXT") // TEXT, IMAGE, FILE, VOICE
+  type           String            @default("TEXT")
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
-  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  readBy         MessageRead[]
-  reactions      MessageReaction[]
-  attachments    Attachment[]
   replyToId      String?
+  attachments    Json?
+  metadata       Json?
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   replyTo        Message?          @relation("Replies", fields: [replyToId], references: [id])
   replies        Message[]         @relation("Replies")
+  sender         User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  school         School?            @relation(fields: [schoolId], references: [id])
+  reactions      MessageReaction[]
+  readBy         MessageRead[]
 
   @@index([conversationId])
   @@index([senderId])
+  @@index([schoolId])
 }
 
 model MessageRead {
   id        String   @id @default(uuid())
+  schoolId  String?
   messageId String
   userId    String
   readAt    DateTime @default(now())
   message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school    School?   @relation(fields: [schoolId], references: [id])
 
   @@unique([messageId, userId])
   @@index([messageId])
   @@index([userId])
+  @@index([schoolId])
 }
 
 model MessageReaction {
   id        String   @id @default(uuid())
+  schoolId  String?
   messageId String
   userId    String
   emoji     String
   createdAt DateTime @default(now())
   message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school    School?   @relation(fields: [schoolId], references: [id])
 
   @@unique([messageId, userId, emoji])
   @@index([messageId])
   @@index([userId])
-}
-
-model Attachment {
-  id        String   @id @default(uuid())
-  messageId String
-  url       String
-  name      String
-  type      String
-  size      Int
-  createdAt DateTime @default(now())
-  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-
-  @@index([messageId])
+  @@index([schoolId])
 }
 
 model CallSession {
   id             String            @id @default(uuid())
+  schoolId       String?
   conversationId String?
-  type           String            @default("VOICE") // VOICE, VIDEO
-  status         String            @default("ONGOING") // ONGOING, ENDED, MISSED
+  type           String            @default("VOICE")
+  status         String            @default("ONGOING")
   startTime      DateTime          @default(now())
   endTime        DateTime?
-  participants   CallParticipant[]
-  history        CallHistory[]
   createdAt      DateTime          @default(now())
+  history        CallHistory[]
+  participants   CallParticipant[]
+  school         School?            @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
 }
 
 model CallParticipant {
   id            String      @id @default(uuid())
+  schoolId      String?
   callSessionId String
   userId        String
   joinedAt      DateTime    @default(now())
   leftAt        DateTime?
   callSession   CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
   user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school        School?      @relation(fields: [schoolId], references: [id])
 
   @@unique([callSessionId, userId])
+  @@index([schoolId])
 }
 
 model CallHistory {
   id            String      @id @default(uuid())
+  schoolId      String?
   userId        String
   callSessionId String
-  type          String // INCOMING, OUTGOING, MISSED
-  status        String // COMPLETED, MISSED, REJECTED
-  duration      Int? // in seconds
+  type          String
+  status        String
+  duration      Int?
   createdAt     DateTime    @default(now())
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   callSession   CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school        School?      @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
 }
+
+model PendingRegistration {
+  id            String   @id
+  schoolId      String?
+  email         String   @unique
+  password_hash String
+  full_name     String
+  role          String
+  phone         String?
+  school_name   String?
+  token         String   @unique
+  expires_at    DateTime
+  createdAt     DateTime @default(now())
+  school        School?  @relation(fields: [schoolId], references: [id])
+
+  @@index([email])
+  @@index([token])
+  @@index([schoolId])
+}
+

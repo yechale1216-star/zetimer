@@ -20,11 +20,11 @@ const DEFAULT_SETTINGS = {
     school_logo: '',
 };
 const getSettings = async (schoolId) => {
-    let settings = await db_1.default.schoolSettings.findUnique({ where: { school_id: schoolId } });
+    let settings = await db_1.default.schoolSettings.findUnique({ where: { schoolId: schoolId } });
     if (!settings) {
         // Auto-create defaults on first access
         settings = await db_1.default.schoolSettings.create({
-            data: { ...DEFAULT_SETTINGS, school_id: schoolId },
+            data: { ...DEFAULT_SETTINGS, schoolId: schoolId },
         });
     }
     return settings;
@@ -32,8 +32,8 @@ const getSettings = async (schoolId) => {
 exports.getSettings = getSettings;
 const updateSettings = async (schoolId, data) => {
     return await db_1.default.schoolSettings.upsert({
-        where: { school_id: schoolId },
-        create: { ...DEFAULT_SETTINGS, ...data, school_id: schoolId },
+        where: { schoolId: schoolId },
+        create: { ...DEFAULT_SETTINGS, ...data, schoolId: schoolId },
         update: data,
     });
 };

@@ -7,9 +7,14 @@ exports.createConversation = exports.getMessages = exports.getConversations = vo
 const db_1 = __importDefault(require("../config/db"));
 const getConversations = async (req, res) => {
     const { userId } = req.params;
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) {
+        return res.status(401).json({ error: 'Unauthorized: School ID missing' });
+    }
     try {
         const conversations = await db_1.default.conversation.findMany({
             where: {
+                schoolId,
                 members: {
                     some: { userId },
                 },
@@ -29,6 +34,7 @@ const getConversations = async (req, res) => {
                     },
                 },
                 messages: {
+                    where: { schoolId },
                     orderBy: { createdAt: 'desc' },
                     take: 1,
                     include: {
@@ -51,9 +57,20 @@ exports.getConversations = getConversations;
 const getMessages = async (req, res) => {
     const { conversationId } = req.params;
     const { limit = 50, cursor } = req.query;
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) {
+        return res.status(401).json({ error: 'Unauthorized: School ID missing' });
+    }
     try {
+        // Also verify the conversation belongs to this school
+        const conversation = await db_1.default.conversation.findFirst({
+            where: { id: conversationId, schoolId }
+        });
+        if (!conversation) {
+            return res.status(403).json({ error: 'Forbidden: Access to this conversation is denied' });
+        }
         const messages = await db_1.default.message.findMany({
-            where: { conversationId },
+            where: { conversationId, schoolId },
             take: Number(limit),
             ...(cursor ? { skip: 1, cursor: { id: String(cursor) } } : {}),
             orderBy: { createdAt: 'desc' },
@@ -65,9 +82,12 @@ const getMessages = async (req, res) => {
                         profile_photo: true,
                     },
                 },
-                readBy: true,
-                reactions: true,
-                attachments: true,
+                readBy: {
+                    where: { schoolId }
+                },
+                reactions: {
+                    where: { schoolId }
+                },
                 replyTo: true,
             },
         });
@@ -81,11 +101,16 @@ const getMessages = async (req, res) => {
 exports.getMessages = getMessages;
 const createConversation = async (req, res) => {
     const { name, isGroup, memberIds, avatar } = req.body;
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) {
+        return res.status(401).json({ error: 'Unauthorized: School ID missing' });
+    }
     try {
-        // If not a group, check if a 1:1 conversation already exists
+        // If not a group, check if a 1:1 conversation already exists in THIS school
         if (!isGroup && memberIds.length === 2) {
             const existingConversation = await db_1.default.conversation.findFirst({
                 where: {
+                    schoolId,
                     isGroup: false,
                     AND: [
                         { members: { some: { userId: memberIds[0] } } },
@@ -102,6 +127,7 @@ const createConversation = async (req, res) => {
                 name,
                 isGroup,
                 avatar,
+                schoolId,
                 members: {
                     create: memberIds.map((userId) => ({
                         userId,

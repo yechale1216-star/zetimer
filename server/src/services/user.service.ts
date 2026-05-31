@@ -1,21 +1,31 @@
-import prisma from '../config/db';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import prisma from '../config/db';
 
 export const getUserByEmail = async (email: string) => {
-  return await prisma.user.findUnique({ where: { email } });
+  return await prisma.user.findUnique({ 
+    where: { email },
+    include: { school: true }
+  });
 };
 
-export const getUserById = async (id: string) => {
-  return await prisma.user.findUnique({ where: { id } });
+export const getUserById = async (id: string, schoolId?: string) => {
+  const where: any = { id };
+  if (schoolId) where.schoolId = schoolId;
+  return await prisma.user.findFirst({ where });
 };
 
-export const getUsers = async (schoolId?: string) => {
-  const where: any = {};
-  if (schoolId) where.school_id = schoolId;
-  return await prisma.user.findMany({ where });
+export const getUsers = async (schoolId: string) => {
+  if (!schoolId) throw new Error('School ID is required');
+  return await prisma.user.findMany({ 
+    where: { schoolId },
+    orderBy: { full_name: 'asc' }
+  });
 };
 
 export const getContacts = async (schoolId: string) => {
+  if (!schoolId) throw new Error('School ID is required');
+
   // Extract all parent phones from students in this school for legacy linking
   const students = await prisma.student.findMany({
     where: { schoolId },
@@ -29,7 +39,7 @@ export const getContacts = async (schoolId: string) => {
   const users = await prisma.user.findMany({
     where: {
       OR: [
-        { school_id: schoolId },
+        { schoolId: schoolId },
         { parentStudents: { some: { student: { schoolId } } } },
         { phone: { in: parentPhones }, role: 'parent' }
       ],
@@ -45,7 +55,6 @@ export const getContacts = async (schoolId: string) => {
     }
   });
 
-  // De-duplicate by User ID only, to allow teachers/admins with the same testing phone
   const uniqueUsers = new Map();
   for (const u of users) {
     if (!uniqueUsers.has(u.id)) {
@@ -58,26 +67,27 @@ export const getContacts = async (schoolId: string) => {
 
 export const createUser = async (data: any) => {
   let teacherId = data.teacher_id || null;
+  const schoolId = data.schoolId || null;
 
-  // Prevent duplicate phone for teachers
+  // Prevent duplicate phone for teachers within the same school (or globally if required)
   if (data.role === 'teacher' && data.phone) {
     const cleanPhone = data.phone.trim();
     const existing = await prisma.user.findFirst({
-      where: { phone: cleanPhone, role: 'teacher' }
+      where: { phone: cleanPhone, role: 'teacher', schoolId }
     });
     if (existing) {
-      throw new Error('Phone already registered for another teacher.');
+      throw new Error('Phone already registered for another teacher in this school.');
     }
     data.phone = cleanPhone;
   }
 
   // Automatically create a corresponding Teacher record if role is 'teacher'
-  if (data.role === 'teacher' && !teacherId && data.school_id) {
+  if (data.role === 'teacher' && !teacherId && schoolId) {
     const teacher = await prisma.teacher.create({
       data: {
         name: data.full_name,
         email: data.email,
-        schoolId: data.school_id,
+        schoolId: schoolId,
         phone: data.phone || null,
         subject: data.subject || null,
         qualification: data.qualification || null,
@@ -102,7 +112,7 @@ export const createUser = async (data: any) => {
       phone: data.phone || null,
       is_active: data.is_active !== false,
       teacher_id: teacherId,
-      school_id: data.school_id || null,
+      schoolId: schoolId,
       subject: data.subject || null,
       qualification: data.qualification || null,
       experience_years: data.experience_years !== undefined && data.experience_years !== null ? Number(data.experience_years) : null,
@@ -110,7 +120,6 @@ export const createUser = async (data: any) => {
     },
   });
 
-  // Link the newly created User ID to the Teacher record
   if (data.role === 'teacher' && teacherId) {
     try {
       await prisma.teacher.update({
@@ -125,18 +134,18 @@ export const createUser = async (data: any) => {
   return user;
 };
 
-export const updateUser = async (id: string, data: any) => {
+export const updateUser = async (id: string, data: any, schoolId?: string) => {
   const updateData: any = {};
   if (data.full_name !== undefined) updateData.full_name = data.full_name;
   if (data.email !== undefined) updateData.email = data.email;
+  // ... (rest of update logic)
+  
   if (data.phone !== undefined) {
     const cleanPhone = data.phone.trim();
-    
-    // Prevent duplicate phone for teachers on update
     const currentUser = await prisma.user.findUnique({ where: { id } });
     if (currentUser?.role === 'teacher' && cleanPhone) {
       const existing = await prisma.user.findFirst({
-        where: { phone: cleanPhone, role: 'teacher', id: { not: id } }
+        where: { phone: cleanPhone, role: 'teacher', id: { not: id }, schoolId: currentUser.schoolId }
       });
       if (existing) {
         throw new Error('Phone already registered for another teacher.');
@@ -144,21 +153,25 @@ export const updateUser = async (id: string, data: any) => {
     }
     updateData.phone = cleanPhone;
   }
+  
+  // (Adding necessary fields for update)
   if (data.password_hash !== undefined) {
     updateData.password_hash = data.password_hash && !data.password_hash.startsWith('$2')
       ? bcrypt.hashSync(data.password_hash, 10)
       : data.password_hash;
   }
   if (data.is_active !== undefined) updateData.is_active = data.is_active;
-  if (data.teacher_id !== undefined) updateData.teacher_id = data.teacher_id;
   if (data.subject !== undefined) updateData.subject = data.subject;
   if (data.qualification !== undefined) updateData.qualification = data.qualification;
   if (data.experience_years !== undefined) updateData.experience_years = data.experience_years !== null ? Number(data.experience_years) : null;
   if (data.profile_photo !== undefined) updateData.profile_photo = data.profile_photo;
 
-  const user = await prisma.user.update({ where: { id }, data: updateData });
+  // Enforce schoolId if provided
+  const user = await prisma.user.update({ 
+    where: { id, ...(schoolId && { schoolId }) }, 
+    data: updateData 
+  });
 
-  // Update corresponding Teacher record if it exists
   if (user.teacher_id && (data.full_name !== undefined || data.email !== undefined || data.phone !== undefined || data.subject !== undefined || data.qualification !== undefined || data.experience_years !== undefined || data.is_active !== undefined || data.profile_photo !== undefined)) {
     try {
       await prisma.teacher.update({
@@ -182,13 +195,13 @@ export const updateUser = async (id: string, data: any) => {
   return user;
 };
 
-export const deleteUser = async (id: string) => {
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (user && user.teacher_id) {
+export const deleteUser = async (id: string, schoolId: string) => {
+  const user = await prisma.user.findFirst({ where: { id, schoolId } });
+  if (!user) throw new Error('User not found in this school');
+
+  if (user.teacher_id) {
     try {
-      // Delete assignments first
       await prisma.teacherAssignment.deleteMany({ where: { teacher_id: user.teacher_id } });
-      // Delete teacher record
       await prisma.teacher.delete({ where: { id: user.teacher_id } });
     } catch (e) {
       console.error("Failed to delete linked teacher:", e);
@@ -198,9 +211,63 @@ export const deleteUser = async (id: string) => {
 };
 
 export const verifyPassword = (plain: string, hash: string): boolean => {
-  // Support plain text passwords (dev mode) and bcrypt hashes
   if (hash.startsWith('$2')) {
-    try { return require('bcryptjs').compareSync(plain, hash); } catch { return false; }
+    try { return bcrypt.compareSync(plain, hash); } catch { return false; }
   }
   return plain === hash;
+};
+
+export const createPasswordResetToken = async (email: string) => {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return null;
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 3600000); // 1 hour
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      reset_password_token: token,
+      reset_password_expires: expires,
+    },
+  });
+
+  return token;
+};
+
+export const resetPasswordByToken = async (token: string, newPassword: any) => {
+  const user = await prisma.user.findFirst({
+    where: {
+      reset_password_token: token,
+      reset_password_expires: { gt: new Date() },
+    },
+  });
+
+  if (!user) {
+    throw new Error('Invalid or expired reset token');
+  }
+
+  const hashedPassword = !newPassword.startsWith('$2')
+    ? bcrypt.hashSync(newPassword, 10)
+    : newPassword;
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password_hash: hashedPassword,
+      reset_password_token: null,
+      reset_password_expires: null,
+    },
+  });
+
+  return user;
+};
+
+export const getUserByResetToken = async (token: string) => {
+  return await prisma.user.findFirst({
+    where: {
+      reset_password_token: token,
+      reset_password_expires: { gt: new Date() },
+    },
+  });
 };

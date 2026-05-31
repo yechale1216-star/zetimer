@@ -6,10 +6,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteAssignment = exports.createAssignment = exports.getAssignments = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const getAssignments = async (schoolId, teacherId) => {
-    const where = { school_id: schoolId };
+    if (!schoolId)
+        throw new Error('School ID is required');
+    const where = { schoolId };
     if (teacherId) {
         let resolvedTeacherId = teacherId;
-        const user = await db_1.default.user.findUnique({ where: { id: teacherId } });
+        const user = await db_1.default.user.findFirst({
+            where: { id: teacherId, schoolId }
+        });
         if (user && user.teacher_id) {
             resolvedTeacherId = user.teacher_id;
         }
@@ -21,21 +25,25 @@ const getAssignments = async (schoolId, teacherId) => {
     });
 };
 exports.getAssignments = getAssignments;
-const createAssignment = async (data) => {
+const createAssignment = async (data, schoolId) => {
+    if (!schoolId)
+        throw new Error('School ID is required');
     let teacherId = data.teacher_id;
     // Resolve User.id -> Teacher.id if a User ID was passed
-    const user = await db_1.default.user.findUnique({ where: { id: teacherId } });
+    const user = await db_1.default.user.findFirst({
+        where: { id: teacherId, schoolId }
+    });
     if (user) {
         if (user.teacher_id) {
             teacherId = user.teacher_id;
         }
-        else if (user.role === 'teacher' && user.school_id) {
+        else if (user.role === 'teacher') {
             // Lazy-create missing Teacher record for this user
             const newTeacher = await db_1.default.teacher.create({
                 data: {
                     name: user.full_name,
                     email: user.email,
-                    schoolId: user.school_id,
+                    schoolId: schoolId,
                     user_id: user.id,
                     phone: user.phone || null,
                     profile_photo: user.profile_photo || null,
@@ -48,10 +56,10 @@ const createAssignment = async (data) => {
             teacherId = newTeacher.id;
         }
     }
-    // Check for duplicate class assignment for this teacher
+    // Check for duplicate class assignment for this teacher in this school
     const existing = await db_1.default.teacherAssignment.findFirst({
         where: {
-            school_id: data.school_id,
+            schoolId,
             teacher_id: teacherId,
             grade: data.grade,
             section: data.section,
@@ -65,7 +73,7 @@ const createAssignment = async (data) => {
     return await db_1.default.teacherAssignment.create({
         data: {
             teacher_id: teacherId,
-            school_id: data.school_id,
+            schoolId: schoolId,
             grade: data.grade,
             section: data.section,
             subject: data.subject || null,
@@ -75,7 +83,9 @@ const createAssignment = async (data) => {
     });
 };
 exports.createAssignment = createAssignment;
-const deleteAssignment = async (id) => {
-    return await db_1.default.teacherAssignment.delete({ where: { id } });
+const deleteAssignment = async (id, schoolId) => {
+    return await db_1.default.teacherAssignment.delete({
+        where: { id, schoolId }
+    });
 };
 exports.deleteAssignment = deleteAssignment;

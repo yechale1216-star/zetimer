@@ -1,10 +1,13 @@
 import prisma from '../config/db';
 
 export const getAssignments = async (schoolId: string, teacherId?: string) => {
-  const where: any = { school_id: schoolId };
+  if (!schoolId) throw new Error('School ID is required');
+  const where: any = { schoolId };
   if (teacherId) {
     let resolvedTeacherId = teacherId;
-    const user = await prisma.user.findUnique({ where: { id: teacherId } });
+    const user = await prisma.user.findFirst({ 
+      where: { id: teacherId, schoolId } 
+    });
     if (user && user.teacher_id) {
       resolvedTeacherId = user.teacher_id;
     }
@@ -16,21 +19,25 @@ export const getAssignments = async (schoolId: string, teacherId?: string) => {
   });
 };
 
-export const createAssignment = async (data: any) => {
+export const createAssignment = async (data: any, schoolId: string) => {
+  if (!schoolId) throw new Error('School ID is required');
   let teacherId = data.teacher_id;
 
   // Resolve User.id -> Teacher.id if a User ID was passed
-  const user = await prisma.user.findUnique({ where: { id: teacherId } });
+  const user = await prisma.user.findFirst({ 
+    where: { id: teacherId, schoolId } 
+  });
+  
   if (user) {
     if (user.teacher_id) {
       teacherId = user.teacher_id;
-    } else if (user.role === 'teacher' && user.school_id) {
+    } else if (user.role === 'teacher') {
       // Lazy-create missing Teacher record for this user
       const newTeacher = await prisma.teacher.create({
         data: {
           name: user.full_name,
           email: user.email,
-          schoolId: user.school_id,
+          schoolId: schoolId,
           user_id: user.id,
           phone: user.phone || null,
           profile_photo: user.profile_photo || null,
@@ -44,10 +51,10 @@ export const createAssignment = async (data: any) => {
     }
   }
 
-  // Check for duplicate class assignment for this teacher
+  // Check for duplicate class assignment for this teacher in this school
   const existing = await prisma.teacherAssignment.findFirst({
     where: {
-      school_id: data.school_id,
+      schoolId,
       teacher_id: teacherId,
       grade: data.grade,
       section: data.section,
@@ -63,7 +70,7 @@ export const createAssignment = async (data: any) => {
   return await prisma.teacherAssignment.create({
     data: {
       teacher_id: teacherId,
-      school_id: data.school_id,
+      schoolId: schoolId,
       grade: data.grade,
       section: data.section,
       subject: data.subject || null,
@@ -73,6 +80,8 @@ export const createAssignment = async (data: any) => {
   });
 };
 
-export const deleteAssignment = async (id: string) => {
-  return await prisma.teacherAssignment.delete({ where: { id } });
+export const deleteAssignment = async (id: string, schoolId: string) => {
+  return await prisma.teacherAssignment.delete({ 
+    where: { id, schoolId } 
+  });
 };

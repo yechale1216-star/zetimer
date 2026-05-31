@@ -1,12 +1,19 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
+import { AuthenticatedRequest } from '../middleware/tenant.middleware';
 
-export const getConversations = async (req: Request, res: Response) => {
+export const getConversations = async (req: AuthenticatedRequest, res: Response) => {
   const { userId } = req.params;
+  const schoolId = req.user?.schoolId;
+
+  if (!schoolId) {
+    return res.status(401).json({ error: 'Unauthorized: School ID missing' });
+  }
 
   try {
     const conversations = await prisma.conversation.findMany({
       where: {
+        schoolId,
         members: {
           some: { userId },
         },
@@ -26,6 +33,7 @@ export const getConversations = async (req: Request, res: Response) => {
           },
         },
         messages: {
+          where: { schoolId },
           orderBy: { createdAt: 'desc' },
           take: 1,
           include: {
@@ -45,13 +53,27 @@ export const getConversations = async (req: Request, res: Response) => {
   }
 };
 
-export const getMessages = async (req: Request, res: Response) => {
+export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
   const { conversationId } = req.params;
   const { limit = 50, cursor } = req.query;
+  const schoolId = req.user?.schoolId;
+
+  if (!schoolId) {
+    return res.status(401).json({ error: 'Unauthorized: School ID missing' });
+  }
 
   try {
+    // Also verify the conversation belongs to this school
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, schoolId }
+    });
+
+    if (!conversation) {
+      return res.status(403).json({ error: 'Forbidden: Access to this conversation is denied' });
+    }
+
     const messages = await prisma.message.findMany({
-      where: { conversationId },
+      where: { conversationId, schoolId },
       take: Number(limit),
       ...(cursor ? { skip: 1, cursor: { id: String(cursor) } } : {}),
       orderBy: { createdAt: 'desc' },
@@ -63,9 +85,12 @@ export const getMessages = async (req: Request, res: Response) => {
             profile_photo: true,
           },
         },
-        readBy: true,
-        reactions: true,
-        attachments: true,
+        readBy: {
+          where: { schoolId }
+        },
+        reactions: {
+          where: { schoolId }
+        },
         replyTo: true,
       },
     });
@@ -77,14 +102,20 @@ export const getMessages = async (req: Request, res: Response) => {
   }
 };
 
-export const createConversation = async (req: Request, res: Response) => {
+export const createConversation = async (req: AuthenticatedRequest, res: Response) => {
   const { name, isGroup, memberIds, avatar } = req.body;
+  const schoolId = req.user?.schoolId;
+
+  if (!schoolId) {
+    return res.status(401).json({ error: 'Unauthorized: School ID missing' });
+  }
 
   try {
-    // If not a group, check if a 1:1 conversation already exists
+    // If not a group, check if a 1:1 conversation already exists in THIS school
     if (!isGroup && memberIds.length === 2) {
       const existingConversation = await prisma.conversation.findFirst({
         where: {
+          schoolId,
           isGroup: false,
           AND: [
             { members: { some: { userId: memberIds[0] } } },
@@ -103,6 +134,7 @@ export const createConversation = async (req: Request, res: Response) => {
         name,
         isGroup,
         avatar,
+        schoolId,
         members: {
           create: memberIds.map((userId: string) => ({
             userId,
@@ -133,3 +165,4 @@ export const createConversation = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to create conversation' });
   }
 };
+

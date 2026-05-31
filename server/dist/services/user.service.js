@@ -7,21 +7,31 @@ exports.verifyPassword = exports.deleteUser = exports.updateUser = exports.creat
 const db_1 = __importDefault(require("../config/db"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const getUserByEmail = async (email) => {
-    return await db_1.default.user.findUnique({ where: { email } });
+    return await db_1.default.user.findUnique({
+        where: { email },
+        include: { school: true }
+    });
 };
 exports.getUserByEmail = getUserByEmail;
-const getUserById = async (id) => {
-    return await db_1.default.user.findUnique({ where: { id } });
+const getUserById = async (id, schoolId) => {
+    const where = { id };
+    if (schoolId)
+        where.schoolId = schoolId;
+    return await db_1.default.user.findFirst({ where });
 };
 exports.getUserById = getUserById;
 const getUsers = async (schoolId) => {
-    const where = {};
-    if (schoolId)
-        where.school_id = schoolId;
-    return await db_1.default.user.findMany({ where });
+    if (!schoolId)
+        throw new Error('School ID is required');
+    return await db_1.default.user.findMany({
+        where: { schoolId },
+        orderBy: { full_name: 'asc' }
+    });
 };
 exports.getUsers = getUsers;
 const getContacts = async (schoolId) => {
+    if (!schoolId)
+        throw new Error('School ID is required');
     // Extract all parent phones from students in this school for legacy linking
     const students = await db_1.default.student.findMany({
         where: { schoolId },
@@ -33,7 +43,7 @@ const getContacts = async (schoolId) => {
     const users = await db_1.default.user.findMany({
         where: {
             OR: [
-                { school_id: schoolId },
+                { schoolId: schoolId },
                 { parentStudents: { some: { student: { schoolId } } } },
                 { phone: { in: parentPhones }, role: 'parent' }
             ],
@@ -48,7 +58,6 @@ const getContacts = async (schoolId) => {
             phone: true,
         }
     });
-    // De-duplicate by User ID only, to allow teachers/admins with the same testing phone
     const uniqueUsers = new Map();
     for (const u of users) {
         if (!uniqueUsers.has(u.id)) {
@@ -60,24 +69,25 @@ const getContacts = async (schoolId) => {
 exports.getContacts = getContacts;
 const createUser = async (data) => {
     let teacherId = data.teacher_id || null;
-    // Prevent duplicate phone for teachers
+    const schoolId = data.schoolId || null;
+    // Prevent duplicate phone for teachers within the same school (or globally if required)
     if (data.role === 'teacher' && data.phone) {
         const cleanPhone = data.phone.trim();
         const existing = await db_1.default.user.findFirst({
-            where: { phone: cleanPhone, role: 'teacher' }
+            where: { phone: cleanPhone, role: 'teacher', schoolId }
         });
         if (existing) {
-            throw new Error('Phone already registered for another teacher.');
+            throw new Error('Phone already registered for another teacher in this school.');
         }
         data.phone = cleanPhone;
     }
     // Automatically create a corresponding Teacher record if role is 'teacher'
-    if (data.role === 'teacher' && !teacherId && data.school_id) {
+    if (data.role === 'teacher' && !teacherId && schoolId) {
         const teacher = await db_1.default.teacher.create({
             data: {
                 name: data.full_name,
                 email: data.email,
-                schoolId: data.school_id,
+                schoolId: schoolId,
                 phone: data.phone || null,
                 subject: data.subject || null,
                 qualification: data.qualification || null,
@@ -100,14 +110,13 @@ const createUser = async (data) => {
             phone: data.phone || null,
             is_active: data.is_active !== false,
             teacher_id: teacherId,
-            school_id: data.school_id || null,
+            schoolId: schoolId,
             subject: data.subject || null,
             qualification: data.qualification || null,
             experience_years: data.experience_years !== undefined && data.experience_years !== null ? Number(data.experience_years) : null,
             profile_photo: data.profile_photo || null,
         },
     });
-    // Link the newly created User ID to the Teacher record
     if (data.role === 'teacher' && teacherId) {
         try {
             await db_1.default.teacher.update({
@@ -122,19 +131,19 @@ const createUser = async (data) => {
     return user;
 };
 exports.createUser = createUser;
-const updateUser = async (id, data) => {
+const updateUser = async (id, data, schoolId) => {
     const updateData = {};
     if (data.full_name !== undefined)
         updateData.full_name = data.full_name;
     if (data.email !== undefined)
         updateData.email = data.email;
+    // ... (rest of update logic)
     if (data.phone !== undefined) {
         const cleanPhone = data.phone.trim();
-        // Prevent duplicate phone for teachers on update
         const currentUser = await db_1.default.user.findUnique({ where: { id } });
         if (currentUser?.role === 'teacher' && cleanPhone) {
             const existing = await db_1.default.user.findFirst({
-                where: { phone: cleanPhone, role: 'teacher', id: { not: id } }
+                where: { phone: cleanPhone, role: 'teacher', id: { not: id }, schoolId: currentUser.schoolId }
             });
             if (existing) {
                 throw new Error('Phone already registered for another teacher.');
@@ -142,6 +151,7 @@ const updateUser = async (id, data) => {
         }
         updateData.phone = cleanPhone;
     }
+    // (Adding necessary fields for update)
     if (data.password_hash !== undefined) {
         updateData.password_hash = data.password_hash && !data.password_hash.startsWith('$2')
             ? bcryptjs_1.default.hashSync(data.password_hash, 10)
@@ -149,8 +159,6 @@ const updateUser = async (id, data) => {
     }
     if (data.is_active !== undefined)
         updateData.is_active = data.is_active;
-    if (data.teacher_id !== undefined)
-        updateData.teacher_id = data.teacher_id;
     if (data.subject !== undefined)
         updateData.subject = data.subject;
     if (data.qualification !== undefined)
@@ -159,8 +167,11 @@ const updateUser = async (id, data) => {
         updateData.experience_years = data.experience_years !== null ? Number(data.experience_years) : null;
     if (data.profile_photo !== undefined)
         updateData.profile_photo = data.profile_photo;
-    const user = await db_1.default.user.update({ where: { id }, data: updateData });
-    // Update corresponding Teacher record if it exists
+    // Enforce schoolId if provided
+    const user = await db_1.default.user.update({
+        where: { id, ...(schoolId && { schoolId }) },
+        data: updateData
+    });
     if (user.teacher_id && (data.full_name !== undefined || data.email !== undefined || data.phone !== undefined || data.subject !== undefined || data.qualification !== undefined || data.experience_years !== undefined || data.is_active !== undefined || data.profile_photo !== undefined)) {
         try {
             await db_1.default.teacher.update({
@@ -184,13 +195,13 @@ const updateUser = async (id, data) => {
     return user;
 };
 exports.updateUser = updateUser;
-const deleteUser = async (id) => {
-    const user = await db_1.default.user.findUnique({ where: { id } });
-    if (user && user.teacher_id) {
+const deleteUser = async (id, schoolId) => {
+    const user = await db_1.default.user.findFirst({ where: { id, schoolId } });
+    if (!user)
+        throw new Error('User not found in this school');
+    if (user.teacher_id) {
         try {
-            // Delete assignments first
             await db_1.default.teacherAssignment.deleteMany({ where: { teacher_id: user.teacher_id } });
-            // Delete teacher record
             await db_1.default.teacher.delete({ where: { id: user.teacher_id } });
         }
         catch (e) {
@@ -201,10 +212,9 @@ const deleteUser = async (id) => {
 };
 exports.deleteUser = deleteUser;
 const verifyPassword = (plain, hash) => {
-    // Support plain text passwords (dev mode) and bcrypt hashes
     if (hash.startsWith('$2')) {
         try {
-            return require('bcryptjs').compareSync(plain, hash);
+            return bcryptjs_1.default.compareSync(plain, hash);
         }
         catch {
             return false;

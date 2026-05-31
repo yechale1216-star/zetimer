@@ -16,11 +16,11 @@ const DEFAULT_SETTINGS = {
 };
 
 export const getSettings = async (schoolId: string) => {
-  let settings = await prisma.schoolSettings.findUnique({ where: { school_id: schoolId } });
+  let settings = await prisma.schoolSettings.findUnique({ where: { schoolId: schoolId } });
   if (!settings) {
     // Auto-create defaults on first access
     settings = await prisma.schoolSettings.create({
-      data: { ...DEFAULT_SETTINGS, school_id: schoolId },
+      data: { ...DEFAULT_SETTINGS, schoolId: schoolId },
     });
   }
   return settings;
@@ -28,8 +28,8 @@ export const getSettings = async (schoolId: string) => {
 
 export const updateSettings = async (schoolId: string, data: any) => {
   return await prisma.schoolSettings.upsert({
-    where: { school_id: schoolId },
-    create: { ...DEFAULT_SETTINGS, ...data, school_id: schoolId },
+    where: { schoolId: schoolId },
+    create: { ...DEFAULT_SETTINGS, ...data, schoolId: schoolId },
     update: data,
   });
 };

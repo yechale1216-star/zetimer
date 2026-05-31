@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const userService = __importStar(require("../services/user.service"));
 const router = (0, express_1.Router)();
-// Get user by email — used by auth login
+// Get user by email — used by auth login (Public or filtered)
 router.get('/by-email', async (req, res, next) => {
     try {
         const { email } = req.query;
@@ -52,7 +52,9 @@ router.get('/by-email', async (req, res, next) => {
 // Get all users for a school (teachers list)
 router.get('/', async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'];
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'School ID required' });
         const users = await userService.getUsers(schoolId);
         res.status(200).json({ success: true, data: users });
     }
@@ -63,7 +65,7 @@ router.get('/', async (req, res, next) => {
 // Get all contacts for a school (admin, teacher, parent, no students)
 router.get('/contacts', async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'];
+        const schoolId = req.user?.schoolId;
         if (!schoolId) {
             return res.status(400).json({ success: false, message: 'School ID required' });
         }
@@ -74,13 +76,13 @@ router.get('/contacts', async (req, res, next) => {
         next(error);
     }
 });
-// Create user — used by auth signup
+// Create user
 router.post('/', async (req, res, next) => {
     try {
-        const schoolId = req.headers['x-school-id'];
+        const schoolId = req.user?.schoolId;
         const data = { ...req.body };
-        if (schoolId && !data.school_id)
-            data.school_id = schoolId;
+        if (schoolId)
+            data.schoolId = schoolId;
         const user = await userService.createUser(data);
         res.status(201).json({ success: true, data: user });
     }
@@ -91,7 +93,8 @@ router.post('/', async (req, res, next) => {
 // Update user
 router.put('/:id', async (req, res, next) => {
     try {
-        const user = await userService.updateUser(req.params.id, req.body);
+        const schoolId = req.user?.schoolId;
+        const user = await userService.updateUser(req.params.id, req.body, schoolId);
         res.status(200).json({ success: true, data: user });
     }
     catch (error) {
@@ -101,14 +104,17 @@ router.put('/:id', async (req, res, next) => {
 // Delete user
 router.delete('/:id', async (req, res, next) => {
     try {
-        await userService.deleteUser(req.params.id);
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        await userService.deleteUser(req.params.id, schoolId);
         res.status(200).json({ success: true, message: 'User deleted' });
     }
     catch (error) {
         next(error);
     }
 });
-// Verify password (login check)
+// Verify password (legacy or internal)
 router.post('/verify-password', async (req, res, next) => {
     try {
         const { email, password } = req.body;

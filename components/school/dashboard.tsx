@@ -139,7 +139,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   useEffect(() => {
     const user = authService.getCurrentUser()
     if (user?.name) {
-      setFirstName(user.name.split(' ')[0])
+      const nameParts = user.name.trim().split(/\s+/)
+      const titles = ['dr', 'dr.', 'mr', 'mr.', 'mrs', 'mrs.', 'ms', 'ms.', 'prof', 'prof.']
+      if (nameParts.length > 1 && titles.includes(nameParts[0].toLowerCase())) {
+        setFirstName(`${nameParts[0]} ${nameParts[1]}`)
+      } else {
+        setFirstName(nameParts[0])
+      }
     }
   }, [])
 

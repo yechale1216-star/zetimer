@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation"
 import { ResetPasswordForm } from "@/components/auth/reset-password-form"
+import { Logo } from "@/components/logo"
 
 export default function ResetPasswordPageContent() {
   const searchParams = useSearchParams()
@@ -10,13 +11,16 @@ export default function ResetPasswordPageContent() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-600 to-purple-700 p-4">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Invalid Reset Link</h1>
-          <p className="text-gray-600 mb-6">No reset token provided. Please request a new password reset.</p>
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="bg-card rounded-3xl shadow-2xl border border-border/40 p-8 max-w-md w-full text-center">
+          <div className="flex justify-center mb-6">
+            <Logo size="md" href="/" />
+          </div>
+          <h1 className="text-2xl font-bold text-destructive mb-4">Invalid Reset Link</h1>
+          <p className="text-muted-foreground mb-6">No reset token provided. Please request a new password reset.</p>
           <button
-            onClick={() => router.push("/")}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+            onClick={() => router.push("/login")}
+            className="w-full bg-primary text-primary-foreground py-3 px-4 rounded-xl font-semibold hover:opacity-90 transition-all"
           >
             Back to Login
           </button>
@@ -25,5 +29,14 @@ export default function ResetPasswordPageContent() {
     )
   }
 
-  return <ResetPasswordForm token={token} onResetSuccess={() => router.push("/")} />
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="max-w-md w-full">
+        <div className="flex justify-center mb-8">
+          <Logo size="md" href="/" />
+        </div>
+        <ResetPasswordForm token={token} onResetSuccess={() => router.push("/login")} />
+      </div>
+    </div>
+  )
 }

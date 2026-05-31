@@ -17,7 +17,7 @@ export const getAttendanceSummary = async (schoolId: string, filters: any) => {
     prisma.student.count({ where: { schoolId } }),
     prisma.attendance.groupBy({
       by: ['status'],
-      where,
+      where: { ...where, schoolId },
       _count: {
         _all: true
       }
@@ -62,7 +62,7 @@ export const getGradeStats = async (schoolId: string, filters: any) => {
     where.session = session;
   }
 
-  // Get all students grouped by grade, section, stream
+  // Get all students grouped by grade, section, stream, strictly for this school
   const students = await prisma.student.findMany({
     where: { schoolId },
     include: {
@@ -72,9 +72,8 @@ export const getGradeStats = async (schoolId: string, filters: any) => {
     }
   });
 
-  // Get attendance records for the period
   const attendance = await prisma.attendance.findMany({
-    where,
+    where: { ...where, schoolId },
     select: {
       studentId: true,
       status: true,
@@ -82,7 +81,6 @@ export const getGradeStats = async (schoolId: string, filters: any) => {
     }
   });
 
-  // Create an attendance map for faster lookup: studentId -> attendanceRecords[]
   const attendanceMap: Record<string, any[]> = {};
   attendance.forEach(rec => {
     if (!attendanceMap[rec.studentId]) {
@@ -91,7 +89,6 @@ export const getGradeStats = async (schoolId: string, filters: any) => {
     attendanceMap[rec.studentId].push(rec);
   });
 
-  // Group stats
   const groups: Record<string, any> = {};
 
   students.forEach(student => {
@@ -116,7 +113,6 @@ export const getGradeStats = async (schoolId: string, filters: any) => {
 
     groups[key].totalStudents++;
     
-    // Use the attendance map for O(1) lookup
     const studentAttendance = attendanceMap[student.id] || [];
     studentAttendance.forEach(rec => {
       const status = rec.status.toLowerCase();
@@ -155,7 +151,7 @@ export const getAttendanceTrends = async (schoolId: string, filters: any) => {
   }
 
   if (grade || section || stream) {
-    where.student = {};
+    where.student = { schoolId };
     if (grade) where.student.grade = { name: grade };
     if (section) where.student.section = { name: section };
     if (stream) where.student.stream = { name: stream };
@@ -163,7 +159,7 @@ export const getAttendanceTrends = async (schoolId: string, filters: any) => {
 
   const attendance = await prisma.attendance.groupBy({
     by: ['date', 'status'],
-    where,
+    where: { ...where, schoolId },
     _count: {
       _all: true
     },
@@ -197,6 +193,7 @@ export const getDrillDownStats = async (schoolId: string, gradeId: string, filte
   const where: any = { 
     schoolId,
     student: {
+      schoolId,
       gradeId: gradeId,
     }
   };
@@ -222,6 +219,7 @@ export const getDrillDownStats = async (schoolId: string, gradeId: string, filte
       stream: true,
       attendance: {
         where: {
+          schoolId,
           ...(startDate || endDate ? { 
             date: {
               ...(startDate ? { gte: new Date(startDate) } : {}),

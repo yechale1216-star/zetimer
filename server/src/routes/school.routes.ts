@@ -1,43 +1,43 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import prisma from '../config/db';
+import * as schoolService from '../services/school.service';
+import { authorize, AuthenticatedRequest } from '../middleware/tenant.middleware';
 
 const router = Router();
 
 // Create or ensure a school exists (called on admin signup)
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id, name, email, phone, code, address } = req.body;
+    const { id, name } = req.body;
 
     if (!name) {
       return res.status(400).json({ success: false, message: 'School name is required' });
     }
 
-    // If an ID is provided, upsert with that exact ID so localStorage and Postgres stay in sync
-    let school;
-    if (id) {
-      school = await prisma.school.upsert({
-        where: { id },
-        create: { id, name },
-        update: { name },
-      });
-    } else {
-      // Try to find by name first
-      school = await prisma.school.findFirst({ where: { name } });
-      if (!school) {
-        school = await prisma.school.create({ data: { name } });
-      }
-    }
+    const school = await schoolService.createSchool({ id, name });
 
-    res.status(201).json({ success: true, data: { id: school.id, name: school.name } });
+    res.status(201).json({ success: true, data: { 
+      id: school.id, 
+      schoolId: school.schoolId, 
+      name: school.name,
+      subscriptionStatus: school.subscriptionStatus
+    }});
   } catch (error) {
     next(error);
   }
 });
 
-// Get school by ID
+// Get school by ID (UUID or SCH-XXXX)
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const school = await prisma.school.findUnique({ where: { id: req.params.id } });
+    const { id } = req.params;
+    let school;
+    
+    if (id.startsWith('SCH-')) {
+      school = await schoolService.getSchoolByCustomId(id);
+    } else {
+      school = await schoolService.getSchoolById(id);
+    }
+
     if (!school) return res.status(404).json({ success: false, message: 'School not found' });
     res.status(200).json({ success: true, data: school });
   } catch (error) {
@@ -45,4 +45,15 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// Get all schools (Super Admin only)
+router.get('/', authorize(['super_admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const schools = await schoolService.getAllSchools();
+    res.status(200).json({ success: true, data: schools });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
+

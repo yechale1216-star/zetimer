@@ -13,13 +13,15 @@ export const initSocket = (server: HttpServer) => {
   });
 
   const userSockets = new Map<string, string>(); // userId -> socketId
+  const socketData = new Map<string, { userId: string; schoolId: string }>(); // socketId -> data
 
   io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    socket.on('authenticate', async (userId: string) => {
+    socket.on('authenticate', async ({ userId, schoolId }: { userId: string; schoolId: string }) => {
       userSockets.set(userId, socket.id);
-      console.log(`User ${userId} authenticated with socket ${socket.id}`);
+      socketData.set(socket.id, { userId, schoolId });
+      console.log(`User ${userId} from school ${schoolId} authenticated with socket ${socket.id}`);
       
       // Notify friends/contacts that user is online
       socket.broadcast.emit('user_online', userId);
@@ -42,10 +44,14 @@ export const initSocket = (server: HttpServer) => {
         size: number;
       };
     }) => {
+      const tenant = socketData.get(socket.id);
+      if (!tenant) return;
+
       try {
         const messageData: any = {
           conversationId: data.conversationId,
           senderId: data.senderId,
+          schoolId: tenant.schoolId,
           content: data.content,
           type: data.type,
         };
@@ -71,14 +77,13 @@ export const initSocket = (server: HttpServer) => {
                 profile_photo: true,
               },
             },
-            attachments: true,
           },
         });
 
         io.to(data.conversationId).emit('new_message', message);
         
         await prisma.conversation.update({
-          where: { id: data.conversationId },
+          where: { id: data.conversationId, schoolId: tenant.schoolId },
           data: { updatedAt: new Date() },
         });
 
@@ -93,6 +98,9 @@ export const initSocket = (server: HttpServer) => {
     });
 
     socket.on('mark_as_read', async (data: { messageId: string; userId: string; conversationId: string }) => {
+      const tenant = socketData.get(socket.id);
+      if (!tenant) return;
+
       try {
         await prisma.messageRead.upsert({
           where: {
@@ -105,6 +113,7 @@ export const initSocket = (server: HttpServer) => {
           create: {
             messageId: data.messageId,
             userId: data.userId,
+            schoolId: tenant.schoolId,
           },
         });
 
@@ -117,17 +126,21 @@ export const initSocket = (server: HttpServer) => {
     // --- WebRTC Signaling ---
     
     socket.on('call_user', async (data: { to: string; offer: any; from: string; profile: any; type: 'VOICE' | 'VIDEO' }) => {
+      const tenant = socketData.get(socket.id);
+      if (!tenant) return;
+
       const targetSocketId = userSockets.get(data.to);
       
       // Create call session
       const session = await (prisma as any).callSession.create({
         data: {
+          schoolId: tenant.schoolId,
           type: data.type,
           status: 'RINGING',
           participants: {
             create: [
-              { userId: data.from },
-              { userId: data.to }
+              { userId: data.from, schoolId: tenant.schoolId },
+              { userId: data.to, schoolId: tenant.schoolId }
             ]
           }
         }
@@ -165,6 +178,9 @@ export const initSocket = (server: HttpServer) => {
     });
 
     socket.on('reject_call', async (data: { to: string; from: string; conversationId: string }) => {
+      const tenant = socketData.get(socket.id);
+      if (!tenant) return;
+
       const targetSocketId = userSockets.get(data.to);
       if (targetSocketId) {
         io.to(targetSocketId).emit('call_rejected', { from: data.from });
@@ -175,6 +191,7 @@ export const initSocket = (server: HttpServer) => {
           data: {
             conversationId: data.conversationId,
             senderId: data.from,
+            schoolId: tenant.schoolId,
             content: 'Missed Call',
             type: 'CALL_MISSED_VOICE',
           }
@@ -190,6 +207,9 @@ export const initSocket = (server: HttpServer) => {
     });
 
     socket.on('end_call', async (data: { to: string; from: string; conversationId: string; duration?: number }) => {
+      const tenant = socketData.get(socket.id);
+      if (!tenant) return;
+
       const targetSocketId = userSockets.get(data.to);
       if (targetSocketId) {
         io.to(targetSocketId).emit('call_ended', { from: data.from });
@@ -201,6 +221,7 @@ export const initSocket = (server: HttpServer) => {
           data: {
             conversationId: data.conversationId,
             senderId: data.from,
+            schoolId: tenant.schoolId,
             content: `Call ended ${durationText}`,
             type: 'CALL_VOICE',
           }
@@ -217,16 +238,15 @@ export const initSocket = (server: HttpServer) => {
 
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
-      // Remove user from the map
-      for (const [userId, socketId] of userSockets.entries()) {
-        if (socketId === socket.id) {
-          userSockets.delete(userId);
-          socket.broadcast.emit('user_offline', userId);
-          break;
-        }
+      const data = socketData.get(socket.id);
+      if (data) {
+        userSockets.delete(data.userId);
+        socket.broadcast.emit('user_offline', data.userId);
       }
+      socketData.delete(socket.id);
     });
   });
 
   return io;
 };
+

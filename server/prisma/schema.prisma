@@ -56,6 +56,7 @@ model User {
   qualification              String?
   subject                    String?
   profile_photo              String?
+  address                    String?
   is_verified                Boolean              @default(false)
   verification_token         String?
   verification_token_expires DateTime?
@@ -70,6 +71,7 @@ model User {
   parentStudents             ParentStudentLink[]
   school                     School?              @relation(fields: [schoolId], references: [id])
 
+  @@unique([phone, schoolId, role])
   @@index([email])
   @@index([schoolId])
 }
@@ -166,12 +168,13 @@ model Stream {
 
 model Student {
   id                  String               @id @default(uuid())
-  student_id          String               @unique
+  student_id          String
   parent_email        String
   parent_phone        String
   parent_name         String
   gender              String?
   date_of_birth       String?
+  address             String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   fullName            String
@@ -187,6 +190,7 @@ model Student {
   section             Section              @relation(fields: [sectionId], references: [id])
   stream              Stream?              @relation(fields: [streamId], references: [id])
 
+  @@unique([student_id, schoolId])
   @@index([schoolId])
   @@index([gradeId])
   @@index([sectionId])
@@ -288,11 +292,14 @@ model ParentNotification {
 
 model ParentPreferences {
   id                 String   @id @default(uuid())
-  parentPhone        String   @unique
+  parentPhone        String
+  schoolId           String?
   emailNotifications Boolean  @default(true)
   smsNotifications   Boolean  @default(false)
   pushNotifications  Boolean  @default(true)
   updatedAt          DateTime @updatedAt
+
+  @@unique([parentPhone, schoolId])
 }
 
 model Conversation {

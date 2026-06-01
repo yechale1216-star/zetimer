@@ -26,10 +26,18 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     }
 
     let customSchoolId = '';
+    let schoolName = 'My School';
+    let schoolLogo = '';
+
     if (user.schoolId) {
       const school = await schoolService.getSchoolById(user.schoolId);
       if (school) {
         customSchoolId = school.schoolId || '';
+        schoolName = school.name || 'My School';
+        // Get logo from settings
+        if (school.settings) {
+          schoolLogo = school.settings.school_logo || '';
+        }
       }
     }
 
@@ -52,7 +60,9 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
           role: user.role,
           schoolId: user.schoolId,
           customSchoolId,
-        }
+        },
+        schoolName,
+        schoolLogo
       }
     });
   } catch (error) {
@@ -103,7 +113,9 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
           role: user.role,
           schoolId: user.schoolId,
           customSchoolId,
-        }
+        },
+        schoolName: schoolName || 'My School',
+        schoolLogo: ''
       }
     });
   } catch (error) {

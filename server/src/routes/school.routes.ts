@@ -4,7 +4,7 @@ import { authorize, AuthenticatedRequest } from '../middleware/tenant.middleware
 
 const router = Router();
 
-// Create or ensure a school exists (called on admin signup)
+// Create or Update a school
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id, name } = req.body;
@@ -13,9 +13,20 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       return res.status(400).json({ success: false, message: 'School name is required' });
     }
 
-    const school = await schoolService.createSchool({ id, name });
+    let school;
+    if (id) {
+      // Check if school exists
+      const existing = await schoolService.getSchoolById(id);
+      if (existing) {
+        school = await schoolService.updateSchool(id, { name });
+      } else {
+        school = await schoolService.createSchool({ id, name });
+      }
+    } else {
+      school = await schoolService.createSchool({ name });
+    }
 
-    res.status(201).json({ success: true, data: { 
+    res.status(200).json({ success: true, data: { 
       id: school.id, 
       schoolId: school.schoolId, 
       name: school.name,

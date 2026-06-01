@@ -27,9 +27,19 @@ export const getSettings = async (schoolId: string) => {
 };
 
 export const updateSettings = async (schoolId: string, data: any) => {
-  return await prisma.schoolSettings.upsert({
+  const settings = await prisma.schoolSettings.upsert({
     where: { schoolId: schoolId },
     create: { ...DEFAULT_SETTINGS, ...data, schoolId: schoolId },
     update: data,
   });
+
+  // Keep School table in sync if name changed
+  if (data.school_name) {
+    await prisma.school.update({
+      where: { id: schoolId },
+      data: { name: data.school_name }
+    });
+  }
+
+  return settings;
 };

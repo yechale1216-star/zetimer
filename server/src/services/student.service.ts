@@ -69,17 +69,29 @@ export const createStudent = async (data: any, schoolId: string) => {
 
   // Handle Parent User Account creation or linking
   if (data.existingParentId) {
-    await prisma.parentStudentLink.create({
-      data: {
+    await prisma.parentStudentLink.upsert({
+      where: {
+        parentId_studentId: {
+          parentId: data.existingParentId,
+          studentId: newStudent.id
+        }
+      },
+      update: {
+        relationshipType: data.relationshipType || 'Guardian',
+        schoolId: schoolId
+      },
+      create: {
         parentId: data.existingParentId,
         studentId: newStudent.id,
-        schoolId: schoolId
+        schoolId: schoolId,
+        relationshipType: data.relationshipType || 'Guardian'
       }
     });
   } else if (data.parent_phone && data.parent_password) {
     const cleanPhone = data.parent_phone.replace(/\s+/g, '');
     const hashedPassword = await bcrypt.hash(data.parent_password, 10);
-    const parentEmail = data.parent_email || `parent-${cleanPhone}@zetime.com`;
+    // Use clear pattern for email if not provided to maintain uniqueness
+    const parentEmail = data.parent_email || `parent-${cleanPhone}-${schoolId}@zetime.com`;
 
     const user = await prisma.user.upsert({
       where: { email: parentEmail },
@@ -88,7 +100,8 @@ export const createStudent = async (data: any, schoolId: string) => {
         full_name: data.parent_name || 'Parent',
         phone: cleanPhone,
         role: 'parent',
-        schoolId: schoolId
+        schoolId: schoolId,
+        address: data.parent_address || null
       },
       create: {
         email: parentEmail,
@@ -97,6 +110,7 @@ export const createStudent = async (data: any, schoolId: string) => {
         phone: cleanPhone,
         role: 'parent',
         schoolId: schoolId,
+        address: data.parent_address || null,
         is_active: true
       }
     });
@@ -105,12 +119,141 @@ export const createStudent = async (data: any, schoolId: string) => {
       data: {
         parentId: user.id,
         studentId: newStudent.id,
-        schoolId: schoolId
+        schoolId: schoolId,
+        relationshipType: data.relationshipType || 'Guardian'
       }
     });
   }
 
   return mapStudentToFlat(newStudent);
+};
+
+export const bulkUpsertStudents = async (students: any[], schoolId: string) => {
+  if (!schoolId) throw new Error('School ID is required');
+
+  const results = {
+    created: 0,
+    updated: 0,
+    errors: [] as string[]
+  };
+
+  // Process in sequence to ensure stability and proper parent linking across siblings
+  for (let i = 0; i < students.length; i++) {
+    const data = students[i];
+    try {
+      const studentId = String(data.student_id);
+      
+      // 1. Handle Relations (Grade, Section, Stream)
+      const grade = await prisma.grade.upsert({
+        where: { schoolId_name: { schoolId, name: data.grade } },
+        update: {},
+        create: { name: data.grade, schoolId }
+      });
+
+      const section = await prisma.section.upsert({
+        where: { schoolId_name: { schoolId, name: data.section } },
+        update: {},
+        create: { name: data.section, schoolId }
+      });
+
+      let streamId: string | undefined = undefined;
+      if (data.stream) {
+        const stream = await prisma.stream.upsert({
+          where: { schoolId_name: { schoolId, name: data.stream } },
+          update: {},
+          create: { name: data.stream, schoolId }
+        });
+        streamId = stream.id;
+      }
+
+      const existingStudent = await prisma.student.findUnique({
+        where: { student_id_schoolId: { student_id: studentId, schoolId } }
+      });
+
+      // 2. Upsert Student
+      const student = await prisma.student.upsert({
+        where: { student_id_schoolId: { student_id: studentId, schoolId } },
+        update: {
+          fullName: data.name,
+          parent_email: data.parent_email || "",
+          parent_phone: data.parent_phone || "",
+          parent_name: data.parent_name || "",
+          gender: data.gender || null,
+          date_of_birth: data.date_of_birth || null,
+          address: data.address || null,
+          gradeId: grade.id,
+          sectionId: section.id,
+          streamId: streamId || null
+        },
+        create: {
+          student_id: studentId,
+          fullName: data.name,
+          parent_email: data.parent_email || "",
+          parent_phone: data.parent_phone || "",
+          parent_name: data.parent_name || "",
+          gender: data.gender || null,
+          date_of_birth: data.date_of_birth || null,
+          address: data.address || null,
+          schoolId: schoolId,
+          gradeId: grade.id,
+          sectionId: section.id,
+          streamId: streamId || null
+        }
+      });
+
+      if (existingStudent) {
+        results.updated++;
+      } else {
+        results.created++;
+      }
+      // 3. Handle Parent Linking
+      if (data.parent_phone) {
+        const cleanPhone = data.parent_phone.replace(/\s+/g, '');
+        const parentEmail = data.parent_email || `parent-${cleanPhone}-${schoolId}@zetime.com`;
+        const tempPassword = data.parent_password || "demo123456";
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+        const parent = await prisma.user.upsert({
+          where: { email: parentEmail },
+          update: {
+            full_name: data.parent_name || 'Parent',
+            phone: cleanPhone,
+            role: 'parent',
+            schoolId: schoolId,
+            address: data.parent_address || null
+          },
+          create: {
+            email: parentEmail,
+            password_hash: hashedPassword,
+            full_name: data.parent_name || 'Parent',
+            phone: cleanPhone,
+            role: 'parent',
+            schoolId: schoolId,
+            address: data.parent_address || null,
+            is_active: true
+          }
+        });
+
+        await prisma.parentStudentLink.upsert({
+          where: { parentId_studentId: { parentId: parent.id, studentId: student.id } },
+          update: {
+            relationshipType: data.relationshipType || 'Guardian',
+            schoolId: schoolId
+          },
+          create: {
+            parentId: parent.id,
+            studentId: student.id,
+            schoolId: schoolId,
+            relationshipType: data.relationshipType || 'Guardian'
+          }
+        });
+      }
+    } catch (err: any) {
+      results.errors.push(`Row ${i + 1} (${data.name}): ${err.message}`);
+    }
+  }
+
+  return results;
 };
 
 export const getStudentById = async (id: string, schoolId: string) => {

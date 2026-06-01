@@ -26,6 +26,29 @@ export const createSchool = async (data: { name: string; id?: string }) => {
   return school;
 };
 
+export const updateSchool = async (id: string, data: { name?: string; subscriptionStatus?: string }) => {
+  const school = await prisma.school.update({
+    where: { id },
+    data: {
+      name: data.name,
+      subscriptionStatus: data.subscriptionStatus as any
+    },
+    include: {
+      settings: true
+    }
+  });
+
+  // Also update school_name in settings for consistency
+  if (data.name) {
+    await prisma.schoolSettings.update({
+      where: { schoolId: id },
+      data: { school_name: data.name }
+    });
+  }
+
+  return school;
+};
+
 export const getSchoolById = async (id: string) => {
   return await prisma.school.findUnique({
     where: { id },

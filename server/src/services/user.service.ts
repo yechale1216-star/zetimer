@@ -26,23 +26,9 @@ export const getUsers = async (schoolId: string) => {
 export const getContacts = async (schoolId: string) => {
   if (!schoolId) throw new Error('School ID is required');
 
-  // Extract all parent phones from students in this school for legacy linking
-  const students = await prisma.student.findMany({
-    where: { schoolId },
-    select: { parent_phone: true }
-  });
-  
-  const parentPhones = students
-    .map(s => s.parent_phone ? s.parent_phone.replace(/\s+/g, '') : '')
-    .filter(p => p !== '');
-
   const users = await prisma.user.findMany({
     where: {
-      OR: [
-        { schoolId: schoolId },
-        { parentStudents: { some: { student: { schoolId } } } },
-        { phone: { in: parentPhones }, role: 'parent' }
-      ],
+      schoolId: schoolId,
       role: { in: ['admin', 'school_admin', 'teacher', 'parent'] },
       is_active: true
     },
@@ -52,17 +38,12 @@ export const getContacts = async (schoolId: string) => {
       profile_photo: true,
       role: true,
       phone: true,
-    }
+      email: true,
+    },
+    orderBy: { full_name: 'asc' }
   });
 
-  const uniqueUsers = new Map();
-  for (const u of users) {
-    if (!uniqueUsers.has(u.id)) {
-      uniqueUsers.set(u.id, u);
-    }
-  }
-
-  return Array.from(uniqueUsers.values());
+  return users;
 };
 
 export const createUser = async (data: any) => {

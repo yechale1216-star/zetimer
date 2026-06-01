@@ -22,18 +22,6 @@ export const tenantMiddleware = (req: AuthenticatedRequest, res: Response, next:
   const schoolIdHeader = req.headers['x-school-id'];
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // If no JWT, we might allow if optional or for public routes, 
-    // but for secure data, we should reject.
-    // However, during migration, we might temporarily allow x-school-id header.
-    if (schoolIdHeader) {
-      req.user = {
-        id: 'system',
-        email: 'system@zetime.com',
-        role: 'school_admin',
-        schoolId: schoolIdHeader as string,
-      };
-      return next();
-    }
     return res.status(401).json({ success: false, message: 'Authorization token required' });
   }
 

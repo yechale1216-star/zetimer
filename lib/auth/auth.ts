@@ -108,7 +108,9 @@ class AuthService {
   // ─── PARENT LOGIN & SECURITY ───────────────────────────────────────────────
   async searchParentByPhone(phone: string): Promise<any> {
     try {
-      const res = await fetch(`${API_URL}/api/parent/search?phone=${encodeURIComponent(phone)}`);
+      const res = await fetch(`${API_URL}/api/parent/search?phone=${encodeURIComponent(phone)}`, {
+        headers: this.getAuthHeaders()
+      });
       return await res.json();
     } catch (error) {
       console.error("[pg] Parent search error:", error);
@@ -153,6 +155,7 @@ class AuthService {
         role: "parent",
         schoolId: schoolId,
         schoolName,
+        schoolLogo: data.schoolLogo || "",
         teacherId: "",
         isSuperAdmin: false,
         profile_photo: "",
@@ -237,6 +240,7 @@ class AuthService {
         schoolId: newUser.schoolId || "",
         customSchoolId: newUser.customSchoolId || data.data.customSchoolId || "",
         schoolName: data.data.schoolName || credentials.schoolName || "My School",
+        schoolLogo: data.data.schoolLogo || "",
         teacherId: "",
         isSuperAdmin: false,
         profile_photo: newUser.profile_photo || "",

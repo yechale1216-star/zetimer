@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-import { generateSchoolId } from "@/lib/utils/school-id-generator"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,8 +26,6 @@ export function Settings() {
   const [isSaving, setIsSaving] = useState(false)
   const [schoolInfo, setSchoolInfo] = useState({ 
     schoolName: "", 
-    schoolId: "", 
-    schoolCode: "", 
     schoolLogo: "" 
   })
   const [isEditingSchoolInfo, setIsEditingSchoolInfo] = useState(false)
@@ -42,31 +39,14 @@ export function Settings() {
     if (user) {
       setSchoolInfo({
         schoolName: user.schoolName || "",
-        schoolId: user.schoolId || "",
-        schoolCode: "", // add schoolCode field
         schoolLogo: user.schoolLogo || "",
       })
       if (user.role === "admin" && user.schoolName === "Setup Required") {
         setIsEditingSchoolInfo(true)
       }
-      if (user.schoolId && user.role === "admin") {
-        loadSchoolCode(user.schoolId)
-      }
     }
   }, [])
 
-  const loadSchoolCode = async (schoolId: string) => {
-    try {
-      // In localStorage mode, the schoolId is often the code itself or we can get it from user settings
-      const settings = await db.getSettings()
-      setSchoolInfo((prev) => ({
-        ...prev,
-        schoolCode: settings.schoolId || schoolId || "",
-      }))
-    } catch (error) {
-      console.error("[v0] Failed to load school code:", error)
-    }
-  }
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -100,23 +80,11 @@ export function Settings() {
     console.log("[v0] Starting to save settings:", settings)
     setIsSaving(true)
     try {
-      let finalSchoolCode = schoolInfo.schoolCode
-
       if ((user?.role === "admin" || user?.role === "super_admin") && isEditingSchoolInfo) {
-        if (!finalSchoolCode || finalSchoolCode.trim().length === 0) {
-          // Auto-generate school code from school name
-          finalSchoolCode = generateSchoolId(schoolInfo.schoolName)
-          console.log("[v0] Auto-generated school code:", finalSchoolCode)
-          setSchoolInfo((prev) => ({
-            ...prev,
-            schoolCode: finalSchoolCode,
-          }))
-        }
-
-        console.log("[v0] Saving school info:", { ...schoolInfo, schoolCode: finalSchoolCode })
+        console.log("[v0] Saving school info:", { ...schoolInfo })
         const result = await authService.updateSchoolInfo(
           schoolInfo.schoolName, 
-          finalSchoolCode, 
+          "", // legacy code param
           settings.schoolPhone,
           schoolInfo.schoolLogo
         )
@@ -136,7 +104,6 @@ export function Settings() {
       const updatedSettings = {
         ...settings,
         schoolName: schoolInfo.schoolName,
-        schoolId: schoolInfo.schoolCode, // Store the code as schoolId
         schoolLogo: schoolInfo.schoolLogo,
       }
 
@@ -409,7 +376,7 @@ export function Settings() {
                 </div>
 
                 <div className="flex-1 w-full space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div>
                       <Label htmlFor="schoolName">School Name</Label>
                       <Input
@@ -421,28 +388,9 @@ export function Settings() {
                         placeholder="Enter school name"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="schoolCode">School ID (Code)</Label>
-                      <Input
-                        id="schoolCode"
-                        value={schoolInfo.schoolCode}
-                        disabled={true}
-                        className="bg-muted cursor-not-allowed text-muted-foreground font-semibold"
-                        placeholder="Auto-generated"
-                      />
-                    </div>
                   </div>
                 </div>
               </div>
-
-              {user?.role === "admin" && isEditingSchoolInfo && (
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-                  <p className="text-sm text-primary">
-                    The School ID will be automatically generated when you save. Click "Save Settings" at the bottom to
-                    complete.
-                  </p>
-                </div>
-              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

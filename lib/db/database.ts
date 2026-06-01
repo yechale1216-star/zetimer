@@ -22,6 +22,9 @@ export interface Student {
   class_id?: string
   address?: string
   status?: string
+  relationshipType?: string
+  parent_address?: string
+  parent_password?: string
 }
 
 export interface AttendanceRecord {
@@ -155,6 +158,16 @@ class Database {
       stream: s.stream?.name || s.stream || "",
       schoolId: schoolId,
     }
+  }
+
+  async bulkAddStudents(students: Partial<Student>[]): Promise<any> {
+    const schoolId = this.getSchoolId()
+    if (!schoolId) throw new Error("School ID not found")
+    const res = await fetch(`${API_URL}/api/students/bulk`, {
+      method: "POST", headers: this.getApiHeaders(), body: JSON.stringify({ students }),
+    })
+    if (!res.ok) throw new Error(await res.text())
+    return await res.json()
   }
 
   async updateStudent(id: string, data: Partial<Student>): Promise<void> {

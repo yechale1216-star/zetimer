@@ -1,11 +1,17 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Smile, MoreVertical, Phone, Video, ChevronLeft, Check, CheckCheck, Reply, Forward, Trash2, Heart, Search, X, Pin, Copy } from 'lucide-react';
+import { 
+  Send, Paperclip, Smile, MoreVertical, Phone, Video, ChevronLeft, 
+  Check, CheckCheck, Reply, Forward, Trash2, Heart, Search, X, 
+  Pin, Copy, FileText, FileJson, FileType, Music, Play, ExternalLink, 
+  Download, Globe, FileArchive
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils/utils';
+import { MessageWindowSkeleton } from './skeletons';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +41,6 @@ interface Message {
   type: 'TEXT' | 'IMAGE' | 'FILE' | 'CALL_VOICE' | 'CALL_VIDEO' | 'CALL_MISSED_VOICE' | 'CALL_MISSED_VIDEO';
   isMe: boolean;
   attachments?: {
-    id: string;
     url: string;
     name: string;
     type: string;
@@ -48,6 +53,7 @@ interface ChatWindowProps {
   messages: Message[];
   onSendMessage: (content: string, options?: { type: string; attachmentUrl?: string }) => void;
   onBack?: () => void;
+  isLoading?: boolean;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -55,6 +61,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   messages,
   onSendMessage,
   onBack,
+  isLoading,
 }) => {
   const { initiateCall } = useCall();
   const [inputValue, setInputValue] = useState('');
@@ -63,6 +70,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [attachedFile, setAttachedFile] = useState<{ file: File; type: 'IMAGE' | 'FILE'; preview: string } | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -117,11 +125,20 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       throw uploadError;
     }
 
-    const { data: { publicUrl } } = supabase.storage
+    // Use signed URL for privacy (10 years expiration)
+    const { data, error: signError } = await supabase.storage
       .from('communication-attachments')
-      .getPublicUrl(filePath);
+      .createSignedUrl(filePath, 315360000); // 10 years
 
-    return publicUrl;
+    if (signError || !data?.signedUrl) {
+      // Fallback to public URL if signing fails
+      const { data: { publicUrl } } = supabase.storage
+        .from('communication-attachments')
+        .getPublicUrl(filePath);
+      return publicUrl;
+    }
+
+    return data.signedUrl;
   };
 
   const handleSend = async () => {
@@ -136,7 +153,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       onSendMessage(inputValue || (attachedFile?.type === 'IMAGE' ? 'Image' : 'File'), {
         type: attachedFile?.type || 'TEXT',
-        attachmentUrl
+        attachment: attachedFile ? {
+          url: attachmentUrl,
+          name: attachedFile.file.name,
+          type: attachedFile.file.type,
+          size: attachedFile.file.size
+        } : undefined
       });
       
       setInputValue('');
@@ -238,22 +260,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       {/* Messages Area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 scrollbar-hide">
-        <DateSeparator date="Today" />
-        
-        {messages.map((message, index) => {
-          const isNextSameSender = messages[index + 1]?.senderId === message.senderId;
-          return (
-            <MessageBubble 
-              key={message.id} 
-              message={message} 
-              isLastInGroup={!isNextSameSender}
-              isSelectionMode={isSelectionMode}
-              isSelected={selectedIds.includes(message.id)}
-              onToggleSelect={() => toggleSelect(message.id)}
-              onEnterSelectionMode={() => setIsSelectionMode(true)}
-            />
-          );
-        })}
+        {isLoading ? (
+          <MessageWindowSkeleton />
+        ) : (
+          <>
+            <DateSeparator date="Today" />
+            {messages.map((message, index) => {
+              const isNextSameSender = messages[index + 1]?.senderId === message.senderId;
+              return (
+                <MessageBubble 
+                  key={message.id} 
+                  message={message} 
+                  isLastInGroup={!isNextSameSender}
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedIds.includes(message.id)}
+                  onToggleSelect={() => toggleSelect(message.id)}
+                  onEnterSelectionMode={() => setIsSelectionMode(true)}
+                />
+              );
+            })}
+          </>
+        )}
       </div>
 
       {/* Floating Selection Bar */}
@@ -364,6 +391,202 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Image Preview Modal */}
+      <AnimatePresence>
+        {previewImage && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 md:p-10 cursor-zoom-out"
+            onClick={() => setPreviewImage(null)}
+          >
+            <motion.img 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              src={previewImage} 
+              alt="Preview" 
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute top-4 right-4 text-white hover:bg-white/10"
+              onClick={() => setPreviewImage(null)}
+            >
+              <X className="h-8 w-8" />
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
+
+      <ImagePreviewListener onPreview={setPreviewImage} />
+    </div>
+  );
+};
+
+const ImagePreviewListener = ({ onPreview }: { onPreview: (url: string) => void }) => {
+  useEffect(() => {
+    (window as any).showImagePreview = (url: string) => {
+      const event = new CustomEvent('show-image-preview', { detail: url });
+      window.dispatchEvent(event);
+    };
+
+    const handle = (e: any) => onPreview(e.detail);
+    window.addEventListener('show-image-preview', handle);
+    return () => {
+      window.removeEventListener('show-image-preview', handle);
+      delete (window as any).showImagePreview;
+    };
+  }, [onPreview]);
+  return null;
+};
+const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact }: { file: any, onImageClick: (url: string) => void, isCompact?: boolean }) => {
+  const file = rawFile.create ? rawFile.create : rawFile;
+  const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.url);
+  const isVideo = file.type?.startsWith('video/') || /\.(mp4|webm|ogg)$/i.test(file.url);
+  const isAudio = file.type?.startsWith('audio/') || /\.(mp3|wav|ogg)$/i.test(file.url);
+
+  const getFileIcon = (url: string) => {
+    if (url.endsWith('.pdf')) return <FileText className="h-6 w-6 text-red-500" />;
+    if (url.match(/\.(docx|doc|rtf)$/)) return <FileText className="h-6 w-6 text-blue-500" />;
+    if (url.match(/\.(xlsx|xls|csv)$/)) return <FileType className="h-6 w-6 text-emerald-500" />;
+    if (url.match(/\.(pptx|ppt)$/)) return <FileType className="h-6 w-6 text-orange-500" />;
+    if (url.match(/\.(zip|rar|7z|tar|gz)$/)) return <FileArchive className="h-6 w-6 text-yellow-600" />;
+    return <Paperclip className="h-6 w-6 text-primary" />;
+  };
+
+  if (isImage) {
+    return (
+      <div 
+        className={cn(
+          "overflow-hidden cursor-pointer hover:opacity-95 transition-opacity relative group",
+          isCompact ? "rounded-lg" : "rounded-xl border border-border/10"
+        )}
+        onClick={() => onImageClick(file.url)}
+      >
+        <img 
+          src={file.url} 
+          alt={file.name || "Image"} 
+          className="w-full h-auto max-h-[400px] object-cover"
+          loading="lazy"
+        />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+          <Search className="text-white h-8 w-8" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isVideo) {
+    return (
+      <div className={cn(
+        "overflow-hidden border border-border/10 bg-black relative",
+        isCompact ? "rounded-lg" : "rounded-xl"
+      )}>
+        <video src={file.url} controls className="w-full h-auto max-h-[400px]" />
+      </div>
+    );
+  }
+
+  if (isAudio) {
+    return (
+      <div className={cn(
+        "bg-background/40 dark:bg-slate-800/40 border border-border/10 flex items-center gap-3 backdrop-blur-sm",
+        isCompact ? "rounded-lg p-2" : "rounded-xl p-3"
+      )}>
+        <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+          <Music className="h-5 w-5 text-primary" />
+        </div>
+        <audio src={file.url} controls className="w-full h-8 custom-audio-player" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn(
+        "bg-background/40 dark:bg-slate-800/40 border border-border/10 flex items-center gap-4 hover:bg-background/60 transition-all cursor-pointer group backdrop-blur-sm shadow-sm",
+        isCompact ? "rounded-lg p-3" : "rounded-xl p-3"
+      )}
+         onClick={() => window.open(file.url, '_blank')}>
+      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+        {getFileIcon(file.url)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">{file.name || "Document"}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <p className="text-[10px] opacity-70 uppercase font-bold tracking-wider">
+            {file.url.split('.').pop() || 'FILE'}
+          </p>
+          <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+          <p className="text-[10px] opacity-70">
+            {file.size ? (file.size / 1024 / 1024).toFixed(2) + ' MB' : 'Download'}
+          </p>
+        </div>
+      </div>
+      <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8 rounded-full">
+        <Download className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+};
+
+const LinkPreview = ({ url }: { url: string }) => {
+  const [metadata, setMetadata] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchMetadata = async () => {
+      try {
+        const domain = new URL(url).hostname;
+        if (isMounted) {
+          setMetadata({
+            title: domain,
+            description: `Click to visit ${domain}`,
+            url,
+            domain,
+            favicon: `https://www.google.com/s2/favicons?sz=64&domain=${domain}`
+          });
+          setLoading(false);
+        }
+      } catch (e) {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchMetadata();
+    return () => { isMounted = false; };
+  }, [url]);
+
+  if (loading) return null;
+
+  return (
+    <div 
+      className="mt-2 border-l-2 border-primary bg-primary/5 rounded-r-lg p-2 hover:bg-primary/10 transition-all cursor-pointer group max-w-sm"
+      onClick={(e) => {
+        e.stopPropagation();
+        window.open(url, '_blank');
+      }}
+    >
+      <div className="flex items-center gap-2 mb-0.5">
+        <div className="h-3 w-3 shrink-0">
+          <img 
+            src={metadata?.favicon} 
+            alt="" 
+            className="h-full w-full rounded-sm"
+            onError={(e) => {
+              (e.target as any).style.display = 'none';
+              (e.target as any).parentElement.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe h-3 w-3 text-primary/70"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20"/><path d="M2 12h20"/></svg>';
+            }}
+          />
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-primary/70">{metadata?.domain}</span>
+      </div>
+      <h5 className="text-[13px] font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">{metadata?.title}</h5>
+      <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">{metadata?.description}</p>
     </div>
   );
 };
@@ -383,6 +606,11 @@ const MessageBubble = ({
   onToggleSelect: () => void,
   onEnterSelectionMode: () => void
 }) => {
+  const isMe = message.isMe;
+  const hasAttachments = message.attachments && message.attachments.length > 0;
+  const isMediaOnly = hasAttachments && 
+    (!message.content || message.content === 'Image' || message.content === 'File');
+
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
   };
@@ -392,29 +620,100 @@ const MessageBubble = ({
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       className={cn(
-        "flex flex-col max-w-[85%] md:max-w-[50%] group relative transition-all",
-        message.isMe ? "ml-auto items-end" : "mr-auto items-start",
+        "flex flex-col group relative transition-all",
+        isMe ? "ml-auto items-end" : "mr-auto items-start",
+        isMediaOnly ? "max-w-[70%] md:max-w-[40%] w-full" : "max-w-[85%] md:max-w-[50%]",
         isLastInGroup && "mb-2",
         isSelectionMode && "cursor-pointer"
       )}
       onClick={() => isSelectionMode && onToggleSelect()}
     >
       <div className={cn(
-        "relative pl-3 pr-12 py-2 rounded-2xl shadow-sm text-[15px] transition-all min-w-0 w-full",
-        message.isMe 
-          ? "bg-primary text-primary-foreground rounded-br-none" 
-          : "bg-white dark:bg-slate-900 border border-border/50 text-foreground rounded-bl-none",
-        !isLastInGroup && (message.isMe ? "rounded-br-sm" : "rounded-bl-sm")
+        "relative transition-all shadow-sm overflow-hidden",
+        isMediaOnly 
+          ? "p-1 rounded-xl bg-white dark:bg-slate-900 border border-border/40" 
+          : cn(
+              "pl-3 pr-12 py-2 rounded-2xl text-[15px]",
+              isMe 
+                ? "bg-primary text-primary-foreground rounded-br-none" 
+                : "bg-white dark:bg-slate-900 border border-border/50 text-foreground rounded-bl-none"
+            ),
+        !isLastInGroup && !isMediaOnly && (isMe ? "rounded-br-sm" : "rounded-bl-sm")
       )}>
         <ContextMenu>
           <ContextMenuTrigger>
-            <div className="select-text whitespace-pre-wrap break-words overflow-hidden w-full">
-              {message.type === 'IMAGE' && message.attachments?.[0] && (
-                <div className="mb-1 -ml-1 -mr-1 rounded-lg overflow-hidden border border-border/10">
-                  <img src={message.attachments[0].url} alt="Shared image" className="w-full h-auto max-h-[300px] object-cover" />
+            <div className={cn(
+              "select-text whitespace-pre-wrap break-words w-full relative",
+              isMediaOnly ? "leading-[0]" : ""
+            )}>
+              {hasAttachments && (
+                <div className={cn(
+                  "flex flex-col gap-1",
+                  isMediaOnly ? "-m-1" : "mb-1 -mx-2 -mt-1"
+                )}>
+                  {message.attachments!.map((file, idx) => (
+                    <AttachmentRenderer 
+                      key={idx} 
+                      file={file} 
+                      onImageClick={(url) => (window as any).showImagePreview?.(url)} 
+                      isCompact={isMediaOnly}
+                    />
+                  ))}
                 </div>
               )}
-              {message.content}
+              {message.content && !isMediaOnly && message.content !== 'File' && (
+                <div className={cn(
+                  "pb-4",
+                  hasAttachments ? "mt-2" : ""
+                )}>
+                  {(() => {
+                    const urlRegex = /((https?:\/\/[^\s]+)|(www\.[^\s]+))/g;
+                    const parts = message.content.split(urlRegex);
+                    let firstLinkFound = false;
+                    
+                    const matches = Array.from(message.content.matchAll(urlRegex));
+                    if (matches.length === 0) return message.content;
+
+                    let lastIdx = 0;
+                    const result = [];
+                    matches.forEach((match, i) => {
+                      if (match.index! > lastIdx) {
+                        result.push(message.content.substring(lastIdx, match.index));
+                      }
+                      
+                      const url = match[0];
+                      const href = url.startsWith('http') ? url : `https://${url}`;
+                      const showPreview = !firstLinkFound;
+                      firstLinkFound = true;
+
+                      result.push(
+                        <React.Fragment key={`link-${i}`}>
+                          <a 
+                            href={href} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className={cn(
+                              "underline decoration-2 underline-offset-2 hover:opacity-80 transition-opacity font-bold break-all",
+                              message.isMe ? "text-white" : "text-primary"
+                            )}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {url}
+                          </a>
+                          {showPreview && <LinkPreview url={href} />}
+                        </React.Fragment>
+                      );
+                      lastIdx = match.index! + url.length;
+                    });
+                    
+                    if (lastIdx < message.content.length) {
+                      result.push(message.content.substring(lastIdx));
+                    }
+                    
+                    return result;
+                  })()}
+                </div>
+              )}
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent className="w-56">
@@ -427,10 +726,12 @@ const MessageBubble = ({
 
         <div className={cn(
           "absolute bottom-1 right-2 flex items-center gap-1 text-[10px]",
-          message.isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+          isMediaOnly 
+            ? "bg-black/30 backdrop-blur-md text-white px-2 py-0.5 rounded-full" 
+            : (isMe ? "text-primary-foreground/70" : "text-muted-foreground")
         )}>
           <span>{message.timestamp}</span>
-          {message.isMe && (
+          {isMe && (
             <span>
               {message.status === 'read' ? (
                 <CheckCheck className="h-3 w-3" />

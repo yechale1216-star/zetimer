@@ -82,3 +82,19 @@ export const getStudentsByParentPhone = async (req: AuthenticatedRequest, res: R
     next(error);
   }
 };
+export const bulkCreateStudents = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) {
+      return res.status(401).json({ success: false, message: 'School ID context missing' });
+    }
+    const { students } = req.body;
+    if (!Array.isArray(students)) {
+      return res.status(400).json({ success: false, message: 'Invalid data format. Expected an array of students.' });
+    }
+    const results = await studentService.bulkUpsertStudents(students, schoolId);
+    res.status(200).json({ success: true, data: results });
+  } catch (error) {
+    next(error);
+  }
+};

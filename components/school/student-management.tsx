@@ -48,20 +48,31 @@ export function StudentManagement() {
     parent_phone: "+251",
     parent_name: "",
     parent_password: "",
+    parent_address: "",
+    relationshipType: "Guardian",
     existingParentId: "", // Added existingParentId
     gender: "",
     date_of_birth: "",
+    address: "",
   })
 
-  // Parent Search State
-  const [searchPhone, setSearchPhone] = useState("+251")
   const [isSearchingParent, setIsSearchingParent] = useState(false)
   const [foundParent, setFoundParent] = useState<any>(null)
   const [linkExistingParent, setLinkExistingParent] = useState(false)
-
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const { toast } = useToast()
+
+  // Parent Search Trigger (Automatic)
+  useEffect(() => {
+    const cleanPhone = formData.parent_phone.replace(/\s+/g, '');
+    if (cleanPhone.length >= 13 && cleanPhone.startsWith('+251')) {
+      handleSearchParent();
+    } else {
+      setFoundParent(null);
+      setLinkExistingParent(false);
+    }
+  }, [formData.parent_phone]);
 
   useEffect(() => {
     const user = authService.getCurrentUser()
@@ -152,13 +163,15 @@ export function StudentManagement() {
       parent_phone: "+251",
       parent_name: "",
       parent_password: "",
+      parent_address: "",
+      relationshipType: "Guardian",
       existingParentId: "",
       gender: "",
       date_of_birth: "",
+      address: "",
     })
     setEditingStudent(null)
     setValidationErrors([])
-    setSearchPhone("+251")
     setFoundParent(null)
     setLinkExistingParent(false)
   }
@@ -274,24 +287,26 @@ export function StudentManagement() {
       parent_phone: student.parent_phone || "+251",
       parent_name: student.parent_name || "",
       parent_password: "",
+      parent_address: student.parent_address || "",
+      relationshipType: student.relationshipType || "Guardian",
       existingParentId: "",
       gender: student.gender || "",
       date_of_birth: student.date_of_birth || "",
+      address: student.address || "",
     })
     setValidationErrors([])
-    setSearchPhone("+251")
     setFoundParent(null)
     setLinkExistingParent(false)
     setIsAddModalOpen(true)
   }
 
   const handleSearchParent = async () => {
-    const cleanPhone = searchPhone.replace(/\s+/g, "")
-    if (cleanPhone.length < 10) {
-      notifications.error("Invalid Phone", "Please enter a valid phone number format to search.");
-      return;
-    }
+    const cleanPhone = formData.parent_phone.replace(/\s+/g, "")
+    if (cleanPhone.length < 13) return;
     
+    // Prevent redundant searches if already found for this phone
+    if (foundParent && foundParent.phone === cleanPhone) return;
+
     setIsSearchingParent(true);
     try {
       const res = await authService.searchParentByPhone(cleanPhone);
@@ -301,19 +316,18 @@ export function StudentManagement() {
         // Pre-fill form data with found parent info
         setFormData(prev => ({
           ...prev,
-          parent_name: res.data.full_name || "",
-          parent_phone: res.data.phone || "",
-          parent_email: res.data.email || "",
+          parent_name: res.data.full_name || prev.parent_name,
+          parent_email: res.data.email || prev.parent_email,
+          parent_address: res.data.address || prev.parent_address,
           existingParentId: res.data.id
         }));
       } else {
         setFoundParent(null);
         setLinkExistingParent(false);
-        setFormData(prev => ({ ...prev, existingParentId: "", parent_phone: cleanPhone }));
-        notifications.info("No Parent Found", "Please fill in the parent details to create a new account.");
+        setFormData(prev => ({ ...prev, existingParentId: "" }));
       }
     } catch (err) {
-      notifications.error("Error", "Failed to search for parent");
+      console.error("Parent search error:", err);
     } finally {
       setIsSearchingParent(false);
     }
@@ -359,11 +373,8 @@ export function StudentManagement() {
           "student_id",
           "grade",
           "section",
-          "parent_email",
           "parent_phone",
           "parent_name",
-          "gender",
-          "date_of_birth",
         ]
         const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h))
 
@@ -374,13 +385,14 @@ export function StudentManagement() {
 
         const studentsToImport = []
         const importErrors = []
-        const existingStudentIds = students.map((s) => s.student_id || "")
+        // For CSV import, we allow existing IDs because we support updates (upsert)
+        // But we still track IDs within the same CSV to prevent duplicates in the file itself
+        const studentIdsInCsv: string[] = []
 
         for (let i = 1; i < lines.length; i++) {
           const rawValues = lines[i].split(",").map((v) => v.trim())
           if (rawValues.length === 0 || (rawValues.length === 1 && rawValues[0] === "")) continue
 
-          // Pad values to match header length so optional empty columns don't fail
           const values = headers.map((_, index) => rawValues[index] || "")
 
           const student: any = {}
@@ -388,19 +400,17 @@ export function StudentManagement() {
             student[header] = values[index] || ""
           })
 
-          // Skip if core info is missing
           if (!student.name || !student.student_id || !student.grade) {
             importErrors.push(`Row ${i + 1}: Missing student name, ID, or grade`)
             continue
           }
 
-          // Fallbacks for missing parent fields to prevent strict schema rejects
+          // Parent defaults
           if (!student.parent_name || student.parent_name.trim() === "") {
             student.parent_name = `Parent of ${student.name}`
           }
           
           let phone = student.parent_phone || ""
-          // Clean phone numbers: remove spaces, dashes, parentheses
           phone = phone.replace(/[\s\-\(\)]/g, "")
           if (phone.startsWith("0")) {
             phone = "+251" + phone.substring(1)
@@ -410,32 +420,25 @@ export function StudentManagement() {
             phone = "+251" + phone
           }
           if (phone.trim() === "" || phone === "+251") {
-            phone = "+251900000000" // Fallback valid phone
+            phone = "+251900000000"
           }
           student.parent_phone = phone
 
-          if (!student.parent_email || student.parent_email.trim() === "") {
-            student.parent_email = `parent-${student.student_id}@school.com`
-          }
-
-          // Validate student
+          // Validate student (pass an empty array to validateStudentId to bypass existence check, 
+          // but we use studentIdsInCsv to catch duplicates within the file)
           const nameValidation = ValidationService.validateName(student.name)
-          const studentIdValidation = ValidationService.validateStudentId(student.student_id, existingStudentIds)
-          const emailValidation = ValidationService.validateEmail(student.parent_email)
+          const studentIdValidation = ValidationService.validateStudentId(student.student_id, studentIdsInCsv)
           const phoneValidation = ValidationService.validatePhone(student.parent_phone)
-          const parentNameValidation = ValidationService.validateName(student.parent_name)
-
+          
           const validationResult = ValidationService.combineValidationResults(
             nameValidation,
             studentIdValidation,
-            emailValidation,
-            phoneValidation,
-            parentNameValidation,
+            phoneValidation
           )
 
           if (validationResult.isValid) {
             studentsToImport.push(student)
-            existingStudentIds.push(student.student_id) // Prevent duplicates within the same import
+            studentIdsInCsv.push(student.student_id)
           } else {
             importErrors.push(`Row ${i + 1} (${student.name}): ${validationResult.errors.join(", ")}`)
           }
@@ -451,16 +454,23 @@ export function StudentManagement() {
           return
         }
 
-        for (const student of studentsToImport) {
-          await db.addStudent(student)
-        }
+        const importResult = await db.bulkAddStudents(studentsToImport)
 
-        notifications.success(
-          "Import Successful",
-          `${studentsToImport.length} students have been imported successfully.`,
-        )
+        if (importResult.success) {
+          notifications.success(
+            "Import Successful",
+            `${importResult.data.created} students processed. ${importResult.data.errors.length} rows had issues.`,
+          )
+          if (importResult.data.errors.length > 0) {
+            console.warn("Bulk import errors:", importResult.data.errors)
+          }
+        } else {
+          notifications.error("Import Failed", importResult.message || "Failed to import students")
+        }
+        
         await loadStudents()
       } catch (error) {
+        console.error("CSV Import Error:", error)
         notifications.error("Error", "Failed to import CSV file")
       }
     }
@@ -482,9 +492,13 @@ export function StudentManagement() {
         "section",
         "gender",
         "date_of_birth",
-        "parent_email",
-        "parent_phone",
+        "address",
         "parent_name",
+        "parent_phone",
+        "parent_email",
+        "relationshipType",
+        "parent_address",
+        "parent_password"
       ]
       const example = [
         "John Doe",
@@ -494,9 +508,13 @@ export function StudentManagement() {
         "A",
         "Male",
         "2009-05-15",
-        "parent@email.com",
-        "+1234567890",
+        "Addis Ababa, Bole",
         "Jane Doe",
+        "+251911223344",
+        "jane.doe@example.com",
+        "Mother",
+        "Addis Ababa, Bole",
+        "password123"
       ]
 
       let csvContent = headers.join(",") + "\n"
@@ -543,9 +561,12 @@ export function StudentManagement() {
         "Section",
         "Gender",
         "Date of Birth",
+        "Student Address",
         "Parent Name",
         "Parent Phone",
         "Parent Email",
+        "Relationship",
+        "Parent Address"
       ]
 
       const csvData = filteredStudents.map((student) => [
@@ -556,9 +577,12 @@ export function StudentManagement() {
         student.section,
         student.gender,
         student.date_of_birth || "",
+        `"${student.address || ""}"`,
         `"${student.parent_name || ""}"`,
         student.parent_phone || "",
         student.parent_email || "",
+        `"${student.relationshipType || "Guardian"}"`,
+        `"${student.parent_address || ""}"`,
       ])
 
       const csvContent = [headers, ...csvData].map((row) => row.join(",")).join("\n")
@@ -679,7 +703,7 @@ export function StudentManagement() {
                             <Input
                               id="name"
                               placeholder="e.g. Abebe Bikila"
-                              value={formData.name}
+                              value={formData.name || ""}
                               onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                               required
                               className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
@@ -689,7 +713,7 @@ export function StudentManagement() {
                             <Label htmlFor="student_id" className="text-sm font-medium">Student ID (Auto)</Label>
                             <Input
                               id="student_id"
-                              value={formData.student_id}
+                              value={formData.student_id || ""}
                               readOnly
                               className="h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed text-sm"
                             />
@@ -760,7 +784,7 @@ export function StudentManagement() {
                             <Input
                               id="section"
                               placeholder={formData.grade ? "e.g. A" : "Select grade first"}
-                              value={formData.section}
+                              value={formData.section || ""}
                               onChange={(e) => setFormData((prev) => ({ ...prev, section: e.target.value.toUpperCase() }))}
                               disabled={!formData.grade}
                               required
@@ -790,7 +814,7 @@ export function StudentManagement() {
                             <Input
                               id="date_of_birth"
                               type="date"
-                              value={formData.date_of_birth}
+                              value={formData.date_of_birth || ""}
                               onChange={(e) => setFormData((prev) => ({ ...prev, date_of_birth: e.target.value }))}
                               className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
                             />
@@ -799,118 +823,189 @@ export function StudentManagement() {
                       </div>
 
                       <div className="bg-slate-50/50 dark:bg-slate-900/30 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/50 space-y-4">
-                        <p className="text-[10px] uppercase tracking-widest font-black text-emerald-600 dark:text-emerald-400">Parent/Guardian Contact</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] uppercase tracking-widest font-black text-emerald-600 dark:text-emerald-400">Parent/Guardian Contact</p>
+                          {isSearchingParent && (
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground animate-pulse">
+                              <span className="h-2 w-2 bg-emerald-500 rounded-full animate-ping" />
+                              Checking parent directory...
+                            </div>
+                          )}
+                        </div>
                         
-                        {!editingStudent && (
-                          <div className="p-4 bg-background/50 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3 mb-4">
-                            <Label className="text-xs font-bold text-muted-foreground">Search Existing Parent by Phone</Label>
-                            <div className="flex gap-2">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="parent_phone" className="text-sm font-bold text-slate-700 dark:text-slate-300">Parent Phone Number (Ethiopian) *</Label>
+                            <div className="relative group">
                               <Input
+                                id="parent_phone"
                                 type="tel"
                                 placeholder="+251 9XX XXX XXX"
-                                value={searchPhone}
+                                maxLength={13}
+                                value={formData.parent_phone || ""}
                                 onChange={(e) => {
                                   let val = e.target.value.replace(/[^\d+]/g, "")
                                   if (val.lastIndexOf("+") > 0) val = "+" + val.replace(/\+/g, "")
                                   if (!val.startsWith("+251") && val.length > 0 && !val.startsWith("+")) val = "+251" + val
-                                  setSearchPhone(val)
+                                  setFormData((prev) => ({ ...prev, parent_phone: val }))
                                 }}
-                                className="h-10 text-sm"
-                              />
-                              <Button type="button" onClick={handleSearchParent} disabled={isSearchingParent} variant="secondary" className="h-10 px-4 whitespace-nowrap">
-                                {isSearchingParent ? <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
-                                Search
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        {foundParent && !editingStudent ? (
-                          <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 rounded-xl space-y-3 relative overflow-hidden animate-in fade-in slide-in-from-top-2">
-                            <div className="absolute top-0 right-0 p-3">
-                              <CheckCircle2 className="w-6 h-6 text-emerald-500 opacity-20" />
-                            </div>
-                            <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-100 flex items-center gap-2">
-                              Existing Parent Found
-                            </h4>
-                            <div className="space-y-1 text-xs">
-                              <p><span className="font-semibold text-emerald-800/70 dark:text-emerald-200/70">Name:</span> <span className="font-bold">{foundParent.full_name}</span></p>
-                              <p><span className="font-semibold text-emerald-800/70 dark:text-emerald-200/70">Phone:</span> <span className="font-bold">{foundParent.phone}</span></p>
-                              <p><span className="font-semibold text-emerald-800/70 dark:text-emerald-200/70">Email:</span> <span className="font-bold">{foundParent.email}</span></p>
-                            </div>
-                            <div className="pt-2">
-                              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                                This student will be automatically linked to this parent account.
-                              </p>
-                              <Button type="button" variant="link" onClick={() => { setFoundParent(null); setLinkExistingParent(false); setFormData(prev => ({...prev, existingParentId: ""})) }} className="text-xs h-auto p-0 text-emerald-600 mt-2">
-                                Change / Enter manually
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-4 animate-in fade-in">
-                            <div className="space-y-2">
-                              <Label htmlFor="parent_name" className="text-sm font-medium">Parent Name *</Label>
-                              <Input
-                                id="parent_name"
-                                placeholder="e.g. Jane Doe"
-                                value={formData.parent_name}
-                                onChange={(e) => setFormData((prev) => ({ ...prev, parent_name: e.target.value }))}
                                 required
-                                className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                                className={`h-12 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-base font-medium ${foundParent ? 'border-emerald-500 bg-emerald-50/30' : ''}`}
                               />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="parent_email" className="text-sm font-medium">Parent Email *</Label>
-                                <Input
-                                  id="parent_email"
-                                  type="email"
-                                  placeholder="parent@example.com"
-                                  value={formData.parent_email}
-                                  onChange={(e) => setFormData((prev) => ({ ...prev, parent_email: e.target.value }))}
-                                  required
-                                  className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="parent_phone" className="text-sm font-medium">Parent Phone (Ethiopian) *</Label>
-                                <div className="relative group">
-                                  <Input
-                                    id="parent_phone"
-                                    type="tel"
-                                    placeholder="+251 9XX XXX XXX"
-                                    maxLength={13}
-                                    value={formData.parent_phone}
-                                    onChange={(e) => {
-                                      let val = e.target.value.replace(/[^\d+]/g, "")
-                                      if (val.lastIndexOf("+") > 0) val = "+" + val.replace(/\+/g, "")
-                                      if (!val.startsWith("+251") && val.length > 0 && !val.startsWith("+")) val = "+251" + val
-                                      setFormData((prev) => ({ ...prev, parent_phone: val }))
-                                    }}
-                                    required
-                                    className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
-                                  />
+                              {foundParent && (
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                                 </div>
-                                <p className="text-[10px] text-muted-foreground/60 mt-1 ml-1">Format: +251 9XXXXXXXX</p>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground italic">Phone number is used for automatic account detection.</p>
+                          </div>
+
+                          {foundParent && !editingStudent ? (
+                            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 rounded-xl space-y-3 relative overflow-hidden animate-in fade-in slide-in-from-top-2">
+                              <div className="flex items-center gap-2">
+                                <span className="p-1 px-2 bg-emerald-600 text-white rounded text-[9px] font-black uppercase">Auto-Detected</span>
+                                <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-200 italic">Existing Parent Found</h4>
                               </div>
-                              <div className="space-y-2 md:col-span-2">
-                                <Label htmlFor="parent_password" className="text-sm font-medium">
-                                  Parent Portal Password {editingStudent ? "(Leave blank to keep current)" : "*"}
-                                </Label>
-                                <Input
-                                  id="parent_password"
-                                  type="text"
-                                  placeholder={editingStudent ? "Enter new password to change" : "e.g. 123456"}
-                                  value={formData.parent_password || ""}
-                                  onChange={(e) => setFormData((prev) => ({ ...prev, parent_password: e.target.value }))}
-                                  required={!editingStudent}
-                                  className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
-                                />
+                              
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-emerald-900/80 dark:text-emerald-100/80">
+                                <p><span className="font-semibold text-emerald-800/60 dark:text-emerald-200/60">Name:</span> <strong>{foundParent.full_name}</strong></p>
+                                <p><span className="font-semibold text-emerald-800/60 dark:text-emerald-200/60">Email:</span> <strong className="truncate block">{foundParent.email}</strong></p>
+                                <p className="col-span-2"><span className="font-semibold text-emerald-800/60 dark:text-emerald-200/60">Address:</span> <strong>{foundParent.address || "No address provided"}</strong></p>
+                              </div>
+                              
+                              <div className="space-y-2 pt-2 border-t border-emerald-200/50 dark:border-emerald-800/50">
+                                <Label htmlFor="found_relationship" className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-tighter">Relationship to Student *</Label>
+                                <Select
+                                  value={formData.relationshipType}
+                                  onValueChange={(value) => setFormData((prev) => ({ ...prev, relationshipType: value }))}
+                                >
+                                  <SelectTrigger id="found_relationship" className="h-10 rounded-lg bg-white/60 border-emerald-200 dark:border-emerald-800 text-sm font-medium">
+                                    <SelectValue placeholder="Select" />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-lg border-emerald-200 dark:border-emerald-800">
+                                    <SelectItem value="Father">Father</SelectItem>
+                                    <SelectItem value="Mother">Mother</SelectItem>
+                                    <SelectItem value="Guardian">Guardian</SelectItem>
+                                    <SelectItem value="Grandparent">Grandparent</SelectItem>
+                                    <SelectItem value="Other">Other</SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </div>
                             </div>
-                          </div>
-                        )}
+                          ) : (
+                            !isSearchingParent && !editingStudent && formData.parent_phone.replace(/\s+/g, '').length >= 13 && (
+                              <div className="space-y-4 animate-in slide-in-from-top-2 fade-in">
+                                <div className="flex items-center gap-2">
+                                  <span className="p-1 px-2 bg-amber-500 text-white rounded text-[9px] font-black uppercase">New Profile</span>
+                                  <h4 className="text-xs font-bold text-amber-600 dark:text-amber-400 italic">Registering New Parent</h4>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="parent_name" className="text-sm font-medium text-slate-600">Parent Full Name *</Label>
+                                    <Input
+                                      id="parent_name"
+                                      placeholder="First and Father Name"
+                                      value={formData.parent_name || ""}
+                                      onChange={(e) => setFormData((prev) => ({ ...prev, parent_name: e.target.value }))}
+                                      required
+                                      className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="relationship" className="text-sm font-medium text-slate-600">Relationship *</Label>
+                                    <Select
+                                      value={formData.relationshipType}
+                                      onValueChange={(value) => setFormData((prev) => ({ ...prev, relationshipType: value }))}
+                                    >
+                                      <SelectTrigger id="relationship" className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 text-sm">
+                                        <SelectValue placeholder="Select" />
+                                      </SelectTrigger>
+                                      <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800">
+                                        <SelectItem value="Father">Father</SelectItem>
+                                        <SelectItem value="Mother">Mother</SelectItem>
+                                        <SelectItem value="Guardian">Guardian</SelectItem>
+                                        <SelectItem value="Grandparent">Grandparent</SelectItem>
+                                        <SelectItem value="Other">Other</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="parent_email" className="text-sm font-medium text-slate-600">Email Address (Optional)</Label>
+                                    <Input
+                                      id="parent_email"
+                                      type="email"
+                                      placeholder="email@example.com"
+                                      value={formData.parent_email || ""}
+                                      onChange={(e) => setFormData((prev) => ({ ...prev, parent_email: e.target.value }))}
+                                      className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="parent_password" className="text-sm font-medium text-slate-600">Portal Password *</Label>
+                                    <Input
+                                      id="parent_password"
+                                      type="text"
+                                      placeholder="Temporary password"
+                                      value={formData.parent_password || ""}
+                                      onChange={(e) => setFormData((prev) => ({ ...prev, parent_password: e.target.value }))}
+                                      required={!editingStudent && !foundParent && formData.parent_phone.length >= 13}
+                                      className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                                    />
+                                  </div>
+                                  <div className="space-y-2 md:col-span-2">
+                                    <Label htmlFor="parent_address" className="text-sm font-medium text-slate-600">Home Address (Optional)</Label>
+                                    <Input
+                                      id="parent_address"
+                                      placeholder="Location details"
+                                      value={formData.parent_address || ""}
+                                      onChange={(e) => setFormData((prev) => ({ ...prev, parent_address: e.target.value }))}
+                                      className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          )}
+
+                          {editingStudent && (
+                            <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800/50">
+                               <p className="text-[10px] uppercase font-bold text-slate-400">Update Contact Info</p>
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit_parent_name" className="text-sm font-medium text-slate-600">Parent Name</Label>
+                                    <Input
+                                      id="edit_parent_name"
+                                      value={formData.parent_name || ""}
+                                      onChange={(e) => setFormData((prev) => ({ ...prev, parent_name: e.target.value }))}
+                                      className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 text-sm"
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="edit_relationship" className="text-sm font-medium text-slate-600">Relationship</Label>
+                                    <Select
+                                      value={formData.relationshipType}
+                                      onValueChange={(value) => setFormData((prev) => ({ ...prev, relationshipType: value }))}
+                                    >
+                                      <SelectTrigger id="edit_relationship" className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 text-sm">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="Father">Father</SelectItem>
+                                        <SelectItem value="Mother">Mother</SelectItem>
+                                        <SelectItem value="Guardian">Guardian</SelectItem>
+                                        <SelectItem value="Grandparent">Grandparent</SelectItem>
+                                        <SelectItem value="Other">Other</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                               </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <Button type="submit" className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-base font-bold shadow-lg shadow-emerald-600/10 transition-all active:scale-[0.98]" disabled={isSaving}>

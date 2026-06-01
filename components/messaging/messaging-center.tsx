@@ -1,107 +1,121 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChatLayout } from '@/components/messaging/chat-layout';
 import { ChatSidebar } from '@/components/messaging/chat-sidebar';
 import { ChatWindow } from '@/components/messaging/chat-window';
 import { useSocket } from '@/components/providers/socket-provider';
 import { authService } from '@/lib/auth/auth';
-import { useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+function getAuthHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('attendance_token') : null;
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 export function MessagingCenter() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConversationData, setActiveConversationData] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  
+  // KEY: messages are stored per-conversation, never mixed
+  const [messagesByConversation, setMessagesByConversation] = useState<Record<string, any[]>>({});
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isLoadingSidebar, setIsLoadingSidebar] = useState(true);
+
   const { socket, isConnected } = useSocket();
   const [user, setUser] = useState<any>(null);
-  const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  // Use a ref so the socket handler always sees the latest activeConversationId
+  // This solves the stale closure problem that caused message mixing
+  const activeConversationIdRef = useRef<string | null>(null);
+  const userRef = useRef<any>(null);
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     setUser(authService.getCurrentUser());
   }, []);
 
-  const loadData = async () => {
+  // ── Load sidebar data ────────────────────────────────────────────────────────
+  const loadData = useCallback(async () => {
     if (!user) return;
     try {
-      const token = localStorage.getItem('attendance_token');
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+      const headers = getAuthHeaders();
 
-      // 1. Fetch all contacts for this school explicitly (Parents, Teachers, Admins)
-      const sid = user.schoolId || '';
-      const contactsRes = await fetch(`${API_URL}/api/users/contacts`, {
-        headers,
-        cache: 'no-store'
-      });
+      const [contactsRes, convRes] = await Promise.all([
+        fetch(`${API_URL}/api/users/contacts`, { headers, cache: 'no-store' }),
+        fetch(`${API_URL}/api/messages/conversations/${user.id}`, { headers, cache: 'no-store' }),
+      ]);
+
       const contactsData = await contactsRes.json();
-      const contacts = contactsData.data || [];
+      const contacts: any[] = contactsData.data || [];
 
-      // 2. Fetch existing conversations
-      const convRes = await fetch(`${API_URL}/api/messages/conversations/${user.id}`, { 
-        headers,
-        cache: 'no-store' 
-      });
       const convs = await convRes.json();
 
-      // 3. Process existing conversations (Groups and 1:1)
       const finalItems: any[] = [];
-      const handledUserIds = new Set();
+      const handledUserIds = new Set<string>();
 
+      // Process existing conversations first (most recent first)
       if (Array.isArray(convs)) {
-        // Sort conversations by most recent message/update first
-        const sortedConvs = [...convs].sort((a, b) => 
-          new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+        const sorted = [...convs].sort(
+          (a, b) =>
+            new Date(b.updatedAt || b.createdAt).getTime() -
+            new Date(a.updatedAt || a.createdAt).getTime()
         );
 
-        for (const c of sortedConvs) {
+        for (const c of sorted) {
           const isGroup = c.isGroup;
-          let otherMember = null;
-          
+          let otherMember: any = null;
+
           if (!isGroup) {
             otherMember = c.members.find((m: any) => m.userId !== user.id)?.user;
-            if (otherMember) {
-              const cleanPhone = otherMember.phone ? otherMember.phone.replace(/\s+/g, '') : null;
-              
-              // De-duplicate: If we already have a more recent 1:1 with this person, skip
-              if (handledUserIds.has(otherMember.id)) continue;
-              
-              handledUserIds.add(otherMember.id);
-            }
+            if (!otherMember) continue; // Skip orphaned conversations
+
+            // De-duplicate: one entry per person (keep most recent)
+            if (handledUserIds.has(otherMember.id)) continue;
+            handledUserIds.add(otherMember.id);
           }
 
           finalItems.push({
             id: c.id,
-            name: isGroup ? c.name : (otherMember?.full_name || 'Unknown'),
-            avatar: isGroup ? c.avatar : (otherMember?.profile_photo || undefined),
+            name: isGroup ? c.name : otherMember?.full_name || 'Unknown',
+            avatar: isGroup ? c.avatar : otherMember?.profile_photo || undefined,
             isOnline: false,
-            lastMessage: c.messages?.[0]?.content || 'Start a new conversation',
-            timestamp: c.messages?.[0]?.createdAt ? new Date(c.messages[0].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+            lastMessage: c.messages?.[0]?.content || 'Start a conversation',
+            timestamp: c.messages?.[0]?.createdAt
+              ? new Date(c.messages[0].createdAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : '',
             updatedAt: new Date(c.updatedAt || c.createdAt).getTime(),
-            unreadCount: 0, 
+            unreadCount: 0,
             isGroup,
             memberIds: c.members.map((m: any) => m.userId),
             phone: otherMember?.phone || '',
             role: otherMember?.role || (isGroup ? 'Group' : 'User'),
             realContactId: otherMember?.id || null,
-            isNewContact: false
+            isNewContact: false,
           });
         }
       }
 
-      // 4. Group all remaining school directory members
+      // Add directory contacts (no conversation yet)
       for (const contact of contacts) {
         if (contact.id === user.id) continue;
-        
-        // Skip users we already have an active conversation with
         if (handledUserIds.has(contact.id)) continue;
 
         finalItems.push({
@@ -109,165 +123,227 @@ export function MessagingCenter() {
           name: contact.full_name,
           avatar: contact.profile_photo || undefined,
           isOnline: false,
-          lastMessage: `Send a message to this ${contact.role}`,
+          lastMessage: `Tap to message this ${contact.role}`,
           timestamp: '',
-          updatedAt: 0, // Directory users go below active conversations
+          updatedAt: 0,
           unreadCount: 0,
           isGroup: false,
           memberIds: [user.id, contact.id],
           phone: contact.phone || '',
           role: contact.role,
           realContactId: contact.id,
-          isNewContact: true
+          isNewContact: true,
         });
 
-        // Mark as handled to prevent duplication within directory
         handledUserIds.add(contact.id);
       }
 
-      // 5. Separate into two groups
-      const activeChats = finalItems.filter(item => !item.isNewContact);
-      const directory = finalItems.filter(item => item.isNewContact);
-
-      // Sort Active by recent, Directory by name
+      // Sort: active chats by recency, directory by name
+      const activeChats = finalItems.filter(i => !i.isNewContact);
+      const directory = finalItems.filter(i => i.isNewContact);
       activeChats.sort((a, b) => b.updatedAt - a.updatedAt);
       directory.sort((a, b) => a.name.localeCompare(b.name));
 
       setConversations([...activeChats, ...directory]);
     } catch (error) {
-      console.error('Failed to load messaging data', error);
-      toast({ title: 'Error', description: 'Could not load messaging data', variant: 'destructive' });
+      console.error('[Messaging] Failed to load data:', error);
+      toast({ title: 'Error', description: 'Could not load conversations', variant: 'destructive' });
+    } finally {
+      setIsLoadingSidebar(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     loadData();
-  }, [user]);
+  }, [loadData]);
 
-  const handleSelectConversation = async (id: string, chatData: any) => {
-    if (!user) return;
-    
-    // If it's a new contact without conversation, we create the conversation first
-    if (chatData?.isNewContact) {
-      try {
-        const token = localStorage.getItem('attendance_token');
-        const res = await fetch(`${API_URL}/api/messages/conversations`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
-          },
-          body: JSON.stringify({
-            isGroup: false,
-            memberIds: [user.id, chatData.realContactId]
-          })
-        });
-        const newConv = await res.json();
-        setActiveConversationId(newConv.id);
-        setActiveConversationData({ ...chatData, id: newConv.id, isNewContact: false });
-        
-        // Reload list to align real IDs
-        loadData();
-      } catch (err) {
-        toast({ title: 'Error', description: 'Could not start conversation', variant: 'destructive' });
+  // ── Fetch messages for the selected conversation ─────────────────────────────
+  const loadMessages = useCallback(async (conversationId: string) => {
+    // If already cached, use cache instantly
+    if (messagesByConversation[conversationId]) return;
+
+    setIsLoadingMessages(true);
+    try {
+      const res = await fetch(`${API_URL}/api/messages/${conversationId}`, {
+        headers: getAuthHeaders(),
+      });
+
+      if (!res.ok) {
+        console.error('[Messaging] Failed to fetch messages', res.status);
+        return;
       }
-    } else {
+
+      const msgs: any[] = await res.json();
+      if (!Array.isArray(msgs)) return;
+
+      const formatted = msgs.map(m => ({
+        id: m.id,
+        senderId: m.senderId,
+        senderName: m.sender?.full_name || 'Unknown',
+        content: m.content,
+        timestamp: new Date(m.createdAt).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        status: 'read',
+        type: m.type || 'TEXT',
+        attachments: m.attachments,
+        isMe: m.senderId === userRef.current?.id,
+      }));
+
+      // Store messages keyed by conversationId — never mixed
+      setMessagesByConversation(prev => ({ ...prev, [conversationId]: formatted }));
+    } catch (err) {
+      console.error('[Messaging] Error loading messages:', err);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  }, [messagesByConversation]);
+
+  // ── Select conversation ──────────────────────────────────────────────────────
+  const handleSelectConversation = useCallback(
+    async (id: string, chatData: any) => {
+      if (!user) return;
+
+      // If new contact without a conversation → create one first
+      if (chatData?.isNewContact) {
+        try {
+          const res = await fetch(`${API_URL}/api/messages/conversations`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              isGroup: false,
+              memberIds: [user.id, chatData.realContactId],
+            }),
+          });
+
+          if (!res.ok) throw new Error('Failed to create conversation');
+
+          const newConv = await res.json();
+          const realId = newConv.id;
+
+          // Update sidebar entry with real conversation id
+          setConversations(prev =>
+            prev.map(c =>
+              c.id === id
+                ? { ...c, id: realId, isNewContact: false, lastMessage: 'Start a conversation' }
+                : c
+            )
+          );
+
+          setActiveConversationId(realId);
+          setActiveConversationData({ ...chatData, id: realId, isNewContact: false });
+
+          // Initialise empty message list so we don't flash old messages
+          setMessagesByConversation(prev => ({ ...prev, [realId]: [] }));
+
+          if (socket && isConnected) {
+            socket.emit('join_conversation', realId);
+          }
+        } catch (err) {
+          toast({ title: 'Error', description: 'Could not start conversation', variant: 'destructive' });
+        }
+        return;
+      }
+
+      // --- CORE FIX: switch conversations atomically ---
+      // 1. Switch active conversation FIRST (clears the window immediately)
       setActiveConversationId(id);
       setActiveConversationData(chatData);
-    }
-  };
 
-  useEffect(() => {
-    if (activeConversationId && activeConversationData) {
-      // Fetch messages for this conversation
-      const token = localStorage.getItem('attendance_token');
-      fetch(`${API_URL}/api/messages/${activeConversationId}`, {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : ''
-        }
-      })
-        .then(r => r.json())
-        .then(msgs => {
-          if (Array.isArray(msgs)) {
-            const formatted = msgs.map(m => ({
-              id: m.id,
-              senderId: m.senderId,
-              senderName: m.sender?.full_name || 'Unknown',
-              content: m.content,
-              timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              status: 'read',
-              type: m.type,
-              isMe: m.senderId === user?.id
-            }));
-            setMessages(formatted);
-          }
-        });
-
+      // 2. Join the socket room for this conversation
       if (socket && isConnected) {
-        socket.emit('join_conversation', activeConversationId);
+        socket.emit('join_conversation', id);
       }
-    }
-  }, [activeConversationId, socket, isConnected, user]);
 
+      // 3. Load messages for this specific conversation
+      await loadMessages(id);
+    },
+    [user, socket, isConnected, loadMessages]
+  );
+
+  // ── Socket: authenticate + listen for new messages ────────────────────────
   useEffect(() => {
-    if (socket && isConnected && user) {
-      socket.emit('authenticate', user.id);
+    if (!socket || !isConnected || !user) return;
 
-      socket.on('new_message', (message) => {
-        if (message.conversationId === activeConversationId) {
-          setMessages((prev) => {
-            if (prev.some(m => m.id === message.id)) return prev;
-            return [...prev, { 
-              ...message, 
-              isMe: message.senderId === user.id,
-              timestamp: new Date(message.createdAt || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }];
-          });
-        }
-        
-        // Update last message in sidebar
-        setConversations((prev) => prev.map(c => 
-          c.id === message.conversationId 
-            ? { ...c, lastMessage: message.content, timestamp: 'Just now' } 
-            : c
-        ));
+    const token = localStorage.getItem('attendance_token');
+    socket.emit('authenticate', { token });
+
+    const handleNewMessage = (message: any) => {
+      const convId: string = message.conversationId;
+      const currentUser = userRef.current;
+
+      const formatted = {
+        id: message.id || Date.now().toString(),
+        senderId: message.senderId,
+        senderName: message.sender?.full_name || 'Unknown',
+        content: message.content,
+        timestamp: new Date(message.createdAt || new Date()).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        status: 'delivered',
+        type: message.type || 'TEXT',
+        attachments: message.attachments,
+        isMe: message.senderId === currentUser?.id,
+      };
+
+      // Append ONLY to the correct conversation bucket
+      setMessagesByConversation(prev => {
+        const existing = prev[convId] || [];
+        // Deduplicate by id
+        if (existing.some(m => m.id === formatted.id)) return prev;
+        return { ...prev, [convId]: [...existing, formatted] };
       });
-    }
+
+      // Update sidebar last-message preview
+      setConversations(prev =>
+        prev.map(c =>
+          c.id === convId
+            ? {
+                ...c,
+                lastMessage: message.content,
+                timestamp: 'Just now',
+                updatedAt: Date.now(),
+                unreadCount:
+                  convId !== activeConversationIdRef.current
+                    ? (c.unreadCount || 0) + 1
+                    : 0,
+              }
+            : c
+        )
+      );
+    };
+
+    socket.on('new_message', handleNewMessage);
 
     return () => {
-      if (socket) socket.off('new_message');
+      socket.off('new_message', handleNewMessage);
     };
-  }, [socket, isConnected, user, activeConversationId]);
+  }, [socket, isConnected, user]);
 
-  const handleSendMessage = (content: string, options?: { type: string; attachmentUrl?: string }) => {
-    if (socket && isConnected && activeConversationId && user) {
+  // ── Send message ─────────────────────────────────────────────────────────────
+  const handleSendMessage = useCallback(
+    (content: string, options?: { type: string; attachment?: any }) => {
+      if (!socket || !isConnected || !activeConversationId || !user) return;
+
       const messageData = {
         conversationId: activeConversationId,
         senderId: user.id,
         content,
         type: options?.type || 'TEXT',
-        attachment: options?.attachmentUrl ? {
-          url: options.attachmentUrl,
-          name: content,
-          type: options.type,
-          size: 0,
-        } : undefined
+        attachment: options?.attachment,
       };
 
-      const newMessage = {
-        id: Date.now().toString(),
-        ...messageData,
-        senderName: user.name,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: 'sending',
-        isMe: true,
-      };
-      
-      // Remove optimistic update to prevent duplication on echo
-      // setMessages((prev) => [...prev, newMessage]);
       socket.emit('send_message', messageData);
-    }
-  };
+    },
+    [socket, isConnected, activeConversationId, user]
+  );
+
+  // ── Derive the messages to display for the active conversation ───────────────
+  const currentMessages = activeConversationId
+    ? messagesByConversation[activeConversationId] || []
+    : [];
 
   return (
     <div className="h-full">
@@ -276,17 +352,19 @@ export function MessagingCenter() {
           <ChatSidebar
             conversations={conversations}
             activeConversationId={activeConversationId || undefined}
-            onSelectConversation={(id) => {
+            onSelectConversation={id => {
               const chat = conversations.find(c => c.id === id);
               handleSelectConversation(id, chat);
             }}
+            isLoading={isLoadingSidebar}
           />
         }
         content={
           <ChatWindow
             activeConversation={activeConversationData}
-            messages={messages}
+            messages={currentMessages}
             onSendMessage={handleSendMessage}
+            isLoading={isLoadingMessages}
             onBack={() => {
               setActiveConversationId(null);
               setActiveConversationData(null);

@@ -89,20 +89,26 @@ export const markAllAsRead = async (req: AuthenticatedRequest, res: Response, ne
   }
 };
 
-export const getPreferences = async (req: Request, res: Response, next: NextFunction) => {
+export const getPreferences = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    
     const { phone } = req.params;
-    const preferences = await parentService.getPreferences(phone);
+    const preferences = await parentService.getPreferences(phone, schoolId);
     res.status(200).json({ success: true, data: preferences });
   } catch (error: any) {
     next(error);
   }
 };
 
-export const updatePreferences = async (req: Request, res: Response, next: NextFunction) => {
+export const updatePreferences = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    
     const { phone } = req.params;
-    const preferences = await parentService.updatePreferences(phone, req.body);
+    const preferences = await parentService.updatePreferences(phone, schoolId, req.body);
     res.status(200).json({ success: true, data: preferences, message: "Preferences updated successfully." });
   } catch (error: any) {
     next(error);

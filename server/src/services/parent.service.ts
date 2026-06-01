@@ -150,13 +150,14 @@ export const markAllNotificationsAsRead = async (phone: string, schoolId: string
   });
 };
 
-export const getPreferences = async (phone: string) => {
+export const getPreferences = async (phone: string, schoolId: string) => {
   const cleanPhone = phone.replace(/\s+/g, '');
   return await prisma.parentPreferences.upsert({
-    where: { parentPhone: cleanPhone },
+    where: { parentPhone_schoolId: { parentPhone: cleanPhone, schoolId } },
     update: {},
     create: {
       parentPhone: cleanPhone,
+      schoolId,
       emailNotifications: true,
       smsNotifications: false,
       pushNotifications: true
@@ -164,10 +165,10 @@ export const getPreferences = async (phone: string) => {
   });
 };
 
-export const updatePreferences = async (phone: string, data: any) => {
+export const updatePreferences = async (phone: string, schoolId: string, data: any) => {
   const cleanPhone = phone.replace(/\s+/g, '');
   return await prisma.parentPreferences.upsert({
-    where: { parentPhone: cleanPhone },
+    where: { parentPhone_schoolId: { parentPhone: cleanPhone, schoolId } },
     update: {
       emailNotifications: data.emailNotifications ?? true,
       smsNotifications: data.smsNotifications ?? false,
@@ -175,6 +176,7 @@ export const updatePreferences = async (phone: string, data: any) => {
     },
     create: {
       parentPhone: cleanPhone,
+      schoolId,
       emailNotifications: data.emailNotifications ?? true,
       smsNotifications: data.smsNotifications ?? false,
       pushNotifications: data.pushNotifications ?? true
@@ -218,7 +220,7 @@ export const searchParentByPhone = async (phone: string, schoolId: string) => {
   const cleanPhone = phone.replace(/\s+/g, '');
   const user = await prisma.user.findFirst({
     where: { phone: cleanPhone, role: 'parent', schoolId },
-    select: { id: true, full_name: true, email: true, phone: true }
+    select: { id: true, full_name: true, email: true, phone: true, address: true }
   });
 
   if (!user) {

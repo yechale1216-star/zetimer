@@ -3,7 +3,7 @@ import prisma from '../config/db';
 import { AuthenticatedRequest } from '../middleware/tenant.middleware';
 
 export const getConversations = async (req: AuthenticatedRequest, res: Response) => {
-  const { userId } = req.params;
+  const userId = req.user?.id;
   const schoolId = req.user?.schoolId;
 
   if (!schoolId) {
@@ -111,6 +111,23 @@ export const createConversation = async (req: AuthenticatedRequest, res: Respons
   }
 
   try {
+    // 1. Verify all members belong to the SAME school
+    const usersInSchool = await prisma.user.findMany({
+      where: {
+        id: { in: memberIds },
+        schoolId,
+        is_active: true,
+        role: { in: ['admin', 'school_admin', 'teacher', 'parent'] }
+      },
+      select: { id: true }
+    });
+
+    if (usersInSchool.length !== memberIds.length) {
+      return res.status(403).json({ 
+        error: 'Forbidden: One or more users are not found in your school or are not authorized for communication' 
+      });
+    }
+
     // If not a group, check if a 1:1 conversation already exists in THIS school
     if (!isGroup && memberIds.length === 2) {
       const existingConversation = await prisma.conversation.findFirst({

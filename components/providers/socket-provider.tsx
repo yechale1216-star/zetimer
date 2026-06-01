@@ -20,7 +20,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const socketInstance = ClientIO(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000', {
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 
+      (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:5000` : 'http://localhost:5000');
+    
+    const socketInstance = ClientIO(socketUrl, {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });

@@ -71,7 +71,7 @@ function ViewDetailsModal({ subscription, onClose }: ViewDetailsModalProps) {
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border-primary/20" onClick={(e) => e.stopPropagation()}>
         <CardHeader>
-          <CardTitle className="text-xl font-bold flex items-center gap-2">
+          <CardTitle className="typography-section-title flex items-center gap-2">
             <CreditCard className="w-5 h-5 text-primary" />
             Subscription Details
           </CardTitle>
@@ -79,12 +79,12 @@ function ViewDetailsModal({ subscription, onClose }: ViewDetailsModalProps) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">School</p>
-              <p className="font-medium text-foreground">{subscription.school?.name || "Unknown"}</p>
+              <p className="typography-label text-muted-foreground uppercase">School</p>
+              <p className="typography-label text-foreground">{subscription.school?.name || "Unknown"}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Tier</p>
-              <Badge variant="outline" className="mt-1 font-bold">
+              <p className="typography-label text-muted-foreground uppercase">Tier</p>
+              <Badge variant="outline" className="typography-label mt-1">
                 {TIER_CONFIG[subscription.tier]?.label ?? subscription.tier}
               </Badge>
             </div>
@@ -92,54 +92,54 @@ function ViewDetailsModal({ subscription, onClose }: ViewDetailsModalProps) {
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Billing Period</p>
-              <p className="font-medium capitalize text-foreground">{subscription.billingPeriod ?? subscription.plan}</p>
+              <p className="typography-label text-muted-foreground uppercase">Billing Period</p>
+              <p className="typography-label capitalize text-foreground">{subscription.billingPeriod ?? subscription.plan}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Active Students</p>
-              <p className="font-medium text-foreground">{seats}</p>
+              <p className="typography-label text-muted-foreground uppercase">Active Students</p>
+              <p className="typography-label text-foreground">{seats}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Period Total</p>
-              <p className="font-bold text-foreground text-lg">${(subscription.currentPeriodTotal ?? 0).toFixed(2)}</p>
+              <p className="typography-label text-muted-foreground uppercase">Period Total</p>
+              <p className="typography-card-title text-foreground">${(subscription.currentPeriodTotal ?? 0).toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Monthly Equiv.</p>
-              <p className="font-medium text-foreground">${(subscription.effectiveMonthly ?? 0).toFixed(2)}</p>
+              <p className="typography-label text-muted-foreground uppercase">Monthly Equiv.</p>
+              <p className="typography-label text-foreground">${(subscription.effectiveMonthly ?? 0).toFixed(2)}</p>
             </div>
           </div>
 
           <div className="pt-2 border-t border-border">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Billing window</p>
-            <p className="font-medium text-sm text-foreground">
+            <p className="typography-label text-muted-foreground uppercase mb-1">Billing window</p>
+            <p className="typography-label text-foreground">
               {subscription.billingStart} <span className="text-muted-foreground mx-1">→</span> {subscription.billingEnd}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Renewal</p>
-              <p className="font-medium text-foreground">{subscription.renewalDate}</p>
+              <p className="typography-label text-muted-foreground uppercase">Renewal</p>
+              <p className="typography-label text-foreground">{subscription.renewalDate}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Discount</p>
-              <p className="font-medium text-foreground">{subscription.discountPercent ?? 0}%</p>
+              <p className="typography-label text-muted-foreground uppercase">Discount</p>
+              <p className="typography-label text-foreground">{subscription.discountPercent ?? 0}%</p>
             </div>
           </div>
 
           {subscription.trialEndsAt && (
             <div className="bg-primary/5 p-3 rounded-lg border border-primary/20">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Trial ends</p>
-              <p className="font-bold text-primary">{subscription.trialEndsAt}</p>
+              <p className="typography-label text-muted-foreground uppercase">Trial ends</p>
+              <p className="typography-label text-primary">{subscription.trialEndsAt}</p>
             </div>
           )}
 
           <div className="pt-2">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Status</p>
-            <Badge variant="outline" className={`${getStatusColor(subscription.status)} font-bold px-3 py-1`}>
+            <p className="typography-label text-muted-foreground uppercase mb-1">Status</p>
+            <Badge variant="outline" className={`typography-label ${getStatusColor(subscription.status)} px-3 py-1`}>
               {getStatusLabel(subscription.status)}
             </Badge>
           </div>
@@ -255,15 +255,15 @@ export function SubscriptionsList({ searchQuery, statusFilter }: SubscriptionsLi
             <table className="w-full min-w-[900px]">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">School</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Tier</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Billing</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Students</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Period total</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">MRR eq.</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Renewal</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+                  <th className="typography-label text-left py-3 px-4 text-muted-foreground">School</th>
+                  <th className="typography-label text-left py-3 px-4 text-muted-foreground">Tier</th>
+                  <th className="typography-label text-left py-3 px-4 text-muted-foreground">Billing</th>
+                  <th className="typography-label text-left py-3 px-4 text-muted-foreground">Students</th>
+                  <th className="typography-label text-left py-3 px-4 text-muted-foreground">Period total</th>
+                  <th className="typography-label text-left py-3 px-4 text-muted-foreground">MRR eq.</th>
+                  <th className="typography-label text-left py-3 px-4 text-muted-foreground">Renewal</th>
+                  <th className="typography-label text-left py-3 px-4 text-muted-foreground">Status</th>
+                  <th className="typography-label text-left py-3 px-4 text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -271,17 +271,17 @@ export function SubscriptionsList({ searchQuery, statusFilter }: SubscriptionsLi
                   const seats = sub.studentCount ?? sub.userCount ?? 0
                   return (
                     <tr key={sub.id} className="border-b border-border hover:bg-secondary/50 transition-colors">
-                      <td className="py-3 px-4 text-sm font-medium text-foreground">{sub.school?.name || "Unknown"}</td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">{TIER_CONFIG[sub.tier]?.label}</td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground capitalize">
+                      <td className="typography-label py-3 px-4 text-foreground">{sub.school?.name || "Unknown"}</td>
+                      <td className="typography-body py-3 px-4 text-muted-foreground">{TIER_CONFIG[sub.tier]?.label}</td>
+                      <td className="typography-body py-3 px-4 text-muted-foreground capitalize">
                         {sub.billingPeriod ?? sub.plan}
                       </td>
-                      <td className="py-3 px-4 text-sm font-medium">{seats}</td>
-                      <td className="py-3 px-4 text-sm font-medium">${(sub.currentPeriodTotal ?? 0).toFixed(2)}</td>
-                      <td className="py-3 px-4 text-sm font-medium">${(sub.effectiveMonthly ?? 0).toFixed(2)}</td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">{sub.renewalDate}</td>
+                      <td className="typography-label py-3 px-4">{seats}</td>
+                      <td className="typography-label py-3 px-4">${(sub.currentPeriodTotal ?? 0).toFixed(2)}</td>
+                      <td className="typography-label py-3 px-4">${(sub.effectiveMonthly ?? 0).toFixed(2)}</td>
+                      <td className="typography-body py-3 px-4 text-muted-foreground">{sub.renewalDate}</td>
                       <td className="py-3 px-4">
-                        <Badge variant="outline" className={`${getStatusColor(sub.status)} text-[10px] font-bold uppercase tracking-wider`}>
+                        <Badge variant="outline" className={`typography-label ${getStatusColor(sub.status)} text-[10px] uppercase`}>
                           {getStatusLabel(sub.status)}
                         </Badge>
                       </td>
@@ -318,7 +318,7 @@ export function SubscriptionsList({ searchQuery, statusFilter }: SubscriptionsLi
           </div>
 
           <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
-            <p className="text-sm text-muted-foreground">
+            <p className="typography-body text-muted-foreground">
               Showing {Math.min((page - 1) * itemsPerPage + 1, filteredSubscriptions.length)} to{" "}
               {Math.min(page * itemsPerPage, filteredSubscriptions.length)} of {filteredSubscriptions.length}
             </p>

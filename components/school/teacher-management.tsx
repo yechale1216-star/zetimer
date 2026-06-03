@@ -281,7 +281,7 @@ export function TeacherManagement() {
       <div className="flex items-center justify-center py-24">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-slate-500 font-medium animate-pulse">Loading teachers data...</p>
+          <p className="typography-label mt-4 text-slate-500 animate-pulse">Loading teachers data...</p>
         </div>
       </div>
     )
@@ -292,10 +292,10 @@ export function TeacherManagement() {
       {/* Dynamic Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="typography-page-title text-slate-900 dark:text-white">
             Teacher Directory
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="typography-body text-slate-500 dark:text-slate-400 mt-1">
             Manage your faculty members, profile records, and check their class assignments.
           </p>
         </div>
@@ -344,8 +344,8 @@ export function TeacherManagement() {
               <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30 animate-bounce mb-5">
                 <CheckCircle2 className="w-10 h-10 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">Successfully Registered!</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">The teacher has been added to the system.</p>
+              <h2 className="typography-page-title text-emerald-700 dark:text-emerald-400">Successfully Registered!</h2>
+              <p className="typography-body text-slate-500 dark:text-slate-400 mt-1">The teacher has been added to the system.</p>
             </div>
           ) : (
             <>
@@ -355,8 +355,8 @@ export function TeacherManagement() {
                     <Plus className="w-4 h-4" />
                   </div>
                   <div>
-                    <DialogTitle className="text-xl font-bold">{editingTeacher ? "Update Faculty Member" : "Register Faculty Member"}</DialogTitle>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Provide complete personal and academic specialization fields.</p>
+                    <DialogTitle className="typography-section-title">{editingTeacher ? "Update Faculty Member" : "Register Faculty Member"}</DialogTitle>
+                    <p className="typography-helper text-slate-500 dark:text-slate-400 mt-0.5">Provide complete personal and academic specialization fields.</p>
                   </div>
                 </div>
               </DialogHeader>
@@ -373,7 +373,7 @@ export function TeacherManagement() {
                     className="w-20 h-20 rounded-full object-cover shadow-md ring-2 ring-blue-500/80 dark:ring-blue-400/80 ring-offset-2 ring-offset-white dark:ring-offset-slate-900"
                   />
                 ) : (
-                  <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${getAvatarGradient(formData.full_name || 'T')} flex items-center justify-center text-white font-bold text-2xl shadow-md`}>
+                  <div className={`typography-page-title w-20 h-20 rounded-full bg-gradient-to-br ${getAvatarGradient(formData.full_name || 'T')} flex items-center justify-center text-white shadow-md`}>
                     {getInitials(formData.full_name || 'T')}
                   </div>
                 )}
@@ -400,13 +400,13 @@ export function TeacherManagement() {
                 />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Profile Photo</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Optional · JPG, PNG or WebP</p>
+                <p className="typography-label text-slate-700 dark:text-slate-300">Profile Photo</p>
+                <p className="typography-helper text-slate-400 dark:text-slate-500 mt-0.5">Optional · JPG, PNG or WebP</p>
                 {profilePhoto && (
                   <button
                     type="button"
                     onClick={() => setProfilePhoto(null)}
-                    className="text-xs text-rose-500 hover:text-rose-600 mt-1 transition-colors"
+                    className="typography-helper text-rose-500 hover:text-rose-600 mt-1 transition-colors"
                   >
                     Remove photo
                   </button>
@@ -416,7 +416,7 @@ export function TeacherManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
-                <Label htmlFor="full_name" className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">Full Name <span className="text-red-500">*</span></Label>
+                <Label htmlFor="full_name" className="typography-label text-slate-700 dark:text-slate-300 uppercase">Full Name <span className="text-red-500">*</span></Label>
                 <Input
                   id="full_name"
                   value={formData.full_name}
@@ -427,7 +427,7 @@ export function TeacherManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">Email Address <span className="text-red-500">*</span></Label>
+                <Label htmlFor="email" className="typography-label text-slate-700 dark:text-slate-300 uppercase">Email Address <span className="text-red-500">*</span></Label>
                 <Input
                   id="email"
                   type="email"
@@ -442,7 +442,7 @@ export function TeacherManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">Password {!editingTeacher && <span className="text-red-500">*</span>}</Label>
+                <Label htmlFor="password" className="typography-label text-slate-700 dark:text-slate-300 uppercase">Password {!editingTeacher && <span className="text-red-500">*</span>}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -454,7 +454,7 @@ export function TeacherManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">Phone (Ethiopia +251)</Label>
+                <Label htmlFor="phone" className="typography-label text-slate-700 dark:text-slate-300 uppercase">Phone (Ethiopia +251)</Label>
                 <Input
                   id="phone"
                   placeholder="+251911223344"
@@ -473,7 +473,7 @@ export function TeacherManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="space-y-2">
-                <Label htmlFor="subject" className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">Primary Subject</Label>
+                <Label htmlFor="subject" className="typography-label text-slate-700 dark:text-slate-300 uppercase">Primary Subject</Label>
                 <Input
                   id="subject"
                   value={formData.subject}
@@ -483,7 +483,7 @@ export function TeacherManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="qualification" className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">Qualification</Label>
+                <Label htmlFor="qualification" className="typography-label text-slate-700 dark:text-slate-300 uppercase">Qualification</Label>
                 <Input
                   id="qualification"
                   placeholder="e.g. BSc in Education, MA"
@@ -493,7 +493,7 @@ export function TeacherManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="experience_years" className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">Experience (years)</Label>
+                <Label htmlFor="experience_years" className="typography-label text-slate-700 dark:text-slate-300 uppercase">Experience (years)</Label>
                 <Input
                   id="experience_years"
                   type="number"
@@ -537,7 +537,7 @@ export function TeacherManagement() {
 
       {/* Card Grid of Teachers */}
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+        <h2 className="typography-section-title text-slate-800 dark:text-slate-100 flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-blue-600" />
           Active Faculty Members ({teachers.length})
         </h2>
@@ -547,8 +547,8 @@ export function TeacherManagement() {
             <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center mx-auto mb-4 text-slate-400">
               <User className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">No teachers registered</h3>
-            <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">Get started by creating your first teacher record in the registration form above.</p>
+            <h3 className="typography-card-title text-slate-800 dark:text-slate-200">No teachers registered</h3>
+            <p className="typography-body text-slate-500 mt-1 max-w-sm mx-auto">Get started by creating your first teacher record in the registration form above.</p>
           </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -569,20 +569,16 @@ export function TeacherManagement() {
                           className="w-10 h-10 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform duration-300 ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-900"
                         />
                       ) : (
-                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white font-bold text-xs shadow-sm group-hover:scale-105 transition-transform duration-300`}>
+                        <div className={`typography-label w-10 h-10 rounded-full bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform duration-300`}>
                           {getInitials(teacher.full_name)}
                         </div>
                       )}
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full ${
-                          teacher.is_active !== false 
-                            ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400" 
-                            : "bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-400"
-                        }`}>
+                        <span className={`typography-label text-[9px] uppercase px-1.5 py-0.5 rounded-full ${ teacher.is_active !== false ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400" : "bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-400" }`}>
                           {teacher.is_active !== false ? "Active" : "Inactive"}
                         </span>
                         {teacher.experience_years && (
-                          <span className="text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                          <span className="typography-label text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                             <Briefcase className="w-2.5 h-2.5 text-slate-400" />
                             {teacher.experience_years} yrs
                           </span>
@@ -592,11 +588,11 @@ export function TeacherManagement() {
 
                     {/* Name & Primary Subject */}
                     <div>
-                      <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 group-hover:text-blue-600 truncate transition-colors duration-200" title={teacher.full_name}>
+                      <h3 className="typography-card-title text-slate-900 dark:text-slate-100 group-hover:text-blue-600 truncate transition-colors duration-200" title={teacher.full_name}>
                         {teacher.full_name}
                       </h3>
                       {teacher.subject ? (
-                        <div className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-400/10 px-2 py-0.5 rounded-full">
+                        <div className="typography-label inline-flex items-center gap-1 mt-0.5 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-400/10 px-2 py-0.5 rounded-full">
                           <BookOpen className="w-2.5 h-2.5" />
                           {teacher.subject}
                         </div>
@@ -606,7 +602,7 @@ export function TeacherManagement() {
                     </div>
 
                     {/* Meta Links */}
-                    <div className="space-y-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-900/50 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="typography-helper space-y-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-900/50 text-slate-500 dark:text-slate-400">
                       <div className="flex items-center gap-1.5 truncate">
                         <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                         <span className="truncate" title={teacher.email}>{teacher.email}</span>
@@ -624,7 +620,7 @@ export function TeacherManagement() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => setSelectedTeacher(teacher)}
-                      className="h-8 rounded-lg bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/20 hover:text-blue-600 dark:hover:text-blue-400 px-2.5 text-xs transition-colors duration-200"
+                      className="typography-helper h-8 rounded-lg bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/20 hover:text-blue-600 dark:hover:text-blue-400 px-2.5 transition-colors duration-200"
                     >
                       <Eye className="w-4 h-4 mr-1.5" />
                       View Profile
@@ -677,23 +673,23 @@ export function TeacherManagement() {
                     className="w-24 h-24 rounded-full object-cover shadow-lg ring-4 ring-white/30 ring-offset-2 ring-offset-blue-600"
                   />
                 ) : (
-                  <div className="w-24 h-24 rounded-full bg-white text-slate-800 font-extrabold text-3xl flex items-center justify-center shadow-lg">
+                  <div className="typography-page-title w-24 h-24 rounded-full bg-white text-slate-800 flex items-center justify-center shadow-lg">
                     {getInitials(selectedTeacher.full_name)}
                   </div>
                 )}
                 <div className="text-center sm:text-left space-y-1">
                   <div className="flex flex-col sm:flex-row items-center gap-2">
-                    <h2 className="text-2xl font-extrabold tracking-tight">{selectedTeacher.full_name}</h2>
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-white/20 text-white border border-white/20 rounded-full">
+                    <h2 className="typography-page-title">{selectedTeacher.full_name}</h2>
+                    <span className="typography-label text-[10px] uppercase px-2 py-0.5 bg-white/20 text-white border border-white/20 rounded-full">
                       Faculty Member
                     </span>
                   </div>
-                  <p className="text-white/80 text-sm flex items-center justify-center sm:justify-start gap-1">
+                  <p className="typography-body text-white/80 flex items-center justify-center sm:justify-start gap-1">
                     <Mail className="w-4 h-4" />
                     {selectedTeacher.email}
                   </p>
                   {selectedTeacher.subject && (
-                    <div className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-white bg-white/20 px-3 py-1 rounded-full border border-white/10">
+                    <div className="typography-label inline-flex items-center gap-1 mt-2 text-white bg-white/20 px-3 py-1 rounded-full border border-white/10">
                       <BookOpen className="w-3.5 h-3.5" />
                       {selectedTeacher.subject} Teacher
                     </div>
@@ -708,22 +704,22 @@ export function TeacherManagement() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-900 flex flex-col items-center justify-center text-center">
                   <Briefcase className="w-5 h-5 text-blue-600 dark:text-blue-400 mb-1" />
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 tracking-wider">Experience</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                  <span className="typography-label text-[10px] uppercase text-slate-400 dark:text-slate-500">Experience</span>
+                  <span className="typography-label text-slate-800 dark:text-slate-200 mt-0.5">
                     {selectedTeacher.experience_years ? `${selectedTeacher.experience_years} Years` : "N/A"}
                   </span>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-900 flex flex-col items-center justify-center text-center">
                   <GraduationCap className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mb-1" />
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 tracking-wider">Qualification</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5 truncate max-w-full" title={selectedTeacher.qualification || "N/A"}>
+                  <span className="typography-label text-[10px] uppercase text-slate-400 dark:text-slate-500">Qualification</span>
+                  <span className="typography-label text-slate-800 dark:text-slate-200 mt-0.5 truncate max-w-full" title={selectedTeacher.qualification || "N/A"}>
                     {selectedTeacher.qualification || "N/A"}
                   </span>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-900 flex flex-col items-center justify-center text-center">
                   <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mb-1" />
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 tracking-wider">Status</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                  <span className="typography-label text-[10px] uppercase text-slate-400 dark:text-slate-500">Status</span>
+                  <span className="typography-label text-slate-800 dark:text-slate-200 mt-0.5">
                     {selectedTeacher.is_active !== false ? "Active Account" : "Suspended"}
                   </span>
                 </div>
@@ -731,38 +727,38 @@ export function TeacherManagement() {
 
               {/* Personal Details */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Contact Details</h3>
+                <h3 className="typography-label uppercase text-slate-400 dark:text-slate-500">Contact Details</h3>
                 <div className="divide-y divide-slate-100 dark:divide-slate-900 border border-slate-100 dark:border-slate-900 rounded-2xl overflow-hidden bg-slate-50/30 dark:bg-slate-900/20">
                   <div className="flex justify-between items-center p-4">
-                    <span className="text-sm text-slate-500 flex items-center gap-2">
+                    <span className="typography-body text-slate-500 flex items-center gap-2">
                       <Mail className="w-4 h-4 text-slate-400" />
                       Email Address
                     </span>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{selectedTeacher.email}</span>
+                    <span className="typography-label text-slate-800 dark:text-slate-200">{selectedTeacher.email}</span>
                   </div>
                   <div className="flex justify-between items-center p-4">
-                    <span className="text-sm text-slate-500 flex items-center gap-2">
+                    <span className="typography-body text-slate-500 flex items-center gap-2">
                       <Phone className="w-4 h-4 text-slate-400" />
                       Phone Number
                     </span>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{selectedTeacher.phone || "No phone added"}</span>
+                    <span className="typography-label text-slate-800 dark:text-slate-200">{selectedTeacher.phone || "No phone added"}</span>
                   </div>
                 </div>
               </div>
 
               {/* Assignments / Dynamic Section */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Class Assignments</h3>
+                <h3 className="typography-label uppercase text-slate-400 dark:text-slate-500">Class Assignments</h3>
                 
                 {isLoadingAssignments ? (
                   <div className="py-8 text-center bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
                     <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                    <span className="text-xs text-slate-500">Loading assignments...</span>
+                    <span className="typography-helper text-slate-500">Loading assignments...</span>
                   </div>
                 ) : assignments.length === 0 ? (
                   <div className="py-8 text-center bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200/50 dark:border-slate-800/50 rounded-2xl text-slate-400">
                     <BookOpen className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
-                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">No classes assigned yet</p>
+                    <p className="typography-label text-slate-600 dark:text-slate-400">No classes assigned yet</p>
                     <p className="text-[10px] text-slate-400 mt-0.5">Use the Assignments panel under school administrator dashboard to allocate classes.</p>
                   </div>
                 ) : (
@@ -772,20 +768,20 @@ export function TeacherManagement() {
                         key={assignment.id} 
                         className="flex items-center gap-3 p-3 bg-blue-50/20 dark:bg-slate-900/50 rounded-xl border border-blue-100/50 dark:border-slate-800/80 hover:bg-blue-50/40 dark:hover:bg-slate-800 transition-colors"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-blue-600/10 dark:bg-blue-400/10 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs">
+                        <div className="typography-label w-8 h-8 rounded-lg bg-blue-600/10 dark:bg-blue-400/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
                           {assignment.grade}{assignment.section}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          <p className="typography-label text-slate-800 dark:text-slate-200">
                             Grade {assignment.grade} - Section {assignment.section}
                           </p>
                           {assignment.stream && assignment.stream !== "General" && (
-                            <p className="text-[9px] text-slate-400 uppercase tracking-wide font-semibold mt-0.5">
+                            <p className="typography-label text-[9px] text-slate-400 uppercase mt-0.5">
                               {assignment.stream}
                             </p>
                           )}
                           {assignment.subject && (
-                            <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
+                            <p className="typography-label text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">
                               {assignment.subject}
                             </p>
                           )}
@@ -813,7 +809,7 @@ export function TeacherManagement() {
               </Button>
               <Button 
                 onClick={() => setSelectedTeacher(null)}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-1 text-sm transition-all duration-200"
+                className="typography-body bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-1 transition-all duration-200"
               >
                 Close Profile
               </Button>

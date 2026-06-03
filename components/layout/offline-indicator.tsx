@@ -30,14 +30,14 @@ export function OfflineIndicator() {
         {!isOnline ? (
           <Alert className="bg-orange-50 border-orange-200 dark:bg-orange-950 dark:border-orange-800 shadow-lg rounded-lg">
             <WifiOff className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-            <AlertDescription className="text-orange-800 dark:text-orange-200 font-medium">
+            <AlertDescription className="typography-label text-orange-800 dark:text-orange-200">
               You're offline. Changes will sync when you're back online.
             </AlertDescription>
           </Alert>
         ) : (
           <Alert className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800 shadow-lg rounded-lg">
             <Wifi className="h-4 w-4 text-green-600 dark:text-green-400" />
-            <AlertDescription className="text-green-800 dark:text-green-200 font-medium">
+            <AlertDescription className="typography-label text-green-800 dark:text-green-200">
               Back online! Syncing your changes...
             </AlertDescription>
           </Alert>
@@ -51,7 +51,7 @@ export function ConnectionStatus() {
   const { isOnline } = useOnline()
 
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="typography-body flex items-center gap-2">
       {isOnline ? (
         <>
           <Wifi className="h-4 w-4 text-green-600" />

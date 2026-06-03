@@ -98,13 +98,13 @@ export function AnnouncementsList({ searchQuery }: AnnouncementsListProps) {
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-sm font-semibold text-foreground">{announcement.title}</h3>
+                    <h3 className="typography-label text-foreground">{announcement.title}</h3>
                     <Badge className={getStatusColor(announcement.status)}>
                       {announcement.status.charAt(0).toUpperCase() + announcement.status.slice(1)}
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">{announcement.description}</p>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <p className="typography-body text-muted-foreground mb-2">{announcement.description}</p>
+                  <div className="typography-helper flex items-center gap-4 text-muted-foreground">
                     <span>Target: {announcement.targetAudience}</span>
                     <span>Recipients: {announcement.recipients}</span>
                     {announcement.status === 'published' && <span>Read Rate: {announcement.readRate}%</span>}

@@ -110,7 +110,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
               <AvatarImage src={caller.avatar || undefined} />
               <AvatarFallback>{caller.name.slice(0, 2)}</AvatarFallback>
             </Avatar>
-            <span className="text-[10px] text-white font-bold truncate w-full">{caller.name}</span>
+            <span className="typography-label text-[10px] text-white truncate w-full">{caller.name}</span>
           </div>
         )}
         <div className="absolute top-2 right-2">
@@ -178,9 +178,9 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
         </Button>
         <div className="flex flex-col items-center">
           {status === 'CONNECTED' && (
-            <span className="text-white/60 text-[10px] font-bold uppercase tracking-[0.3em] mb-1">Encrypted Call</span>
+            <span className="typography-label text-white/60 text-[10px] uppercase tracking-[0.3em] mb-1">Encrypted Call</span>
           )}
-          <span className="text-white text-xl font-bold font-mono">
+          <span className="typography-section-title text-white font-mono">
             {status === 'CONNECTED' ? formatTime(callTime) : status.toLowerCase() + '...'}
           </span>
         </div>
@@ -191,7 +191,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
         >
           <div className="relative">
             <Users className="h-6 w-6" />
-            <span className="absolute -top-1 -right-1 bg-primary text-white text-[8px] h-4 w-4 rounded-full flex items-center justify-center font-bold">
+            <span className="typography-label absolute -top-1 -right-1 bg-primary text-white text-[8px] h-4 w-4 rounded-full flex items-center justify-center">
               {allParticipantsCount}
             </span>
           </div>
@@ -212,12 +212,12 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-800">
                   <Avatar className="h-24 w-24">
-                    <AvatarFallback className="text-2xl bg-white/10 text-white">You</AvatarFallback>
+                    <AvatarFallback className="typography-section-title bg-white/10 text-white">You</AvatarFallback>
                   </Avatar>
-                  <span className="text-xs font-bold text-white/40">Camera Off</span>
+                  <span className="typography-label text-white/40">Camera Off</span>
                 </div>
               )}
-              <div className="absolute bottom-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <div className="typography-label absolute bottom-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full text-[10px] text-white uppercase flex items-center gap-2">
                 You {isMuted && <MicOff className="h-3 w-3 text-red-500" />}
               </div>
             </div>
@@ -231,12 +231,12 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
                   <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-800">
                     <Avatar className="h-24 w-24 border-2 border-white/10">
                       <AvatarImage src={p.avatar || undefined} />
-                      <AvatarFallback className="text-2xl bg-white/10 text-white">{p.name.slice(0, 2)}</AvatarFallback>
+                      <AvatarFallback className="typography-section-title bg-white/10 text-white">{p.name.slice(0, 2)}</AvatarFallback>
                     </Avatar>
-                    <span className="text-xs font-bold text-white/40">Connecting...</span>
+                    <span className="typography-label text-white/40">Connecting...</span>
                   </div>
                 )}
-                <div className="absolute bottom-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase tracking-wider">
+                <div className="typography-label absolute bottom-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full text-[10px] text-white uppercase">
                   {p.name}
                 </div>
               </div>
@@ -253,16 +253,16 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
                 />
                 <Avatar className="h-48 w-48 border-4 border-white/10 shadow-2xl relative z-10">
                   <AvatarImage src={caller.avatar || undefined} />
-                  <AvatarFallback className="text-5xl font-bold bg-primary/20 text-white">
+                  <AvatarFallback className="typography-label text-5xl bg-primary/20 text-white">
                     {caller.name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
              </div>
              <div className="text-center">
-                <h2 className="text-4xl font-bold text-white tracking-tight mb-2">{caller.name}</h2>
+                <h2 className="typography-page-title text-white mb-2">{caller.name}</h2>
                 <div className="flex items-center justify-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <p className="text-white/40 text-xs font-bold tracking-widest uppercase">Ongoing voice session</p>
+                  <p className="typography-label text-white/40 uppercase">Ongoing voice session</p>
                 </div>
              </div>
           </div>

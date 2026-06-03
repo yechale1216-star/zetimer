@@ -29,8 +29,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     if (this.state.hasError) {
       return (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <h2 className="text-red-800 font-semibold mb-2">Something went wrong</h2>
-          <p className="text-red-600 text-sm">{this.state.error?.message || "An unexpected error occurred"}</p>
+          <h2 className="typography-label text-red-800 mb-2">Something went wrong</h2>
+          <p className="typography-body text-red-600">{this.state.error?.message || "An unexpected error occurred"}</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"

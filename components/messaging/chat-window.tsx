@@ -30,6 +30,7 @@ import { useCall } from '@/components/providers/call-provider';
 import { authService } from '@/lib/auth/auth';
 import { supabase } from '@/lib/utils/supabase';
 import { toast } from 'sonner';
+import { useLanguage } from '@/lib/context/language-context';
 
 interface Message {
   id: string;
@@ -51,7 +52,7 @@ interface Message {
 interface ChatWindowProps {
   activeConversation: any;
   messages: Message[];
-  onSendMessage: (content: string, options?: { type: string; attachmentUrl?: string }) => void;
+  onSendMessage: (content: string, options?: { type: string; attachment?: any }) => void;
   onBack?: () => void;
   isLoading?: boolean;
 }
@@ -63,6 +64,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onBack,
   isLoading,
 }) => {
+  const { t } = useLanguage();
   const { initiateCall } = useCall();
   const [inputValue, setInputValue] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -177,10 +179,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         <div className="relative w-20 h-20 mb-4">
           <img src="/zetime-logo.png" alt="Zetime Logo" className="w-full h-full object-contain" />
         </div>
-        <h3 className="text-2xl font-black tracking-tight mb-1 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">ZETIME</h3>
-        <h4 className="text-base font-bold mb-2 text-foreground">Communication</h4>
-        <p className="text-muted-foreground max-w-xs text-sm">
-          Select a conversation to start messaging or create a new group.
+        <h3 className="typography-page-title mb-1 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">ZETIME</h3>
+        <h4 className="typography-card-title mb-2 text-foreground">{t("communication")}</h4>
+        <p className="typography-body text-muted-foreground max-w-xs">
+          {t("start_messaging")}
         </p>
       </div>
     );
@@ -203,16 +205,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           )}
           <Avatar className="h-10 w-10 border border-border overflow-hidden rounded-full">
             <AvatarImage src={activeConversation?.avatar || undefined} />
-            <AvatarFallback className="bg-primary/10 text-primary flex items-center justify-center font-bold h-full w-full">
+            <AvatarFallback className="typography-label bg-primary/10 text-primary flex items-center justify-center h-full w-full">
               {activeConversation.name.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="font-bold text-[15px] leading-tight">{activeConversation.name}</span>
+            <span className="typography-label text-[15px]">{activeConversation.name}</span>
             {activeConversation.isOnline ? (
-              <span className="text-[11px] text-green-500 font-medium">online</span>
+              <span className="typography-label text-[11px] text-green-500">{t("online")}</span>
             ) : (
-              <span className="text-[11px] text-muted-foreground">last seen recently</span>
+              <span className="text-[11px] text-muted-foreground">{t("last_seen")}</span>
             )}
           </div>
         </div>
@@ -249,10 +251,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem>View Profile</DropdownMenuItem>
-              <DropdownMenuItem>Mute Notifications</DropdownMenuItem>
-              <DropdownMenuItem>Clear Chat</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">Delete Chat</DropdownMenuItem>
+              <DropdownMenuItem>{t("view_profile")}</DropdownMenuItem>
+              <DropdownMenuItem>{t("mute_notifications")}</DropdownMenuItem>
+              <DropdownMenuItem>{t("clear_chat")}</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive">{t("delete_chat")}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -264,7 +266,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           <MessageWindowSkeleton />
         ) : (
           <>
-            <DateSeparator date="Today" />
+            <DateSeparator date={t("today")} />
             {messages.map((message, index) => {
               const isNextSameSender = messages[index + 1]?.senderId === message.senderId;
               return (
@@ -276,6 +278,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   isSelected={selectedIds.includes(message.id)}
                   onToggleSelect={() => toggleSelect(message.id)}
                   onEnterSelectionMode={() => setIsSelectionMode(true)}
+                  t={t}
                 />
               );
             })}
@@ -297,7 +300,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 <Button variant="ghost" size="icon" onClick={() => { setIsSelectionMode(false); setSelectedIds([]); }}>
                   <X className="h-5 w-5" />
                 </Button>
-                <span className="font-bold">{selectedIds.length} selected</span>
+                <span className="typography-label">{selectedIds.length} {t("selected")}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="icon" className="text-primary">
@@ -334,7 +337,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold truncate">{attachedFile.file.name}</p>
+                  <p className="typography-label truncate">{attachedFile.file.name}</p>
                   <p className="text-[10px] text-muted-foreground">{(attachedFile.file.size / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
                 <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={() => setAttachedFile(null)}>
@@ -350,7 +353,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 <Smile className="h-5 w-5" />
               </Button>
               <textarea
-                placeholder="Write a message..."
+                placeholder={t("write_message")}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
@@ -420,8 +423,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-
-
 
       <ImagePreviewListener onPreview={setPreviewImage} />
     </div>
@@ -516,9 +517,9 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact }: { file: 
         {getFileIcon(file.url)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">{file.name || "Document"}</p>
+        <p className="typography-label truncate group-hover:text-primary transition-colors">{file.name || "Document"}</p>
         <div className="flex items-center gap-2 mt-0.5">
-          <p className="text-[10px] opacity-70 uppercase font-bold tracking-wider">
+          <p className="typography-label text-[10px] opacity-70 uppercase">
             {file.url.split('.').pop() || 'FILE'}
           </p>
           <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
@@ -583,9 +584,9 @@ const LinkPreview = ({ url }: { url: string }) => {
             }}
           />
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-primary/70">{metadata?.domain}</span>
+        <span className="typography-label text-[10px] uppercase text-primary/70">{metadata?.domain}</span>
       </div>
-      <h5 className="text-[13px] font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">{metadata?.title}</h5>
+      <h5 className="typography-label text-[13px] text-foreground group-hover:text-primary transition-colors line-clamp-1">{metadata?.title}</h5>
       <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">{metadata?.description}</p>
     </div>
   );
@@ -597,14 +598,16 @@ const MessageBubble = ({
   isSelectionMode, 
   isSelected, 
   onToggleSelect, 
-  onEnterSelectionMode 
+  onEnterSelectionMode,
+  t
 }: { 
   message: Message, 
   isLastInGroup: boolean,
   isSelectionMode: boolean,
   isSelected: boolean,
   onToggleSelect: () => void,
-  onEnterSelectionMode: () => void
+  onEnterSelectionMode: () => void,
+  t: any
 }) => {
   const isMe = message.isMe;
   const hasAttachments = message.attachments && message.attachments.length > 0;
@@ -717,10 +720,10 @@ const MessageBubble = ({
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent className="w-56">
-             <ContextMenuItem onClick={handleCopy}>Copy Text</ContextMenuItem>
-             <ContextMenuItem>Reply</ContextMenuItem>
-             <ContextMenuItem>Forward</ContextMenuItem>
-             <ContextMenuItem className="text-destructive">Delete</ContextMenuItem>
+             <ContextMenuItem onClick={handleCopy}>{t("copy_text")}</ContextMenuItem>
+             <ContextMenuItem>{t("reply")}</ContextMenuItem>
+             <ContextMenuItem>{t("forward")}</ContextMenuItem>
+             <ContextMenuItem className="text-destructive">{t("delete")}</ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
 
@@ -761,7 +764,7 @@ const MessageBubble = ({
 
 const DateSeparator = ({ date }: { date: string }) => (
   <div className="flex justify-center my-6">
-    <div className="bg-secondary/40 backdrop-blur-sm px-4 py-1 rounded-full text-[11px] font-bold text-muted-foreground uppercase tracking-widest shadow-sm">
+    <div className="typography-label bg-secondary/40 backdrop-blur-sm px-4 py-1 rounded-full text-[11px] text-muted-foreground uppercase shadow-sm">
       {date}
     </div>
   </div>

@@ -14,6 +14,7 @@ import attendanceAnalyticsRoutes from './routes/attendance-analytics.routes';
 import messageRoutes from './routes/message.routes';
 import authRoutes from './routes/auth.routes';
 import { tenantMiddleware } from './middleware/tenant.middleware';
+import * as parentController from './controllers/parent.controller';
 
 const app = express();
 
@@ -27,6 +28,10 @@ app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 app.use('/api/auth', authRoutes);
+
+// Parent Login is public (no token required)
+app.post('/api/parent/login', parentController.loginParent);
+app.post('/api/parent/update-password', parentController.updatePassword);
 
 // Apply Tenant Isolation Middleware to all other API routes
 app.use('/api', tenantMiddleware);

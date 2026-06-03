@@ -82,7 +82,7 @@ export function DynamicPriceCalculator() {
           <div className="space-y-2">
             <Label>Product tier</Label>
             <select
-              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+              className="typography-body w-full h-10 rounded-md border border-input bg-background px-3"
               value={tier}
               onChange={(e) => setTier(e.target.value as TierPlan)}
             >
@@ -96,7 +96,7 @@ export function DynamicPriceCalculator() {
           <div className="space-y-2">
             <Label>Billing period</Label>
             <select
-              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+              className="typography-body w-full h-10 rounded-md border border-input bg-background px-3"
               value={billing}
               onChange={(e) => setBilling(e.target.value as BillingPeriod)}
             >
@@ -123,7 +123,7 @@ export function DynamicPriceCalculator() {
                     checked={addons[id].on}
                     onCheckedChange={(on) => setAddons((prev) => ({ ...prev, [id]: { ...prev[id], on } }))}
                   />
-                  <span className="text-sm font-medium">{ADDON_CATALOG[id].name}</span>
+                  <span className="typography-label">{ADDON_CATALOG[id].name}</span>
                 </div>
                 {ADDON_CATALOG[id].perUnit && addons[id].on && (
                   <Input
@@ -158,20 +158,20 @@ export function DynamicPriceCalculator() {
                 <Badge variant="outline">Upgrade: {result.upgrade.suggestedTier}</Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">{result.upgrade?.reason}</p>
+            <p className="typography-body text-muted-foreground">{result.upgrade?.reason}</p>
             <div className="space-y-1">
               {result.lineItems?.map((row: { label: string; amount: number }, i: number) => (
-                <div key={i} className="flex justify-between text-sm">
+                <div key={i} className="typography-body flex justify-between">
                   <span>{row.label}</span>
-                  <span className="font-medium">${row.amount.toFixed(2)}</span>
+                  <span className="typography-label">${row.amount.toFixed(2)}</span>
                 </div>
               ))}
             </div>
-            <div className="flex justify-between border-t border-border pt-3 text-base font-semibold">
+            <div className="typography-card-title flex justify-between border-t border-border pt-3">
               <span>Total ({result.billingMonths} mo)</span>
               <span>${result.total?.toFixed(2)}</span>
             </div>
-            <p className="text-sm text-muted-foreground">Effective monthly: ${result.effectiveMonthly?.toFixed(2)}</p>
+            <p className="typography-body text-muted-foreground">Effective monthly: ${result.effectiveMonthly?.toFixed(2)}</p>
           </div>
         )}
       </CardContent>

@@ -7,6 +7,7 @@ import { ChatWindow } from '@/components/messaging/chat-window';
 import { useSocket } from '@/components/providers/socket-provider';
 import { authService } from '@/lib/auth/auth';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/lib/context/language-context';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -19,6 +20,7 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export function MessagingCenter() {
+  const { t } = useLanguage();
   const [conversations, setConversations] = useState<any[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConversationData, setActiveConversationData] = useState<any>(null);
@@ -94,7 +96,7 @@ export function MessagingCenter() {
             name: isGroup ? c.name : otherMember?.full_name || 'Unknown',
             avatar: isGroup ? c.avatar : otherMember?.profile_photo || undefined,
             isOnline: false,
-            lastMessage: c.messages?.[0]?.content || 'Start a conversation',
+            lastMessage: c.messages?.[0]?.content || t("no_messages"),
             timestamp: c.messages?.[0]?.createdAt
               ? new Date(c.messages[0].createdAt).toLocaleTimeString([], {
                   hour: '2-digit',
@@ -123,7 +125,7 @@ export function MessagingCenter() {
           name: contact.full_name,
           avatar: contact.profile_photo || undefined,
           isOnline: false,
-          lastMessage: `Tap to message this ${contact.role}`,
+          lastMessage: t("tap_to_message").replace("{role}", contact.role),
           timestamp: '',
           updatedAt: 0,
           unreadCount: 0,
@@ -147,11 +149,15 @@ export function MessagingCenter() {
       setConversations([...activeChats, ...directory]);
     } catch (error) {
       console.error('[Messaging] Failed to load data:', error);
-      toast({ title: 'Error', description: 'Could not load conversations', variant: 'destructive' });
+      toast({ 
+        title: t("error"), 
+        description: t("load_conv_error"), 
+        variant: 'destructive' 
+      });
     } finally {
       setIsLoadingSidebar(false);
     }
-  }, [user]);
+  }, [user, t, toast]);
 
   useEffect(() => {
     loadData();
@@ -226,7 +232,7 @@ export function MessagingCenter() {
           setConversations(prev =>
             prev.map(c =>
               c.id === id
-                ? { ...c, id: realId, isNewContact: false, lastMessage: 'Start a conversation' }
+                ? { ...c, id: realId, isNewContact: false, lastMessage: t("no_messages") }
                 : c
             )
           );
@@ -241,7 +247,11 @@ export function MessagingCenter() {
             socket.emit('join_conversation', realId);
           }
         } catch (err) {
-          toast({ title: 'Error', description: 'Could not start conversation', variant: 'destructive' });
+          toast({ 
+            title: t("error"), 
+            description: t("start_conv_error"), 
+            variant: 'destructive' 
+          });
         }
         return;
       }
@@ -259,7 +269,7 @@ export function MessagingCenter() {
       // 3. Load messages for this specific conversation
       await loadMessages(id);
     },
-    [user, socket, isConnected, loadMessages]
+    [user, socket, isConnected, loadMessages, t, toast]
   );
 
   // ── Socket: authenticate + listen for new messages ────────────────────────

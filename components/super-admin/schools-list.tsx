@@ -93,7 +93,7 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg md:text-xl">All Schools</CardTitle>
+        <CardTitle className="typography-card-title">All Schools</CardTitle>
         <CardDescription>Total: {filteredSchools.length} schools</CardDescription>
       </CardHeader>
       <CardContent>
@@ -103,8 +103,8 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
             <div key={school.id} className="p-4 border border-border rounded-lg space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="font-semibold text-sm text-foreground">{school.name}</p>
-                  <p className="text-xs text-muted-foreground">{school.code}</p>
+                  <p className="typography-label text-foreground">{school.name}</p>
+                  <p className="typography-helper text-muted-foreground">{school.code}</p>
                 </div>
                 <div className="flex gap-1">
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
@@ -118,21 +118,21 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
                   </Button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="typography-helper grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-muted-foreground">Region</p>
-                  <p className="text-foreground font-medium">{school.region}</p>
+                  <p className="typography-label text-foreground">{school.region}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Students/Teachers</p>
-                  <p className="text-foreground font-medium">{school.students}/{school.teachers}</p>
+                  <p className="typography-label text-foreground">{school.students}/{school.teachers}</p>
                 </div>
               </div>
               <div className="flex gap-2">
-                <Badge variant="outline" className={`${getTierColor(school.tier)} text-[10px] font-semibold uppercase tracking-wider`}>
+                <Badge variant="outline" className={`typography-label ${getTierColor(school.tier)} text-[10px] uppercase`}>
                   {school.tier}
                 </Badge>
-                <Badge variant="outline" className={`${getStatusColor(school.status)} text-[10px] font-semibold uppercase tracking-wider`}>
+                <Badge variant="outline" className={`typography-label ${getStatusColor(school.status)} text-[10px] uppercase`}>
                   {school.status === 'active' ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
@@ -142,34 +142,34 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
 
         {/* Desktop View - Table */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="typography-body w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">School Name</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Code</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Region</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Students</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Teachers</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Tier</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Actions</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">School Name</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Code</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Region</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Students</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Teachers</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Tier</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Status</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
               {paginatedSchools.map((school) => (
                 <tr key={school.id} className="border-b border-border hover:bg-secondary/50 transition-colors">
-                  <td className="py-3 px-4 font-medium text-foreground">{school.name}</td>
+                  <td className="typography-label py-3 px-4 text-foreground">{school.name}</td>
                   <td className="py-3 px-4 text-muted-foreground">{school.code}</td>
                   <td className="py-3 px-4 text-muted-foreground">{school.region}</td>
-                  <td className="py-3 px-4 font-medium text-foreground">{school.students}</td>
-                  <td className="py-3 px-4 font-medium text-foreground">{school.teachers}</td>
+                  <td className="typography-label py-3 px-4 text-foreground">{school.students}</td>
+                  <td className="typography-label py-3 px-4 text-foreground">{school.teachers}</td>
                   <td className="py-3 px-4">
-                    <Badge variant="outline" className={`${getTierColor(school.tier)} text-[10px] font-semibold uppercase tracking-wider`}>
+                    <Badge variant="outline" className={`typography-label ${getTierColor(school.tier)} text-[10px] uppercase`}>
                       {school.tier}
                     </Badge>
                   </td>
                   <td className="py-3 px-4">
-                    <Badge variant="outline" className={`${getStatusColor(school.status)} text-[10px] font-semibold uppercase tracking-wider`}>
+                    <Badge variant="outline" className={`typography-label ${getStatusColor(school.status)} text-[10px] uppercase`}>
                       {school.status === 'active' ? 'Active' : 'Inactive'}
                     </Badge>
                   </td>
@@ -195,7 +195,7 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
         </div>
 
         {/* Pagination */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-border text-sm">
+        <div className="typography-body flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-border">
           <p className="text-muted-foreground order-2 sm:order-1">
             Showing {Math.min((page - 1) * itemsPerPage + 1, filteredSchools.length)} to{' '}
             {Math.min(page * itemsPerPage, filteredSchools.length)} of {filteredSchools.length}

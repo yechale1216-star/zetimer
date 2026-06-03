@@ -46,42 +46,42 @@ export function PricingCards({ currentTier, studentCount, billingPeriod, onSelec
           >
             {isCurrent && (
               <div className="absolute -top-3 left-0 right-0 flex justify-center z-10">
-                <Badge className="bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest px-3 py-1 shadow-sm">
+                <Badge className="typography-label bg-primary text-primary-foreground text-[10px] uppercase px-3 py-1 shadow-sm">
                   Current Plan
                 </Badge>
               </div>
             )}
             
             <CardHeader className={cn("pb-8 pt-8 border-b border-slate-200/60 dark:border-slate-800/60", isCurrent && "pt-10")}>
-              <CardTitle className="text-xl font-black">{config.label}</CardTitle>
-              <CardDescription className="min-h-[40px] text-xs font-bold uppercase tracking-widest opacity-70 mt-2">{config.description}</CardDescription>
+              <CardTitle className="typography-section-title">{config.label}</CardTitle>
+              <CardDescription className="typography-label min-h-[40px] uppercase opacity-70 mt-2">{config.description}</CardDescription>
             </CardHeader>
             
             <CardContent className="flex-1 pb-6 pt-6">
               <div className="mb-6 flex items-baseline gap-1">
                 {isEnterprise ? (
-                  <span className="text-3xl font-black">Custom</span>
+                  <span className="typography-page-title">Custom</span>
                 ) : (
                   <>
-                    <span className="text-4xl font-black tracking-tighter">{breakdown.effectiveMonthly.toLocaleString('en-ET', { maximumFractionDigits: 0 })}</span>
-                    <span className="text-base font-black text-primary ml-1">ETB</span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">/ mo</span>
+                    <span className="typography-page-title">{breakdown.effectiveMonthly.toLocaleString('en-ET', { maximumFractionDigits: 0 })}</span>
+                    <span className="typography-card-title text-primary ml-1">ETB</span>
+                    <span className="typography-label text-[10px] uppercase text-muted-foreground ml-1">/ mo</span>
                   </>
                 )}
               </div>
 
               {/* Display total based on billing period */}
               {!isEnterprise && billingPeriod !== 'monthly' && (
-                <div className="mb-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-slate-100/50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
+                <div className="typography-label mb-6 text-[10px] uppercase text-muted-foreground bg-slate-100/50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
                   Billed <span className="text-foreground">{breakdown.total.toLocaleString('en-ET', { maximumFractionDigits: 0 })} ETB</span> {billingPeriod === 'yearly' ? 'annually' : 'per semester'}
                 </div>
               )}
 
-              <ul className="space-y-3 text-sm">
+              <ul className="typography-body space-y-3">
                 <li className="flex items-start">
                   <Check className="h-4 w-4 text-primary shrink-0 mr-3 mt-0.5" />
                   <span>
-                    Up to <strong className="font-semibold">{isEnterprise ? 'Unlimited' : config.maxStudentsSoft.toLocaleString()}</strong> students
+                    Up to <strong className="typography-label">{isEnterprise ? 'Unlimited' : config.maxStudentsSoft.toLocaleString()}</strong> students
                   </span>
                 </li>
                 {tier === 'standard' || tier === 'premium' || tier === 'enterprise' ? (
@@ -107,7 +107,7 @@ export function PricingCards({ currentTier, studentCount, billingPeriod, onSelec
             
             <CardFooter className="pt-2">
               <Button 
-                className="w-full rounded-xl font-bold uppercase tracking-widest text-xs h-12 transition-all shadow-md active:scale-95" 
+                className="typography-label w-full rounded-xl uppercase h-12 transition-all shadow-md active:scale-95" 
                 variant={isCurrent ? "outline" : "default"}
                 disabled={isCurrent || isLoading}
                 onClick={() => onSelectTier(tier)}

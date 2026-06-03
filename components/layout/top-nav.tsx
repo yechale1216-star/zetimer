@@ -64,21 +64,21 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={user.schoolLogo} alt="School Logo" className="w-full h-full object-cover" />
               ) : (
-                <span className="text-primary font-black text-xl">
+                <span className="typography-section-title text-primary">
                   {user?.schoolName?.[0]?.toUpperCase() || "S"}
                 </span>
               )}
             </div>
             <div className="flex flex-col overflow-hidden">
-              <h1 className="font-black text-primary text-lg sm:text-2xl truncate leading-tight tracking-tight">
+              <h1 className="typography-card-title text-primary sm:text-2xl truncate">
                 {user?.schoolName || "School Admin"}
               </h1>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-primary/70 uppercase tracking-[0.2em] font-black">
-                  Management Portal
+                <span className="typography-label text-[10px] text-primary/70 uppercase tracking-[0.2em]">
+                  {user?.role === "parent" ? "Parent Portal" : user?.role === "teacher" ? "Teacher Portal" : user?.role === "admin" || user?.role === "school_admin" ? "Admin Portal" : "Management Portal"}
                 </span>
                 {user?.customSchoolId && (
-                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 font-bold">
+                  <span className="typography-label text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20">
                     {user.customSchoolId}
                   </span>
                 )}
@@ -100,15 +100,15 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
               <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 border border-border/50 hover:border-primary/30 transition-all shadow-sm">
                 <Avatar className="h-9 w-9">
                   <AvatarImage src={user?.profile_photo || undefined} alt={user?.name} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">{initials}</AvatarFallback>
+                  <AvatarFallback className="typography-label bg-primary/10 text-primary">{initials}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
+              <DropdownMenuLabel className="typography-body">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.name}</p>
-                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  <p className="typography-label">{user?.name}</p>
+                  <p className="typography-helper text-muted-foreground">{user?.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

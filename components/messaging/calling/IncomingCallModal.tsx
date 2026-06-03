@@ -58,13 +58,13 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
             <div className="relative z-10 flex flex-col items-center">
               <Avatar className="h-28 w-28 border-4 border-background shadow-xl mb-6">
                 <AvatarImage src={caller.avatar || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary text-3xl font-bold">
+                <AvatarFallback className="typography-page-title bg-primary/10 text-primary">
                   {caller.name.slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
 
-              <h3 className="text-2xl font-bold mb-1 tracking-tight">{caller.name}</h3>
-              <p className="text-primary font-medium flex items-center gap-2 mb-12">
+              <h3 className="typography-page-title mb-1">{caller.name}</h3>
+              <p className="typography-label text-primary flex items-center gap-2 mb-12">
                 {type === 'VIDEO' ? (
                   <><Video className="h-4 w-4" /> Incoming Video Call</>
                 ) : (
@@ -82,7 +82,7 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
                   >
                     <PhoneOff className="h-8 w-8" />
                   </Button>
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Decline</span>
+                  <span className="typography-label text-muted-foreground uppercase">Decline</span>
                 </div>
 
                 <div className="flex flex-col items-center gap-3">
@@ -97,7 +97,7 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
                       <Phone className="h-8 w-8 text-white" />
                     )}
                   </Button>
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Accept</span>
+                  <span className="typography-label text-muted-foreground uppercase">Accept</span>
                 </div>
               </div>
             </div>

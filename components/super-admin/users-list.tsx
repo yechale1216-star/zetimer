@@ -116,7 +116,7 @@ export function UsersList({ searchQuery, roleFilter }: UsersListProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg md:text-xl">All Users</CardTitle>
+        <CardTitle className="typography-card-title">All Users</CardTitle>
         <CardDescription>Total: {filteredUsers.length} users</CardDescription>
       </CardHeader>
       <CardContent>
@@ -131,8 +131,8 @@ export function UsersList({ searchQuery, roleFilter }: UsersListProps) {
                     <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold text-sm text-foreground">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                    <p className="typography-label text-foreground">{user.name}</p>
+                    <p className="typography-helper text-muted-foreground">{user.email}</p>
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -147,21 +147,21 @@ export function UsersList({ searchQuery, roleFilter }: UsersListProps) {
                   </Button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="typography-helper grid grid-cols-2 gap-2">
                 <div>
-                  <p className="text-muted-foreground font-medium">Role</p>
-                  <Badge variant="outline" className={`${getRoleColor(user.role)} text-[10px] font-bold uppercase tracking-wider mt-1`}>
+                  <p className="typography-label text-muted-foreground">Role</p>
+                  <Badge variant="outline" className={`typography-label ${getRoleColor(user.role)} text-[10px] uppercase mt-1`}>
                     {getRoleLabel(user.role)}
                   </Badge>
                 </div>
                 <div>
-                  <p className="text-muted-foreground font-medium">Status</p>
-                  <Badge variant="outline" className={`${getStatusColor(user.status)} text-[10px] font-bold uppercase tracking-wider mt-1`}>
+                  <p className="typography-label text-muted-foreground">Status</p>
+                  <Badge variant="outline" className={`typography-label ${getStatusColor(user.status)} text-[10px] uppercase mt-1`}>
                     {user.status === 'active' ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="typography-helper text-muted-foreground">
                 <p>School: {user.school}</p>
                 <p>Joined: {user.joinDate}</p>
               </div>
@@ -171,16 +171,16 @@ export function UsersList({ searchQuery, roleFilter }: UsersListProps) {
 
         {/* Desktop View - Table */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="typography-body w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">User</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Email</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Role</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">School</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Join Date</th>
-                <th className="text-left py-3 px-4 font-medium text-muted-foreground">Actions</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">User</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Email</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Role</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">School</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Status</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Join Date</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -192,18 +192,18 @@ export function UsersList({ searchQuery, roleFilter }: UsersListProps) {
                         <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} />
                         <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                       </Avatar>
-                      <span className="font-medium text-foreground">{user.name}</span>
+                      <span className="typography-label text-foreground">{user.name}</span>
                     </div>
                   </td>
                   <td className="py-3 px-4 text-muted-foreground">{user.email}</td>
                   <td className="py-3 px-4">
-                    <Badge variant="outline" className={`${getRoleColor(user.role)} text-[10px] font-bold uppercase tracking-wider`}>
+                    <Badge variant="outline" className={`typography-label ${getRoleColor(user.role)} text-[10px] uppercase`}>
                       {getRoleLabel(user.role)}
                     </Badge>
                   </td>
                   <td className="py-3 px-4 text-muted-foreground">{user.school}</td>
                   <td className="py-3 px-4">
-                    <Badge variant="outline" className={`${getStatusColor(user.status)} text-[10px] font-bold uppercase tracking-wider`}>
+                    <Badge variant="outline" className={`typography-label ${getStatusColor(user.status)} text-[10px] uppercase`}>
                       {user.status === 'active' ? 'Active' : 'Inactive'}
                     </Badge>
                   </td>
@@ -228,7 +228,7 @@ export function UsersList({ searchQuery, roleFilter }: UsersListProps) {
         </div>
 
         {/* Pagination */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-border text-sm">
+        <div className="typography-body flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-border">
           <p className="text-muted-foreground order-2 sm:order-1">
             Showing {Math.min((page - 1) * itemsPerPage + 1, filteredUsers.length)} to{' '}
             {Math.min(page * itemsPerPage, filteredUsers.length)} of {filteredUsers.length}

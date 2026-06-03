@@ -25,9 +25,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Logo } from "@/components/logo"
 import { TopNav } from "@/components/layout/top-nav"
 
+import { LanguageProvider, useLanguage } from "@/lib/context/language-context"
+
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <LanguageProvider>
+      <ParentLayoutInner>{children}</ParentLayoutInner>
+    </LanguageProvider>
+  )
+}
+
+function ParentLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  const { t, language, setLanguage } = useLanguage()
   
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [students, setStudents] = useState<any[]>([])
@@ -119,20 +130,20 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-600 border-t-transparent" />
-          <p className="text-sm font-semibold text-muted-foreground">Securing portal session...</p>
+          <p className="typography-label text-muted-foreground">Securing portal session...</p>
         </div>
       </div>
     )
   }
 
   const navLinks = [
-    { href: "/parent/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/parent/communication", label: "Communication", icon: MessageSquare },
-    { href: "/parent/attendance", label: "Attendance History", icon: Calendar },
-    { href: "/parent/profile", label: "Student Profile", icon: User },
+    { href: "/parent/dashboard", label: t("dashboard"), icon: LayoutDashboard },
+    { href: "/parent/communication", label: t("communication"), icon: MessageSquare },
+    { href: "/parent/attendance", label: t("attendance"), icon: Calendar },
+    { href: "/parent/profile", label: t("profile"), icon: User },
     { 
       href: "/parent/notifications", 
-      label: "Notifications", 
+      label: t("notifications"), 
       icon: Bell, 
       badge: unreadCount > 0 ? unreadCount : undefined 
     },
@@ -154,9 +165,8 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border/40 shrink-0 select-none">
         
         {/* Header/Logo */}
-        <div className="h-20 flex items-center px-6 border-b border-border/40 gap-2.5">
-          <Logo size="md" href="/parent/dashboard" />
-          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-widest mt-0.5 block opacity-70">Parent Portal</span>
+        <div className="p-6 border-b border-border/40 flex items-center">
+          <Logo size="md" href="/parent/dashboard" withText={true} />
         </div>
 
         {/* Dynamic Multi-Child Selector */}
@@ -168,13 +178,13 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <Avatar className="h-8 w-8 ring-2 ring-emerald-600/10">
-                  <AvatarFallback className="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-xs">
+                  <AvatarFallback className="typography-label bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
                     {getInitials(selectedStudent.fullName)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-foreground truncate leading-snug">{selectedStudent.fullName}</p>
-                  <p className="text-[10px] text-muted-foreground font-semibold leading-tight">Grade {selectedStudent.grade}</p>
+                  <p className="typography-label text-foreground truncate">{selectedStudent.fullName}</p>
+                  <p className="typography-label text-muted-foreground">Grade {selectedStudent.grade}</p>
                 </div>
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} />
@@ -183,7 +193,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
             {/* Child Switcher Dropdown */}
             {isStudentDropdownOpen && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border/40 rounded-xl shadow-xl z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest px-3 py-1 border-b border-border/20">Select Child</p>
+                <p className="typography-label text-[11px] text-muted-foreground/60 uppercase px-3 py-1 border-b border-border/20">{t("select_child")}</p>
                 {students.map((student) => (
                   <button
                     key={student.id}
@@ -193,15 +203,15 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
                     }`}
                   >
                     <Avatar className="h-7 w-7 ring-1 ring-border">
-                      <AvatarFallback className="bg-emerald-50 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
+                      <AvatarFallback className="typography-label bg-emerald-50 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400 text-[10px]">
                         {getInitials(student.fullName)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-xs truncate ${student.id === selectedStudent.id ? "font-bold text-emerald-600 dark:text-emerald-400" : "font-medium text-foreground"}`}>
+                      <p className={`typography-body truncate ${student.id === selectedStudent.id ? "font-bold text-emerald-600 dark:text-emerald-400" : "font-medium text-foreground"}`}>
                         {student.fullName}
                       </p>
-                      <p className="text-[9px] text-muted-foreground">Grade {student.grade}</p>
+                      <p className="typography-helper text-muted-foreground">Grade {student.grade}</p>
                     </div>
                     {student.id === selectedStudent.id && (
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 shrink-0" />
@@ -222,22 +232,14 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all relative group ${
-                  isActive
-                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20"
-                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-foreground"
-                }`}
+                className={`typography-label flex items-center justify-between px-3 py-2.5 rounded-xl transition-all relative group ${ isActive ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-foreground" }`}
               >
                 <div className="flex items-center gap-2.5">
                   <Icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
                   <span>{link.label}</span>
                 </div>
                 {link.badge !== undefined && (
-                  <span className={`px-2 py-0.5 text-[9px] font-black rounded-full leading-none shrink-0 ${
-                    isActive 
-                      ? "bg-white text-emerald-700" 
-                      : "bg-rose-500 text-white"
-                  }`}>
+                  <span className={`typography-label px-2 py-0.5 text-[9px] rounded-full shrink-0 ${ isActive ? "bg-white text-emerald-700" : "bg-rose-500 text-white" }`}>
                     {link.badge}
                   </span>
                 )}
@@ -249,16 +251,26 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
         {/* Sidebar Footer */}
         <div className="p-4 border-t border-border/40 flex flex-col gap-3">
           <div className="flex items-center justify-between px-2">
-            <span className="text-[10px] text-muted-foreground font-semibold">Logged in as parent</span>
-            <ModeToggle />
+            <span className="typography-label text-muted-foreground">{t("logged_in_as")}</span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="typography-label h-8 w-8 p-0"
+                onClick={() => setLanguage(language === 'en' ? 'am' : 'en')}
+              >
+                {language === 'en' ? 'EN' : 'AM'}
+              </Button>
+              <ModeToggle />
+            </div>
           </div>
           
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 border border-rose-500/20 hover:bg-rose-50 dark:hover:bg-rose-950/10 text-rose-500 hover:text-rose-600 text-xs font-bold rounded-xl transition-all"
+            className="typography-label w-full flex items-center justify-center gap-2 py-2 px-3 border border-rose-500/20 hover:bg-rose-50 dark:hover:bg-rose-950/10 text-rose-500 hover:text-rose-600 rounded-xl transition-all"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
+            <span>{t("logout")}</span>
           </button>
         </div>
       </aside>
@@ -270,7 +282,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
         {/* Student Switcher Bar (Mobile & Desktop subset) */}
         <div className="md:hidden flex items-center justify-between p-2 px-4 bg-muted/20 border-b border-border/40">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Switch Student</span>
+            <span className="typography-label text-[10px] text-muted-foreground uppercase mt-0.5">{t("switch_student")}</span>
           </div>
           <div className="relative">
             <button
@@ -278,11 +290,11 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
                 className="flex items-center gap-1.5 p-1 px-2.5 bg-background hover:bg-muted rounded-full border border-border/40 text-left transition-all shadow-sm"
               >
                 <Avatar className="h-5 w-5">
-                  <AvatarFallback className="bg-emerald-100 text-emerald-700 font-bold text-[9px]">
+                  <AvatarFallback className="typography-label bg-emerald-100 text-emerald-700 text-[9px]">
                     {getInitials(selectedStudent.fullName)}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-[10px] font-bold max-w-[80px] truncate">{selectedStudent.fullName.split(" ")[0]}</span>
+                <span className="typography-label text-[10px] max-w-[80px] truncate">{selectedStudent.fullName.split(" ")[0]}</span>
                 <ChevronDown className="w-3 h-3 text-muted-foreground" />
               </button>
               
@@ -296,12 +308,12 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
                       className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted text-left transition-colors"
                     >
                       <Avatar className="h-6 w-6">
-                        <AvatarFallback className="bg-emerald-50 text-emerald-600 font-bold text-[9px]">
+                        <AvatarFallback className="typography-label bg-emerald-50 text-emerald-600 text-[9px]">
                           {getInitials(student.fullName)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-bold truncate text-foreground">{student.fullName}</p>
+                        <p className="typography-label text-[10px] truncate text-foreground">{student.fullName}</p>
                         <p className="text-[8px] text-muted-foreground">Grade {student.grade}</p>
                       </div>
                     </button>
@@ -325,14 +337,8 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
               
               {/* Close Button */}
               <div className="flex items-center justify-between pb-4 border-b border-border/20 mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="bg-emerald-600 p-2 rounded-xl text-white">
-                    <GraduationCap className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h1 className="text-base font-black tracking-tight text-foreground">ZETIME</h1>
-                    <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest">Parent Portal</span>
-                  </div>
+                <div className="flex items-center gap-2.5">
+                  <Logo size="sm" href="/parent/dashboard" withText={true} />
                 </div>
                 <button
                   onClick={() => setIsSidebarOpen(false)}
@@ -352,22 +358,14 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
                       key={link.href}
                       href={link.href}
                       onClick={() => setIsSidebarOpen(false)}
-                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                        isActive
-                          ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/15"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
+                      className={`typography-label flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${ isActive ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/15" : "text-muted-foreground hover:bg-muted hover:text-foreground" }`}
                     >
                       <div className="flex items-center gap-2.5">
                         <Icon className="w-4.5 h-4.5 shrink-0" />
                         <span>{link.label}</span>
                       </div>
                       {link.badge !== undefined && (
-                        <span className={`px-2 py-0.5 text-[9px] font-black rounded-full leading-none shrink-0 ${
-                          isActive 
-                            ? "bg-white text-emerald-700" 
-                            : "bg-rose-500 text-white"
-                        }`}>
+                        <span className={`typography-label px-2 py-0.5 text-[9px] rounded-full shrink-0 ${ isActive ? "bg-white text-emerald-700" : "bg-rose-500 text-white" }`}>
                           {link.badge}
                         </span>
                       )}
@@ -378,17 +376,17 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
               {/* Mobile Sidebar Footer */}
               <div className="pt-4 border-t border-border/20 flex flex-col gap-3">
-                <div className="flex items-center justify-between px-2 text-xs text-muted-foreground font-semibold">
-                  <span>Parent Mode</span>
+                <div className="typography-label flex items-center justify-between px-2 text-muted-foreground">
+                  <span>{t("logged_in_as")}</span>
                   <span>{currentUser.name}</span>
                 </div>
                 
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 border border-rose-500/20 hover:bg-rose-50 text-rose-500 text-xs font-bold rounded-xl transition-all"
+                  className="typography-label w-full flex items-center justify-center gap-2 py-2.5 border border-rose-500/20 hover:bg-rose-50 text-rose-500 rounded-xl transition-all"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span>Sign Out</span>
+                  <span>{t("logout")}</span>
                 </button>
               </div>
 

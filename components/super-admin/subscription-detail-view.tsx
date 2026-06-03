@@ -104,7 +104,7 @@ export function SubscriptionDetailView() {
           Subscriptions
         </Button>
         <Separator orientation="vertical" className="h-6 hidden sm:block" />
-        <h1 className="text-2xl font-bold">{sub.school?.name ?? "School"}</h1>
+        <h1 className="typography-page-title">{sub.school?.name ?? "School"}</h1>
         <Badge variant="outline" className="capitalize">
           {String(sub.status).replace(/_/g, " ")}
         </Badge>
@@ -113,36 +113,36 @@ export function SubscriptionDetailView() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Tier & billing</CardTitle>
+            <CardTitle className="typography-body">Tier & billing</CardTitle>
             <CardDescription>Product plan and cadence</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="typography-body space-y-2">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tier</span>
-              <span className="font-medium">{TIER_CONFIG[tier]?.label}</span>
+              <span className="typography-label">{TIER_CONFIG[tier]?.label}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Billing</span>
-              <span className="font-medium capitalize">{sub.billingPeriod ?? sub.plan}</span>
+              <span className="typography-label capitalize">{sub.billingPeriod ?? sub.plan}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Students</span>
-              <span className="font-medium">{sub.studentCount ?? sub.userCount}</span>
+              <span className="typography-label">{sub.studentCount ?? sub.userCount}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Discount</span>
-              <span className="font-medium">{sub.discountPercent ?? 0}%</span>
+              <span className="typography-label">{sub.discountPercent ?? 0}%</span>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Current charge model</CardTitle>
+            <CardTitle className="typography-body">Current charge model</CardTitle>
             <CardDescription>Dynamic total for this period</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between text-lg font-semibold">
+          <CardContent className="typography-body space-y-2">
+            <div className="typography-card-title flex justify-between">
               <span>Period total</span>
               <span>${(sub.priceBreakdown?.total ?? 0).toFixed(2)}</span>
             </div>
@@ -155,7 +155,7 @@ export function SubscriptionDetailView() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Super admin actions</CardTitle>
+            <CardTitle className="typography-body">Super admin actions</CardTitle>
             <CardDescription>Suspend, resume, invoice</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
@@ -195,7 +195,7 @@ export function SubscriptionDetailView() {
           <CardHeader className="flex flex-row items-center gap-2 space-y-0">
             <Sparkles className="w-5 h-5 text-primary" />
             <div>
-              <CardTitle className="text-base">Upgrade recommendation</CardTitle>
+              <CardTitle className="typography-body">Upgrade recommendation</CardTitle>
               <CardDescription>{reco.reason}</CardDescription>
             </div>
           </CardHeader>
@@ -215,12 +215,12 @@ export function SubscriptionDetailView() {
           </CardHeader>
           <CardContent className="space-y-2">
             {(sub.billingHistory || []).map((b: any) => (
-              <div key={b.id} className="flex justify-between text-sm border-b border-border/60 py-2 last:border-0">
+              <div key={b.id} className="typography-body flex justify-between border-b border-border/60 py-2 last:border-0">
                 <div>
-                  <p className="font-medium">${b.amount}</p>
-                  <p className="text-muted-foreground text-xs">{b.description}</p>
+                  <p className="typography-label">${b.amount}</p>
+                  <p className="typography-helper text-muted-foreground">{b.description}</p>
                 </div>
-                <span className="text-xs text-muted-foreground">{b.date}</span>
+                <span className="typography-helper text-muted-foreground">{b.date}</span>
               </div>
             ))}
           </CardContent>
@@ -233,18 +233,18 @@ export function SubscriptionDetailView() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2">Invoices</p>
+              <p className="typography-label text-muted-foreground mb-2">Invoices</p>
               {(sub.invoices || []).map((inv: any) => (
-                <div key={inv.id} className="flex justify-between text-sm py-1">
+                <div key={inv.id} className="typography-body flex justify-between py-1">
                   <span>{inv.number}</span>
-                  <span className="font-medium">${inv.amount}</span>
+                  <span className="typography-label">${inv.amount}</span>
                 </div>
               ))}
             </div>
             <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2">Transactions</p>
+              <p className="typography-label text-muted-foreground mb-2">Transactions</p>
               {(sub.transactions || []).map((t: any) => (
-                <div key={t.id} className="flex justify-between text-sm py-1">
+                <div key={t.id} className="typography-body flex justify-between py-1">
                   <span className="capitalize">{t.type}</span>
                   <span className={t.amount < 0 ? "text-green-600" : ""}>${t.amount}</span>
                 </div>

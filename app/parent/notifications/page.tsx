@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { parentDb, type ParentNotification, type ParentPreferences } from "@/lib/db/parent-db"
+import { useLanguage } from "@/lib/context/language-context"
 import { 
   Bell, 
   Settings, 
@@ -23,6 +24,7 @@ import {
 } from "lucide-react"
 
 export default function ParentNotifications() {
+  const { t, language } = useLanguage()
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [notificationsList, setNotificationsList] = useState<ParentNotification[]>([])
   const [preferences, setPreferences] = useState<ParentPreferences>({
@@ -134,7 +136,7 @@ export default function ParentNotifications() {
   const formatNotificationTime = (dateStr: string) => {
     try {
       const date = new Date(dateStr)
-      return date.toLocaleDateString("en-US", {
+      return date.toLocaleDateString(language === "am" ? "am-ET" : "en-US", {
         month: "short",
         day: "numeric",
         hour: "2-digit",
@@ -161,8 +163,8 @@ export default function ParentNotifications() {
       
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-black tracking-tight text-foreground">Alerts & Configuration</h1>
-        <p className="text-xs text-muted-foreground font-semibold mt-0.5">Manage notifications inbox, SMS delivery, and channel preferences.</p>
+        <h1 className="typography-page-title text-foreground">{t("alerts_config")}</h1>
+        <p className="typography-label text-muted-foreground mt-0.5">{t("notifications_desc")}</p>
       </div>
 
       {/* Tabs list layout switcher */}
@@ -174,18 +176,18 @@ export default function ParentNotifications() {
       >
         <div className="flex items-center justify-between">
           <TabsList className="bg-card/60 backdrop-blur-md border border-border/40 p-1 rounded-2xl">
-            <TabsTrigger value="inbox" className="text-xs font-bold gap-1.5 rounded-xl px-4 py-2">
+            <TabsTrigger value="inbox" className="typography-label gap-1.5 rounded-xl px-4 py-2">
               <Bell className="w-4 h-4" />
-              <span>Notification Inbox</span>
+              <span>{t("notification_inbox")}</span>
               {unreadCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-[9px] font-black rounded-full bg-rose-500 text-white shrink-0">
+                <span className="typography-label ml-1 px-1.5 py-0.5 text-[9px] rounded-full bg-rose-500 text-white shrink-0">
                   {unreadCount}
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="preferences" className="text-xs font-bold gap-1.5 rounded-xl px-4 py-2">
+            <TabsTrigger value="preferences" className="typography-label gap-1.5 rounded-xl px-4 py-2">
               <Settings className="w-4 h-4" />
-              <span>Channel Preferences</span>
+              <span>{t("channel_preferences")}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -194,10 +196,10 @@ export default function ParentNotifications() {
               variant="outline"
               size="sm"
               onClick={handleMarkAllAsRead}
-              className="text-xs font-bold gap-1.5 rounded-xl border-border/40 hover:bg-muted"
+              className="typography-label gap-1.5 rounded-xl border-border/40 hover:bg-muted"
             >
               <CheckCheck className="w-3.5 h-3.5" />
-              <span>Mark All Read</span>
+              <span>{t("mark_all_read")}</span>
             </Button>
           )}
         </div>
@@ -209,8 +211,8 @@ export default function ParentNotifications() {
               {notificationsList.length === 0 ? (
                 <div className="py-20 flex flex-col items-center justify-center text-muted-foreground text-center">
                   <Bell className="w-12 h-12 text-muted-foreground/30 mb-2" />
-                  <p className="text-xs font-black">Your notification inbox is clean</p>
-                  <span className="text-[10px] text-muted-foreground/60 font-semibold mt-1">Check back later for school newsletters or attendance triggers.</span>
+                  <p className="typography-label">{t("no_alerts")}</p>
+                  <span className="typography-label text-[10px] text-muted-foreground/60 mt-1">Check back later for school newsletters or attendance triggers.</span>
                 </div>
               ) : (
                 notificationsList.map((notification) => (
@@ -231,8 +233,8 @@ export default function ParentNotifications() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <span className="text-xs font-black text-foreground">{notification.title}</span>
-                          <span className="block text-[10px] text-muted-foreground font-semibold mt-0.5">{formatNotificationTime(notification.createdAt)}</span>
+                          <span className="typography-label text-foreground">{notification.title}</span>
+                          <span className="typography-label block text-[10px] text-muted-foreground mt-0.5">{formatNotificationTime(notification.createdAt)}</span>
                         </div>
 
                         {!notification.isRead && (
@@ -248,7 +250,7 @@ export default function ParentNotifications() {
                         )}
                       </div>
                       
-                      <p className="text-xs text-muted-foreground font-semibold mt-2 leading-relaxed">{notification.message}</p>
+                      <p className="typography-label text-muted-foreground mt-2">{notification.message}</p>
                     </div>
 
                   </div>
@@ -262,8 +264,8 @@ export default function ParentNotifications() {
         <TabsContent value="preferences" className="outline-none animate-in fade-in duration-300">
           <Card className="border-border/40 shadow-xl rounded-3xl bg-card/60 backdrop-blur-md overflow-hidden">
             <CardHeader className="border-b border-border/20 py-4 px-6">
-              <CardTitle className="text-sm font-black uppercase tracking-wider text-foreground">Notification Channels</CardTitle>
-              <CardDescription className="text-xs">Select how you want to receive emergency and attendance updates.</CardDescription>
+              <CardTitle className="typography-label uppercase text-foreground">{t("notification_channels")}</CardTitle>
+              <CardDescription className="typography-helper">{t("notifications_desc")}</CardDescription>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
               
@@ -274,8 +276,8 @@ export default function ParentNotifications() {
                     <Smartphone className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-black text-foreground">SMS Tardy Toggles</p>
-                    <span className="text-[10px] text-muted-foreground font-semibold mt-0.5">Receive text message triggers on Absents or Lates.</span>
+                    <p className="typography-label text-foreground">{t("sms_alerts")}</p>
+                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">Receive text message triggers on Absents or Lates.</span>
                   </div>
                 </div>
                 <Switch 
@@ -292,8 +294,8 @@ export default function ParentNotifications() {
                     <Mail className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-black text-foreground">Email Summaries</p>
-                    <span className="text-[10px] text-muted-foreground font-semibold mt-0.5">Receive monthly attendance PDF audit sheets.</span>
+                    <p className="typography-label text-foreground">{t("email_alerts")}</p>
+                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">Receive monthly attendance PDF audit sheets.</span>
                   </div>
                 </div>
                 <Switch 
@@ -310,8 +312,8 @@ export default function ParentNotifications() {
                     <Radio className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-black text-foreground">Push Portal Updates</p>
-                    <span className="text-[10px] text-muted-foreground font-semibold mt-0.5">Receive active web-app updates when mark is altered.</span>
+                    <p className="typography-label text-foreground">{t("push_alerts")}</p>
+                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">Receive active web-app updates when mark is altered.</span>
                   </div>
                 </div>
                 <Switch 

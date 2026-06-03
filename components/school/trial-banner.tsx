@@ -24,7 +24,7 @@ export function TrialBanner() {
   const isExpired = status === "expired" || daysRemaining <= 0
 
   return (
-    <div className={`w-full px-4 py-3 text-sm font-medium flex flex-col sm:flex-row items-center justify-center sm:justify-between shadow-sm z-50 relative ${isExpired ? "bg-red-50 text-red-900 border-b border-red-200" : "bg-blue-50 text-blue-900 border-b border-blue-200"}`}>
+    <div className={`typography-label w-full px-4 py-3 flex flex-col sm:flex-row items-center justify-center sm:justify-between shadow-sm z-50 relative ${isExpired ? "bg-red-50 text-red-900 border-b border-red-200" : "bg-blue-50 text-blue-900 border-b border-blue-200"}`}>
       <div className="flex items-center gap-3 mb-2 sm:mb-0 text-center sm:text-left">
         {isExpired ? (
           <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 hidden sm:block" />

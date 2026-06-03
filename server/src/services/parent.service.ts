@@ -1,5 +1,7 @@
 import prisma from '../config/db';
 import bcrypt from 'bcryptjs';
+import { generateToken } from '../utils/jwt';
+import * as schoolService from './school.service';
 
 /**
  * Login Parent and establish session.
@@ -70,12 +72,39 @@ export const loginParent = async (phone: string, password: string) => {
     stream: s.stream?.name || null,
   }));
 
+  // Generate a token for the parent
+  let customSchoolId = '';
+  let schoolName = user.school?.name || 'My School';
+  let schoolLogo = '';
+  const firstStudent = students[0];
+  const resolvedSchoolId = user.schoolId || firstStudent?.schoolId || '';
+
+  if (resolvedSchoolId) {
+    const school = await schoolService.getSchoolById(resolvedSchoolId);
+    if (school) {
+      customSchoolId = school.schoolId || '';
+      schoolName = school.name || schoolName;
+      schoolLogo = (school as any).settings?.school_logo || '';
+    }
+  }
+
+  const token = generateToken({
+    id: user.id,
+    email: user.email || `parent-${cleanPhone}@zetime.com`,
+    role: 'parent',
+    schoolId: resolvedSchoolId,
+    customSchoolId,
+  });
+
   return {
     success: true,
     id: user.id,
+    token,
     parentName: user.full_name || students[0]?.parent_name || "Parent",
     parentPhone: cleanPhone,
-    schoolId: user.schoolId || students[0]?.schoolId,
+    schoolId: resolvedSchoolId,
+    schoolName,
+    schoolLogo,
     students: mappedStudents
   };
 };

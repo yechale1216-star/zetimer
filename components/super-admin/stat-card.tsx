@@ -28,7 +28,7 @@ export function StatCard({ title, value, change, icon: Icon, trend }: StatCardPr
     <Card className="relative overflow-hidden border-border/50 backdrop-blur supports-[backdrop-filter]:bg-background/95">
       <CardHeader className="pb-2 md:pb-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">{title}</CardTitle>
+          <CardTitle className="typography-helper text-muted-foreground">{title}</CardTitle>
           <div className="p-1.5 md:p-2 bg-primary/10 rounded-lg flex-shrink-0">
             <Icon className="w-4 h-4 text-primary" />
           </div>
@@ -36,7 +36,7 @@ export function StatCard({ title, value, change, icon: Icon, trend }: StatCardPr
       </CardHeader>
       <CardContent>
         <div className="space-y-1 md:space-y-2">
-          <div className="text-xl md:text-2xl font-bold text-foreground">{value}</div>
+          <div className="typography-section-title text-foreground">{value}</div>
           <div className={cn('flex items-center gap-1 text-xs font-medium', getTrendColor())}>
             {getTrendIcon()}
             <span className="line-clamp-1">{change}</span>

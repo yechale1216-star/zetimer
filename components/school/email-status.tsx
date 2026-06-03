@@ -95,7 +95,7 @@ export function EmailStatus() {
           ) : (
             <XCircle className="h-5 w-5 text-red-500" />
           )}
-          <span className="font-medium">
+          <span className="typography-label">
             {emailStatus.configured ? "Real Email Delivery" : "Configuration Required"}
           </span>
           <Badge variant={emailStatus.configured ? "default" : "secondary"}>
@@ -103,27 +103,27 @@ export function EmailStatus() {
           </Badge>
         </div>
 
-        <p className="text-sm text-muted-foreground">{emailStatus.message}</p>
+        <p className="typography-body text-muted-foreground">{emailStatus.message}</p>
 
         {!emailStatus.configured && (
           <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
             <div className="flex items-start gap-2">
               <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
               <div className="space-y-2">
-                <h4 className="font-medium text-orange-600 dark:text-orange-400">Setup Required</h4>
-                <p className="text-sm text-orange-600/80 dark:text-orange-400/80">
+                <h4 className="typography-label text-orange-600 dark:text-orange-400">Setup Required</h4>
+                <p className="typography-body text-orange-600/80 dark:text-orange-400/80">
                   To enable real email delivery, add your Resend API key as an environment variable:
                 </p>
-                <div className="bg-orange-500/10 rounded p-2 font-mono text-xs text-orange-700 dark:text-orange-300">
+                <div className="typography-helper bg-orange-500/10 rounded p-2 font-mono text-orange-700 dark:text-orange-300">
                   RESEND_API_KEY=re_your_actual_api_key_here
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="typography-body flex items-center gap-2">
                   <span className="text-muted-foreground">Get your API key from:</span>
                   <a
                     href="https://resend.com/api-keys"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline flex items-center gap-1 font-medium"
+                    className="typography-label text-primary hover:underline flex items-center gap-1"
                   >
                     Resend Dashboard
                     <ExternalLink className="h-3 w-3" />
@@ -149,7 +149,7 @@ export function EmailStatus() {
             </Button>
           </div>
           {testResult && (
-            <p className={`text-sm font-medium ${testResult.includes("successfully") ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+            <p className={`typography-label ${testResult.includes("successfully") ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
               {testResult}
             </p>
           )}

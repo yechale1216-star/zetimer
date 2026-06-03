@@ -8,7 +8,7 @@ export function SettingsPanel() {
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="typography-page-title flex items-center gap-2">
           <Settings className="h-8 w-8" />
           System Settings
         </h1>
@@ -40,8 +40,8 @@ export function SettingsPanel() {
             <CardContent>
               <div className="space-y-4">
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <h4 className="font-medium text-green-800 mb-2">✅ SMS Configuration Active</h4>
-                  <div className="text-sm text-green-700 space-y-1">
+                  <h4 className="typography-label text-green-800 mb-2">✅ SMS Configuration Active</h4>
+                  <div className="typography-body text-green-700 space-y-1">
                     <p>
                       <strong>Service:</strong> Twilio
                     </p>
@@ -54,8 +54,8 @@ export function SettingsPanel() {
                   </div>
                 </div>
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <h4 className="font-medium text-yellow-800 mb-2">⚠️ Trial Account Limitations</h4>
-                  <p className="text-sm text-yellow-700">
+                  <h4 className="typography-label text-yellow-800 mb-2">⚠️ Trial Account Limitations</h4>
+                  <p className="typography-body text-yellow-700">
                     Your Twilio account is in trial mode. SMS will only be sent to verified phone numbers. To send to
                     all numbers, upgrade to a paid Twilio account.
                   </p>

@@ -170,14 +170,14 @@ export function AttendanceFilters({ onFilterChange, initialFilters = {}, attenda
             type="date"
             value={filters.startDate}
             onChange={(e) => handleFilterChange("startDate", e.target.value)}
-            className="h-8 w-32 border-none bg-transparent focus-visible:ring-0 text-xs"
+            className="typography-helper h-8 w-32 border-none bg-transparent focus-visible:ring-0"
           />
-          <span className="text-muted-foreground text-xs">to</span>
+          <span className="typography-helper text-muted-foreground">to</span>
           <Input
             type="date"
             value={filters.endDate}
             onChange={(e) => handleFilterChange("endDate", e.target.value)}
-            className="h-8 w-32 border-none bg-transparent focus-visible:ring-0 text-xs"
+            className="typography-helper h-8 w-32 border-none bg-transparent focus-visible:ring-0"
           />
         </div>
 

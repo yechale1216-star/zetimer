@@ -114,7 +114,7 @@ export function EmailSettings() {
               <p>
                 <strong>To enable real email delivery:</strong>
               </p>
-              <ol className="list-decimal list-inside space-y-1 text-sm">
+              <ol className="typography-body list-decimal list-inside space-y-1">
                 <li>
                   Create a free account at{" "}
                   <a
@@ -156,7 +156,7 @@ export function EmailSettings() {
             onChange={(e) => setApiKey(e.target.value)}
             className="font-mono"
           />
-          <p className="text-sm text-muted-foreground">
+          <p className="typography-body text-muted-foreground">
             Your API key starts with "re_" and is found in your Resend dashboard
           </p>
         </div>
@@ -170,7 +170,7 @@ export function EmailSettings() {
             value={fromDomain}
             onChange={(e) => setFromDomain(e.target.value)}
           />
-          <p className="text-sm text-muted-foreground">Domain for sending emails (use "resend.dev" for testing)</p>
+          <p className="typography-body text-muted-foreground">Domain for sending emails (use "resend.dev" for testing)</p>
         </div>
 
         {/* Test Result */}
@@ -193,8 +193,8 @@ export function EmailSettings() {
 
         {/* Current Status */}
         <div className="pt-4 border-t">
-          <h4 className="font-medium mb-2">Current Status</h4>
-          <div className="text-sm text-muted-foreground">
+          <h4 className="typography-label mb-2">Current Status</h4>
+          <div className="typography-body text-muted-foreground">
             {apiKey.trim() ? (
               testResult?.success ? (
                 <div className="flex items-center gap-2 text-green-600">

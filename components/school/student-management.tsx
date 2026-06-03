@@ -625,8 +625,8 @@ export function StudentManagement() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/80 dark:bg-slate-900/80 p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 backdrop-blur-md shadow-sm">
         <div>
-          <h2 className="text-3xl font-black tracking-tight text-foreground">Student Directory</h2>
-          <p className="text-muted-foreground text-sm font-medium mt-1">
+          <h2 className="typography-page-title text-foreground">Student Directory</h2>
+          <p className="typography-label text-muted-foreground mt-1">
             Manage and monitor your school's student database
           </p>
         </div>
@@ -663,8 +663,8 @@ export function StudentManagement() {
                   <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30 animate-bounce mb-5">
                     <CheckCircle2 className="w-10 h-10 text-white" />
                   </div>
-                  <h2 className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">Enrolled Successfully!</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">The student has been added to the system.</p>
+                  <h2 className="typography-page-title text-emerald-700 dark:text-emerald-400">Enrolled Successfully!</h2>
+                  <p className="typography-body text-slate-500 dark:text-slate-400 mt-1">The student has been added to the system.</p>
                 </div>
               ) : (
                 <>
@@ -674,8 +674,8 @@ export function StudentManagement() {
                         <Plus className="w-4 h-4" />
                       </div>
                       <div>
-                        <DialogTitle className="text-xl font-bold">{editingStudent ? "Update Student Profile" : "Enroll New Student"}</DialogTitle>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Provide complete personal and guardian contact fields.</p>
+                        <DialogTitle className="typography-section-title">{editingStudent ? "Update Student Profile" : "Enroll New Student"}</DialogTitle>
+                        <p className="typography-helper text-slate-500 dark:text-slate-400 mt-0.5">Provide complete personal and guardian contact fields.</p>
                       </div>
                     </div>
                   </DialogHeader>
@@ -685,9 +685,9 @@ export function StudentManagement() {
                       <Alert variant="destructive" className="rounded-xl border-red-500/20 bg-red-500/10 mb-4">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
-                          <ul className="list-disc list-inside space-y-0.5 text-xs">
+                          <ul className="typography-helper list-disc list-inside space-y-0.5">
                             {validationErrors.map((error, index) => (
-                              <li key={index} className="font-medium">{error}</li>
+                              <li key={index} className="typography-label">{error}</li>
                             ))}
                           </ul>
                         </AlertDescription>
@@ -696,38 +696,38 @@ export function StudentManagement() {
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                       <div className="bg-slate-50/50 dark:bg-slate-900/30 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/50 space-y-4">
-                        <p className="text-[10px] uppercase tracking-widest font-black text-emerald-600 dark:text-emerald-400">Basic Information</p>
+                        <p className="typography-label text-[10px] uppercase text-emerald-600 dark:text-emerald-400">Basic Information</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="name" className="text-sm font-medium">Full Name *</Label>
+                            <Label htmlFor="name" className="typography-label">Full Name *</Label>
                             <Input
                               id="name"
                               placeholder="e.g. Abebe Bikila"
                               value={formData.name || ""}
                               onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                               required
-                              className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                              className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="student_id" className="text-sm font-medium">Student ID (Auto)</Label>
+                            <Label htmlFor="student_id" className="typography-label">Student ID (Auto)</Label>
                             <Input
                               id="student_id"
                               value={formData.student_id || ""}
                               readOnly
-                              className="h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed text-sm"
+                              className="typography-body h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed"
                             />
                           </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="grade" className="text-sm font-medium">Grade *</Label>
+                            <Label htmlFor="grade" className="typography-label">Grade *</Label>
                             <Select
                               value={formData.grade}
                               onValueChange={handleGradeChange}
                             >
-                              <SelectTrigger className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 text-sm">
+                              <SelectTrigger className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800">
                                 <SelectValue placeholder="Select Grade" />
                               </SelectTrigger>
                               <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800">
@@ -738,14 +738,14 @@ export function StudentManagement() {
                             </Select>
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="stream" className="text-sm font-medium">Stream</Label>
+                            <Label htmlFor="stream" className="typography-label">Stream</Label>
                             {!formData.grade ? (
                               <Input
                                 id="stream"
                                 placeholder="Select grade first"
                                 readOnly
                                 disabled
-                                className="h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed text-sm"
+                                className="typography-body h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed"
                               />
                             ) : (
                               (() => {
@@ -756,7 +756,7 @@ export function StudentManagement() {
                                       id="stream"
                                       value={formData.stream || "General"}
                                       readOnly
-                                      className="h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed text-sm"
+                                      className="typography-body h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed"
                                     />
                                   );
                                 } else {
@@ -765,7 +765,7 @@ export function StudentManagement() {
                                       value={formData.stream}
                                       onValueChange={(value) => setFormData((prev) => ({ ...prev, stream: value }))}
                                     >
-                                      <SelectTrigger className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 text-sm">
+                                      <SelectTrigger className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800">
                                         <SelectValue placeholder="Select Stream" />
                                       </SelectTrigger>
                                       <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800">
@@ -780,7 +780,7 @@ export function StudentManagement() {
                             )}
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="section" className="text-sm font-medium">Section *</Label>
+                            <Label htmlFor="section" className="typography-label">Section *</Label>
                             <Input
                               id="section"
                               placeholder={formData.grade ? "e.g. A" : "Select grade first"}
@@ -788,19 +788,19 @@ export function StudentManagement() {
                               onChange={(e) => setFormData((prev) => ({ ...prev, section: e.target.value.toUpperCase() }))}
                               disabled={!formData.grade}
                               required
-                              className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                              className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                             />
                           </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="gender" className="text-sm font-medium">Gender</Label>
+                            <Label htmlFor="gender" className="typography-label">Gender</Label>
                             <Select
                               value={formData.gender}
                               onValueChange={(value) => setFormData((prev) => ({ ...prev, gender: value }))}
                             >
-                              <SelectTrigger className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 text-sm">
+                              <SelectTrigger className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800">
                                 <SelectValue placeholder="Select Gender" />
                               </SelectTrigger>
                               <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800">
@@ -810,13 +810,13 @@ export function StudentManagement() {
                             </Select>
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="date_of_birth" className="text-sm font-medium">Date of Birth</Label>
+                            <Label htmlFor="date_of_birth" className="typography-label">Date of Birth</Label>
                             <Input
                               id="date_of_birth"
                               type="date"
                               value={formData.date_of_birth || ""}
                               onChange={(e) => setFormData((prev) => ({ ...prev, date_of_birth: e.target.value }))}
-                              className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                              className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                             />
                           </div>
                         </div>
@@ -824,7 +824,7 @@ export function StudentManagement() {
 
                       <div className="bg-slate-50/50 dark:bg-slate-900/30 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/50 space-y-4">
                         <div className="flex items-center justify-between">
-                          <p className="text-[10px] uppercase tracking-widest font-black text-emerald-600 dark:text-emerald-400">Parent/Guardian Contact</p>
+                          <p className="typography-label text-[10px] uppercase text-emerald-600 dark:text-emerald-400">Parent/Guardian Contact</p>
                           {isSearchingParent && (
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground animate-pulse">
                               <span className="h-2 w-2 bg-emerald-500 rounded-full animate-ping" />
@@ -835,7 +835,7 @@ export function StudentManagement() {
                         
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <Label htmlFor="parent_phone" className="text-sm font-bold text-slate-700 dark:text-slate-300">Parent Phone Number (Ethiopian) *</Label>
+                            <Label htmlFor="parent_phone" className="typography-label text-slate-700 dark:text-slate-300">Parent Phone Number (Ethiopian) *</Label>
                             <div className="relative group">
                               <Input
                                 id="parent_phone"
@@ -850,7 +850,7 @@ export function StudentManagement() {
                                   setFormData((prev) => ({ ...prev, parent_phone: val }))
                                 }}
                                 required
-                                className={`h-12 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-base font-medium ${foundParent ? 'border-emerald-500 bg-emerald-50/30' : ''}`}
+                                className={`typography-body h-12 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all ${foundParent ? 'border-emerald-500 bg-emerald-50/30' : ''}`}
                               />
                               {foundParent && (
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -864,23 +864,23 @@ export function StudentManagement() {
                           {foundParent && !editingStudent ? (
                             <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 rounded-xl space-y-3 relative overflow-hidden animate-in fade-in slide-in-from-top-2">
                               <div className="flex items-center gap-2">
-                                <span className="p-1 px-2 bg-emerald-600 text-white rounded text-[9px] font-black uppercase">Auto-Detected</span>
-                                <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-200 italic">Existing Parent Found</h4>
+                                <span className="typography-label p-1 px-2 bg-emerald-600 text-white rounded text-[9px] uppercase">Auto-Detected</span>
+                                <h4 className="typography-label text-emerald-800 dark:text-emerald-200 italic">Existing Parent Found</h4>
                               </div>
                               
-                              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-emerald-900/80 dark:text-emerald-100/80">
-                                <p><span className="font-semibold text-emerald-800/60 dark:text-emerald-200/60">Name:</span> <strong>{foundParent.full_name}</strong></p>
-                                <p><span className="font-semibold text-emerald-800/60 dark:text-emerald-200/60">Email:</span> <strong className="truncate block">{foundParent.email}</strong></p>
-                                <p className="col-span-2"><span className="font-semibold text-emerald-800/60 dark:text-emerald-200/60">Address:</span> <strong>{foundParent.address || "No address provided"}</strong></p>
+                              <div className="typography-helper grid grid-cols-2 gap-x-4 gap-y-1 text-emerald-900/80 dark:text-emerald-100/80">
+                                <p><span className="typography-label text-emerald-800/60 dark:text-emerald-200/60">Name:</span> <strong>{foundParent.full_name}</strong></p>
+                                <p><span className="typography-label text-emerald-800/60 dark:text-emerald-200/60">Email:</span> <strong className="truncate block">{foundParent.email}</strong></p>
+                                <p className="col-span-2"><span className="typography-label text-emerald-800/60 dark:text-emerald-200/60">Address:</span> <strong>{foundParent.address || "No address provided"}</strong></p>
                               </div>
                               
                               <div className="space-y-2 pt-2 border-t border-emerald-200/50 dark:border-emerald-800/50">
-                                <Label htmlFor="found_relationship" className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-tighter">Relationship to Student *</Label>
+                                <Label htmlFor="found_relationship" className="typography-label text-emerald-800 dark:text-emerald-300 uppercase">Relationship to Student *</Label>
                                 <Select
                                   value={formData.relationshipType}
                                   onValueChange={(value) => setFormData((prev) => ({ ...prev, relationshipType: value }))}
                                 >
-                                  <SelectTrigger id="found_relationship" className="h-10 rounded-lg bg-white/60 border-emerald-200 dark:border-emerald-800 text-sm font-medium">
+                                  <SelectTrigger id="found_relationship" className="typography-label h-10 rounded-lg bg-white/60 border-emerald-200 dark:border-emerald-800">
                                     <SelectValue placeholder="Select" />
                                   </SelectTrigger>
                                   <SelectContent className="rounded-lg border-emerald-200 dark:border-emerald-800">
@@ -897,28 +897,28 @@ export function StudentManagement() {
                             !isSearchingParent && !editingStudent && formData.parent_phone.replace(/\s+/g, '').length >= 13 && (
                               <div className="space-y-4 animate-in slide-in-from-top-2 fade-in">
                                 <div className="flex items-center gap-2">
-                                  <span className="p-1 px-2 bg-amber-500 text-white rounded text-[9px] font-black uppercase">New Profile</span>
-                                  <h4 className="text-xs font-bold text-amber-600 dark:text-amber-400 italic">Registering New Parent</h4>
+                                  <span className="typography-label p-1 px-2 bg-amber-500 text-white rounded text-[9px] uppercase">New Profile</span>
+                                  <h4 className="typography-label text-amber-600 dark:text-amber-400 italic">Registering New Parent</h4>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div className="space-y-2">
-                                    <Label htmlFor="parent_name" className="text-sm font-medium text-slate-600">Parent Full Name *</Label>
+                                    <Label htmlFor="parent_name" className="typography-label text-slate-600">Parent Full Name *</Label>
                                     <Input
                                       id="parent_name"
                                       placeholder="First and Father Name"
                                       value={formData.parent_name || ""}
                                       onChange={(e) => setFormData((prev) => ({ ...prev, parent_name: e.target.value }))}
                                       required
-                                      className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                                      className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                                     />
                                   </div>
                                   <div className="space-y-2">
-                                    <Label htmlFor="relationship" className="text-sm font-medium text-slate-600">Relationship *</Label>
+                                    <Label htmlFor="relationship" className="typography-label text-slate-600">Relationship *</Label>
                                     <Select
                                       value={formData.relationshipType}
                                       onValueChange={(value) => setFormData((prev) => ({ ...prev, relationshipType: value }))}
                                     >
-                                      <SelectTrigger id="relationship" className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 text-sm">
+                                      <SelectTrigger id="relationship" className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800">
                                         <SelectValue placeholder="Select" />
                                       </SelectTrigger>
                                       <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800">
@@ -934,18 +934,18 @@ export function StudentManagement() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div className="space-y-2">
-                                    <Label htmlFor="parent_email" className="text-sm font-medium text-slate-600">Email Address (Optional)</Label>
+                                    <Label htmlFor="parent_email" className="typography-label text-slate-600">Email Address (Optional)</Label>
                                     <Input
                                       id="parent_email"
                                       type="email"
                                       placeholder="email@example.com"
                                       value={formData.parent_email || ""}
                                       onChange={(e) => setFormData((prev) => ({ ...prev, parent_email: e.target.value }))}
-                                      className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                                      className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                                     />
                                   </div>
                                   <div className="space-y-2">
-                                    <Label htmlFor="parent_password" className="text-sm font-medium text-slate-600">Portal Password *</Label>
+                                    <Label htmlFor="parent_password" className="typography-label text-slate-600">Portal Password *</Label>
                                     <Input
                                       id="parent_password"
                                       type="text"
@@ -953,17 +953,17 @@ export function StudentManagement() {
                                       value={formData.parent_password || ""}
                                       onChange={(e) => setFormData((prev) => ({ ...prev, parent_password: e.target.value }))}
                                       required={!editingStudent && !foundParent && formData.parent_phone.length >= 13}
-                                      className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                                      className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                                     />
                                   </div>
                                   <div className="space-y-2 md:col-span-2">
-                                    <Label htmlFor="parent_address" className="text-sm font-medium text-slate-600">Home Address (Optional)</Label>
+                                    <Label htmlFor="parent_address" className="typography-label text-slate-600">Home Address (Optional)</Label>
                                     <Input
                                       id="parent_address"
                                       placeholder="Location details"
                                       value={formData.parent_address || ""}
                                       onChange={(e) => setFormData((prev) => ({ ...prev, parent_address: e.target.value }))}
-                                      className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm"
+                                      className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                                     />
                                   </div>
                                 </div>
@@ -973,24 +973,24 @@ export function StudentManagement() {
 
                           {editingStudent && (
                             <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800/50">
-                               <p className="text-[10px] uppercase font-bold text-slate-400">Update Contact Info</p>
+                               <p className="typography-label text-[10px] uppercase text-slate-400">Update Contact Info</p>
                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div className="space-y-2">
-                                    <Label htmlFor="edit_parent_name" className="text-sm font-medium text-slate-600">Parent Name</Label>
+                                    <Label htmlFor="edit_parent_name" className="typography-label text-slate-600">Parent Name</Label>
                                     <Input
                                       id="edit_parent_name"
                                       value={formData.parent_name || ""}
                                       onChange={(e) => setFormData((prev) => ({ ...prev, parent_name: e.target.value }))}
-                                      className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 text-sm"
+                                      className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800"
                                     />
                                   </div>
                                   <div className="space-y-2">
-                                    <Label htmlFor="edit_relationship" className="text-sm font-medium text-slate-600">Relationship</Label>
+                                    <Label htmlFor="edit_relationship" className="typography-label text-slate-600">Relationship</Label>
                                     <Select
                                       value={formData.relationshipType}
                                       onValueChange={(value) => setFormData((prev) => ({ ...prev, relationshipType: value }))}
                                     >
-                                      <SelectTrigger id="edit_relationship" className="h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 text-sm">
+                                      <SelectTrigger id="edit_relationship" className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800">
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -1008,7 +1008,7 @@ export function StudentManagement() {
                         </div>
                       </div>
 
-                      <Button type="submit" className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-base font-bold shadow-lg shadow-emerald-600/10 transition-all active:scale-[0.98]" disabled={isSaving}>
+                      <Button type="submit" className="typography-card-title w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-600/10 transition-all active:scale-[0.98]" disabled={isSaving}>
                         {isSaving ? (
                           <div className="flex items-center gap-2">
                             <div className="h-4 w-4 border-2 border-emerald-foreground border-t-transparent rounded-full animate-spin" />
@@ -1029,7 +1029,7 @@ export function StudentManagement() {
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl bg-card/95 backdrop-blur-xl p-8">
           <DialogHeader className="mb-6">
-            <DialogTitle className="text-2xl font-bold">Import Student Data</DialogTitle>
+            <DialogTitle className="typography-page-title">Import Student Data</DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
             <Label htmlFor="csv-upload" className="cursor-pointer group">
@@ -1039,13 +1039,13 @@ export function StudentManagement() {
                   <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                     <Upload className="w-8 h-8 text-primary" />
                   </div>
-                  <p className="text-lg font-bold text-foreground">Click or Drag CSV File</p>
-                  <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
+                  <p className="typography-card-title text-foreground">Click or Drag CSV File</p>
+                  <p className="typography-body text-muted-foreground mt-2 max-w-xs mx-auto">
                     Supported columns: name, id, grade, stream, section, gender, dob, parent info
                   </p>
                   <div className="mt-6 flex justify-center gap-2">
-                    <Badge variant="outline" className="bg-background/50 border-border/50 text-[10px] font-bold">MAX 5MB</Badge>
-                    <Badge variant="outline" className="bg-background/50 border-border/50 text-[10px] font-bold">.CSV ONLY</Badge>
+                    <Badge variant="outline" className="typography-label bg-background/50 border-border/50 text-[10px]">MAX 5MB</Badge>
+                    <Badge variant="outline" className="typography-label bg-background/50 border-border/50 text-[10px]">.CSV ONLY</Badge>
                   </div>
                 </div>
               </div>
@@ -1054,12 +1054,12 @@ export function StudentManagement() {
 
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 p-4 rounded-2xl bg-muted/30 border border-border/50">
-                <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground/70 mb-2">Need Help?</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="typography-label text-[10px] uppercase text-muted-foreground/70 mb-2">Need Help?</p>
+                <p className="typography-helper text-muted-foreground">
                   Download our pre-formatted template to ensure your student data is imported correctly without errors.
                 </p>
               </div>
-              <Button variant="outline" onClick={downloadCSVTemplate} className="h-auto py-4 rounded-2xl border-border/50 bg-background/50 hover:bg-muted font-bold text-sm">
+              <Button variant="outline" onClick={downloadCSVTemplate} className="typography-label h-auto py-4 rounded-2xl border-border/50 bg-background/50 hover:bg-muted">
                 <Download className="w-4 h-4 mr-2 text-primary" />
                 Get Template
               </Button>
@@ -1076,14 +1076,14 @@ export function StudentManagement() {
             placeholder="Search by name, ID, or class details..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-11 h-12 rounded-xl bg-background/50 border-border/50 focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+            className="typography-label pl-11 h-12 rounded-xl bg-background/50 border-border/50 focus:ring-2 focus:ring-primary/20 transition-all"
           />
         </div>
 
         {!isTeacher && (
           <div className="flex gap-2 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 scrollbar-hide">
             <Select value={gradeFilter} onValueChange={setGradeFilter}>
-              <SelectTrigger className="h-12 w-[140px] rounded-xl bg-background/50 border-border/50 font-bold text-xs">
+              <SelectTrigger className="typography-label h-12 w-[140px] rounded-xl bg-background/50 border-border/50">
                 <SelectValue placeholder="Grade" />
               </SelectTrigger>
               <SelectContent className="rounded-xl border-border/50">
@@ -1095,7 +1095,7 @@ export function StudentManagement() {
             </Select>
 
             <Select value={streamFilter} onValueChange={setStreamFilter}>
-              <SelectTrigger className="h-12 w-[140px] rounded-xl bg-background/50 border-border/50 font-bold text-xs">
+              <SelectTrigger className="typography-label h-12 w-[140px] rounded-xl bg-background/50 border-border/50">
                 <SelectValue placeholder="Stream" />
               </SelectTrigger>
               <SelectContent className="rounded-xl border-border/50">
@@ -1107,7 +1107,7 @@ export function StudentManagement() {
             </Select>
 
             <Select value={sectionFilter} onValueChange={setSectionFilter}>
-              <SelectTrigger className="h-12 w-[140px] rounded-xl bg-background/50 border-border/50 font-bold text-xs">
+              <SelectTrigger className="typography-label h-12 w-[140px] rounded-xl bg-background/50 border-border/50">
                 <SelectValue placeholder="Section" />
               </SelectTrigger>
               <SelectContent className="rounded-xl border-border/50">
@@ -1122,7 +1122,7 @@ export function StudentManagement() {
         
         <div className="hidden lg:block h-8 w-[1px] bg-border/50 mx-2" />
         
-        <div className="flex items-center gap-2 text-xs font-black text-muted-foreground/70 uppercase tracking-widest px-2 min-w-fit">
+        <div className="typography-label flex items-center gap-2 text-muted-foreground/70 uppercase px-2 min-w-fit">
           <Users className="w-4 h-4 text-primary/60" />
           <span>{filteredStudents.length} Students</span>
         </div>
@@ -1138,7 +1138,7 @@ export function StudentManagement() {
                 <Users className="w-6 h-6 text-primary animate-pulse" />
               </div>
             </div>
-            <p className="text-muted-foreground font-bold tracking-tight">Syncing student database...</p>
+            <p className="typography-label text-muted-foreground">Syncing student database...</p>
           </div>
         ) : filteredStudents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 space-y-6 animate-in zoom-in-95 duration-500">
@@ -1146,8 +1146,8 @@ export function StudentManagement() {
               <Search className="w-10 h-10 text-muted-foreground/40" />
             </div>
             <div className="text-center space-y-2">
-              <h3 className="text-xl font-bold text-foreground">No students found</h3>
-              <p className="text-muted-foreground text-sm max-w-xs mx-auto font-medium leading-relaxed">
+              <h3 className="typography-section-title text-foreground">No students found</h3>
+              <p className="typography-label text-muted-foreground max-w-xs mx-auto">
                 We couldn't find any students matching your search or filters. Try adjusting your criteria.
               </p>
             </div>
@@ -1172,13 +1172,13 @@ export function StudentManagement() {
                   <TableRow key={student.id} className="group hover:bg-primary/[0.02] transition-colors border-b border-slate-100 dark:border-slate-800/80">
                     <TableCell>
                       <div className="flex items-center gap-4">
-                        <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center text-primary font-black text-lg shadow-sm border border-primary/10 group-hover:scale-110 transition-transform">
+                        <div className="typography-card-title h-11 w-11 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center text-primary shadow-sm border border-primary/10 group-hover:scale-110 transition-transform">
                           {student.name?.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-foreground leading-none mb-1">{student.name}</p>
+                          <p className="typography-label text-foreground mb-1">{student.name}</p>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="bg-background/50 border-border/50 text-[9px] h-4 py-0 font-bold opacity-70">
+                            <Badge variant="outline" className="typography-label bg-background/50 border-border/50 text-[9px] h-4 py-0 opacity-70">
                               {student.gender || 'N/A'}
                             </Badge>
                           </div>
@@ -1186,14 +1186,14 @@ export function StudentManagement() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <code className="text-xs font-bold text-muted-foreground bg-muted/50 px-2 py-1 rounded-md border border-border/50">
+                      <code className="typography-label text-muted-foreground bg-muted/50 px-2 py-1 rounded-md border border-border/50">
                         {student.student_id}
                       </code>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
-                        <p className="text-sm font-bold text-foreground">{student.grade}</p>
-                        <p className="text-[10px] font-black text-primary/70 uppercase tracking-widest">
+                        <p className="typography-label text-foreground">{student.grade}</p>
+                        <p className="typography-label text-[10px] text-primary/70 uppercase">
                           {student.section} {student.stream ? `• ${student.stream}` : ""}
                         </p>
                       </div>
@@ -1252,19 +1252,19 @@ export function StudentManagement() {
               </Button>
               
               <div className="flex flex-col sm:flex-row items-center gap-6 mt-4">
-                <div className="w-24 h-24 rounded-full bg-white text-emerald-800 font-extrabold text-3xl flex items-center justify-center shadow-lg ring-4 ring-white/30">
+                <div className="typography-page-title w-24 h-24 rounded-full bg-white text-emerald-800 flex items-center justify-center shadow-lg ring-4 ring-white/30">
                   {selectedStudent.name?.charAt(0).toUpperCase()}
                 </div>
                 <div className="text-center sm:text-left space-y-1">
                   <div className="flex flex-col sm:flex-row items-center gap-2">
-                    <h2 className="text-2xl font-extrabold tracking-tight">{selectedStudent.name}</h2>
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-white/20 text-white border border-white/20 rounded-full">
+                    <h2 className="typography-page-title">{selectedStudent.name}</h2>
+                    <span className="typography-label text-[10px] uppercase px-2 py-0.5 bg-white/20 text-white border border-white/20 rounded-full">
                       Student Record
                     </span>
                   </div>
-                  <p className="text-white/80 text-sm flex items-center justify-center sm:justify-start gap-1">
-                    <span className="font-semibold text-white/90">ID:</span>
-                    <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">{selectedStudent.student_id}</code>
+                  <p className="typography-body text-white/80 flex items-center justify-center sm:justify-start gap-1">
+                    <span className="typography-label text-white/90">ID:</span>
+                    <code className="typography-helper bg-white/10 px-1.5 py-0.5 rounded font-mono">{selectedStudent.student_id}</code>
                   </p>
                 </div>
               </div>
@@ -1276,22 +1276,22 @@ export function StudentManagement() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-900 flex flex-col items-center justify-center text-center">
                   <GraduationCap className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mb-1" />
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 tracking-wider">Class</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                  <span className="typography-label text-[10px] uppercase text-slate-400 dark:text-slate-500">Class</span>
+                  <span className="typography-label text-slate-800 dark:text-slate-200 mt-0.5">
                     {selectedStudent.grade || "N/A"}
                   </span>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-900 flex flex-col items-center justify-center text-center">
                   <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mb-1" />
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 tracking-wider">Section</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                  <span className="typography-label text-[10px] uppercase text-slate-400 dark:text-slate-500">Section</span>
+                  <span className="typography-label text-slate-800 dark:text-slate-200 mt-0.5">
                     {selectedStudent.section || "N/A"} {selectedStudent.stream ? `(${selectedStudent.stream})` : ""}
                   </span>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-900 flex flex-col items-center justify-center text-center">
                   <ShieldCheck className="w-5 h-5 text-teal-600 dark:text-teal-400 mb-1" />
-                  <span className="text-[10px] uppercase font-semibold text-slate-400 dark:text-slate-500 tracking-wider">Gender</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                  <span className="typography-label text-[10px] uppercase text-slate-400 dark:text-slate-500">Gender</span>
+                  <span className="typography-label text-slate-800 dark:text-slate-200 mt-0.5">
                     {selectedStudent.gender || "N/A"}
                   </span>
                 </div>
@@ -1299,42 +1299,42 @@ export function StudentManagement() {
 
               {/* Student Personal Info */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Student Details</h3>
+                <h3 className="typography-label uppercase text-slate-400 dark:text-slate-500">Student Details</h3>
                 <div className="divide-y divide-slate-100 dark:divide-slate-900 border border-slate-100 dark:border-slate-900 rounded-2xl overflow-hidden bg-slate-50/30 dark:bg-slate-900/20">
                   <div className="flex justify-between items-center p-4">
-                    <span className="text-sm text-slate-500 flex items-center gap-2">
+                    <span className="typography-body text-slate-500 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-slate-400" />
                       Date of Birth
                     </span>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{selectedStudent.date_of_birth || "N/A"}</span>
+                    <span className="typography-label text-slate-800 dark:text-slate-200">{selectedStudent.date_of_birth || "N/A"}</span>
                   </div>
                 </div>
               </div>
 
               {/* Parent / Guardian Information */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Parent / Guardian Information</h3>
+                <h3 className="typography-label uppercase text-slate-400 dark:text-slate-500">Parent / Guardian Information</h3>
                 <div className="divide-y divide-slate-100 dark:divide-slate-900 border border-slate-100 dark:border-slate-900 rounded-2xl overflow-hidden bg-slate-50/30 dark:bg-slate-900/20">
                   <div className="flex justify-between items-center p-4">
-                    <span className="text-sm text-slate-500 flex items-center gap-2">
+                    <span className="typography-body text-slate-500 flex items-center gap-2">
                       <Users className="w-4 h-4 text-slate-400" />
                       Parent / Guardian Name
                     </span>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{selectedStudent.parent_name || "N/A"}</span>
+                    <span className="typography-label text-slate-800 dark:text-slate-200">{selectedStudent.parent_name || "N/A"}</span>
                   </div>
                   <div className="flex justify-between items-center p-4">
-                    <span className="text-sm text-slate-500 flex items-center gap-2">
+                    <span className="typography-body text-slate-500 flex items-center gap-2">
                       <Phone className="w-4 h-4 text-slate-400" />
                       Phone Number
                     </span>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{selectedStudent.parent_phone || "N/A"}</span>
+                    <span className="typography-label text-slate-800 dark:text-slate-200">{selectedStudent.parent_phone || "N/A"}</span>
                   </div>
                   <div className="flex justify-between items-center p-4">
-                    <span className="text-sm text-slate-500 flex items-center gap-2">
+                    <span className="typography-body text-slate-500 flex items-center gap-2">
                       <Mail className="w-4 h-4 text-slate-400" />
                       Email Address
                     </span>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{selectedStudent.parent_email || "No email added"}</span>
+                    <span className="typography-label text-slate-800 dark:text-slate-200">{selectedStudent.parent_email || "No email added"}</span>
                   </div>
                 </div>
               </div>
@@ -1344,7 +1344,7 @@ export function StudentManagement() {
             <div className="bg-slate-50 dark:bg-slate-950/80 border-t border-slate-150 dark:border-slate-900/80 px-6 py-4 flex justify-end">
               <Button 
                 onClick={() => setSelectedStudent(null)}
-                className="rounded-xl px-6 bg-slate-800 hover:bg-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-bold text-sm"
+                className="typography-label rounded-xl px-6 bg-slate-800 hover:bg-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 text-white"
               >
                 Close Profile
               </Button>

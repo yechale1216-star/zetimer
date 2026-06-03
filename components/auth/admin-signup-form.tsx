@@ -132,16 +132,16 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <CardTitle className="text-2xl font-bold tracking-tight">Create Admin Account</CardTitle>
+        <CardTitle className="typography-page-title">Create Admin Account</CardTitle>
         <CardDescription className="text-muted-foreground">
           Register your school and start tracking attendance
         </CardDescription>
       </CardHeader>
       <CardContent className="px-6 sm:px-8 pb-8">
         {generalError && (
-          <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 mb-6 text-sm animate-in slide-in-from-top-2">
-            <p className="text-destructive font-semibold flex items-center gap-2">
-              <span className="text-lg">✕</span>
+          <div className="typography-body bg-destructive/10 border border-destructive/20 rounded-xl p-4 mb-6 animate-in slide-in-from-top-2">
+            <p className="typography-label text-destructive flex items-center gap-2">
+              <span className="typography-card-title">✕</span>
               {generalError}
             </p>
           </div>
@@ -291,12 +291,12 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
 
           <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 flex gap-3 items-start animate-in zoom-in-95 duration-500 delay-150">
             <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-            <p className="text-xs text-muted-foreground">
+            <p className="typography-helper text-muted-foreground">
               <strong className="text-foreground">Full Admin Control:</strong> You will be able to manage students, teachers, and generate comprehensive school reports.
             </p>
           </div>
 
-          <Button type="submit" className="w-full h-11 text-base font-semibold rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-[0.98] mt-2" disabled={isLoading}>
+          <Button type="submit" className="typography-card-title w-full h-11 rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-[0.98] mt-2" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -309,9 +309,9 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
         </form>
 
         <div className="mt-8 pt-6 border-t border-border/50 text-center">
-          <p className="text-xs text-muted-foreground">
+          <p className="typography-helper text-muted-foreground">
             Already have an account?{" "}
-            <Button variant="link" onClick={onBack} className="h-auto p-0 text-primary font-bold">
+            <Button variant="link" onClick={onBack} className="typography-label h-auto p-0 text-primary">
               Sign In
             </Button>
           </p>

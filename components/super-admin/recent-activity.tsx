@@ -82,9 +82,9 @@ export function RecentActivity() {
                   <Icon className={cn('w-5 h-5', iconColor)} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">{activity.title}</p>
-                  <p className="text-sm text-muted-foreground truncate">{activity.description}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{activity.timestamp}</p>
+                  <p className="typography-label text-foreground">{activity.title}</p>
+                  <p className="typography-body text-muted-foreground truncate">{activity.description}</p>
+                  <p className="typography-helper text-muted-foreground mt-1">{activity.timestamp}</p>
                 </div>
               </div>
             )

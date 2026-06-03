@@ -159,15 +159,15 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       <CardHeader className="pb-0 border-none">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <span className="text-xl">⚡</span>
+            <CardTitle className="typography-card-title flex items-center gap-2">
+              <span className="typography-section-title">⚡</span>
               Quick Actions
             </CardTitle>
-            <CardDescription className="text-xs font-medium dark:text-slate-400">
+            <CardDescription className="typography-helper dark:text-slate-400">
               {isAdmin ? "Administrative Controls" : `Teacher Dashboard - ${studentCount} students`}
             </CardDescription>
           </div>
-          <Badge variant="outline" className="bg-white/50 dark:bg-slate-800/50 border-blue-200 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider">
+          <Badge variant="outline" className="typography-label bg-white/50 dark:bg-slate-800/50 border-blue-200 dark:border-slate-700 text-[10px] uppercase">
             {user?.role === "admin" ? "Admin Mode" : "Teacher Mode"}
           </Badge>
         </div>
@@ -181,29 +181,29 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
               className={`group relative cursor-pointer p-5 rounded-2xl border transition-all duration-300 hover:shadow-lg active:scale-[0.98] ${action.color} backdrop-blur-sm`}
             >
               <div className="flex items-start gap-4">
-                <div className="h-12 w-12 rounded-xl bg-white/80 dark:bg-slate-900/80 flex items-center justify-center text-2xl shadow-sm group-hover:scale-110 transition-transform duration-300">
+                <div className="typography-section-title h-12 w-12 rounded-xl bg-white/80 dark:bg-slate-900/80 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-300">
                   {action.icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-sm md:text-base text-foreground mb-1">
+                  <h3 className="typography-label text-foreground mb-1">
                     {action.title}
                   </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                  <p className="typography-helper text-muted-foreground line-clamp-2">
                     {action.description}
                   </p>
                 </div>
               </div>
               
-              <div className="mt-4 flex items-center text-xs font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="typography-label mt-4 flex items-center text-primary opacity-0 group-hover:opacity-100 transition-opacity">
                 Execute Action 
-                <span className="ml-1 text-lg leading-none">→</span>
+                <span className="typography-card-title ml-1">→</span>
               </div>
             </div>
           ))}
         </div>
 
         <div className="mt-6 p-3 bg-white/30 dark:bg-slate-800/30 rounded-xl border border-blue-100/30 dark:border-slate-700/30 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-[11px] uppercase tracking-widest font-bold">
+          <div className="typography-label flex items-center justify-between text-[11px] uppercase">
             <span className="text-muted-foreground/60">Signed In As</span>
             <span className="text-primary flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />

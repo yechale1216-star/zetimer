@@ -54,7 +54,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ sidebar, content }) => {
               className="fixed inset-y-0 left-0 w-[85%] max-w-sm bg-background z-[70] md:hidden shadow-2xl flex flex-col"
             >
               <div className="p-4 border-b border-border flex justify-between items-center bg-secondary/30">
-                <h2 className="font-bold text-lg">Chats</h2>
+                <h2 className="typography-card-title">Chats</h2>
                 <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(false)}>
                   <X className="h-5 w-5" />
                 </Button>

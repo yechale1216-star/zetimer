@@ -53,6 +53,7 @@ export const viewport: Viewport = {
 }
 
 import { ThemeProvider } from "@/components/theme-provider"
+import { LanguageProvider } from "@/lib/context/language-context"
 
 export default function RootLayout({
   children,
@@ -71,8 +72,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster />
+          <LanguageProvider>
+            {children}
+            <Toaster />
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

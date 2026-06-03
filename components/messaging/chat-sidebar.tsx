@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatListSkeleton } from './skeletons';
+import { useLanguage } from '@/lib/context/language-context';
 
 interface Conversation {
   id: string;
@@ -37,6 +38,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   onSelectConversation,
   isLoading
 }) => {
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
 
@@ -58,28 +60,28 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold tracking-tight">School Directory</h2>
+            <h2 className="typography-section-title">{t("school_directory")}</h2>
             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full bg-primary/10 text-primary hover:bg-primary/20">
               <Plus className="h-4 w-4" />
             </Button>
           </div>
           <Avatar className="h-8 w-8 cursor-pointer border border-border">
             <AvatarImage src="" />
-            <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">JD</AvatarFallback>
+            <AvatarFallback className="typography-label bg-primary/10 text-primary">U</AvatarFallback>
           </Avatar>
         </div>
         
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          <FilterTab label="All" active={activeTab === 'All'} onClick={() => setActiveTab('All')} count={conversations.length} />
-          <FilterTab label="Staff" active={activeTab === 'Staff'} onClick={() => setActiveTab('Staff')} count={conversations.filter(c => c.role === 'teacher' || c.role === 'admin').length} />
-          <FilterTab label="Parents" active={activeTab === 'Parents'} onClick={() => setActiveTab('Parents')} count={conversations.filter(c => c.role === 'parent').length} />
-          <FilterTab label="Unread" active={activeTab === 'Unread'} onClick={() => setActiveTab('Unread')} count={conversations.filter(c => c.unreadCount).length} />
+          <FilterTab label={t("all")} active={activeTab === 'All'} onClick={() => setActiveTab('All')} count={conversations.length} />
+          <FilterTab label={t("staff")} active={activeTab === 'Staff'} onClick={() => setActiveTab('Staff')} count={conversations.filter(c => c.role === 'teacher' || c.role === 'admin').length} />
+          <FilterTab label={t("parents")} active={activeTab === 'Parents'} onClick={() => setActiveTab('Parents')} count={conversations.filter(c => c.role === 'parent').length} />
+          <FilterTab label={t("unread")} active={activeTab === 'Unread'} onClick={() => setActiveTab('Unread')} count={conversations.filter(c => (c.unreadCount ?? 0) > 0).length} />
         </div>
 
         <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input
-            placeholder="Search users..."
+            placeholder={t("search_users")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 bg-secondary/50 border-none focus-visible:ring-1 focus-visible:ring-primary rounded-xl"
@@ -94,8 +96,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         ) : (
           <div className="px-2 pb-4 space-y-0.5">
             {filteredConversations.filter(c => !c.isNewContact).length > 0 && (
-              <div className="px-3 pt-2 pb-1 text-[11px] font-black text-muted-foreground/50 tracking-widest uppercase">
-                Recent Chats
+              <div className="typography-label px-3 pt-2 pb-1 text-[11px] text-muted-foreground/50 uppercase">
+                {t("recent_chats")}
               </div>
             )}
             {filteredConversations.filter(c => !c.isNewContact).map((chat) => (
@@ -127,8 +129,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                  <div className="flex-1 min-w-0 text-left">
                    <div className="flex items-center justify-between mb-0.5">
                      <div className="flex flex-col">
-                       <span className="font-semibold truncate text-[15px]">{chat.name}</span>
-                       <span className="text-[10px] opacity-70 uppercase tracking-wider font-bold">{chat.role}</span>
+                       <span className="typography-label truncate text-[15px]">{chat.name}</span>
+                       <span className="typography-label text-[10px] opacity-70 uppercase">{chat.role}</span>
                      </div>
                      <span className={cn(
                        "text-[10px] whitespace-nowrap ml-2",
@@ -141,7 +143,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                      "text-sm truncate pr-4",
                      activeConversationId === chat.id ? "text-primary-foreground/80" : "text-muted-foreground"
                    )}>
-                     {chat.lastMessage || "No messages yet"}
+                     {chat.lastMessage || t("no_messages")}
                    </p>
                  </div>
 
@@ -161,8 +163,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             ))}
 
             {filteredConversations.filter(c => c.isNewContact).length > 0 && (
-              <div className="px-3 pt-6 pb-1 text-[11px] font-black text-muted-foreground/50 tracking-widest uppercase">
-                School Directory
+              <div className="typography-label px-3 pt-6 pb-1 text-[11px] text-muted-foreground/50 uppercase">
+                {t("school_directory")}
               </div>
             )}
             {filteredConversations.filter(c => c.isNewContact).map((chat) => (
@@ -179,15 +181,15 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                  <div className="relative shrink-0">
                    <Avatar className="h-10 w-10 border border-transparent group-hover:border-primary/20 transition-all opacity-80 group-hover:opacity-100">
                      <AvatarImage src={chat.avatar || undefined} />
-                     <AvatarFallback className="bg-secondary text-muted-foreground text-xs font-bold">
+                     <AvatarFallback className="typography-label bg-secondary text-muted-foreground">
                        {chat.name.slice(0, 2).toUpperCase()}
                      </AvatarFallback>
                    </Avatar>
                  </div>
 
                  <div className="flex-1 min-w-0 text-left">
-                   <span className="font-medium text-[14px]">{chat.name}</span>
-                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">{chat.role}</p>
+                   <span className="typography-label text-[14px]">{chat.name}</span>
+                   <p className="typography-label text-[10px] text-muted-foreground uppercase">{chat.role}</p>
                  </div>
                  
                  <div className="p-2 rounded-lg bg-primary/5 text-primary opacity-0 group-hover:opacity-100 transition-all">
@@ -198,7 +200,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
             {filteredConversations.length === 0 && (
               <div className="p-8 text-center">
-                <p className="text-sm text-muted-foreground">No conversations found</p>
+                <p className="typography-body text-muted-foreground">{t("no_conv_found")}</p>
               </div>
             )}
           </div>

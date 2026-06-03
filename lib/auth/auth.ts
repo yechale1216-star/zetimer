@@ -143,17 +143,8 @@ class AuthService {
 
       const parentName = data.parentName || "Parent";
       const students = data.students || [];
-      const schoolId = students[0]?.school_id || "";
-
-      // Fetch school name
-      let schoolName = "My School";
-      if (schoolId) {
-        try {
-          const schoolRes = await fetch(`${API_URL}/api/schools/${schoolId}`);
-          const schoolData = await schoolRes.json();
-          if (schoolData.success && schoolData.data) schoolName = schoolData.data.name;
-        } catch { /* school lookup is non-fatal */ }
-      }
+      // data.schoolId is now returned directly by the backend login endpoint
+      const schoolId = data.schoolId || students[0]?.schoolId || "";
 
       const user: User = {
         id: data.id,
@@ -162,7 +153,7 @@ class AuthService {
         name: data.parentName || parentName,
         role: "parent",
         schoolId: schoolId,
-        schoolName,
+        schoolName: data.schoolName || "My School",
         schoolLogo: data.schoolLogo || "",
         teacherId: "",
         isSuperAdmin: false,
@@ -171,6 +162,7 @@ class AuthService {
 
       if (this.isClient()) {
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user));
+        localStorage.setItem("attendance_token", data.token); // Store the JWT token
         localStorage.setItem("parent_students", JSON.stringify(students));
         if (user.schoolId) {
           const { db } = await import("@/lib/db/database");

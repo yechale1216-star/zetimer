@@ -23,14 +23,22 @@ export const getUsers = async (schoolId: string) => {
   });
 };
 
-export const getContacts = async (schoolId: string) => {
+export const getContacts = async (schoolId: string, currentUser?: any) => {
   if (!schoolId) throw new Error('School ID is required');
+
+  let allowedRoles = ['admin', 'school_admin', 'teacher', 'parent'];
+  
+  // Parents should only see admins and teachers
+  if (currentUser?.role === 'parent') {
+    allowedRoles = ['admin', 'school_admin', 'teacher'];
+  }
 
   const users = await prisma.user.findMany({
     where: {
       schoolId: schoolId,
-      role: { in: ['admin', 'school_admin', 'teacher', 'parent'] },
-      is_active: true
+      role: { in: allowedRoles },
+      is_active: true,
+      ...(currentUser?.id ? { id: { not: currentUser.id } } : {})
     },
     select: {
       id: true,

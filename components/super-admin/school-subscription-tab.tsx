@@ -42,8 +42,8 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
             <CreditCard className="w-6 h-6 text-muted-foreground" />
           </div>
           <div className="space-y-1">
-            <p className="font-semibold text-lg">No active subscription</p>
-            <p className="text-sm text-muted-foreground max-w-xs">
+            <p className="typography-card-title">No active subscription</p>
+            <p className="typography-body text-muted-foreground max-w-xs">
               This school does not have an active subscription plan assigned yet.
             </p>
           </div>
@@ -65,7 +65,7 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="typography-label flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-primary" />
               Current Plan
             </CardTitle>
@@ -73,8 +73,8 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold capitalize">{sub.tier}</p>
-                <p className="text-xs text-muted-foreground capitalize">{sub.billingPeriod} billing</p>
+                <p className="typography-page-title capitalize">{sub.tier}</p>
+                <p className="typography-helper text-muted-foreground capitalize">{sub.billingPeriod} billing</p>
               </div>
               <Badge variant={sub.status === 'active' ? 'default' : 'outline'} className="capitalize">
                 {sub.status}
@@ -85,7 +85,7 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="typography-label flex items-center gap-2">
               <Users className="w-4 h-4 text-primary" />
               Student Usage
             </CardTitle>
@@ -93,8 +93,8 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
           <CardContent>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-2xl font-bold">{studentCount}</p>
-                <p className="text-xs text-muted-foreground">Limit: {studentLimit === Number.POSITIVE_INFINITY ? 'Unlimited' : studentLimit}</p>
+                <p className="typography-page-title">{studentCount}</p>
+                <p className="typography-helper text-muted-foreground">Limit: {studentLimit === Number.POSITIVE_INFINITY ? 'Unlimited' : studentLimit}</p>
               </div>
               <Progress value={usagePercent} className="h-1.5" />
             </div>
@@ -103,14 +103,14 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="typography-label flex items-center gap-2">
               <Calendar className="w-4 h-4 text-primary" />
               Next Renewal
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{sub.renewalDate}</p>
-            <p className="text-xs text-muted-foreground">Auto-renews: Yes</p>
+            <p className="typography-page-title">{sub.renewalDate}</p>
+            <p className="typography-helper text-muted-foreground">Auto-renews: Yes</p>
           </CardContent>
         </Card>
       </div>
@@ -132,17 +132,17 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex justify-between items-center text-sm">
+            <div className="typography-body flex justify-between items-center">
               <span className="text-muted-foreground">Effective monthly rate</span>
-              <span className="font-semibold">${sub.effectiveMonthly?.toFixed(2)}</span>
+              <span className="typography-label">${sub.effectiveMonthly?.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center text-sm">
+            <div className="typography-body flex justify-between items-center">
               <span className="text-muted-foreground">Total period amount</span>
-              <span className="font-semibold">${sub.currentPeriodTotal?.toFixed(2)}</span>
+              <span className="typography-label">${sub.currentPeriodTotal?.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center text-sm">
+            <div className="typography-body flex justify-between items-center">
               <span className="text-muted-foreground">Applied discount</span>
-              <span className="text-green-600 font-medium">-{sub.discountPercent || 0}%</span>
+              <span className="typography-label text-green-600">-{sub.discountPercent || 0}%</span>
             </div>
           </div>
         </CardContent>

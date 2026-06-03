@@ -145,8 +145,8 @@ export function PWAInstall() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg shadow-lg p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="font-semibold text-blue-900 mb-1">Update Available</h3>
-              <p className="text-sm text-blue-700 mb-3">
+              <h3 className="typography-label text-blue-900 mb-1">Update Available</h3>
+              <p className="typography-body text-blue-700 mb-3">
                 A new version of the app is available. Update now to get the latest features and improvements.
               </p>
               <div className="flex gap-2">
@@ -184,8 +184,8 @@ export function PWAInstall() {
         <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 mb-2">Install App</h3>
-              <div className="text-sm text-gray-600 space-y-2">
+              <h3 className="typography-label text-gray-900 mb-2">Install App</h3>
+              <div className="typography-body text-gray-600 space-y-2">
                 <p>
                   <strong>Chrome/Edge (Android):</strong>
                 </p>
@@ -219,8 +219,8 @@ export function PWAInstall() {
         <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 mb-1">Install Attendance Tracker</h3>
-              <p className="text-sm text-gray-600 mb-3">
+              <h3 className="typography-label text-gray-900 mb-1">Install Attendance Tracker</h3>
+              <p className="typography-body text-gray-600 mb-3">
                 Install this app on your device for quick access and offline use.
               </p>
               <div className="flex gap-2">

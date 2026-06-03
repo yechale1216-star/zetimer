@@ -96,7 +96,7 @@ export function AttendanceByGrade() {
     return (
       <div className="flex flex-col items-center justify-center h-[400px] gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="text-muted-foreground font-medium">Crunching attendance data...</p>
+        <p className="typography-label text-muted-foreground">Crunching attendance data...</p>
       </div>
     )
   }
@@ -117,8 +117,8 @@ export function AttendanceByGrade() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Attendance by Grade</h2>
-          <p className="text-muted-foreground text-sm">Monitor and analyze attendance performance across all grades.</p>
+          <h2 className="typography-page-title text-foreground">Attendance by Grade</h2>
+          <p className="typography-body text-muted-foreground">Monitor and analyze attendance performance across all grades.</p>
         </div>
         <div className="flex flex-col items-start md:items-end gap-3 w-full md:w-auto">
           <Button 
@@ -135,7 +135,7 @@ export function AttendanceByGrade() {
                 variant={filters.session === "total" ? "default" : "ghost"} 
                 onClick={() => setFilters(prev => ({ ...prev, session: "total" }))}
                 size="sm"
-                className="h-7 px-3 text-[10px] font-bold uppercase rounded-full"
+                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
               >
                 Full Day
               </Button>
@@ -143,7 +143,7 @@ export function AttendanceByGrade() {
                 variant={filters.session === "morning" ? "default" : "ghost"} 
                 onClick={() => setFilters(prev => ({ ...prev, session: "morning" }))}
                 size="sm"
-                className="h-7 px-3 text-[10px] font-bold uppercase rounded-full"
+                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
               >
                 Morning
               </Button>
@@ -151,7 +151,7 @@ export function AttendanceByGrade() {
                 variant={filters.session === "afternoon" ? "default" : "ghost"} 
                 onClick={() => setFilters(prev => ({ ...prev, session: "afternoon" }))}
                 size="sm"
-                className="h-7 px-3 text-[10px] font-bold uppercase rounded-full"
+                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
               >
                 Afternoon
               </Button>
@@ -181,8 +181,8 @@ export function AttendanceByGrade() {
               <div className={`h-8 w-8 rounded-lg bg-${item.color}-500/10 flex items-center justify-center mb-3`}>
                 <item.icon className={`h-4 w-4 text-${item.color}-600 dark:text-${item.color}-400`} />
               </div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">{item.label}</p>
-              <p className={`text-xl font-black ${item.isRate ? 'text-primary' : 'text-foreground'}`}>{item.value}</p>
+              <p className="typography-label text-[10px] text-muted-foreground uppercase mb-1">{item.label}</p>
+              <p className={`typography-section-title ${item.isRate ? 'text-primary' : 'text-foreground'}`}>{item.value}</p>
             </CardContent>
           </Card>
         ))}
@@ -197,7 +197,7 @@ export function AttendanceByGrade() {
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-2">
           <TableIcon className="w-5 h-5 text-primary" />
-          <h3 className="font-bold text-foreground">Detailed Grade Statistics</h3>
+          <h3 className="typography-label text-foreground">Detailed Grade Statistics</h3>
         </div>
         <GradeAttendanceTable data={gradeStats} onDrillDown={handleDrillDown} />
       </div>

@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { authService, type LoginCredentials } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Phone } from "lucide-react"
+import { useLanguage } from "@/lib/context/language-context"
 
 interface LoginFormProps {
   onLoginSuccess: () => void
@@ -23,6 +24,7 @@ interface LoginFormProps {
 
 export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSignup }: LoginFormProps) {
   const router = useRouter()
+  const { t, language, setLanguage } = useLanguage()
   const [activeTab, setActiveTab] = useState<"staff" | "parent">("staff")
   const [parentPhone, setParentPhone] = useState("+251")
   const [parentPassword, setParentPassword] = useState("")
@@ -69,17 +71,17 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         const result = await authService.loginParent(cleanPhone, parentPassword)
         if (result.success) {
           setLoginError(null)
-          notifications.success("Welcome Back, Parent!", `Successfully logged in. Accessing children's profiles.`)
+          notifications.success(t("welcome_back_parent"), t("login_success_parent"))
           router.push("/parent/dashboard")
         } else {
-          const errorMessage = result.message || "Invalid phone number or password"
+          const errorMessage = result.message || t("invalid_credentials")
           setLoginError(errorMessage)
-          notifications.error("Login Failed", errorMessage)
+          notifications.error(t("login_failed"), errorMessage)
         }
       } catch (error) {
-        const errorMsg = "An unexpected error occurred. Please try again."
+        const errorMsg = t("unexpected_error")
         setLoginError(errorMsg)
-        notifications.error("Login Error", errorMsg)
+        notifications.error(t("login_failed"), errorMsg)
       } finally {
         setIsLoading(false)
       }
@@ -87,9 +89,9 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
     }
 
     if (!credentials.email || !credentials.password) {
-      const errorMsg = "Please fill in all fields"
+      const errorMsg = t("enter_password_error")
       setLoginError(errorMsg)
-      notifications.error("Validation Error", errorMsg)
+      notifications.error(t("validation_error"), errorMsg)
       return
     }
 
@@ -140,15 +142,15 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
 
   return (
     <Card className="border-border/40 shadow-2xl bg-card/80 backdrop-blur-xl rounded-3xl overflow-hidden border animate-in fade-in duration-300">
-      <CardHeader className="space-y-1 pb-6 pt-8 px-8 text-center">
+      <CardHeader className="space-y-2 pb-6 pt-8 px-8 text-center">
         <div className="md:hidden flex justify-center mb-4">
            {/* Mobile only logo is handled in page.tsx now */}
         </div>
-        <CardTitle className="text-2xl font-bold tracking-tight">Welcome Back</CardTitle>
-        <CardDescription className="text-muted-foreground transition-all duration-300">
+        <CardTitle className="typography-page-title">{t("welcome_back")}</CardTitle>
+        <CardDescription className="typography-label text-muted-foreground transition-all duration-300">
           {activeTab === "parent" 
-            ? "Enter your phone number and password to access the parent portal" 
-            : "Enter your credentials to access your school dashboard"}
+            ? t("login_desc_parent") 
+            : t("login_desc_staff")}
         </CardDescription>
 
       </CardHeader>
@@ -158,30 +160,22 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
           <button
             type="button"
             onClick={() => { setActiveTab("staff"); setLoginError(null); }}
-            className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all duration-200 ${
-              activeTab === "staff"
-                ? "bg-background text-foreground shadow-sm font-black"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`typography-label flex-1 py-2.5 uppercase rounded-xl transition-all duration-200 ${ activeTab === "staff" ? "bg-background text-foreground shadow-sm font-black" : "text-muted-foreground hover:text-foreground" }`}
           >
-            School Staff
+            {t("school_staff")}
           </button>
           <button
             type="button"
             onClick={() => { setActiveTab("parent"); setLoginError(null); }}
-            className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-xl transition-all duration-200 ${
-              activeTab === "parent"
-                ? "bg-background text-emerald-600 dark:text-emerald-400 shadow-sm font-black"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`typography-label flex-1 py-2.5 uppercase rounded-xl transition-all duration-200 ${ activeTab === "parent" ? "bg-background text-emerald-600 dark:text-emerald-400 shadow-sm font-black" : "text-muted-foreground hover:text-foreground" }`}
           >
-            Parent Portal
+            {t("parent_portal_tab")}
           </button>
         </div>
 
         {loginError && (
           <Alert variant="destructive" className="mb-6 animate-in slide-in-from-top-2 duration-300">
-            <AlertDescription className="text-sm font-medium">{loginError}</AlertDescription>
+            <AlertDescription className="typography-label">{loginError}</AlertDescription>
           </Alert>
         )}
 
@@ -189,7 +183,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
           {activeTab === "parent" ? (
             <div className="space-y-5 animate-in fade-in duration-300">
               <div className="space-y-2">
-                <Label htmlFor="parentPhone">Registered Phone Number</Label>
+                <Label htmlFor="parentPhone" className="typography-label">{t("registered_phone")}</Label>
                 <div className="relative group">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-emerald-500 transition-colors">
                     <Phone className="w-4 h-4" />
@@ -197,7 +191,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                   <Input
                     id="parentPhone"
                     type="tel"
-                    placeholder="+251 9XX XXX XXX"
+                    placeholder={t("parent_phone_placeholder")}
                     maxLength={13}
                     value={parentPhone}
                     onChange={(e) => {
@@ -207,22 +201,22 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                       setParentPhone(val)
                     }}
                     required
-                    className="pl-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all rounded-xl text-sm"
+                    className="typography-body pl-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all rounded-xl"
                   />
                 </div>
-                <p className="text-[10px] text-muted-foreground/60 ml-1">Format: +251 9XXXXXXXX (Ethiopian Phone)</p>
+                <p className="typography-helper text-muted-foreground/70 ml-1">Format: +251 9XXXXXXXX (Ethiopian Phone)</p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="parentPassword">Password</Label>
+                  <Label htmlFor="parentPassword">{t("password")}</Label>
                   <Button
                     variant="link"
                     type="button"
                     onClick={onShowForgotPassword}
-                    className="text-xs text-emerald-600 hover:text-emerald-700 h-auto p-0"
+                    className="typography-helper text-emerald-600 hover:text-emerald-700 h-auto p-0"
                   >
-                    Forgot password?
+                    {t("forgot_password")}
                   </Button>
                 </div>
                 <div className="relative group">
@@ -236,7 +230,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                     value={parentPassword}
                     onChange={(e) => setParentPassword(e.target.value)}
                     required
-                    className="pl-10 pr-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all rounded-xl text-sm"
+                    className="typography-body pl-10 pr-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all rounded-xl"
                   />
                   <button
                     type="button"
@@ -257,7 +251,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                 />
                 <label
                   htmlFor="rememberParent"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  className="typography-label peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                 >
                   Remember me on this device
                 </label>
@@ -266,7 +260,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
           ) : (
             <div className="space-y-5 animate-in fade-in duration-300">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email" className="typography-label">Email Address</Label>
                 <div className="relative group">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
                     <Mail className="w-4 h-4" />
@@ -278,19 +272,19 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                     value={credentials.email}
                     onChange={(e) => setCredentials((prev) => ({ ...prev, email: e.target.value }))}
                     required
-                    className="pl-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl text-sm"
+                    className="typography-body pl-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password" className="typography-label">Password</Label>
                   <Button
                     variant="link"
                     type="button"
                     onClick={onShowForgotPassword}
-                    className="text-xs text-primary hover:text-primary/80 h-auto p-0"
+                    className="typography-label text-primary hover:text-primary/80 h-auto p-0"
                   >
                     Forgot password?
                   </Button>
@@ -306,7 +300,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                     value={credentials.password}
                     onChange={(e) => setCredentials((prev) => ({ ...prev, password: e.target.value }))}
                     required
-                    className="pl-10 pr-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl text-sm"
+                    className="typography-body pl-10 pr-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl"
                   />
                   <button
                     type="button"
@@ -327,7 +321,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                 />
                 <label
                   htmlFor="remember"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  className="typography-label peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                 >
                   Remember me on this device
                 </label>
@@ -337,21 +331,17 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
 
           <Button 
             type="submit" 
-            className={`w-full h-12 text-base font-semibold rounded-xl shadow-lg transition-all active:scale-[0.98] ${
-              activeTab === "parent" 
-                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/10 animate-in fade-in" 
-                : "shadow-primary/10"
-            }`} 
+            className={`typography-card-title w-full h-12 rounded-xl shadow-lg transition-all active:scale-[0.98] ${ activeTab === "parent" ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/10 animate-in fade-in" : "shadow-primary/10" }`} 
             disabled={isLoading}
           >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {activeTab === "parent" ? "Verifying..." : "Signing in..."}
+                {activeTab === "parent" ? t("verifying") : t("signing_in")}
               </>
             ) : (
               <>
-                {activeTab === "parent" ? "Sign In to Parent Portal" : "Sign In"}
+                {activeTab === "parent" ? t("sign_in_parent") : t("sign_in_staff")}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </>
             )}
@@ -360,7 +350,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
 
         {onShowAdminSignup && (
           <div className="mt-8 pt-6 border-t border-border/50 text-center">
-            <p className="text-sm text-muted-foreground mb-4">New to Zetime? Create a school account</p>
+            <p className="typography-body text-muted-foreground mb-4">New to Zetime? Create a school account</p>
             <Button
               variant="outline"
               onClick={onShowAdminSignup}
@@ -372,18 +362,35 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         )}
 
         <div className="mt-8 flex flex-col items-center gap-4">
-          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-            <Link href="/about" className="hover:text-primary transition-colors">About</Link>
-            <Link href="/pricing" className="hover:text-primary transition-colors">Pricing</Link>
-            <Link href="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
-            <Link href="/terms" className="hover:text-primary transition-colors">Terms</Link>
+          <div className="typography-label flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-muted-foreground uppercase">
+            <Link href="/about" className="hover:text-primary transition-colors">{t("about")}</Link>
+            <Link href="/pricing" className="hover:text-primary transition-colors">{t("pricing")}</Link>
+            <Link href="/privacy" className="hover:text-primary transition-colors">{t("privacy")}</Link>
+            <Link href="/terms" className="hover:text-primary transition-colors">{t("terms")}</Link>
           </div>
           
-          <div className="flex items-center gap-2 bg-muted/30 p-1.5 px-3 rounded-full border border-border/50">
-             <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-tight">Theme</span>
-             <div className="scale-75">
-               <ModeToggle />
-             </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-muted/30 p-1.5 px-3 rounded-full border border-border/50">
+               <span className="typography-label text-[10px] text-muted-foreground uppercase">{t("theme")}</span>
+               <div className="scale-75">
+                 <ModeToggle />
+               </div>
+            </div>
+
+            <div className="flex items-center gap-2 bg-muted/30 p-1.5 px-3 rounded-full border border-border/50">
+              <button 
+                onClick={() => setLanguage('en')}
+                className={`typography-label text-[10px] px-2 py-0.5 rounded ${language === 'en' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+              >
+                EN
+              </button>
+              <button 
+                onClick={() => setLanguage('am')}
+                className={`typography-label text-[10px] px-2 py-0.5 rounded ${language === 'am' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+              >
+                አማ
+              </button>
+            </div>
           </div>
         </div>
       </CardContent>

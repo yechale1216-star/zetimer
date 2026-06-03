@@ -85,7 +85,7 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
       <Card className="border-border/40 shadow-2xl bg-card/80 backdrop-blur-xl rounded-3xl overflow-hidden border animate-pulse">
         <CardContent className="flex flex-col items-center justify-center py-12 space-y-4">
           <Loader2 className="h-10 w-10 text-primary animate-spin" />
-          <p className="text-muted-foreground font-medium">Verifying reset token...</p>
+          <p className="typography-label text-muted-foreground">Verifying reset token...</p>
         </CardContent>
       </Card>
     )
@@ -98,11 +98,11 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
           <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center mb-4 border border-destructive/20">
             <XCircle className="w-8 h-8 text-destructive" />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-destructive">Invalid Reset Link</CardTitle>
+          <CardTitle className="typography-page-title text-destructive">Invalid Reset Link</CardTitle>
           <CardDescription>This link is invalid or has expired</CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-8 text-center space-y-6">
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <p className="typography-body text-muted-foreground">
             Password reset links expire after 1 hour for security reasons. Please request a new link if needed.
           </p>
           <Button onClick={() => (window.location.href = "/login")} className="w-full h-11 rounded-xl shadow-lg shadow-primary/10">
@@ -116,7 +116,7 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
   return (
     <Card className="border-border/40 shadow-2xl bg-card/80 backdrop-blur-xl rounded-3xl overflow-hidden border">
       <CardHeader className="space-y-1 pb-6 pt-8 px-8 text-center relative">
-        <CardTitle className="text-2xl font-bold tracking-tight">Set New Password</CardTitle>
+        <CardTitle className="typography-page-title">Set New Password</CardTitle>
         <CardDescription className="text-muted-foreground">
           Create a secure new password for your account
         </CardDescription>
@@ -178,12 +178,12 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
           {passwords.password && passwords.confirmPassword && (
             <div className="animate-in fade-in duration-300">
               {passwords.password === passwords.confirmPassword ? (
-                <div className="flex items-center text-xs text-green-600 font-medium bg-green-500/10 p-2 rounded-lg border border-green-500/20">
+                <div className="typography-helper flex items-center text-green-600 bg-green-500/10 p-2 rounded-lg border border-green-500/20">
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
                   Passwords match
                 </div>
               ) : (
-                <div className="flex items-center text-xs text-destructive font-medium bg-destructive/10 p-2 rounded-lg border border-destructive/20">
+                <div className="typography-helper flex items-center text-destructive bg-destructive/10 p-2 rounded-lg border border-destructive/20">
                   <XCircle className="w-3.5 h-3.5 mr-1.5" />
                   Passwords do not match
                 </div>
@@ -193,7 +193,7 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
 
           <Button 
             type="submit" 
-            className="w-full h-12 text-base font-semibold rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-[0.98]" 
+            className="typography-card-title w-full h-12 rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-[0.98]" 
             disabled={isLoading || passwords.password !== passwords.confirmPassword}
           >
             {isLoading ? (

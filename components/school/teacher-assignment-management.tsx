@@ -182,7 +182,7 @@ export function TeacherAssignmentManagement() {
       <div className="flex items-center justify-center py-24">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-slate-500 font-medium animate-pulse">Loading assignments...</p>
+          <p className="typography-label mt-4 text-slate-500 animate-pulse">Loading assignments...</p>
         </div>
       </div>
     )
@@ -194,10 +194,10 @@ export function TeacherAssignmentManagement() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="typography-page-title text-slate-900 dark:text-white">
             Class Assignments
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="typography-body text-slate-500 dark:text-slate-400 mt-1">
             Assign teachers to grade sections and manage their classes.
           </p>
         </div>
@@ -231,8 +231,8 @@ export function TeacherAssignmentManagement() {
               <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30 animate-bounce mb-5">
                 <CheckCircle2 className="w-10 h-10 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">Assignment Successful!</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">The teacher has been assigned to the class.</p>
+              <h2 className="typography-page-title text-emerald-700 dark:text-emerald-400">Assignment Successful!</h2>
+              <p className="typography-body text-slate-500 dark:text-slate-400 mt-1">The teacher has been assigned to the class.</p>
             </div>
           ) : (
             <>
@@ -242,8 +242,8 @@ export function TeacherAssignmentManagement() {
                     <Plus className="w-4 h-4" />
                   </div>
                   <div>
-                    <DialogTitle className="text-xl font-bold">New Class Assignment</DialogTitle>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Select a teacher and assign them to a grade section.</p>
+                    <DialogTitle className="typography-section-title">New Class Assignment</DialogTitle>
+                    <p className="typography-helper text-slate-500 dark:text-slate-400 mt-0.5">Select a teacher and assign them to a grade section.</p>
                   </div>
                 </div>
               </DialogHeader>
@@ -251,13 +251,13 @@ export function TeacherAssignmentManagement() {
               <div className="px-6 py-6 space-y-5">
                 {/* Teacher */}
                 <div className="space-y-2">
-                  <label className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">
+                  <label className="typography-label text-slate-700 dark:text-slate-300 uppercase">
                     Select Teacher <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={selectedTeacher}
                     onChange={(e) => setSelectedTeacher(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    className="typography-body w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                   >
                     <option value="">-- Choose a Teacher --</option>
                     {teachers.length > 0 ? (
@@ -271,13 +271,13 @@ export function TeacherAssignmentManagement() {
                 <div className="grid grid-cols-2 gap-4">
                   {/* Grade */}
                   <div className="space-y-2">
-                    <label className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">
+                    <label className="typography-label text-slate-700 dark:text-slate-300 uppercase">
                       Grade <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={selectedGrade}
                       onChange={(e) => { setSelectedGrade(e.target.value); setSelectedStream("") }}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      className="typography-body w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                     >
                       <option value="">-- Grade --</option>
                       {GRADES.map((g) => <option key={g} value={g}>Grade {g}</option>)}
@@ -286,13 +286,13 @@ export function TeacherAssignmentManagement() {
 
                   {/* Section */}
                   <div className="space-y-2">
-                    <label className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">
+                    <label className="typography-label text-slate-700 dark:text-slate-300 uppercase">
                       Section <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={selectedSection}
                       onChange={(e) => setSelectedSection(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      className="typography-body w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                     >
                       <option value="">-- Section --</option>
                       {SECTIONS.map((s) => <option key={s} value={s}>Section {s}</option>)}
@@ -302,17 +302,17 @@ export function TeacherAssignmentManagement() {
 
                 {/* Stream */}
                 <div className="space-y-2">
-                  <label className="text-slate-700 dark:text-slate-300 font-semibold text-xs uppercase tracking-wider">
+                  <label className="typography-label text-slate-700 dark:text-slate-300 uppercase">
                     Stream {(selectedGrade === "11" || selectedGrade === "12") && <span className="text-red-500 ml-1">*</span>}
                     {selectedGrade && selectedGrade !== "11" && selectedGrade !== "12" && (
-                      <span className="text-slate-400 font-normal normal-case ml-1">(optional)</span>
+                      <span className="typography-body text-slate-400 normal-case ml-1">(optional)</span>
                     )}
                   </label>
                   <select
                     value={selectedStream}
                     onChange={(e) => setSelectedStream(e.target.value)}
                     disabled={!selectedGrade}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50"
+                    className="typography-body w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50"
                   >
                     <option value="">
                       {selectedGrade === "11" || selectedGrade === "12" ? "-- Choose Stream (Required) --" : "-- Choose Stream (Optional) --"}
@@ -324,7 +324,7 @@ export function TeacherAssignmentManagement() {
                 {/* Preview */}
                 {selectedGrade && selectedSection && (
                   <div className="p-3 bg-blue-50/60 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/40">
-                    <p className="text-sm text-blue-700 dark:text-blue-400 font-medium">
+                    <p className="typography-label text-blue-700 dark:text-blue-400">
                       Assigning to: <strong>Grade {selectedGrade}</strong> - <strong>Section {selectedSection}</strong>
                       {selectedStream && <> - <strong>{selectedStream}</strong></>}
                     </p>
@@ -363,7 +363,7 @@ export function TeacherAssignmentManagement() {
       {/* Assignments Grid */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <h2 className="typography-section-title text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Users className="w-5 h-5 text-blue-600" />
             Active Assignments ({assignments.length})
           </h2>
@@ -374,8 +374,8 @@ export function TeacherAssignmentManagement() {
             <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center mx-auto mb-4 text-slate-400">
               <Users className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">No assignments yet</h3>
-            <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">Click "Assign Teacher" to create your first class assignment.</p>
+            <h3 className="typography-card-title text-slate-800 dark:text-slate-200">No assignments yet</h3>
+            <p className="typography-body text-slate-500 mt-1 max-w-sm mx-auto">Click "Assign Teacher" to create your first class assignment.</p>
           </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -397,7 +397,7 @@ export function TeacherAssignmentManagement() {
                           className="w-10 h-10 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform duration-300 ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-900"
                         />
                       ) : (
-                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white font-bold text-xs shadow-sm group-hover:scale-105 transition-transform duration-300`}>
+                        <div className={`typography-label w-10 h-10 rounded-full bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform duration-300`}>
                           {getInitials(teacherName)}
                         </div>
                       )}
@@ -414,19 +414,19 @@ export function TeacherAssignmentManagement() {
 
                     {/* Name */}
                     <div>
-                      <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 group-hover:text-blue-600 truncate transition-colors duration-200" title={teacherName}>
+                      <h3 className="typography-card-title text-slate-900 dark:text-slate-100 group-hover:text-blue-600 truncate transition-colors duration-200" title={teacherName}>
                         {teacherName}
                       </h3>
                     </div>
 
                     {/* Class Details */}
                     <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800/50 space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
+                      <div className="typography-helper flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
                         <Users className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                         <span>Grade {assignment.grade} - Section {assignment.section}</span>
                       </div>
                       {assignment.stream && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <div className="typography-helper flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                           <GraduationCap className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                           <span>{assignment.stream} Stream</span>
                         </div>

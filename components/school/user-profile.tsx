@@ -138,11 +138,11 @@ export function UserProfile() {
             </div>
           )}
           <div>
-            <p className="text-indigo-100/80 text-sm font-medium mb-1">{getGreeting()}</p>
-            <h1 className="text-3xl font-bold tracking-tight">{user?.full_name || user?.name}</h1>
+            <p className="typography-label text-indigo-100/80 mb-1">{getGreeting()}</p>
+            <h1 className="typography-page-title">{user?.full_name || user?.name}</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <p className="text-indigo-100/90 capitalize text-sm font-medium tracking-wide">{user?.role} Account</p>
+              <p className="typography-label text-indigo-100/90 capitalize">{user?.role} Account</p>
             </div>
           </div>
         </div>
@@ -151,13 +151,13 @@ export function UserProfile() {
       <div className="space-y-6">
         {/* Personal Information */}
         <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
+          <h2 className="typography-card-title mb-6 text-foreground flex items-center gap-2">
             <div className="w-1 h-5 bg-primary rounded-full" />
             Personal Information
           </h2>
           <div className="space-y-5">
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-muted-foreground">Name</label>
+              <label className="typography-label block text-muted-foreground">Name</label>
               <input
                 type="text"
                 value={formData.full_name || ""}
@@ -167,7 +167,7 @@ export function UserProfile() {
               />
             </div>
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <label className="typography-label block text-muted-foreground flex items-center gap-2">
                 <Mail className="w-4 h-4" />
                 Email
               </label>
@@ -182,7 +182,7 @@ export function UserProfile() {
             {isEditing && (
               <>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-muted-foreground">New Password</label>
+                  <label className="typography-label block text-muted-foreground">New Password</label>
                   <input
                     type="password"
                     placeholder="Leave blank to keep current password"
@@ -192,7 +192,7 @@ export function UserProfile() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-muted-foreground">Confirm New Password</label>
+                  <label className="typography-label block text-muted-foreground">Confirm New Password</label>
                   <input
                     type="password"
                     placeholder="Confirm your new password"
@@ -204,7 +204,7 @@ export function UserProfile() {
               </>
             )}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-muted-foreground">Role</label>
+              <label className="typography-label block text-muted-foreground">Role</label>
               <input
                 type="text"
                 value={formData.role || ""}
@@ -218,13 +218,13 @@ export function UserProfile() {
         {/* School Information */}
         {school && (
           <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold mb-6 text-foreground flex items-center gap-2">
+            <h2 className="typography-card-title mb-6 text-foreground flex items-center gap-2">
               <div className="w-1 h-5 bg-primary rounded-full" />
               School Information
             </h2>
             <div className="space-y-5">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-muted-foreground">School Name</label>
+                <label className="typography-label block text-muted-foreground">School Name</label>
                 <input
                   type="text"
                   value={school.schoolName || school.name || ""}
@@ -233,7 +233,7 @@ export function UserProfile() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-muted-foreground">Phone</label>
+                <label className="typography-label block text-muted-foreground">Phone</label>
                 <input
                   type="text"
                   value={school.schoolPhone || school.phone || ""}

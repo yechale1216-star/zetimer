@@ -98,13 +98,13 @@ export function SchoolSetup({ onSetupComplete }: SchoolSetupProps) {
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-2">
-          <CardTitle className="text-3xl font-bold text-primary">Welcome to Attendance Tracker</CardTitle>
-          <CardDescription className="text-base">Let's set up your school information to get started</CardDescription>
+          <CardTitle className="typography-page-title text-primary">Welcome to Attendance Tracker</CardTitle>
+          <CardDescription className="typography-body">Let's set up your school information to get started</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-              <p className="text-sm text-primary">
+              <p className="typography-body text-primary">
                 <strong>Hello {user?.name}!</strong> Please complete your school setup to access the dashboard.
               </p>
             </div>
@@ -135,11 +135,11 @@ export function SchoolSetup({ onSetupComplete }: SchoolSetupProps) {
                   type="text"
                   value={schoolCode}
                   disabled={true}
-                  className="bg-muted cursor-not-allowed text-muted-foreground font-semibold h-12"
+                  className="typography-label bg-muted cursor-not-allowed text-muted-foreground h-12"
                   placeholder="Auto-generated from school name"
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="typography-helper text-muted-foreground mt-1">
                 Your unique School ID has been generated automatically. Teachers will use this code to join.
               </p>
             </div>
@@ -185,11 +185,11 @@ export function SchoolSetup({ onSetupComplete }: SchoolSetupProps) {
               />
             </div>
 
-            <Button type="submit" className="w-full h-12 text-base" disabled={isLoading}>
+            <Button type="submit" className="typography-body w-full h-12" disabled={isLoading}>
               {isLoading ? "Setting up your school..." : "Complete Setup"}
             </Button>
 
-            <p className="text-xs text-muted-foreground text-center">You can modify these details later in Settings</p>
+            <p className="typography-helper text-muted-foreground text-center">You can modify these details later in Settings</p>
           </form>
         </CardContent>
       </Card>

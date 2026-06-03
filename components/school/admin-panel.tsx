@@ -13,8 +13,8 @@ export function AdminPanel() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">Administration Panel</h2>
-        <p className="text-sm text-muted-foreground mt-1">Manage students, classes, teachers, and system settings</p>
+        <h2 className="typography-page-title text-foreground">Administration Panel</h2>
+        <p className="typography-body text-muted-foreground mt-1">Manage students, classes, teachers, and system settings</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

@@ -134,7 +134,7 @@ export function Sidebar() {
                 )}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
-                <span className="text-sm font-medium">{item.label}</span>
+                <span className="typography-label">{item.label}</span>
               </Link>
             )
           })}
@@ -144,11 +144,11 @@ export function Sidebar() {
         <div className="p-4 border-t border-border space-y-2">
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary">
             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-semibold">SA</span>
+              <span className="typography-label">SA</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">Super Admin</p>
-              <p className="text-xs text-muted-foreground truncate">admin@zetime.io</p>
+              <p className="typography-label text-foreground truncate">Super Admin</p>
+              <p className="typography-helper text-muted-foreground truncate">admin@zetime.io</p>
             </div>
           </div>
 
@@ -157,7 +157,7 @@ export function Sidebar() {
             className="flex w-full items-center gap-3 px-4 py-3 rounded-lg text-red-500 hover:bg-red-500/10 transition-colors"
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            <span className="text-sm font-medium">Logout</span>
+            <span className="typography-label">Logout</span>
           </button>
         </div>
       </aside>

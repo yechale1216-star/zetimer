@@ -57,8 +57,8 @@ export function EmailPasswordDialog({
         <div className="space-y-4">
           <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 p-3 rounded-lg">
             <Lock className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-amber-800">
-              <p className="font-semibold">Developer Only</p>
+            <div className="typography-body text-amber-800">
+              <p className="typography-label">Developer Only</p>
               <p>This is not allowed to users. It is for developer only.</p>
             </div>
           </div>
@@ -78,7 +78,7 @@ export function EmailPasswordDialog({
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+            <div className="typography-body flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
               <span>{error}</span>
             </div>

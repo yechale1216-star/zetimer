@@ -9,35 +9,33 @@ datasource db {
 }
 
 model School {
-  id                  String               @id @default(uuid())
-  schoolId            String?              @unique // Format: SCH-XXXX (Optional for migration)
-  name                String               @unique
-  subscriptionStatus  String               @default("ACTIVE")
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  
-  // Relationships
-  attendance          Attendance[]
-  parentNotifications ParentNotification[]
-  settings            SchoolSettings?
-  students            Student[]
-  teachers            Teacher[]
-  assignments         TeacherAssignment[]
-  users               User[]
-  grades              Grade[]
-  sections            Section[]
-  streams             Stream[]
-  auditLogs           AuditLog[]
-  reports             AttendanceReport[]
-  conversations       Conversation[]
-  callSessions        CallSession[]
-  pendingRegistrations PendingRegistration[]
-  parentStudentLinks   ParentStudentLink[]
-  messages             Message[]
-  messageReads         MessageRead[]
-  messageReactions     MessageReaction[]
-  callParticipants     CallParticipant[]
+  id                   String                @id @default(uuid())
+  schoolId             String?               @unique
+  name                 String                @unique
+  subscriptionStatus   String                @default("ACTIVE")
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  attendance           Attendance[]
   callHistories        CallHistory[]
+  callParticipants     CallParticipant[]
+  callSessions         CallSession[]
+  conversations        Conversation[]
+  grades               Grade[]
+  messages             Message[]
+  messageReactions     MessageReaction[]
+  messageReads         MessageRead[]
+  parentNotifications  ParentNotification[]
+  parentStudentLinks   ParentStudentLink[]
+  pendingRegistrations PendingRegistration[]
+  settings             SchoolSettings?
+  sections             Section[]
+  streams              Stream[]
+  students             Student[]
+  teachers             Teacher[]
+  assignments          TeacherAssignment[]
+  users                User[]
+  reports              AttendanceReport[]
+  auditLogs            AuditLog[]
 }
 
 model User {
@@ -56,12 +54,12 @@ model User {
   qualification              String?
   subject                    String?
   profile_photo              String?
-  address                    String?
   is_verified                Boolean              @default(false)
   verification_token         String?
   verification_token_expires DateTime?
-  reset_password_token       String?   @unique
   reset_password_expires     DateTime?
+  reset_password_token       String?              @unique
+  address                    String?
   callHistory                CallHistory[]
   callSessions               CallParticipant[]
   conversations              ConversationMember[]
@@ -91,7 +89,7 @@ model Teacher {
   user_id          String?             @unique
   profile_photo    String?
   attendance       Attendance[]
-  school           School?              @relation(fields: [schoolId], references: [id])
+  school           School?             @relation(fields: [schoolId], references: [id])
   assignments      TeacherAssignment[]
 
   @@index([schoolId])
@@ -137,8 +135,8 @@ model Grade {
   id       String    @id @default(uuid())
   schoolId String?
   name     String
+  school   School?   @relation(fields: [schoolId], references: [id])
   students Student[]
-  school   School?  @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -148,8 +146,8 @@ model Section {
   id       String    @id @default(uuid())
   schoolId String?
   name     String
+  school   School?   @relation(fields: [schoolId], references: [id])
   students Student[]
-  school   School?    @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -159,8 +157,8 @@ model Stream {
   id       String    @id @default(uuid())
   schoolId String?
   name     String
-  students Student[]
   school   School?   @relation(fields: [schoolId], references: [id])
+  students Student[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -174,7 +172,6 @@ model Student {
   parent_name         String
   gender              String?
   date_of_birth       String?
-  address             String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   fullName            String
@@ -182,11 +179,12 @@ model Student {
   schoolId            String?
   sectionId           String
   streamId            String?
+  address             String?
   attendance          Attendance[]
   parentNotifications ParentNotification[]
   parentStudents      ParentStudentLink[]
   grade               Grade                @relation(fields: [gradeId], references: [id])
-  school              School?               @relation(fields: [schoolId], references: [id])
+  school              School?              @relation(fields: [schoolId], references: [id])
   section             Section              @relation(fields: [sectionId], references: [id])
   stream              Stream?              @relation(fields: [streamId], references: [id])
 
@@ -208,7 +206,7 @@ model Attendance {
   updatedAt DateTime @updatedAt
   schoolId  String?
   teacherId String?
-  school    School?   @relation(fields: [schoolId], references: [id])
+  school    School?  @relation(fields: [schoolId], references: [id])
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   teacher   Teacher? @relation(fields: [teacherId], references: [id])
 
@@ -229,10 +227,10 @@ model AuditLog {
   old_values  Json?
   new_values  Json?
   created_at  DateTime @default(now())
-  school      School?   @relation(fields: [schoolId], references: [id])
+  school      School?  @relation(fields: [schoolId], references: [id])
 
-  @@map("audit_logs")
   @@index([schoolId])
+  @@map("audit_logs")
 }
 
 model AttendanceReport {
@@ -250,11 +248,11 @@ model AttendanceReport {
   attendance_percentage Decimal  @default(0.00) @db.Decimal(5, 2)
   created_at            DateTime @default(now())
   updated_at            DateTime @updatedAt
-  school                School?   @relation(fields: [schoolId], references: [id])
+  school                School?  @relation(fields: [schoolId], references: [id])
 
   @@unique([student_id, month, year])
-  @@map("attendance_reports")
   @@index([schoolId])
+  @@map("attendance_reports")
 }
 
 model ParentStudentLink {
@@ -265,12 +263,11 @@ model ParentStudentLink {
   relationshipType String?  @default("Guardian")
   createdAt        DateTime @default(now())
   parent           User     @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  school           School?  @relation(fields: [schoolId], references: [id])
   student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  school           School?   @relation(fields: [schoolId], references: [id])
 
   @@unique([parentId, studentId])
   @@index([parentId])
-  // @@index([studentId]) // Fix: ParentStudentLink already has an index on studentId from relations
   @@index([schoolId])
 }
 
@@ -283,7 +280,7 @@ model ParentNotification {
   message   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
-  school    School?   @relation(fields: [schoolId], references: [id])
+  school    School?  @relation(fields: [schoolId], references: [id])
   student   Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([schoolId])
@@ -293,11 +290,11 @@ model ParentNotification {
 model ParentPreferences {
   id                 String   @id @default(uuid())
   parentPhone        String
-  schoolId           String?
   emailNotifications Boolean  @default(true)
   smsNotifications   Boolean  @default(false)
   pushNotifications  Boolean  @default(true)
   updatedAt          DateTime @updatedAt
+  schoolId           String?
 
   @@unique([parentPhone, schoolId])
 }
@@ -310,9 +307,9 @@ model Conversation {
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
   schoolId  String?
+  school    School?              @relation(fields: [schoolId], references: [id])
   members   ConversationMember[]
   messages  Message[]
-  school    School?               @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
 }
@@ -346,8 +343,8 @@ model Message {
   conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   replyTo        Message?          @relation("Replies", fields: [replyToId], references: [id])
   replies        Message[]         @relation("Replies")
+  school         School?           @relation(fields: [schoolId], references: [id])
   sender         User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  school         School?            @relation(fields: [schoolId], references: [id])
   reactions      MessageReaction[]
   readBy         MessageRead[]
 
@@ -363,8 +360,8 @@ model MessageRead {
   userId    String
   readAt    DateTime @default(now())
   message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  school    School?  @relation(fields: [schoolId], references: [id])
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  school    School?   @relation(fields: [schoolId], references: [id])
 
   @@unique([messageId, userId])
   @@index([messageId])
@@ -380,8 +377,8 @@ model MessageReaction {
   emoji     String
   createdAt DateTime @default(now())
   message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  school    School?  @relation(fields: [schoolId], references: [id])
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  school    School?   @relation(fields: [schoolId], references: [id])
 
   @@unique([messageId, userId, emoji])
   @@index([messageId])
@@ -400,7 +397,7 @@ model CallSession {
   createdAt      DateTime          @default(now())
   history        CallHistory[]
   participants   CallParticipant[]
-  school         School?            @relation(fields: [schoolId], references: [id])
+  school         School?           @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
 }
@@ -413,8 +410,8 @@ model CallParticipant {
   joinedAt      DateTime    @default(now())
   leftAt        DateTime?
   callSession   CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  school        School?     @relation(fields: [schoolId], references: [id])
   user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  school        School?      @relation(fields: [schoolId], references: [id])
 
   @@unique([callSessionId, userId])
   @@index([schoolId])
@@ -430,8 +427,8 @@ model CallHistory {
   duration      Int?
   createdAt     DateTime    @default(now())
   callSession   CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  school        School?     @relation(fields: [schoolId], references: [id])
   user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  school        School?      @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
 }
@@ -454,4 +451,3 @@ model PendingRegistration {
   @@index([token])
   @@index([schoolId])
 }
-

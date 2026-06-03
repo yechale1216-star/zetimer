@@ -309,11 +309,11 @@ export function Settings() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+          <h1 className="typography-page-title text-foreground">Settings</h1>
           <p className="text-muted-foreground">Manage system configuration and preferences</p>
         </div>
         <Badge variant="secondary" className="flex items-center gap-1">
-          <span className="text-lg">👑</span>
+          <span className="typography-card-title">👑</span>
           Admin Panel
         </Badge>
       </div>
@@ -355,13 +355,13 @@ export function Settings() {
                       <img src={schoolInfo.schoolLogo} alt="School Logo" className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-center p-2">
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">No Logo</p>
+                        <p className="typography-label text-[10px] text-muted-foreground uppercase">No Logo</p>
                       </div>
                     )}
                   </div>
                   {isEditingSchoolInfo && (
                     <div className="mt-2">
-                      <Label htmlFor="logo-upload" className="cursor-pointer text-xs text-primary hover:underline">
+                      <Label htmlFor="logo-upload" className="typography-helper cursor-pointer text-primary hover:underline">
                         Upload Logo
                       </Label>
                       <Input
@@ -469,7 +469,7 @@ export function Settings() {
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>Email Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Send attendance notifications via email</p>
+                      <p className="typography-body text-muted-foreground">Send attendance notifications via email</p>
                     </div>
                     <Switch
                       checked={settings.emailNotifications || false}
@@ -480,7 +480,7 @@ export function Settings() {
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>SMS Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Send attendance notifications via SMS</p>
+                      <p className="typography-body text-muted-foreground">Send attendance notifications via SMS</p>
                     </div>
                     <Switch
                       checked={settings.smsNotifications || false}
@@ -491,7 +491,7 @@ export function Settings() {
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>Daily Reports</Label>
-                      <p className="text-sm text-muted-foreground">Automatically generate daily attendance reports</p>
+                      <p className="typography-body text-muted-foreground">Automatically generate daily attendance reports</p>
                     </div>
                     <Switch
                       checked={settings.dailyReports || false}
@@ -531,7 +531,7 @@ export function Settings() {
                   value={settings.attendanceThreshold || 75}
                   onChange={(e) => setSettings({ ...settings, attendanceThreshold: Number.parseInt(e.target.value) })}
                 />
-                <p className="text-sm text-gray-600 mt-1">Minimum attendance percentage for alerts</p>
+                <p className="typography-body text-gray-600 mt-1">Minimum attendance percentage for alerts</p>
               </div>
               <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 space-y-6">
                 <div className="flex items-center gap-3">
@@ -539,8 +539,8 @@ export function Settings() {
                     <Calendar className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg">Attendance Tracking Mode</h3>
-                    <p className="text-sm text-muted-foreground">Select how your school tracks daily student presence</p>
+                    <h3 className="typography-card-title">Attendance Tracking Mode</h3>
+                    <p className="typography-body text-muted-foreground">Select how your school tracks daily student presence</p>
                   </div>
                 </div>
 
@@ -554,10 +554,10 @@ export function Settings() {
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold">Daily Mode</span>
+                      <span className="typography-label">Daily Mode</span>
                       {(settings.attendanceMode || "session_based") === "daily" && <Check className="h-4 w-4 text-primary" />}
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
+                    <p className="typography-helper text-muted-foreground">
                       Single check-in per day. Best for simple attendance tracking where students are marked present once.
                     </p>
                   </div>
@@ -571,10 +571,10 @@ export function Settings() {
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold">Session Based</span>
+                      <span className="typography-label">Session Based</span>
                       {(settings.attendanceMode || "session_based") === "session_based" && <Check className="h-4 w-4 text-primary" />}
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
+                    <p className="typography-helper text-muted-foreground">
                       Split tracking for Morning and Afternoon sessions. Ideal for schools with multiple shifts or precise monitoring.
                     </p>
                   </div>
@@ -599,7 +599,7 @@ export function Settings() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Allow Late Mark</Label>
-                  <p className="text-sm text-muted-foreground">Allow marking students as late</p>
+                  <p className="typography-body text-muted-foreground">Allow marking students as late</p>
                 </div>
                 <Switch
                   checked={settings.allowLateMark || true}
@@ -621,7 +621,7 @@ export function Settings() {
                     <SelectItem value="tabular">Tabular (Professional)</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-sm text-gray-600 mt-1">Choose between the card-based layout or a professional table view</p>
+                <p className="typography-body text-gray-600 mt-1">Choose between the card-based layout or a professional table view</p>
               </div>
             </CardContent>
           </Card>
@@ -660,7 +660,7 @@ export function Settings() {
                 <Button onClick={clearAllData} variant="destructive" className="w-full">
                   🗑️ Clear All Data
                 </Button>
-                <p className="text-xs text-muted-foreground text-center">Warning: These actions cannot be undone</p>
+                <p className="typography-helper text-muted-foreground text-center">Warning: These actions cannot be undone</p>
               </div>
             </CardContent>
           </Card>
@@ -671,7 +671,7 @@ export function Settings() {
               <CardDescription>Current system status and information</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="typography-body grid grid-cols-2 gap-4">
                 <div>
                   <Label>Current User</Label>
                   <p className="font-mono">

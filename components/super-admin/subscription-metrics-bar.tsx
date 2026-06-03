@@ -61,9 +61,9 @@ export function SubscriptionMetricsBar() {
             <CardContent className="pt-6">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{item.label}</p>
-                  <p className="text-2xl font-bold text-foreground mt-1">{item.value}</p>
-                  <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                  <p className="typography-helper text-muted-foreground uppercase">{item.label}</p>
+                  <p className="typography-page-title text-foreground mt-1">{item.value}</p>
+                  <p className="typography-helper text-muted-foreground mt-2 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     {item.hint}
                   </p>

@@ -72,11 +72,11 @@ export function AuthWrapper({ onAuthSuccess }: AuthWrapperProps) {
               <Logo size="md" href="/" />
             </div>
             
-            <h2 className="text-4xl xl:text-5xl font-black text-foreground leading-[1.1] mb-6 animate-in slide-in-from-left duration-700 delay-100">
+            <h2 className="typography-page-title xl:text-5xl text-foreground leading-[1.1] mb-6 animate-in slide-in-from-left duration-700 delay-100">
               Modern Attendance <br />
               <span className="text-primary">Management.</span>
             </h2>
-            <p className="text-lg xl:text-xl text-muted-foreground mb-10 animate-in slide-in-from-left duration-700 delay-200">
+            <p className="typography-card-title xl:text-xl text-muted-foreground mb-10 animate-in slide-in-from-left duration-700 delay-200">
               The professional choice for schools to track attendance, manage students, and generate real-time reports with ease.
             </p>
 
@@ -85,25 +85,25 @@ export function AuthWrapper({ onAuthSuccess }: AuthWrapperProps) {
                 <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/5 shadow-sm border border-border flex items-center justify-center">
                   <Clock className="w-5 h-5 text-primary" />
                 </div>
-                <span className="font-medium text-sm">Real-time Tracking</span>
+                <span className="typography-label">Real-time Tracking</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/5 shadow-sm border border-border flex items-center justify-center">
                   <Users className="w-5 h-5 text-primary" />
                 </div>
-                <span className="font-medium text-sm">Student Management</span>
+                <span className="typography-label">Student Management</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/5 shadow-sm border border-border flex items-center justify-center">
                   <CheckCircle2 className="w-5 h-5 text-primary" />
                 </div>
-                <span className="font-medium text-sm">Smart Notifications</span>
+                <span className="typography-label">Smart Notifications</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/5 shadow-sm border border-border flex items-center justify-center">
                   <ShieldCheck className="w-5 h-5 text-primary" />
                 </div>
-                <span className="font-medium text-sm">Secure Data</span>
+                <span className="typography-label">Secure Data</span>
               </div>
             </div>
           </div>
@@ -128,7 +128,7 @@ export function AuthWrapper({ onAuthSuccess }: AuthWrapperProps) {
           {/* Mobile/Tablet Logo Section */}
           <div className="md:hidden flex flex-col items-center mb-10">
             <Logo size="md" href="/" className="scale-90 sm:scale-100" />
-            <p className="text-sm text-muted-foreground mt-2">Attendance Management System</p>
+            <p className="typography-body text-muted-foreground mt-2">Attendance Management System</p>
           </div>
 
           <div className="w-full relative px-1 sm:px-0">

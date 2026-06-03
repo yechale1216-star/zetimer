@@ -144,6 +144,26 @@
 
 /* Updated auth-background utility to use solid white */
 @layer utilities {
+  /* Typography Tokens */
+  .typography-page-title {
+    @apply text-[28px] md:text-[32px] font-bold leading-relaxed tracking-tight;
+  }
+  .typography-section-title {
+    @apply text-[20px] md:text-[24px] font-semibold leading-relaxed tracking-tight;
+  }
+  .typography-card-title {
+    @apply text-[18px] md:text-[20px] font-semibold leading-relaxed tracking-tight;
+  }
+  .typography-body {
+    @apply text-[15px] md:text-[16px] font-normal leading-relaxed;
+  }
+  .typography-label {
+    @apply text-[14px] md:text-[15px] font-medium leading-relaxed;
+  }
+  .typography-helper {
+    @apply text-[13px] md:text-[14px] font-normal text-muted-foreground leading-relaxed;
+  }
+
   .auth-background {
     background: var(--auth-background);
     min-height: 100vh;

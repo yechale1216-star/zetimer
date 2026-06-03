@@ -20,7 +20,7 @@ export function AttendanceAnalyticsCharts({ trendData, distributionData, gradeRa
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <Card className="lg:col-span-2 border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
         <CardHeader className="pb-0 border-none">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
+          <CardTitle className="typography-card-title flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             Attendance Trends
           </CardTitle>
@@ -57,7 +57,7 @@ export function AttendanceAnalyticsCharts({ trendData, distributionData, gradeRa
       
       <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
         <CardHeader className="pb-0 border-none">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
+          <CardTitle className="typography-card-title flex items-center gap-2">
             <PieChartIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             Status Distribution
           </CardTitle>

@@ -120,25 +120,25 @@ export function AuditLogsTable({ searchQuery, actionFilter }: AuditLogsTableProp
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Timestamp</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">User</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Action</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Resource</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">IP Address</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Details</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Timestamp</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">User</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Action</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Resource</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">IP Address</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Status</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Details</th>
               </tr>
             </thead>
             <tbody>
               {paginatedLogs.map((log) => (
                 <tr key={log.id} className="border-b border-border hover:bg-secondary/50 transition-colors">
-                  <td className="py-3 px-4 text-sm text-muted-foreground">{log.timestamp}</td>
-                  <td className="py-3 px-4 text-sm font-medium text-foreground">{log.user}</td>
+                  <td className="typography-body py-3 px-4 text-muted-foreground">{log.timestamp}</td>
+                  <td className="typography-label py-3 px-4 text-foreground">{log.user}</td>
                   <td className="py-3 px-4">
                     <Badge className={getActionColor(log.action)}>{getActionLabel(log.action)}</Badge>
                   </td>
-                  <td className="py-3 px-4 text-sm text-muted-foreground">{log.resource}</td>
-                  <td className="py-3 px-4 text-sm text-muted-foreground font-mono text-xs">{log.ipAddress}</td>
+                  <td className="typography-body py-3 px-4 text-muted-foreground">{log.resource}</td>
+                  <td className="typography-helper py-3 px-4 text-muted-foreground font-mono">{log.ipAddress}</td>
                   <td className="py-3 px-4">
                     <Badge
                       className={
@@ -163,7 +163,7 @@ export function AuditLogsTable({ searchQuery, actionFilter }: AuditLogsTableProp
 
         {/* Pagination */}
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
-          <p className="text-sm text-muted-foreground">
+          <p className="typography-body text-muted-foreground">
             Showing {Math.min((page - 1) * itemsPerPage + 1, filteredLogs.length)} to{' '}
             {Math.min(page * itemsPerPage, filteredLogs.length)} of {filteredLogs.length}
           </p>

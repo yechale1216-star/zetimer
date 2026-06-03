@@ -24,14 +24,14 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
   } catch (error) { next(error); }
 });
 
-// Get all contacts for a school (admin, teacher, parent, no students)
+// Get all contacts for a school (admin, teacher, parent) - restricted based on requesting user
 router.get('/contacts', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.user?.schoolId;
     if (!schoolId) {
       return res.status(400).json({ success: false, message: 'School ID required' });
     }
-    const contacts = await userService.getContacts(schoolId);
+    const contacts = await userService.getContacts(schoolId, req.user);
     res.status(200).json({ success: true, data: contacts });
   } catch (error) { next(error); }
 });

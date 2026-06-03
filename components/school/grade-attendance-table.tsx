@@ -63,17 +63,17 @@ export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
       <Table>
         <TableHeader className="bg-slate-50/50 dark:bg-slate-800/50">
           <TableRow className="border-slate-200 dark:border-slate-800">
-            <TableHead onClick={() => requestSort('grade')} className="cursor-pointer font-bold text-[10px] uppercase tracking-widest">
+            <TableHead onClick={() => requestSort('grade')} className="typography-label cursor-pointer text-[10px] uppercase">
               <div className="flex items-center gap-1">Grade {sortConfig?.key === 'grade' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>)}</div>
             </TableHead>
-            <TableHead onClick={() => requestSort('section')} className="cursor-pointer font-bold text-[10px] uppercase tracking-widest text-center">Section</TableHead>
-            <TableHead className="font-bold text-[10px] uppercase tracking-widest text-center">Stream</TableHead>
-            <TableHead onClick={() => requestSort('totalStudents')} className="cursor-pointer font-bold text-[10px] uppercase tracking-widest text-center">Total</TableHead>
-            <TableHead className="font-bold text-[10px] uppercase tracking-widest text-center text-green-600">Present</TableHead>
-            <TableHead className="font-bold text-[10px] uppercase tracking-widest text-center text-red-600">Absent</TableHead>
-            <TableHead className="font-bold text-[10px] uppercase tracking-widest text-center text-amber-500">Late</TableHead>
-            <TableHead className="font-bold text-[10px] uppercase tracking-widest text-center text-indigo-500">Excused</TableHead>
-            <TableHead onClick={() => requestSort('attendanceRate')} className="cursor-pointer font-bold text-[10px] uppercase tracking-widest w-[200px]">
+            <TableHead onClick={() => requestSort('section')} className="typography-label cursor-pointer text-[10px] uppercase text-center">Section</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center">Stream</TableHead>
+            <TableHead onClick={() => requestSort('totalStudents')} className="typography-label cursor-pointer text-[10px] uppercase text-center">Total</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-green-600">Present</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-red-600">Absent</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-amber-500">Late</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-indigo-500">Excused</TableHead>
+            <TableHead onClick={() => requestSort('attendanceRate')} className="typography-label cursor-pointer text-[10px] uppercase w-[200px]">
               <div className="flex items-center gap-1">Rate % {sortConfig?.key === 'attendanceRate' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>)}</div>
             </TableHead>
           </TableRow>
@@ -81,19 +81,19 @@ export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
         <TableBody>
           {sortedData.map((row, idx) => (
             <TableRow key={idx} className="border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-              <TableCell className="font-bold text-sm text-foreground">{row.grade}</TableCell>
+              <TableCell className="typography-label text-foreground">{row.grade}</TableCell>
               <TableCell className="text-center">
-                <Badge variant="outline" className="font-bold text-[10px]">{row.section}</Badge>
+                <Badge variant="outline" className="typography-label text-[10px]">{row.section}</Badge>
               </TableCell>
-              <TableCell className="text-center text-xs text-muted-foreground uppercase">{row.stream || "-"}</TableCell>
-              <TableCell className="text-center font-bold">{row.totalStudents}</TableCell>
-              <TableCell className="text-center font-bold text-green-600">{row.present}</TableCell>
-              <TableCell className="text-center font-bold text-red-600">{row.absent}</TableCell>
-              <TableCell className="text-center font-bold text-amber-500">{row.late}</TableCell>
-              <TableCell className="text-center font-bold text-indigo-500">{row.excused}</TableCell>
+              <TableCell className="typography-helper text-center text-muted-foreground uppercase">{row.stream || "-"}</TableCell>
+              <TableCell className="typography-label text-center">{row.totalStudents}</TableCell>
+              <TableCell className="typography-label text-center text-green-600">{row.present}</TableCell>
+              <TableCell className="typography-label text-center text-red-600">{row.absent}</TableCell>
+              <TableCell className="typography-label text-center text-amber-500">{row.late}</TableCell>
+              <TableCell className="typography-label text-center text-indigo-500">{row.excused}</TableCell>
               <TableCell>
                 <div className="space-y-1.5">
-                  <div className="flex justify-between text-[10px] font-bold">
+                  <div className="typography-label flex justify-between text-[10px]">
                     <span className={getRateColor(row.attendanceRate)}>{row.attendanceRate}%</span>
                   </div>
                   <Progress value={row.attendanceRate} className={`h-1.5 [&>div]:${getRateBg(row.attendanceRate)}`} />
@@ -103,7 +103,7 @@ export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
           ))}
           {sortedData.length === 0 && (
             <TableRow>
-              <TableCell colSpan={9} className="h-32 text-center text-muted-foreground font-medium">
+              <TableCell colSpan={9} className="typography-label h-32 text-center text-muted-foreground">
                 No attendance data found for the selected filters.
               </TableCell>
             </TableRow>

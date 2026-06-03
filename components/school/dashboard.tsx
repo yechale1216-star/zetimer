@@ -389,8 +389,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-foreground">Dashboard</h2>
-          <div className="text-sm text-muted-foreground">
+          <h2 className="typography-page-title text-foreground">Dashboard</h2>
+          <div className="typography-body text-muted-foreground">
             {new Date().toLocaleDateString("en-ET", {
               timeZone: "Africa/Addis_Ababa",
               weekday: "long",
@@ -402,7 +402,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
         <div className="text-center py-12 bg-card border border-border rounded-xl shadow-sm">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground font-medium">Loading your dashboard insights...</p>
+          <p className="typography-label mt-4 text-muted-foreground">Loading your dashboard insights...</p>
         </div>
       </div>
     )
@@ -412,15 +412,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     <div className="space-y-6 px-4 md:px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
         <div className="space-y-1.5 w-full md:w-auto">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+          <h2 className="typography-page-title text-4xl md:text-5xl font-extrabold text-foreground leading-tight">
             {getGreeting()}, <span className="text-primary">{firstName}</span>
           </h2>
-          <p className="text-muted-foreground text-sm font-medium">
+          <p className="typography-label text-muted-foreground">
             Here's what's happening with your school today.
           </p>
         </div>
         <div className="flex flex-col items-start md:items-end gap-3 w-full md:w-auto">
-          <div className="text-[10px] uppercase tracking-widest font-black bg-primary/10 text-primary px-4 py-1.5 rounded-full border border-primary/20 shadow-sm">
+          <div className="typography-label text-[10px] uppercase bg-primary/10 text-primary px-4 py-1.5 rounded-full border border-primary/20 shadow-sm">
             {new Date().toLocaleDateString("en-ET", {
               timeZone: "Africa/Addis_Ababa",
               weekday: "long",
@@ -435,7 +435,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 variant={sessionFilter === "total" ? "default" : "ghost"} 
                 onClick={() => setSessionFilter("total")}
                 size="sm"
-                className="h-7 px-3 text-[10px] font-bold uppercase rounded-full"
+                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
               >
                 Total
               </Button>
@@ -443,7 +443,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 variant={sessionFilter === "morning" ? "default" : "ghost"} 
                 onClick={() => setSessionFilter("morning")}
                 size="sm"
-                className="h-7 px-3 text-[10px] font-bold uppercase rounded-full"
+                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
               >
                 Morning
               </Button>
@@ -451,7 +451,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 variant={sessionFilter === "afternoon" ? "default" : "outline"} 
                 onClick={() => setSessionFilter("afternoon")}
                 size="sm"
-                className="h-7 px-3 text-[10px] font-bold uppercase rounded-full border-none"
+                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full border-none"
               >
                 Afternoon
               </Button>
@@ -462,59 +462,59 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
         <CardHeader className="pb-0 border-none">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
+          <CardTitle className="typography-card-title flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             School Overview
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                <p className="text-xs font-black text-foreground uppercase tracking-wider">Total Students</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+                <p className="typography-label text-foreground uppercase">Total Students</p>
               </div>
-              <p className="text-2xl font-black text-foreground">{stats.totalStudents}</p>
+              <p className="typography-page-title text-foreground">{stats.totalStudents}</p>
             </div>
 
-            <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-2">
-                <UserCheck className="h-4 w-4 text-green-500 dark:text-green-400" />
-                <p className="text-xs font-black text-green-600 dark:text-green-400 uppercase tracking-wider">Present</p>
+            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
+              <div className="flex items-center gap-2 mb-3">
+                <UserCheck className="h-5 w-5 text-green-500 dark:text-green-400" />
+                <p className="typography-label text-green-600 dark:text-green-400 uppercase">Present</p>
               </div>
-              <p className="text-2xl font-black text-green-600 dark:text-green-500">{stats.presentToday}</p>
+              <p className="typography-page-title text-green-600 dark:text-green-500">{stats.presentToday}</p>
             </div>
 
-            <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />
-                <p className="text-xs font-black text-yellow-600 dark:text-yellow-400 uppercase tracking-wider">Late</p>
+            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="h-5 w-5 text-yellow-500 dark:text-yellow-400" />
+                <p className="typography-label text-yellow-600 dark:text-yellow-400 uppercase">Late</p>
               </div>
-              <p className="text-2xl font-black text-yellow-600 dark:text-yellow-500">{stats.lateToday}</p>
+              <p className="typography-page-title text-yellow-600 dark:text-yellow-500">{stats.lateToday}</p>
             </div>
 
-            <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-2">
-                <UserX className="h-4 w-4 text-red-500 dark:text-red-400" />
-                <p className="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-wider">Absent</p>
+            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
+              <div className="flex items-center gap-2 mb-3">
+                <UserX className="h-5 w-5 text-red-500 dark:text-red-400" />
+                <p className="typography-label text-red-600 dark:text-red-400 uppercase">Absent</p>
               </div>
-              <p className="text-2xl font-black text-red-600 dark:text-red-500">{stats.absentToday}</p>
+              <p className="typography-page-title text-red-600 dark:text-red-500">{stats.absentToday}</p>
             </div>
 
-            <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                <p className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">Excused</p>
+            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+                <p className="typography-label text-blue-600 dark:text-blue-400 uppercase">Excused</p>
               </div>
-              <p className="text-2xl font-black text-blue-600 dark:text-blue-500">{stats.excusedToday}</p>
+              <p className="typography-page-title text-blue-600 dark:text-blue-500">{stats.excusedToday}</p>
             </div>
 
-            <div className="flex flex-col p-4 bg-gradient-to-br from-purple-500 to-indigo-600 dark:from-purple-600 dark:to-indigo-800 rounded-xl shadow-lg border-none transform transition-all hover:scale-[1.02] active:scale-[0.98]">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="h-4 w-4 text-white" />
-                <p className="text-xs font-bold text-white/80 uppercase tracking-wider">Rate</p>
+            <div className="flex flex-col p-6 bg-gradient-to-br from-purple-500 to-indigo-600 dark:from-purple-600 dark:to-indigo-800 rounded-xl shadow-lg border-none transform transition-all hover:scale-[1.02] active:scale-[0.98]">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="h-5 w-5 text-white" />
+                <p className="typography-label text-white/80 uppercase">Rate</p>
               </div>
-              <p className="text-2xl font-black text-white">{stats.attendanceRate}%</p>
+              <p className="typography-page-title text-white">{stats.attendanceRate}%</p>
             </div>
           </div>
         </CardContent>
@@ -525,7 +525,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       {trialInfo && (
         <Card className={`overflow-hidden border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800`}>
           <CardHeader className="pb-0 border-none">
-            <CardTitle className="text-lg flex justify-between items-center">
+            <CardTitle className="typography-card-title flex justify-between items-center">
               <span className="flex items-center gap-2">
                 <Clock className={`w-5 h-5 ${trialInfo.status === "expired" ? "text-red-500" : "text-blue-600"}`} />
                 Trial Usage
@@ -538,8 +538,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <CardContent className="pt-6">
             <div className="p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl space-y-4 border border-slate-200 dark:border-slate-700">
               <div className="space-y-2">
-                <div className="flex justify-between text-sm font-medium">
-                  <span className="text-muted-foreground uppercase tracking-tight text-[10px] font-bold">Student Capacity</span>
+                <div className="typography-label flex justify-between">
+                  <span className="typography-label text-muted-foreground uppercase text-[10px]">Student Capacity</span>
                   <span className={stats.totalStudents >= trialInfo.maxStudents ? "text-red-600 font-bold" : "text-foreground"}>
                     {stats.totalStudents} / {trialInfo.maxStudents}
                   </span>
@@ -549,7 +549,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   className={`h-2.5 ${stats.totalStudents >= trialInfo.maxStudents ? "[&>div]:bg-red-500" : "[&>div]:bg-blue-600"}`}
                 />
               </div>
-              <p className="text-sm text-muted-foreground font-medium">
+              <p className="typography-label text-muted-foreground">
                 {trialInfo.status === "expired" 
                   ? "Your trial has expired. Upgrade your plan to increase your student capacity."
                   : "You are currently using the free trial. Upgrade to unlock unlimited students and premium features."}
@@ -565,7 +565,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-2 px-2">
               <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-lg font-bold text-foreground">5-Day Attendance Trend</h3>
+              <h3 className="typography-card-title text-foreground">5-Day Attendance Trend</h3>
             </div>
             <div className="h-[300px] w-full p-6 bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
               <ResponsiveContainer width="100%" height="100%">
@@ -593,7 +593,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
           <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
             <CardHeader className="pb-0 border-none">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <CardTitle className="typography-card-title flex items-center gap-2">
                 <UserCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
                 Today's Status
               </CardTitle>
@@ -643,7 +643,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <div className="p-4 bg-muted rounded-full">
                     <AlertTriangle className="w-8 h-8 opacity-20" />
                   </div>
-                  <p className="text-sm font-medium">No attendance data for today</p>
+                  <p className="typography-label">No attendance data for today</p>
                 </div>
               )}
             </CardContent>
@@ -654,40 +654,40 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-2">
           <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <h3 className="text-lg font-bold text-foreground">Recent Activity</h3>
+          <h3 className="typography-card-title text-foreground">Recent Activity</h3>
         </div>
         <div className="space-y-3">
           {recentActivity.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground bg-white/90 dark:bg-slate-900/90 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
               <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
-              <p className="font-medium text-sm">No recent attendance activity recorded yet</p>
+              <p className="typography-label">No recent attendance activity recorded yet</p>
             </div>
           ) : (
             recentActivity.map((activity, index) => (
               <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 gap-4 sm:gap-0 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-slate-800/80">
                 <div className="flex items-center space-x-4 w-full sm:w-auto">
                   <div className="flex-shrink-0 h-10 w-10">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black shadow-md">
+                    <div className="typography-label h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
                       {activity.grade.match(/\d+/)?.[0] || activity.grade.charAt(0)}
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-foreground truncate uppercase tracking-tight">
+                    <p className="typography-label text-foreground truncate uppercase">
                       {activity.grade} Attendance
                     </p>
-                    <p className="text-[10px] text-muted-foreground truncate uppercase font-bold tracking-widest opacity-70">
+                    <p className="typography-label text-[10px] text-muted-foreground truncate uppercase opacity-70">
                       Section {activity.section} {activity.stream ? `• ${activity.stream}` : ""} 
                       {activity.session ? ` • ${activity.session}` : ""}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center justify-between sm:justify-end space-x-4 w-full sm:w-auto border-t sm:border-0 pt-3 sm:pt-0 dark:border-slate-700/50">
-                  <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 font-black text-[10px] uppercase tracking-tighter">
+                  <Badge variant="outline" className="typography-label bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 text-[10px] uppercase">
                     {activity.count} Present
                   </Badge>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-xs font-bold text-foreground uppercase tracking-tighter">{formatDate(activity.date)}</p>
-                    <p className="text-[10px] text-muted-foreground font-medium opacity-60">{activity.time}</p>
+                    <p className="typography-label text-foreground uppercase">{formatDate(activity.date)}</p>
+                    <p className="typography-label text-[10px] text-muted-foreground opacity-60">{activity.time}</p>
                   </div>
                 </div>
               </div>

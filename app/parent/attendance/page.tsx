@@ -18,10 +18,12 @@ import {
   Filter,
   UserCheck
 } from "lucide-react"
+import { useLanguage } from "@/lib/context/language-context"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
 export default function AttendanceHistory() {
+  const { t, language } = useLanguage()
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
   const [attendance, setAttendance] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -31,14 +33,11 @@ export default function AttendanceHistory() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [activeTab, setActiveTab] = useState<"calendar" | "table">("calendar")
 
-  // Calendar render state
-  const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(new Date())
-
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ]
-
+  
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 
   // 1. Initial Load & Auth verification
@@ -201,7 +200,7 @@ export default function AttendanceHistory() {
   const formatTableDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr)
-      return date.toLocaleDateString("en-US", {
+      return date.toLocaleDateString(language === "am" ? "am-ET" : "en-US", {
         weekday: "short",
         year: "numeric",
         month: "short",
@@ -214,17 +213,18 @@ export default function AttendanceHistory() {
   }
 
   const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
+    const s = status.toLowerCase()
+    switch (s) {
       case "present":
-        return <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none rounded-lg font-bold">Present</Badge>
+        return <Badge className="typography-label bg-emerald-500 hover:bg-emerald-600 border-none rounded-lg">{t("presents")}</Badge>
       case "absent":
-        return <Badge className="bg-rose-500 hover:bg-rose-600 border-none rounded-lg font-bold">Absent</Badge>
+        return <Badge className="typography-label bg-rose-500 hover:bg-rose-600 border-none rounded-lg">{t("absents")}</Badge>
       case "late":
-        return <Badge className="bg-amber-500 hover:bg-amber-600 border-none rounded-lg font-bold">Late</Badge>
+        return <Badge className="typography-label bg-amber-500 hover:bg-amber-600 border-none rounded-lg">{t("late_arrivals")}</Badge>
       case "excused":
-        return <Badge className="bg-blue-500 hover:bg-blue-600 border-none rounded-lg font-bold">Excused</Badge>
+        return <Badge className="typography-label bg-blue-500 hover:bg-blue-600 border-none rounded-lg">{t("excused")}</Badge>
       default:
-        return <Badge variant="outline" className="rounded-lg font-bold">Not Marked</Badge>
+        return <Badge variant="outline" className="typography-label rounded-lg">{t("unmarked")}</Badge>
     }
   }
 
@@ -243,8 +243,8 @@ export default function AttendanceHistory() {
       {/* ─── TITLE & MONTH SELECTOR BAR ────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">Attendance History</h1>
-          <p className="text-xs text-muted-foreground font-semibold mt-0.5">Filter, search, and audit your child's records.</p>
+          <h1 className="typography-page-title text-foreground">{t("view_history")}</h1>
+          <p className="typography-label text-muted-foreground mt-0.5">{t("attendance_history_desc")}</p>
         </div>
 
         <div className="flex items-center gap-2 bg-card/60 backdrop-blur-md p-1.5 rounded-2xl border border-border/40 shrink-0">
@@ -252,12 +252,12 @@ export default function AttendanceHistory() {
             value={selectedMonth.toString()} 
             onValueChange={(val) => setSelectedMonth(parseInt(val))}
           >
-            <SelectTrigger className="w-36 h-9 border-none bg-transparent hover:bg-muted font-bold text-xs rounded-xl focus:ring-0 focus:ring-offset-0">
-              <SelectValue placeholder="Month" />
+            <SelectTrigger className="typography-label w-36 h-9 border-none bg-transparent hover:bg-muted rounded-xl focus:ring-0 focus:ring-offset-0">
+              <SelectValue placeholder={t("month")} />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
               {months.map((m, idx) => (
-                <SelectItem key={m} value={idx.toString()} className="text-xs rounded-lg">{m}</SelectItem>
+                <SelectItem key={m} value={idx.toString()} className="typography-helper rounded-lg">{m}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -266,12 +266,12 @@ export default function AttendanceHistory() {
             value={selectedYear.toString()} 
             onValueChange={(val) => setSelectedYear(parseInt(val))}
           >
-            <SelectTrigger className="w-24 h-9 border-none bg-transparent hover:bg-muted font-bold text-xs rounded-xl focus:ring-0 focus:ring-offset-0">
-              <SelectValue placeholder="Year" />
+            <SelectTrigger className="typography-label w-24 h-9 border-none bg-transparent hover:bg-muted rounded-xl focus:ring-0 focus:ring-offset-0">
+              <SelectValue placeholder={t("year")} />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
               {years.map((y) => (
-                <SelectItem key={y} value={y.toString()} className="text-xs rounded-lg">{y}</SelectItem>
+                <SelectItem key={y} value={y.toString()} className="typography-helper rounded-lg">{y}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -300,32 +300,32 @@ export default function AttendanceHistory() {
                     strokeLinecap="round"
                   />
                 </svg>
-                <span className="absolute text-sm font-black text-foreground">{monthlyRate}%</span>
+                <span className="typography-label absolute text-foreground">{monthlyRate}%</span>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">Monthly Score</p>
-                <h3 className="text-base font-black leading-snug">{months[selectedMonth]} {selectedYear}</h3>
-                <span className="text-[10px] text-muted-foreground font-semibold">Active child: {selectedStudent?.fullName.split(" ")[0]}</span>
+                <p className="typography-label text-[10px] text-muted-foreground uppercase">{t("monthly_score")}</p>
+                <h3 className="typography-card-title">{language === "am" ? t(months[selectedMonth].toLowerCase() as any) : months[selectedMonth]} {selectedYear}</h3>
+                <span className="typography-label text-[10px] text-muted-foreground">{t("active_child")}: {selectedStudent?.fullName.split(" ")[0]}</span>
               </div>
             </div>
 
             {/* Quick breakdown metrics */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:col-span-3">
               <div className="text-center space-y-0.5">
-                <p className="text-[10px] text-muted-foreground font-semibold">Marked Days</p>
-                <span className="text-lg font-black text-foreground">{totalMonthlyDays}</span>
+                <p className="typography-label text-[10px] text-muted-foreground">{t("total_days")}</p>
+                <span className="typography-card-title text-foreground">{totalMonthlyDays}</span>
               </div>
               <div className="text-center space-y-0.5">
-                <p className="text-[10px] text-muted-foreground font-semibold text-emerald-600 dark:text-emerald-400">Presents</p>
-                <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">{monthlyPresents}</span>
+                <p className="typography-label text-[10px] text-muted-foreground text-emerald-600 dark:text-emerald-400">{t("presents")}</p>
+                <span className="typography-card-title text-emerald-600 dark:text-emerald-400">{monthlyPresents}</span>
               </div>
               <div className="text-center space-y-0.5">
-                <p className="text-[10px] text-muted-foreground font-semibold text-rose-600 dark:text-rose-400">Absents</p>
-                <span className="text-lg font-black text-rose-600 dark:text-rose-400">{monthlyAbsents}</span>
+                <p className="typography-label text-[10px] text-muted-foreground text-rose-600 dark:text-rose-400">{t("absents")}</p>
+                <span className="typography-card-title text-rose-600 dark:text-rose-400">{monthlyAbsents}</span>
               </div>
               <div className="text-center space-y-0.5">
-                <p className="text-[10px] text-muted-foreground font-semibold text-amber-600 dark:text-amber-400">Lates</p>
-                <span className="text-lg font-black text-amber-600 dark:text-amber-400">{monthlyLates}</span>
+                <p className="typography-label text-[10px] text-muted-foreground text-amber-600 dark:text-amber-400">{t("late_arrivals")}</p>
+                <span className="typography-card-title text-amber-600 dark:text-amber-400">{monthlyLates}</span>
               </div>
             </div>
 
@@ -342,33 +342,33 @@ export default function AttendanceHistory() {
       >
         <div className="flex items-center justify-between">
           <TabsList className="bg-card/60 backdrop-blur-md border border-border/40 p-1 rounded-2xl">
-            <TabsTrigger value="calendar" className="text-xs font-bold gap-1.5 rounded-xl px-4 py-2">
+            <TabsTrigger value="calendar" className="typography-label gap-1.5 rounded-xl px-4 py-2">
               <CalendarDays className="w-4 h-4" />
-              <span>Calendar Grid</span>
+              <span>{t("calendar_grid")}</span>
             </TabsTrigger>
-            <TabsTrigger value="table" className="text-xs font-bold gap-1.5 rounded-xl px-4 py-2">
+            <TabsTrigger value="table" className="typography-label gap-1.5 rounded-xl px-4 py-2">
               <ListOrdered className="w-4 h-4" />
-              <span>Audit Log List</span>
+              <span>{t("audit_log_list")}</span>
             </TabsTrigger>
           </TabsList>
 
           {/* Indicators description */}
-          <div className="hidden lg:flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+          <div className="typography-label hidden lg:flex items-center gap-4 text-[10px] uppercase text-muted-foreground/80">
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              <span>Present</span>
+              <span>{t("presents")}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-              <span>Absent</span>
+              <span>{t("absents")}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-              <span>Late</span>
+              <span>{t("late_arrivals")}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-              <span>Excused</span>
+              <span>{t("excused")}</span>
             </div>
           </div>
         </div>
@@ -378,10 +378,10 @@ export default function AttendanceHistory() {
           <Card className="border-border/40 shadow-xl rounded-3xl bg-card/60 backdrop-blur-md overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between border-b border-border/20 py-4 px-6">
               <div className="space-y-0.5">
-                <CardTitle className="text-sm font-black uppercase tracking-wider text-foreground">
-                  {months[selectedMonth]} {selectedYear}
+                <CardTitle className="typography-label uppercase text-foreground">
+                  {language === "am" ? t(months[selectedMonth].toLowerCase() as any) : months[selectedMonth]} {selectedYear}
                 </CardTitle>
-                <CardDescription className="text-xs">Click arrows to toggle months directly</CardDescription>
+                <CardDescription className="typography-helper">{t("attendance_history_desc")}</CardDescription>
               </div>
               <div className="flex items-center gap-1 bg-muted/40 p-0.5 rounded-lg border border-border/10">
                 <button 
@@ -401,14 +401,14 @@ export default function AttendanceHistory() {
             <CardContent className="p-6">
               
               {/* Calendar Grid Header */}
-              <div className="grid grid-cols-7 text-center text-xs font-black uppercase tracking-widest text-muted-foreground/80 mb-4 pb-2 border-b border-border/20">
-                <span>Sun</span>
-                <span>Mon</span>
-                <span>Tue</span>
-                <span>Wed</span>
-                <span>Thu</span>
-                <span>Fri</span>
-                <span>Sat</span>
+              <div className="typography-label grid grid-cols-7 text-center uppercase text-muted-foreground/80 mb-4 pb-2 border-b border-border/20">
+                <span>{language === "am" ? "እሁድ" : "Sun"}</span>
+                <span>{language === "am" ? "ሰኞ" : "Mon"}</span>
+                <span>{language === "am" ? "ማክሰ" : "Tue"}</span>
+                <span>{language === "am" ? "ረቡዕ" : "Wed"}</span>
+                <span>{language === "am" ? "ሐሙስ" : "Thu"}</span>
+                <span>{language === "am" ? "ዓርብ" : "Fri"}</span>
+                <span>{language === "am" ? "ቅዳሜ" : "Sat"}</span>
               </div>
 
               {/* Calendar Days */}
@@ -424,7 +424,7 @@ export default function AttendanceHistory() {
                       key={cell.dateStr}
                       className={`aspect-square flex flex-col items-center justify-center border border-border/10 rounded-2xl transition-all relative group select-none ${getCalendarDayColor(dayStatus)}`}
                     >
-                      <span className="text-sm font-bold leading-none">{cell.day}</span>
+                      <span className="typography-label">{cell.day}</span>
                       
                       {/* Optional miniature dot indicator */}
                       {dayStatus && (
@@ -450,10 +450,10 @@ export default function AttendanceHistory() {
               <Table>
                 <TableHeader className="bg-muted/30 border-b border-border/20">
                   <TableRow>
-                    <TableHead className="font-extrabold text-xs uppercase text-muted-foreground py-4 px-6">Date</TableHead>
-                    <TableHead className="font-extrabold text-xs uppercase text-muted-foreground py-4 px-6">Session</TableHead>
-                    <TableHead className="font-extrabold text-xs uppercase text-muted-foreground py-4 px-6">Status</TableHead>
-                    <TableHead className="font-extrabold text-xs uppercase text-muted-foreground py-4 px-6">Remarks / Excuses</TableHead>
+                    <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("date")}</TableHead>
+                    <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("session")}</TableHead>
+                    <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("status_label")}</TableHead>
+                    <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("remarks")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -461,26 +461,26 @@ export default function AttendanceHistory() {
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-16 text-muted-foreground">
                         <CalendarDays className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
-                        <p className="text-xs font-bold">No attendance records found for this month</p>
-                        <span className="text-[10px] text-muted-foreground/60 font-medium">Verify you selected the correct month.</span>
+                        <p className="typography-label">{t("no_attendance_records")}</p>
+                        <span className="typography-label text-[10px] text-muted-foreground/60">{t("verify_month")}</span>
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredAttendance.map((record) => (
                       <TableRow key={record.id} className="border-b border-border/20 hover:bg-muted/10">
-                        <TableCell className="font-bold text-xs py-4 px-6">{formatTableDate(record.date)}</TableCell>
-                        <TableCell className="font-semibold text-xs py-4 px-6 text-muted-foreground">
+                        <TableCell className="typography-label py-4 px-6">{formatTableDate(record.date)}</TableCell>
+                        <TableCell className="typography-label py-4 px-6 text-muted-foreground">
                           {record.session ? (
-                            <Badge variant="outline" className="capitalize text-[10px] font-bold rounded-md bg-muted/40">
-                              {record.session}
+                            <Badge variant="outline" className="typography-label capitalize text-[10px] rounded-md bg-muted/40">
+                              {record.session === "morning" ? t("morning_session") : t("afternoon_session")}
                             </Badge>
                           ) : (
-                            <span className="text-xs italic text-muted-foreground/60 font-medium">Full Day</span>
+                            <span className="typography-helper italic text-muted-foreground/60">{language === "am" ? "ሙሉ ቀን" : "Full Day"}</span>
                           )}
                         </TableCell>
                         <TableCell className="py-4 px-6">{getStatusBadge(record.status)}</TableCell>
-                        <TableCell className="text-xs font-semibold py-4 px-6 text-muted-foreground max-w-xs truncate">
-                          {record.remarks || <span className="text-muted-foreground/40 italic text-[11px]">No notes submitted</span>}
+                        <TableCell className="typography-label py-4 px-6 text-muted-foreground max-w-xs truncate">
+                          {record.remarks || <span className="text-muted-foreground/40 italic text-[11px]">{t("no_notes")}</span>}
                         </TableCell>
                       </TableRow>
                     ))

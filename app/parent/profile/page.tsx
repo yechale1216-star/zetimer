@@ -25,10 +25,12 @@ import { notifications } from "@/lib/utils/notifications"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { useLanguage } from "@/lib/context/language-context"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
 export default function StudentProfile() {
+  const { t } = useLanguage()
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
   const [studentDetails, setStudentDetails] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -89,6 +91,7 @@ export default function StudentProfile() {
   }, [])
 
   const getInitials = (name: string) => {
+    if (!name) return "S"
     return name
       .split(" ")
       .map(n => n[0])
@@ -112,11 +115,11 @@ export default function StudentProfile() {
   // Fallback default details if database fields are blank
   const activeStudent = studentDetails || selectedStudent
   const advisor = activeStudent?.school?.teachers?.[0] || {
-    name: "Dr. Aster Kebede",
-    email: "aster.k@zetime-academy.com",
-    phone: "+251 911 345 678",
-    office: "Science Block A, Room 102",
-    hours: "Mon & Wed: 2:00 PM - 4:00 PM"
+    name: "School Advisor",
+    email: activeStudent?.school?.email || "Not Provided",
+    phone: activeStudent?.school?.phone || "Not Provided",
+    office: "School Office",
+    hours: "Standard Hours"
   }
 
   return (
@@ -124,8 +127,8 @@ export default function StudentProfile() {
       
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-black tracking-tight text-foreground">Student Profile</h1>
-        <p className="text-xs text-muted-foreground font-semibold mt-0.5">Official enrollment details and active academic relationships.</p>
+        <h1 className="typography-page-title text-foreground">{t("student_profile")}</h1>
+        <p className="typography-label text-muted-foreground mt-0.5">{t("profile_desc")}</p>
       </div>
 
       {/* ─── MAIN HERO AVATAR CARD ────────────────────────────────────────── */}
@@ -135,27 +138,27 @@ export default function StudentProfile() {
           <div className="flex flex-col md:flex-row md:items-end justify-between -mt-16 gap-4">
             <div className="flex flex-col md:flex-row items-center md:items-end gap-4 text-center md:text-left">
               <Avatar className="w-24 h-24 border-4 border-card rounded-2xl ring-2 ring-emerald-600/10 shadow-xl">
-                <AvatarFallback className="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-extrabold text-2xl rounded-xl">
+                <AvatarFallback className="typography-page-title bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 rounded-xl">
                   {getInitials(activeStudent?.fullName || activeStudent?.name || "")}
                 </AvatarFallback>
               </Avatar>
               <div className="pb-1">
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                  <h2 className="text-xl font-black tracking-tight text-foreground">{activeStudent?.fullName || activeStudent?.name}</h2>
-                  <Badge variant="outline" className="bg-emerald-500/5 text-emerald-600 border-emerald-500/20 text-[9px] font-black uppercase tracking-wider rounded-md py-0.5">
-                    Active
+                  <h2 className="typography-section-title text-foreground">{activeStudent?.fullName || activeStudent?.name}</h2>
+                  <Badge variant="outline" className="typography-label bg-emerald-500/5 text-emerald-600 border-emerald-500/20 text-[9px] uppercase rounded-md py-0.5">
+                    {t("active_status")}
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground font-semibold mt-0.5">
-                  Roll ID: <span className="font-extrabold">{activeStudent?.rollNumber || activeStudent?.id?.slice(0, 8).toUpperCase() || "N/A"}</span>
+                <p className="typography-label text-muted-foreground mt-0.5">
+                  {t("roll_id")}: <span className="typography-label">{activeStudent?.rollNumber || activeStudent?.id?.slice(0, 8).toUpperCase() || "N/A"}</span>
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-4 text-xs font-bold text-muted-foreground pt-2">
+            <div className="typography-label flex flex-wrap justify-center gap-4 text-muted-foreground pt-2">
               <div className="flex items-center gap-1">
                 <Layers className="w-4 h-4 text-emerald-600" />
-                <span>Grade {activeStudent?.grade} • Section {activeStudent?.section}</span>
+                <span>{t("grade_section").replace("{grade}", activeStudent?.grade || "").replace("{section}", activeStudent?.section || "")}</span>
               </div>
             </div>
           </div>
@@ -168,32 +171,27 @@ export default function StudentProfile() {
         {/* Left: General Academic Information */}
         <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md">
           <CardHeader className="border-b border-border/20 pb-4">
-            <CardTitle className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <CardTitle className="typography-label uppercase text-muted-foreground flex items-center gap-2">
               <GraduationCap className="w-4 h-4 text-emerald-500" />
-              <span>Enrollment Information</span>
+              <span>{t("enrollment_info")}</span>
             </CardTitle>
-            <CardDescription className="text-xs mt-0.5">Details regarding current school registration</CardDescription>
+            <CardDescription className="typography-helper mt-0.5">{t("enrollment_desc")}</CardDescription>
           </CardHeader>
-          <CardContent className="p-6 space-y-4 text-xs font-semibold">
+          <CardContent className="typography-label p-6 space-y-4">
             
             <div className="flex items-center justify-between py-2 border-b border-border/10">
-              <span className="text-muted-foreground">Full Name</span>
-              <span className="text-foreground font-bold">{activeStudent?.fullName || activeStudent?.name}</span>
+              <span className="text-muted-foreground">{t("full_name")}</span>
+              <span className="typography-label text-foreground">{activeStudent?.fullName || activeStudent?.name}</span>
             </div>
             
             <div className="flex items-center justify-between py-2 border-b border-border/10">
-              <span className="text-muted-foreground">Registered Class / Section</span>
-              <span className="text-foreground font-bold">Grade {activeStudent?.grade} - {activeStudent?.section}</span>
+              <span className="text-muted-foreground">{t("class_section")}</span>
+              <span className="typography-label text-foreground">{t("grade_section").replace("{grade}", activeStudent?.grade || "").replace("{section}", activeStudent?.section || "")}</span>
             </div>
 
             <div className="flex items-center justify-between py-2 border-b border-border/10">
-              <span className="text-muted-foreground">Academic Institution</span>
-              <span className="text-foreground font-bold">{activeStudent?.school?.name || "Zetime Academy"}</span>
-            </div>
-
-            <div className="flex items-center justify-between py-2 border-b border-border/10">
-              <span className="text-muted-foreground">Tenant Isolation ID</span>
-              <span className="text-[10px] text-muted-foreground/80 font-bold truncate max-w-[150px]">{activeStudent?.schoolId || "Global"}</span>
+              <span className="text-muted-foreground">{t("academic_institution")}</span>
+              <span className="typography-label text-foreground">{activeStudent?.school?.name || authService.getCurrentUser()?.schoolName || "School Portal"}</span>
             </div>
 
           </CardContent>
@@ -202,23 +200,23 @@ export default function StudentProfile() {
         {/* Right: Assigned Faculty Advisor */}
         <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md">
           <CardHeader className="border-b border-border/20 pb-4">
-            <CardTitle className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <CardTitle className="typography-label uppercase text-muted-foreground flex items-center gap-2">
               <Briefcase className="w-4 h-4 text-emerald-500" />
-              <span>Faculty Advisor Contact</span>
+              <span>{t("faculty_advisor")}</span>
             </CardTitle>
-            <CardDescription className="text-xs mt-0.5">Assigned teacher handling reports and leaves</CardDescription>
+            <CardDescription className="typography-helper mt-0.5">{t("advisor_desc")}</CardDescription>
           </CardHeader>
-          <CardContent className="p-6 space-y-4 text-xs font-semibold">
+          <CardContent className="typography-label p-6 space-y-4">
             
             <div className="flex items-center gap-3">
               <Avatar className="w-10 h-10 border rounded-xl ring-2 ring-emerald-600/5">
-                <AvatarFallback className="bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg">
+                <AvatarFallback className="typography-label bg-emerald-50 text-emerald-700 rounded-lg">
                   {getInitials(advisor.name)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-xs font-black text-foreground">{advisor.name}</p>
-                <span className="text-[10px] text-muted-foreground font-semibold block leading-none mt-0.5">Homeroom Class Advisor</span>
+                <p className="typography-label text-foreground">{advisor.name}</p>
+                <span className="typography-label text-[10px] text-muted-foreground block mt-0.5">{t("homeroom_advisor")}</span>
               </div>
             </div>
 
@@ -237,7 +235,7 @@ export default function StudentProfile() {
               </div>
               <div className="flex items-center gap-2.5">
                 <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-emerald-700 dark:text-emerald-300 font-bold">Office Hours: {advisor.hours}</span>
+                <span className="typography-label text-emerald-700 dark:text-emerald-300">{t("office_hours")}: {advisor.hours}</span>
               </div>
             </div>
 
@@ -249,11 +247,11 @@ export default function StudentProfile() {
       {/* ─── CONTACTS & EMERGENCY SECTION ────────────────────────────────── */}
       <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md">
         <CardHeader className="border-b border-border/20 pb-4">
-          <CardTitle className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <CardTitle className="typography-label uppercase text-muted-foreground flex items-center gap-2">
             <HeartHandshake className="w-4 h-4 text-emerald-500" />
-            <span>Emergency Contacts & Authorized Guardians</span>
+            <span>{t("emergency_contacts")}</span>
           </CardTitle>
-          <CardDescription className="text-xs mt-0.5">List of verified family contacts with permission to receive reports</CardDescription>
+          <CardDescription className="typography-helper mt-0.5">{t("emergency_contacts_desc")}</CardDescription>
         </CardHeader>
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -264,11 +262,11 @@ export default function StudentProfile() {
                   <User className="w-4.5 h-4.5" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-foreground">Primary Parent Guardian</p>
-                  <span className="text-[10px] text-muted-foreground font-semibold">{activeStudent?.parentPhone}</span>
+                  <p className="typography-label text-foreground">{t("primary_guardian")}</p>
+                  <span className="typography-label text-[10px] text-muted-foreground">{activeStudent?.parentPhone}</span>
                 </div>
               </div>
-              <Badge className="bg-emerald-600 hover:bg-emerald-700 border-none font-bold text-[9px] uppercase tracking-wide rounded-md">SMS Alerts Active</Badge>
+              <Badge className="typography-label bg-emerald-600 hover:bg-emerald-700 border-none text-[9px] uppercase rounded-md">{t("sms_alerts_active")}</Badge>
             </div>
 
             <div className="p-4 bg-muted/20 border border-border/10 rounded-2xl flex items-center justify-between gap-4">
@@ -277,11 +275,11 @@ export default function StudentProfile() {
                   <ShieldAlert className="w-4.5 h-4.5" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-foreground">Emergency Hotline Coordinator</p>
-                  <span className="text-[10px] text-muted-foreground font-semibold">+251 911 000 999</span>
+                  <p className="typography-label text-foreground">{activeStudent?.school?.settings?.emergencyContactName || t("emergency_coordinator")}</p>
+                  <span className="typography-label text-[10px] text-muted-foreground">{activeStudent?.school?.settings?.emergencyPhone || activeStudent?.school?.phone || "N/A"}</span>
                 </div>
               </div>
-              <Badge variant="outline" className="border-rose-500/20 text-rose-600 font-bold text-[9px] uppercase tracking-wide rounded-md">Hotline</Badge>
+              <Badge variant="outline" className="typography-label border-rose-500/20 text-rose-600 text-[9px] uppercase rounded-md">{t("hotline")}</Badge>
             </div>
 
           </div>
@@ -291,43 +289,43 @@ export default function StudentProfile() {
       {/* ─── SECURITY & SETTINGS ───────────────────────────────────────────── */}
       <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md">
         <CardHeader className="border-b border-border/20 pb-4">
-          <CardTitle className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <CardTitle className="typography-label uppercase text-muted-foreground flex items-center gap-2">
             <Lock className="w-4 h-4 text-emerald-500" />
-            <span>Account Security</span>
+            <span>{t("security_settings")}</span>
           </CardTitle>
-          <CardDescription className="text-xs mt-0.5">Update your Parent Portal login credentials</CardDescription>
+          <CardDescription className="typography-helper mt-0.5">{t("security_desc")}</CardDescription>
         </CardHeader>
         <CardContent className="p-6">
           <form onSubmit={async (e) => {
             e.preventDefault()
             if (newPassword !== confirmPassword) {
-              notifications.error("Validation Error", "New passwords do not match")
+              notifications.error(t("validation_error"), t("passwords_not_match"))
               return
             }
             if (newPassword.length < 6) {
-              notifications.error("Validation Error", "Password must be at least 6 characters")
+              notifications.error(t("validation_error"), t("password_len_error"))
               return
             }
             setIsChangingPassword(true)
             try {
               const res = await authService.updateParentPassword(userPhone, currentPassword, newPassword)
               if (res.success) {
-                notifications.success("Security Update", "Password updated successfully")
+                notifications.success(t("security_update"), t("password_updated"))
                 setCurrentPassword("")
                 setNewPassword("")
                 setConfirmPassword("")
               } else {
-                notifications.error("Update Failed", res.message || "Failed to update password")
+                notifications.error(t("update_failed"), res.message || t("invalid_credentials"))
               }
             } catch (err) {
-              notifications.error("Update Failed", "An error occurred while updating password")
+              notifications.error(t("update_failed"), t("unexpected_error"))
             } finally {
               setIsChangingPassword(false)
             }
           }} className="space-y-4 max-w-md">
             
             <div className="space-y-2">
-              <Label htmlFor="currentPassword" className="text-xs font-bold text-muted-foreground">Current Password</Label>
+              <Label htmlFor="currentPassword" className="typography-label text-muted-foreground">{t("current_password")}</Label>
               <Input
                 id="currentPassword"
                 type="password"
@@ -335,13 +333,13 @@ export default function StudentProfile() {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
-                className="h-11 rounded-xl bg-background/50 border-border/50 text-sm focus:ring-emerald-500/20"
+                className="typography-body h-11 rounded-xl bg-background/50 border-border/50 focus:ring-emerald-500/20"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="newPassword" className="text-xs font-bold text-muted-foreground">New Password</Label>
+                <Label htmlFor="newPassword" className="typography-label text-muted-foreground">{t("new_password")}</Label>
                 <Input
                   id="newPassword"
                   type="password"
@@ -349,11 +347,11 @@ export default function StudentProfile() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
-                  className="h-11 rounded-xl bg-background/50 border-border/50 text-sm focus:ring-emerald-500/20"
+                  className="typography-body h-11 rounded-xl bg-background/50 border-border/50 focus:ring-emerald-500/20"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-xs font-bold text-muted-foreground">Confirm New Password</Label>
+                <Label htmlFor="confirmPassword" className="typography-label text-muted-foreground">{t("confirm_password")}</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -361,7 +359,7 @@ export default function StudentProfile() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="h-11 rounded-xl bg-background/50 border-border/50 text-sm focus:ring-emerald-500/20"
+                  className="typography-body h-11 rounded-xl bg-background/50 border-border/50 focus:ring-emerald-500/20"
                 />
               </div>
             </div>
@@ -369,17 +367,17 @@ export default function StudentProfile() {
             <Button 
               type="submit" 
               disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
-              className="mt-2 h-11 w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-md shadow-emerald-500/10"
+              className="typography-label mt-2 h-11 w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all shadow-md shadow-emerald-500/10"
             >
               {isChangingPassword ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Updating Security...
+                  {t("updating")}...
                 </>
               ) : (
                 <>
                   <KeyRound className="w-4 h-4 mr-2" />
-                  Update Password
+                  {t("update_password")}
                 </>
               )}
             </Button>

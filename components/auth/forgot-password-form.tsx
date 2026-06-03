@@ -64,11 +64,11 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
           <div className="mx-auto w-16 h-16 bg-green-500/10 rounded-2xl flex items-center justify-center mb-4 border border-green-500/20">
             <CheckCircle2 className="w-8 h-8 text-green-500" />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">Check Your Email</CardTitle>
+          <CardTitle className="typography-page-title">Check Your Email</CardTitle>
           <CardDescription>We've sent reset instructions to your inbox</CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-8 text-center space-y-6">
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <p className="typography-body text-muted-foreground">
             Instructions have been sent to <strong className="text-foreground">{email}</strong>. 
             Please follow the link in the email to securely reset your password.
           </p>
@@ -97,7 +97,7 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <CardTitle className="text-2xl font-bold tracking-tight">Reset Password</CardTitle>
+        <CardTitle className="typography-page-title">Reset Password</CardTitle>
         <CardDescription className="text-muted-foreground">
           Enter your email and we'll send you recovery instructions
         </CardDescription>
@@ -122,7 +122,7 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
             </div>
           </div>
 
-          <Button type="submit" className="w-full h-12 text-base font-semibold rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-[0.98]" disabled={isLoading}>
+          <Button type="submit" className="typography-card-title w-full h-12 rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-[0.98]" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -135,7 +135,7 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
         </form>
 
         <div className="mt-8 pt-6 border-t border-border/50 text-center">
-          <Button variant="link" onClick={onBackToLogin} className="text-xs text-primary font-bold p-0 h-auto">
+          <Button variant="link" onClick={onBackToLogin} className="typography-label text-primary p-0 h-auto">
             <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
             Back to Login
           </Button>

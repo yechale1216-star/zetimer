@@ -94,7 +94,7 @@ export function TeacherView() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-foreground">My Class Assignments</h2>
+        <h2 className="typography-page-title text-foreground">My Class Assignments</h2>
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
         </div>
@@ -105,10 +105,10 @@ export function TeacherView() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">
+        <h2 className="typography-page-title text-foreground">
           {getGreeting()}, <span className="text-primary">{firstName}</span>
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">Manage your assigned classes and student attendance</p>
+        <p className="typography-body text-muted-foreground mt-1">Manage your assigned classes and student attendance</p>
       </div>
 
       {assignments.length === 0 ? (
@@ -133,8 +133,8 @@ export function TeacherView() {
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="font-semibold text-foreground">{assignment.class_name}</h3>
-                      <p className="text-sm text-muted-foreground">
+                      <h3 className="typography-label text-foreground">{assignment.class_name}</h3>
+                      <p className="typography-body text-muted-foreground">
                         Grade {assignment.grade} - Section {assignment.section}
                       </p>
                     </div>
@@ -142,15 +142,15 @@ export function TeacherView() {
 
                   {assignment.subject && (
                     <div className="pt-4 border-t">
-                      <p className="text-sm text-muted-foreground">Subject</p>
-                      <p className="font-medium text-foreground">{assignment.subject}</p>
+                      <p className="typography-body text-muted-foreground">Subject</p>
+                      <p className="typography-label text-foreground">{assignment.subject}</p>
                     </div>
                   )}
 
                   {assignment.stream && (
                     <div className="pt-2">
-                      <p className="text-sm text-muted-foreground">Stream</p>
-                      <p className="font-medium text-foreground">{assignment.stream}</p>
+                      <p className="typography-body text-muted-foreground">Stream</p>
+                      <p className="typography-label text-foreground">{assignment.stream}</p>
                     </div>
                   )}
                 </CardContent>
@@ -161,7 +161,7 @@ export function TeacherView() {
           {/* Students List for Selected Class */}
           {selectedAssignment && (
             <div className="mt-8">
-              <h3 className="text-xl font-bold text-foreground mb-4">Students in {selectedAssignment.class_name}</h3>
+              <h3 className="typography-section-title text-foreground mb-4">Students in {selectedAssignment.class_name}</h3>
               <Card>
                 <CardContent className="p-6">
                   {students.length === 0 ? (
@@ -171,12 +171,12 @@ export function TeacherView() {
                       {students.map((student) => (
                         <div key={student.id} className="flex items-center justify-between p-4 bg-muted/40 rounded-lg">
                           <div>
-                            <p className="font-medium text-foreground">{student.name}</p>
-                            <p className="text-sm text-muted-foreground">Roll: {student.student_id}</p>
+                            <p className="typography-label text-foreground">{student.name}</p>
+                            <p className="typography-body text-muted-foreground">Roll: {student.student_id}</p>
                           </div>
                           <div className="text-right">
-                            {student.parent_phone && <p className="text-sm text-muted-foreground">{student.parent_phone}</p>}
-                            {student.parent_email && <p className="text-sm text-muted-foreground">{student.parent_email}</p>}
+                            {student.parent_phone && <p className="typography-body text-muted-foreground">{student.parent_phone}</p>}
+                            {student.parent_email && <p className="typography-body text-muted-foreground">{student.parent_email}</p>}
                           </div>
                         </div>
                       ))}

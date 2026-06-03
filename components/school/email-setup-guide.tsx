@@ -73,12 +73,12 @@ export function EmailSetupGuide({ onClose }: EmailSetupGuideProps) {
         <div className="space-y-3">
           {steps.map((step, index) => (
             <div key={index} className="flex items-start gap-3 p-3 border rounded-lg">
-              <div className="flex-shrink-0 w-6 h-6 bg-primary/10 text-primary rounded-full flex items-center justify-center text-sm font-medium">
+              <div className="typography-label flex-shrink-0 w-6 h-6 bg-primary/10 text-primary rounded-full flex items-center justify-center">
                 {index + 1}
               </div>
               <div className="flex-1">
-                <h4 className="font-medium">{step.title}</h4>
-                <p className="text-sm text-muted-foreground">{step.description}</p>
+                <h4 className="typography-label">{step.title}</h4>
+                <p className="typography-body text-muted-foreground">{step.description}</p>
                 <div className="flex items-center gap-2 mt-2">
                   {step.link && (
                     <Button variant="outline" size="sm" onClick={() => window.open(step.link, "_blank")}>

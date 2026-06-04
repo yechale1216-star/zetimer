@@ -153,6 +153,12 @@ export const markNotificationAsRead = async (id: string, schoolId: string) => {
   });
 };
 
+export const deleteNotification = async (id: string, schoolId: string) => {
+  return await prisma.parentNotification.deleteMany({
+    where: { id, schoolId }
+  });
+};
+
 export const markAllNotificationsAsRead = async (phone: string, schoolId: string) => {
   const cleanPhone = phone.replace(/\s+/g, '');
   const user = await prisma.user.findFirst({ 

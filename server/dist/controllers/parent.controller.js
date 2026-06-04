@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = void 0;
+exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.deleteNotification = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = void 0;
 const parentService = __importStar(require("../services/parent.service"));
 const loginParent = async (req, res, next) => {
     try {
@@ -114,6 +114,20 @@ const markAsRead = async (req, res, next) => {
     }
 };
 exports.markAsRead = markAsRead;
+const deleteNotification = async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const { id } = req.params;
+        await parentService.deleteNotification(id, schoolId);
+        res.status(200).json({ success: true, message: "Notification deleted." });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.deleteNotification = deleteNotification;
 const markAllAsRead = async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;
@@ -130,8 +144,11 @@ const markAllAsRead = async (req, res, next) => {
 exports.markAllAsRead = markAllAsRead;
 const getPreferences = async (req, res, next) => {
     try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
-        const preferences = await parentService.getPreferences(phone);
+        const preferences = await parentService.getPreferences(phone, schoolId);
         res.status(200).json({ success: true, data: preferences });
     }
     catch (error) {
@@ -141,8 +158,11 @@ const getPreferences = async (req, res, next) => {
 exports.getPreferences = getPreferences;
 const updatePreferences = async (req, res, next) => {
     try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
-        const preferences = await parentService.updatePreferences(phone, req.body);
+        const preferences = await parentService.updatePreferences(phone, schoolId, req.body);
         res.status(200).json({ success: true, data: preferences, message: "Preferences updated successfully." });
     }
     catch (error) {

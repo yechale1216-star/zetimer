@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStudentsByParentPhone = exports.deleteStudent = exports.updateStudent = exports.getStudentById = exports.createStudent = exports.getStudents = void 0;
+exports.bulkCreateStudents = exports.getStudentsByParentPhone = exports.deleteStudent = exports.updateStudent = exports.getStudentById = exports.createStudent = exports.getStudents = void 0;
 const studentService = __importStar(require("../services/student.service"));
 const getStudents = async (req, res, next) => {
     try {
@@ -122,3 +122,21 @@ const getStudentsByParentPhone = async (req, res, next) => {
     }
 };
 exports.getStudentsByParentPhone = getStudentsByParentPhone;
+const bulkCreateStudents = async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId) {
+            return res.status(401).json({ success: false, message: 'School ID context missing' });
+        }
+        const { students } = req.body;
+        if (!Array.isArray(students)) {
+            return res.status(400).json({ success: false, message: 'Invalid data format. Expected an array of students.' });
+        }
+        const results = await studentService.bulkUpsertStudents(students, schoolId);
+        res.status(200).json({ success: true, data: results });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.bulkCreateStudents = bulkCreateStudents;

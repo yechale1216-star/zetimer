@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllSchools = exports.getSchoolByCustomId = exports.getSchoolById = exports.createSchool = void 0;
+exports.getAllSchools = exports.getSchoolByCustomId = exports.getSchoolById = exports.updateSchool = exports.createSchool = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const school_id_1 = require("../utils/school-id");
 const createSchool = async (data) => {
@@ -29,6 +29,27 @@ const createSchool = async (data) => {
     return school;
 };
 exports.createSchool = createSchool;
+const updateSchool = async (id, data) => {
+    const school = await db_1.default.school.update({
+        where: { id },
+        data: {
+            name: data.name,
+            subscriptionStatus: data.subscriptionStatus
+        },
+        include: {
+            settings: true
+        }
+    });
+    // Also update school_name in settings for consistency
+    if (data.name) {
+        await db_1.default.schoolSettings.update({
+            where: { schoolId: id },
+            data: { school_name: data.name }
+        });
+    }
+    return school;
+};
+exports.updateSchool = updateSchool;
 const getSchoolById = async (id) => {
     return await db_1.default.school.findUnique({
         where: { id },

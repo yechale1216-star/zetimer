@@ -13,6 +13,7 @@ import {
   XCircle, 
   Clock, 
   Activity,
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -59,13 +60,19 @@ export default function AttendanceHistory() {
   // 2. Fetch student's attendance list
   const fetchStudentAttendance = async (studentId: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/attendance?studentId=${studentId}`)
+      const token = localStorage.getItem("attendance_token") || "";
+      const headers = { 
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {})
+      };
+
+      const res = await fetch(`${API_URL}/api/attendance?studentId=${studentId}`, { headers })
       const data = await res.json()
       if (data.success && data.data) {
         setAttendance(data.data)
       } else {
         // Fallback
-        const studentRes = await fetch(`${API_URL}/api/students/${studentId}`)
+        const studentRes = await fetch(`${API_URL}/api/students/${studentId}`, { headers })
         const studentData = await studentRes.json()
         if (studentData.success && studentData.data?.attendance) {
           setAttendance(studentData.data.attendance)
@@ -310,7 +317,7 @@ export default function AttendanceHistory() {
             </div>
 
             {/* Quick breakdown metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:col-span-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:col-span-3">
               <div className="text-center space-y-0.5">
                 <p className="typography-label text-[10px] text-muted-foreground">{t("total_days")}</p>
                 <span className="typography-card-title text-foreground">{totalMonthlyDays}</span>
@@ -326,6 +333,10 @@ export default function AttendanceHistory() {
               <div className="text-center space-y-0.5">
                 <p className="typography-label text-[10px] text-muted-foreground text-amber-600 dark:text-amber-400">{t("late_arrivals")}</p>
                 <span className="typography-card-title text-amber-600 dark:text-amber-400">{monthlyLates}</span>
+              </div>
+              <div className="text-center space-y-0.5">
+                <p className="typography-label text-[10px] text-muted-foreground text-blue-600 dark:text-blue-400">{t("excused")}</p>
+                <span className="typography-card-title text-blue-600 dark:text-blue-400">{monthlyExcused}</span>
               </div>
             </div>
 
@@ -422,17 +433,18 @@ export default function AttendanceHistory() {
                   return (
                     <div 
                       key={cell.dateStr}
-                      className={`aspect-square flex flex-col items-center justify-center border border-border/10 rounded-2xl transition-all relative group select-none ${getCalendarDayColor(dayStatus)}`}
+                      className={`aspect-square flex flex-col items-center justify-center p-1 border border-border/10 rounded-2xl transition-all relative group select-none ${getCalendarDayColor(dayStatus)}`}
                     >
-                      <span className="typography-label">{cell.day}</span>
+                      <span className="typography-label text-sm sm:text-base font-semibold">{cell.day}</span>
                       
-                      {/* Optional miniature dot indicator */}
+                      {/* Status Icon */}
                       {dayStatus && (
-                        <div className={`w-1.5 h-1.5 rounded-full absolute bottom-1.5 shrink-0 ${
-                          dayStatus === "present" ? "bg-emerald-500" :
-                          dayStatus === "absent" ? "bg-rose-500" :
-                          dayStatus === "late" ? "bg-amber-500" : "bg-blue-500"
-                        }`} />
+                        <div className="mt-1 flex justify-center items-center opacity-90">
+                          {dayStatus === "present" && <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
+                          {dayStatus === "absent" && <XCircle className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
+                          {dayStatus === "late" && <Clock className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
+                          {dayStatus === "excused" && <AlertTriangle className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
+                        </div>
                       )}
                     </div>
                   )

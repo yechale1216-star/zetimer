@@ -20,7 +20,8 @@ import {
   XCircle,
   Megaphone,
   AlertTriangle,
-  Info
+  Info,
+  X
 } from "lucide-react"
 
 export default function ParentNotifications() {
@@ -75,6 +76,16 @@ export default function ParentNotifications() {
         prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
       )
       // Trigger header badge refresh
+      window.dispatchEvent(new Event("refreshNotifications"))
+    }
+  }
+
+  // 2.5 Delete notification
+  const handleDelete = async (notificationId: string) => {
+    if (!currentUser?.phone) return
+    const success = await parentDb.deleteNotification(notificationId)
+    if (success) {
+      setNotificationsList(prev => prev.filter(n => n.id !== notificationId))
       window.dispatchEvent(new Event("refreshNotifications"))
     }
   }
@@ -237,17 +248,15 @@ export default function ParentNotifications() {
                           <span className="typography-label block text-[10px] text-muted-foreground mt-0.5">{formatNotificationTime(notification.createdAt)}</span>
                         </div>
 
-                        {!notification.isRead && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleMarkAsRead(notification.id)}
-                            className="h-7 w-7 text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10 rounded-md shrink-0"
-                            title="Mark as read"
-                          >
-                            <CheckCheck className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(notification.id)}
+                          className="h-7 w-7 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 rounded-md shrink-0"
+                          title="Dismiss alert"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
                       </div>
                       
                       <p className="typography-label text-muted-foreground mt-2">{notification.message}</p>

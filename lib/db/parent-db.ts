@@ -63,6 +63,19 @@ class ParentDatabase {
     }
   }
 
+  async deleteNotification(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_URL}/api/parent/notifications/${id}`, {
+        method: "DELETE",
+        headers: this.getHeaders(),
+      });
+      return res.ok;
+    } catch (error) {
+      console.error("[parent-db] deleteNotification error:", error);
+      return false;
+    }
+  }
+
   async markAllNotificationsAsRead(phone: string): Promise<boolean> {
     try {
       const res = await fetch(`${API_URL}/api/parent/notifications/read-all/${encodeURIComponent(phone)}`, {

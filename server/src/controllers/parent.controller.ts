@@ -76,6 +76,19 @@ export const markAsRead = async (req: AuthenticatedRequest, res: Response, next:
   }
 };
 
+export const deleteNotification = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const { id } = req.params;
+    await parentService.deleteNotification(id, schoolId);
+    res.status(200).json({ success: true, message: "Notification deleted." });
+  } catch (error: any) {
+    next(error);
+  }
+};
+
 export const markAllAsRead = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.user?.schoolId;

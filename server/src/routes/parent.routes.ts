@@ -11,6 +11,7 @@ router.get('/search', parentController.searchParent);
 // Notifications & Announcements
 router.get('/notifications/:phone', parentController.getNotifications);
 router.patch('/notifications/:id/read', parentController.markAsRead);
+router.delete('/notifications/:id', parentController.deleteNotification);
 router.patch('/notifications/read-all/:phone', parentController.markAllAsRead);
 
 // Announcements Publisher (Admins/Teachers or test suite)

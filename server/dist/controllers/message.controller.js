@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createConversation = exports.getMessages = exports.getConversations = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const getConversations = async (req, res) => {
-    const { userId } = req.params;
+    const userId = req.user?.id;
     const schoolId = req.user?.schoolId;
     if (!schoolId) {
         return res.status(401).json({ error: 'Unauthorized: School ID missing' });
@@ -106,6 +106,21 @@ const createConversation = async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized: School ID missing' });
     }
     try {
+        // 1. Verify all members belong to the SAME school
+        const usersInSchool = await db_1.default.user.findMany({
+            where: {
+                id: { in: memberIds },
+                schoolId,
+                is_active: true,
+                role: { in: ['admin', 'school_admin', 'teacher', 'parent'] }
+            },
+            select: { id: true }
+        });
+        if (usersInSchool.length !== memberIds.length) {
+            return res.status(403).json({
+                error: 'Forbidden: One or more users are not found in your school or are not authorized for communication'
+            });
+        }
         // If not a group, check if a 1:1 conversation already exists in THIS school
         if (!isGroup && memberIds.length === 2) {
             const existingConversation = await db_1.default.conversation.findFirst({

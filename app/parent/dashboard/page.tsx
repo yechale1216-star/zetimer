@@ -23,7 +23,8 @@ import {
   Megaphone,
   AlertOctagon,
   ArrowRight,
-  UserCheck
+  UserCheck,
+  X
 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
@@ -94,13 +95,19 @@ export default function ParentDashboard() {
   // 2. Fetch student's attendance list
   const fetchStudentAttendance = async (studentId: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/attendance?studentId=${studentId}`)
+      const token = localStorage.getItem("attendance_token") || "";
+      const headers = { 
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {})
+      };
+
+      const res = await fetch(`${API_URL}/api/attendance?studentId=${studentId}`, { headers })
       const data = await res.json()
       if (data.success && data.data) {
         setAttendance(data.data)
       } else {
         // Fallback to student relation directly if query fails
-        const studentRes = await fetch(`${API_URL}/api/students/${studentId}`)
+        const studentRes = await fetch(`${API_URL}/api/students/${studentId}`, { headers })
         const studentData = await studentRes.json()
         if (studentData.success && studentData.data?.attendance) {
           setAttendance(studentData.data.attendance)
@@ -129,6 +136,15 @@ export default function ParentDashboard() {
     window.addEventListener("studentChanged", handleStudentChange)
     return () => window.removeEventListener("studentChanged", handleStudentChange)
   }, [])
+
+  const handleDismissAlert = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const success = await parentDb.markNotificationAsRead(id);
+    if (success) {
+      setNotificationsList(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+      window.dispatchEvent(new Event("refreshNotifications"));
+    }
+  }
 
   // ─── DATA CALCULATIONS ──────────────────────────────────────────────────
   
@@ -186,7 +202,7 @@ export default function ParentDashboard() {
   const emergencyNotice = announcements.find(a => a.type === "emergency")
 
   // Child specific alerts (absent & late notifications)
-  const recentAlerts = notificationsList.filter(n => (n.type === "absent" || n.type === "late" || n.type === "warning") && n.studentId === selectedStudent?.id)
+  const recentAlerts = notificationsList.filter(n => !n.isRead && (n.type === "absent" || n.type === "late" || n.type === "warning") && n.studentId === selectedStudent?.id)
 
   const formatNotificationTime = (dateStr: string) => {
     try {
@@ -477,7 +493,16 @@ export default function ParentDashboard() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="typography-label text-foreground uppercase">{alert.title}</span>
-                      <span className="typography-label text-muted-foreground opacity-70">{formatNotificationTime(alert.createdAt)}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="typography-label text-muted-foreground opacity-70">{formatNotificationTime(alert.createdAt)}</span>
+                        <button 
+                          onClick={(e) => handleDismissAlert(alert.id, e)}
+                          className="text-muted-foreground hover:text-rose-500 transition-colors"
+                          title="Dismiss alert"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <p className="typography-label text-foreground/80 dark:text-foreground/70 mt-2">{alert.message}</p>
                   </div>

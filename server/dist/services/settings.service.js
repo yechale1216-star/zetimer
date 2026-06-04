@@ -31,10 +31,18 @@ const getSettings = async (schoolId) => {
 };
 exports.getSettings = getSettings;
 const updateSettings = async (schoolId, data) => {
-    return await db_1.default.schoolSettings.upsert({
+    const settings = await db_1.default.schoolSettings.upsert({
         where: { schoolId: schoolId },
         create: { ...DEFAULT_SETTINGS, ...data, schoolId: schoolId },
         update: data,
     });
+    // Keep School table in sync if name changed
+    if (data.school_name) {
+        await db_1.default.school.update({
+            where: { id: schoolId },
+            data: { name: data.school_name }
+        });
+    }
+    return settings;
 };
 exports.updateSettings = updateSettings;

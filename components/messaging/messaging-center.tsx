@@ -8,19 +8,22 @@ import { useSocket } from '@/components/providers/socket-provider';
 import { authService } from '@/lib/auth/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/lib/context/language-context';
+import { formatLocalizedTime } from '@/lib/utils/date-utils';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 function getAuthHeaders(): Record<string, string> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('attendance_token') : null;
+  const schoolId = typeof window !== 'undefined' ? localStorage.getItem('x-school-id') : null;
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(schoolId ? { 'x-school-id': schoolId } : {}),
   };
 }
 
 export function MessagingCenter() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [conversations, setConversations] = useState<any[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConversationData, setActiveConversationData] = useState<any>(null);
@@ -98,10 +101,7 @@ export function MessagingCenter() {
             isOnline: false,
             lastMessage: c.messages?.[0]?.content || t("no_messages"),
             timestamp: c.messages?.[0]?.createdAt
-              ? new Date(c.messages[0].createdAt).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
+              ? formatLocalizedTime(c.messages[0].createdAt, language)
               : '',
             updatedAt: new Date(c.updatedAt || c.createdAt).getTime(),
             unreadCount: 0,
@@ -157,10 +157,18 @@ export function MessagingCenter() {
     } finally {
       setIsLoadingSidebar(false);
     }
-  }, [user, t, toast]);
+  }, [user, t, toast, language]);
 
   useEffect(() => {
     loadData();
+
+    const handleStudentChange = () => {
+      setIsLoadingSidebar(true);
+      loadData();
+    };
+
+    window.addEventListener("studentChanged", handleStudentChange);
+    return () => window.removeEventListener("studentChanged", handleStudentChange);
   }, [loadData]);
 
   // ── Fetch messages for the selected conversation ─────────────────────────────
@@ -187,10 +195,7 @@ export function MessagingCenter() {
         senderId: m.senderId,
         senderName: m.sender?.full_name || 'Unknown',
         content: m.content,
-        timestamp: new Date(m.createdAt).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
+        timestamp: formatLocalizedTime(m.createdAt, language),
         status: 'read',
         type: m.type || 'TEXT',
         attachments: m.attachments,
@@ -204,7 +209,7 @@ export function MessagingCenter() {
     } finally {
       setIsLoadingMessages(false);
     }
-  }, [messagesByConversation]);
+  }, [messagesByConversation, language]);
 
   // ── Select conversation ──────────────────────────────────────────────────────
   const handleSelectConversation = useCallback(
@@ -288,10 +293,7 @@ export function MessagingCenter() {
         senderId: message.senderId,
         senderName: message.sender?.full_name || 'Unknown',
         content: message.content,
-        timestamp: new Date(message.createdAt || new Date()).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
+        timestamp: formatLocalizedTime(message.createdAt || new Date(), language),
         status: 'delivered',
         type: message.type || 'TEXT',
         attachments: message.attachments,
@@ -313,7 +315,7 @@ export function MessagingCenter() {
             ? {
                 ...c,
                 lastMessage: message.content,
-                timestamp: 'Just now',
+                timestamp: t("just_now"),
                 updatedAt: Date.now(),
                 unreadCount:
                   convId !== activeConversationIdRef.current

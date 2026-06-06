@@ -31,6 +31,7 @@ import { authService } from '@/lib/auth/auth';
 import { supabase } from '@/lib/utils/supabase';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/context/language-context';
+import { Logo } from '@/components/logo';
 
 interface Message {
   id: string;
@@ -175,15 +176,33 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   if (!activeConversation) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-secondary/10 p-8 text-center">
-        <div className="relative w-20 h-20 mb-4">
-          <img src="/zetime-logo.png" alt="Zetime Logo" className="w-full h-full object-contain" />
-        </div>
-        <h3 className="typography-page-title mb-1 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">ZETIME</h3>
-        <h4 className="typography-card-title mb-2 text-foreground">{t("communication")}</h4>
-        <p className="typography-body text-muted-foreground max-w-xs">
-          {t("start_messaging")}
-        </p>
+      <div className="flex-1 flex flex-col items-center justify-center bg-[#f8fafc] dark:bg-slate-950 p-8 text-center relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-sky-500/5 rounded-full blur-[80px]" />
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative z-10 flex flex-col items-center"
+        >
+          <div className="mb-6 scale-150">
+            <Logo size="xl" withText={false} href="" />
+          </div>
+          
+          <h1 className="text-4xl font-black tracking-tighter text-foreground mb-2">
+            ZETIME <span className="text-emerald-500 font-bold">COMMUNICATION</span>
+          </h1>
+          
+          <p className="typography-body text-muted-foreground/60 max-w-sm mx-auto leading-relaxed">
+            {t("start_messaging")}
+          </p>
+
+          <div className="mt-8 flex items-center gap-2 px-4 py-2 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-full border border-border/50 text-[11px] text-muted-foreground font-medium uppercase tracking-widest shadow-sm">
+            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+            {t("ready_connection")}
+          </div>
+        </motion.div>
       </div>
     );
   }
@@ -229,7 +248,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 size="icon" 
                 className="text-muted-foreground hover:text-primary transition-all active:scale-95"
                 onClick={() => initiateCall(activeConversation.id, 'VOICE', activeConversation)}
-                title="Voice Call"
+                title={t("voice_call")}
               >
                 <Phone className="h-4 w-4" />
               </Button>
@@ -238,7 +257,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 size="icon" 
                 className="text-muted-foreground hover:text-primary transition-all active:scale-95"
                 onClick={() => initiateCall(activeConversation.id, 'VIDEO', activeConversation)}
-                title="Video Call"
+                title={t("video_call")}
               >
                 <Video className="h-4 w-4" />
               </Button>

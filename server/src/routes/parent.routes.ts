@@ -4,9 +4,11 @@ import * as parentController from '../controllers/parent.controller';
 const router = Router();
 
 // Authentication / Verification
+router.get('/schools', parentController.listParentSchools);
 router.post('/login', parentController.loginParent);
 router.post('/update-password', parentController.updatePassword);
 router.get('/search', parentController.searchParent);
+router.post('/check-batch', parentController.checkParentsBatch);
 
 // Notifications & Announcements
 router.get('/notifications/:phone', parentController.getNotifications);
@@ -20,5 +22,12 @@ router.post('/announcements', parentController.postAnnouncement);
 // Preferences
 router.get('/preferences/:phone', parentController.getPreferences);
 router.put('/preferences/:phone', parentController.updatePreferences);
+
+// Profile
+router.put('/profile/:phone', parentController.updateProfile);
+
+// Multi-school context — authenticated, server-validated
+router.get('/me/schools', parentController.getMySchools);
+router.post('/me/active-school', parentController.setActiveSchool);
 
 export default router;

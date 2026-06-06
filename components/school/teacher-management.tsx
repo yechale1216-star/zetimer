@@ -21,8 +21,9 @@ import {
   CheckCircle2,
   Camera
 } from "lucide-react"
-import { toast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
+
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -98,11 +99,8 @@ export function TeacherManagement() {
           setAssignments(data)
         } catch (error) {
           console.error("[v0] Error loading assignments:", error)
-          toast({
-            title: "Error Loading Assignments",
-            description: "Could not fetch teacher class assignments.",
-            variant: "destructive"
-          })
+          notifications.error("Error Loading Assignments", "Could not fetch teacher class assignments.")
+
         } finally {
           setIsLoadingAssignments(false)
         }
@@ -236,18 +234,11 @@ export function TeacherManagement() {
       }, 100)
 
       notifications.success("Export Complete", `Successfully exported ${teachers.length} teachers to CSV`)
-      toast({
-        title: "Export Complete",
-        description: `Successfully exported ${teachers.length} teachers to CSV`,
-      })
+
     } catch (error) {
       console.error("[v0] CSV export error:", error)
       notifications.error("Export Failed", "Failed to export teacher list. Please try again.")
-      toast({
-        title: "Export Failed",
-        description: "Failed to export teacher list. Please try again.",
-        variant: "destructive",
-      })
+
     }
   }
 
@@ -277,14 +268,7 @@ export function TeacherManagement() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="typography-label mt-4 text-slate-500 animate-pulse">Loading teachers data...</p>
-        </div>
-      </div>
-    )
+    return <PageSkeleton variant="table" />
   }
 
   return (

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, User, CheckSquare, BarChart2, BookOpen,
-  Settings, LogOut, CreditCard, MessageSquare, Phone
+  Settings, LogOut, CreditCard, MessageSquare, Phone, TrendingUp
 } from 'lucide-react'
 import { authService } from '@/lib/auth/auth'
 import { useRouter } from 'next/navigation'
@@ -74,6 +74,7 @@ export default function SchoolAdminLayout({
                 <NavLink href="/school/admin/attendance" icon={<CheckSquare className="w-4 h-4" />} label="Attendance" active={isActive('/school/admin/attendance')} />
                 <NavLink href="/school/admin/attendance-by-grade" icon={<BarChart2 className="w-4 h-4" />} label="Grade Analytics" active={isActive('/school/admin/attendance-by-grade')} />
                 <NavLink href="/school/admin/reports" icon={<BookOpen className="w-4 h-4" />} label="Reports" active={isActive('/school/admin/reports')} />
+                {isAdmin && <NavLink href="/school/admin/promotion" icon={<TrendingUp className="w-4 h-4" />} label="Promotion" active={isActive('/school/admin/promotion')} />}
                 <NavLink href="/school/admin/subscription" icon={<CreditCard className="w-4 h-4" />} label="Subscription & Pricing" active={pathname.startsWith('/school/admin/subscription')} />
                 {isAdmin && <NavLink href="/school/admin/settings" icon={<Settings className="w-4 h-4" />} label="Settings" active={isActive('/school/admin/settings')} />}
                 <NavLink href="/school/admin/profile" icon={<User className="w-4 h-4" />} label="Profile" active={isActive('/school/admin/profile')} />
@@ -104,7 +105,6 @@ export default function SchoolAdminLayout({
             {/* Main Content */}
             <div className="flex-1 flex flex-col overflow-hidden relative z-10">
               <TopNav showMenuButton />
-              <TrialBanner />
               {/* Content */}
               <main className="flex-1 overflow-auto pb-20 md:pb-0">
                 {children}

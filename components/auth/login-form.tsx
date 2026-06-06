@@ -15,6 +15,8 @@ import { authService, type LoginCredentials } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Phone } from "lucide-react"
 import { useLanguage } from "@/lib/context/language-context"
+import { useSchool } from "@/lib/context/school-context"
+import { useSearchParams } from "next/navigation"
 
 interface LoginFormProps {
   onLoginSuccess: () => void
@@ -24,10 +26,15 @@ interface LoginFormProps {
 
 export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSignup }: LoginFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { t, language, setLanguage } = useLanguage()
+  const { setSchoolsFromLogin } = useSchool()
   const [activeTab, setActiveTab] = useState<"staff" | "parent">("staff")
   const [parentPhone, setParentPhone] = useState("+251")
   const [parentPassword, setParentPassword] = useState("")
+  const [associatedSchools, setAssociatedSchools] = useState<any[]>([])
+  const [selectedSchool, setSelectedSchool] = useState<any>(null)
+  
   const [credentials, setCredentials] = useState<LoginCredentials>({
     email: "",
     password: "",
@@ -38,53 +45,83 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
   const [showParentPassword, setShowParentPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
 
+  useEffect(() => {
+    const phone = searchParams.get("phone")
+    if (activeTab === "parent") {
+      if (phone) {
+        setParentPhone(phone)
+      }
+    }
+  }, [searchParams, activeTab])
+
+  const handleParentLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginError(null)
+
+    const cleanPhone = parentPhone.replace(/\s+/g, "")
+    
+    if (!parentPhone || parentPhone === "+251") {
+      const errorMsg = "Please enter your registered parent phone number"
+      setLoginError(errorMsg)
+      notifications.error("Validation Error", errorMsg)
+      return
+    }
+
+    // Accept any +251 number (9 digits after country code = 13 chars total)
+    const phoneRegex = /^\+251\d{9}$/
+    if (!phoneRegex.test(cleanPhone)) {
+      const errorMsg = "Phone number must be in format: +251XXXXXXXXX (9 digits)"
+      setLoginError(errorMsg)
+      notifications.error("Validation Error", errorMsg)
+      return
+    }
+
+    if (!parentPassword || parentPassword.length < 6) {
+      const errorMsg = "Please enter your password (min 6 characters)"
+      setLoginError(errorMsg)
+      notifications.error("Validation Error", errorMsg)
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const result = await authService.loginParent(cleanPhone, parentPassword)
+      if (result.success) {
+        setLoginError(null)
+        notifications.success(t("welcome_back_parent"), t("login_success_parent"))
+        
+        // Populate school context
+        if (result.availableSchools && result.availableSchools.length > 0) {
+          setSchoolsFromLogin(result.availableSchools, result.user?.schoolId)
+          
+          if (result.availableSchools.length > 1) {
+            router.push("/parent/school-select")
+          } else {
+            router.push("/parent/dashboard")
+          }
+        } else {
+          router.push("/parent/dashboard")
+        }
+      } else {
+        const errorMessage = result.message || t("invalid_credentials")
+        setLoginError(errorMessage)
+        notifications.error(t("login_failed"), errorMessage)
+      }
+    } catch (error) {
+      const errorMsg = t("unexpected_error")
+      setLoginError(errorMsg)
+      notifications.error(t("login_failed"), errorMsg)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginError(null)
 
     if (activeTab === "parent") {
-      if (!parentPhone || parentPhone === "+251") {
-        const errorMsg = "Please enter your registered parent phone number"
-        setLoginError(errorMsg)
-        notifications.error("Validation Error", errorMsg)
-        return
-      }
-
-      const cleanPhone = parentPhone.replace(/\s+/g, "")
-      const phoneRegex = /^\+2519\d{8}$/
-      if (!phoneRegex.test(cleanPhone)) {
-        const errorMsg = "Phone number must match format: +2519XXXXXXXX"
-        setLoginError(errorMsg)
-        notifications.error("Validation Error", errorMsg)
-        return
-      }
-
-      if (!parentPassword || parentPassword.length < 6) {
-        const errorMsg = "Please enter a valid password (min 6 characters)"
-        setLoginError(errorMsg)
-        notifications.error("Validation Error", errorMsg)
-        return
-      }
-
-      setIsLoading(true)
-      try {
-        const result = await authService.loginParent(cleanPhone, parentPassword)
-        if (result.success) {
-          setLoginError(null)
-          notifications.success(t("welcome_back_parent"), t("login_success_parent"))
-          router.push("/parent/dashboard")
-        } else {
-          const errorMessage = result.message || t("invalid_credentials")
-          setLoginError(errorMessage)
-          notifications.error(t("login_failed"), errorMessage)
-        }
-      } catch (error) {
-        const errorMsg = t("unexpected_error")
-        setLoginError(errorMsg)
-        notifications.error(t("login_failed"), errorMsg)
-      } finally {
-        setIsLoading(false)
-      }
+      handleParentLogin(e)
       return
     }
 
@@ -149,7 +186,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         <CardTitle className="typography-page-title">{t("welcome_back")}</CardTitle>
         <CardDescription className="typography-label text-muted-foreground transition-all duration-300">
           {activeTab === "parent" 
-            ? t("login_desc_parent") 
+            ? t("login_desc_parent")
             : t("login_desc_staff")}
         </CardDescription>
 
@@ -179,85 +216,89 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {activeTab === "parent" ? (
-            <div className="space-y-5 animate-in fade-in duration-300">
-              <div className="space-y-2">
-                <Label htmlFor="parentPhone" className="typography-label">{t("registered_phone")}</Label>
-                <div className="relative group">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-emerald-500 transition-colors">
-                    <Phone className="w-4 h-4" />
-                  </div>
-                  <Input
-                    id="parentPhone"
-                    type="tel"
-                    placeholder={t("parent_phone_placeholder")}
-                    maxLength={13}
-                    value={parentPhone}
-                    onChange={(e) => {
-                      let val = e.target.value.replace(/[^\d+]/g, "")
-                      if (val.lastIndexOf("+") > 0) val = "+" + val.replace(/\+/g, "")
-                      if (!val.startsWith("+251") && val.length > 0 && !val.startsWith("+")) val = "+251" + val
-                      setParentPhone(val)
-                    }}
-                    required
-                    className="typography-body pl-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all rounded-xl"
-                  />
+        {activeTab === "parent" ? (
+          <form onSubmit={handleParentLogin} className="space-y-5 animate-in fade-in duration-300">
+            <div className="space-y-2">
+              <Label htmlFor="parentPhone" className="typography-label">{t("registered_phone")}</Label>
+              <div className="relative group">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-emerald-500 transition-colors">
+                  <Phone className="w-4 h-4" />
                 </div>
-                <p className="typography-helper text-muted-foreground/70 ml-1">Format: +251 9XXXXXXXX (Ethiopian Phone)</p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="parentPassword">{t("password")}</Label>
-                  <Button
-                    variant="link"
-                    type="button"
-                    onClick={onShowForgotPassword}
-                    className="typography-helper text-emerald-600 hover:text-emerald-700 h-auto p-0"
-                  >
-                    {t("forgot_password")}
-                  </Button>
-                </div>
-                <div className="relative group">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-emerald-500 transition-colors">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <Input
-                    id="parentPassword"
-                    type={showParentPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={parentPassword}
-                    onChange={(e) => setParentPassword(e.target.value)}
-                    required
-                    className="typography-body pl-10 pr-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all rounded-xl"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowParentPassword(!showParentPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showParentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2 pb-2">
-                <Checkbox 
-                  id="rememberParent" 
-                  checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                  className="rounded-md border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:text-primary-foreground"
+                <Input
+                  id="parentPhone"
+                  type="tel"
+                  placeholder={t("parent_phone_placeholder")}
+                  maxLength={13}
+                  value={parentPhone}
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/[^\d+]/g, "")
+                    if (val.startsWith("0")) {
+                      val = "+251" + val.substring(1);
+                    } else if (val.length > 0 && !val.startsWith("+")) {
+                      val = "+251" + val
+                    }
+                    if (val.lastIndexOf("+") > 0) val = "+" + val.replace(/\+/g, "")
+                    setParentPhone(val)
+                  }}
+                  required
+                  className="typography-body pl-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all rounded-xl"
                 />
-                <label
-                  htmlFor="rememberParent"
-                  className="typography-label peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  Remember me on this device
-                </label>
               </div>
             </div>
-          ) : (
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="parentPassword">{t("password")}</Label>
+                <Button
+                  variant="link"
+                  type="button"
+                  onClick={onShowForgotPassword}
+                  className="typography-helper text-emerald-600 hover:text-emerald-700 h-auto p-0"
+                >
+                  {t("forgot_password")}
+                </Button>
+              </div>
+              <div className="relative group">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-emerald-500 transition-colors">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <Input
+                  id="parentPassword"
+                  type={showParentPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={parentPassword}
+                  onChange={(e) => setParentPassword(e.target.value)}
+                  required
+                  className="typography-body pl-10 pr-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all rounded-xl"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowParentPassword(!showParentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showParentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="rememberParent" 
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                className="rounded-md border-emerald-600 data-[state=checked]:bg-emerald-600 text-white"
+              />
+              <label htmlFor="rememberParent" className="typography-label cursor-pointer select-none">
+                Remember me on this device
+              </label>
+            </div>
+
+            <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg transition-all active:scale-[0.98]">
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Sign In <ArrowRight className="ml-2 h-4 w-4" /></>}
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-5 animate-in fade-in duration-300">
               <div className="space-y-2">
                 <Label htmlFor="email" className="typography-label">Email Address</Label>
@@ -327,26 +368,26 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                 </label>
               </div>
             </div>
-          )}
 
-          <Button 
-            type="submit" 
-            className={`typography-card-title w-full h-12 rounded-xl shadow-lg transition-all active:scale-[0.98] ${ activeTab === "parent" ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/10 animate-in fade-in" : "shadow-primary/10" }`} 
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {activeTab === "parent" ? t("verifying") : t("signing_in")}
-              </>
-            ) : (
-              <>
-                {activeTab === "parent" ? t("sign_in_parent") : t("sign_in_staff")}
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
-            )}
-          </Button>
-        </form>
+            <Button 
+              type="submit" 
+              className="typography-card-title w-full h-12 rounded-xl shadow-lg transition-all active:scale-[0.98] shadow-primary/10"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t("signing_in")}
+                </>
+              ) : (
+                <>
+                  {t("sign_in_staff")}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+          </form>
+        )}
 
         {onShowAdminSignup && (
           <div className="mt-8 pt-6 border-t border-border/50 text-center">

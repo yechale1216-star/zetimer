@@ -1,6 +1,6 @@
 "use client"
 
-const getApiUrl = () => {
+export const getApiUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   if (typeof window !== "undefined") {
     return `${window.location.protocol}//${window.location.hostname}:5000`;
@@ -114,6 +114,16 @@ class AuthService {
   }
 
   // ─── PARENT LOGIN & SECURITY ───────────────────────────────────────────────
+  async listParentSchools(phone: string): Promise<{ success: boolean; data?: any[]; message?: string }> {
+    try {
+      const res = await fetch(`${API_URL}/api/parent/schools?phone=${encodeURIComponent(phone)}`);
+      return await res.json();
+    } catch (error) {
+      console.error("[pg] listParentSchools error:", error);
+      return { success: false, message: "Network error during school search" };
+    }
+  }
+
   async searchParentByPhone(phone: string): Promise<any> {
     try {
       const res = await fetch(`${API_URL}/api/parent/search?phone=${encodeURIComponent(phone)}`, {
@@ -126,14 +136,14 @@ class AuthService {
     }
   }
 
-  async loginParent(phone: string, password: string): Promise<AuthResponse> {
+  async loginParent(phone: string, password: string, schoolId?: string): Promise<AuthResponse & { availableSchools?: any[] }> {
     try {
-      console.log("[pg] Parent login attempt for phone:", phone);
+      console.log("[pg] Parent login attempt for phone:", phone, "at school:", schoolId);
       
       const res = await fetch(`${API_URL}/api/parent/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({ phone, password, schoolId }),
       });
       
       const data = await res.json();
@@ -143,8 +153,9 @@ class AuthService {
 
       const parentName = data.parentName || "Parent";
       const students = data.students || [];
+      const availableSchools = data.availableSchools || [];
       // data.schoolId is now returned directly by the backend login endpoint
-      const schoolId = data.schoolId || students[0]?.schoolId || "";
+      const resolvedSchoolId = data.schoolId || students[0]?.schoolId || "";
 
       const user: User = {
         id: data.id,
@@ -152,7 +163,7 @@ class AuthService {
         phone: phone,
         name: data.parentName || parentName,
         role: "parent",
-        schoolId: schoolId,
+        schoolId: resolvedSchoolId,
         schoolName: data.schoolName || "My School",
         schoolLogo: data.schoolLogo || "",
         teacherId: "",
@@ -164,13 +175,25 @@ class AuthService {
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user));
         localStorage.setItem("attendance_token", data.token); // Store the JWT token
         localStorage.setItem("parent_students", JSON.stringify(students));
+        localStorage.setItem("available_schools", JSON.stringify(availableSchools));
+        
+        if (resolvedSchoolId) {
+          localStorage.setItem("x-school-id", resolvedSchoolId);
+        }
+        
+        if (availableSchools.length > 1) {
+          localStorage.setItem("has_multiple_schools", "true");
+        } else {
+          localStorage.removeItem("has_multiple_schools");
+        }
+
         if (user.schoolId) {
           const { db } = await import("@/lib/db/database");
           db.initializeSchoolData(user.schoolId);
         }
       }
 
-      return { success: true, message: "Login successful", user };
+      return { success: true, message: "Login successful", user, availableSchools };
     } catch (error) {
       console.error("[pg] Parent login error:", error);
       return { success: false, message: "Login failed", error: "An error occurred during parent login" };
@@ -181,7 +204,7 @@ class AuthService {
     try {
       const res = await fetch(`${API_URL}/api/parent/update-password`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify({ phone, currentPassword, newPassword }),
       });
       const data = await res.json();
@@ -189,6 +212,38 @@ class AuthService {
         return { success: false, message: data.message || "Failed to update password", error: "Update failed" };
       }
       return { success: true, message: data.message || "Password updated successfully" };
+    } catch (error) {
+      return { success: false, message: "Server connection failed", error: "Connection error" };
+    }
+  }
+
+  async updateParentProfile(phone: string, data: { name: string, email: string, address?: string }): Promise<{ success: boolean; message: string; error?: string; user?: User }> {
+    try {
+      const res = await fetch(`${API_URL}/api/parent/profile/${phone}`, {
+        method: "PUT",
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        return { success: false, message: result.message || "Failed to update profile", error: "Update failed" };
+      }
+
+      // Update local storage user data
+      const currentUser = this.getCurrentUser();
+      if (currentUser) {
+        const updatedUser = { 
+          ...currentUser, 
+          name: result.data.name, 
+          email: result.data.email,
+          phone: result.data.phone
+        };
+        localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(updatedUser));
+        window.dispatchEvent(new Event("userSessionChanged"));
+        return { success: true, message: result.message, user: updatedUser };
+      }
+
+      return { success: true, message: result.message };
     } catch (error) {
       return { success: false, message: "Server connection failed", error: "Connection error" };
     }
@@ -264,12 +319,20 @@ class AuthService {
 
   private getAuthHeaders(): Record<string, string> {
     const token = this.isClient() ? localStorage.getItem("attendance_token") : null
+    const schoolId = this.isClient() ? localStorage.getItem("x-school-id") : null
+    
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
+    
     if (token) {
       headers["Authorization"] = `Bearer ${token}`
     }
+    
+    if (schoolId) {
+      headers["x-school-id"] = schoolId
+    }
+    
     return headers
   }
 
@@ -412,6 +475,36 @@ class AuthService {
   isSuperAdmin(): boolean { return this.getCurrentUser()?.role === "super_admin" || false }
   isAdmin(): boolean { return this.getCurrentUser()?.role === "admin" || false }
   isTeacher(): boolean { return this.getCurrentUser()?.role === "teacher" || false }
+
+  async refreshUserProfile(): Promise<User | null> {
+    try {
+      const res = await fetch(`${API_URL}/api/users/profile`, {
+        headers: this.getAuthHeaders(),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        const dbUser = data.data
+        const currentUser = this.getCurrentUser()
+        if (currentUser) {
+          const updatedUser: User = {
+            ...currentUser,
+            name: dbUser.full_name || dbUser.name,
+            email: dbUser.email,
+            phone: dbUser.phone || "",
+            profile_photo: dbUser.profile_photo || "",
+          }
+          if (this.isClient()) {
+            localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(updatedUser))
+          }
+          return updatedUser
+        }
+      }
+      return null
+    } catch (error) {
+      console.error("[pg] refreshUserProfile error:", error)
+      return null
+    }
+  }
 }
 
 export const authService = new AuthService()

@@ -1,6 +1,7 @@
 "use client"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+import { getApiUrl } from "@/lib/auth/auth"
+const API_URL = getApiUrl()
 
 export interface Student {
   id: string
@@ -96,7 +97,8 @@ class Database {
 
   private getApiHeaders(): Record<string, string> {
     const token = typeof window !== "undefined" ? localStorage.getItem("attendance_token") : null
-    const user = this.getCurrentUser()
+    const schoolId = this.getSchoolId()
+    
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
@@ -104,11 +106,30 @@ class Database {
     if (token) {
       headers["Authorization"] = `Bearer ${token}`
     }
+
+    if (schoolId) {
+      headers["x-school-id"] = schoolId
+    }
     
     return headers
   }
 
   // ─── STUDENTS ─────────────────────────────────────────────────────────────
+  async getNextStudentId(): Promise<string> {
+    try {
+      const res = await fetch(`${API_URL}/api/students/auto/next-id`, {
+        headers: this.getApiHeaders(),
+        cache: 'no-store'
+      })
+      if (!res.ok) throw new Error(res.statusText)
+      const result = await res.json()
+      return result.data
+    } catch (error) {
+      console.error("[pg] getNextStudentId error:", error)
+      return ""
+    }
+  }
+
   async getStudents(): Promise<Student[]> {
     try {
       const schoolId = this.getSchoolId()
@@ -182,6 +203,22 @@ class Database {
       method: "DELETE", headers: this.getApiHeaders(),
     })
     if (!res.ok) throw new Error(await res.text())
+  }
+
+  async checkParentsBatch(phones: string[]): Promise<boolean[]> {
+    try {
+      const res = await fetch(`${API_URL}/api/parent/check-batch`, {
+        method: "POST",
+        headers: this.getApiHeaders(),
+        body: JSON.stringify({ phones }),
+      })
+      if (!res.ok) return phones.map(() => false)
+      const result = await res.json()
+      return result.data
+    } catch (error) {
+      console.error("[pg] checkParentsBatch error:", error)
+      return phones.map(() => false)
+    }
   }
 
   // ─── ATTENDANCE ───────────────────────────────────────────────────────────
@@ -375,7 +412,7 @@ class Database {
 
   private defaultSettings() {
     return {
-      schoolName: "Zetime School",
+      schoolName: "Setup Required",
       schoolPhone: "",
       schoolAddress: "",
       academicYear: new Date().getFullYear().toString(),
@@ -480,7 +517,13 @@ class Database {
       const res = await fetch(`${API_URL}/api/assignments`, {
         method: "POST",
         headers: this.getApiHeaders(),
-        body: JSON.stringify({ teacher_id: teacherId, grade, section, subject, stream }),
+        body: JSON.stringify({ 
+          teacher_id: teacherId, 
+          gradeId: grade, 
+          sectionId: section, 
+          streamId: stream,
+          subject 
+        }),
       })
       if (!res.ok) throw new Error(await res.text())
       return (await res.json()).data
@@ -490,11 +533,38 @@ class Database {
     }
   }
 
+
   async removeTeacherAssignment(assignmentId: string): Promise<void> {
     await fetch(`${API_URL}/api/assignments/${assignmentId}`, {
       method: "DELETE", headers: this.getApiHeaders(),
     })
   }
+
+  // ─── ACADEMIC ENTITIES ────────────────────────────────────────────────────
+  async getGrades(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_URL}/api/schools/me/grades`, { headers: this.getApiHeaders() })
+      if (!res.ok) return []
+      return (await res.json()).data
+    } catch { return [] }
+  }
+
+  async getSections(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_URL}/api/schools/me/sections`, { headers: this.getApiHeaders() })
+      if (!res.ok) return []
+      return (await res.json()).data
+    } catch { return [] }
+  }
+
+  async getStreams(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_URL}/api/schools/me/streams`, { headers: this.getApiHeaders() })
+      if (!res.ok) return []
+      return (await res.json()).data
+    } catch { return [] }
+  }
+
 
   // ─── USERS / AUTH HELPERS ─────────────────────────────────────────────────
   async getUserByEmail(email: string): Promise<any> {

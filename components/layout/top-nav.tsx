@@ -13,11 +13,12 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
-import { LogOut, User, Bell, Menu } from "lucide-react"
+import { LogOut, User, Bell, Menu, GraduationCap } from "lucide-react"
 import { useSchoolSettings } from "@/hooks/use-school-settings"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils/utils"
 import { authService } from "@/lib/auth/auth"
+import { useSchool } from "@/lib/context/school-context"
 
 interface TopNavProps {
   onMenuClick?: () => void
@@ -27,13 +28,44 @@ interface TopNavProps {
 export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
   const router = useRouter()
   const { settings } = useSchoolSettings()
+  const { activeSchool } = useSchool()
   const [mounted, setMounted] = React.useState(false)
   const [user, setUser] = React.useState<any>(null)
+  const [logoError, setLogoError] = React.useState(false)
 
   React.useEffect(() => {
     setMounted(true)
     setUser(authService.getCurrentUser())
+
+    const handleSchoolSwitch = () => {
+      setUser(authService.getCurrentUser())
+      setLogoError(false) // Reset error state on switch
+    }
+
+    const handleProfileUpdate = () => {
+      setUser(authService.getCurrentUser())
+    }
+
+    window.addEventListener("schoolSwitched", handleSchoolSwitch as any)
+    window.addEventListener("userSessionChanged", handleProfileUpdate)
+    return () => {
+      window.removeEventListener("schoolSwitched", handleSchoolSwitch as any)
+      window.removeEventListener("userSessionChanged", handleProfileUpdate)
+    }
   }, [])
+
+  // Force reactivity by strictly using context first
+  // If activeSchool is present, it MUST take absolute priority (even if its logo is an empty string)
+  const schoolName = activeSchool ? activeSchool.name : (user?.schoolName || "Zetime Portal")
+  const schoolLogo = activeSchool ? (activeSchool.logo || "") : (user?.schoolLogo || "")
+  const customId = activeSchool ? activeSchool.customSchoolId : (user?.customSchoolId || "")
+  
+  const logoUrl = schoolLogo || ""
+
+  // Reset logo error when logo URL changes
+  React.useEffect(() => {
+    setLogoError(false)
+  }, [logoUrl])
 
   const handleLogout = async () => {
     await authService.logout()
@@ -57,29 +89,33 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
         )}
 
         <div className="flex items-center gap-4 flex-1 overflow-hidden">
-          {/* School Identity */}
           <div className="flex items-center gap-4 overflow-hidden">
             <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0 border border-primary/20 shadow-inner">
-              {user?.schoolLogo ? (
+              {logoUrl && !logoError ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={user.schoolLogo} alt="School Logo" className="w-full h-full object-cover" />
+                <img 
+                  src={logoUrl} 
+                  alt="School Logo" 
+                  className="w-full h-full object-cover" 
+                  onError={() => setLogoError(true)}
+                />
               ) : (
-                <span className="typography-section-title text-primary">
-                  {user?.schoolName?.[0]?.toUpperCase() || "S"}
-                </span>
+                <div className="bg-emerald-50 dark:bg-emerald-950 w-full h-full flex items-center justify-center">
+                  <GraduationCap className="h-6 w-6 text-emerald-600" />
+                </div>
               )}
             </div>
             <div className="flex flex-col overflow-hidden">
               <h1 className="typography-card-title text-primary sm:text-2xl truncate">
-                {user?.schoolName || "School Admin"}
+                {schoolName}
               </h1>
               <div className="flex items-center gap-2">
                 <span className="typography-label text-[10px] text-primary/70 uppercase tracking-[0.2em]">
                   {user?.role === "parent" ? "Parent Portal" : user?.role === "teacher" ? "Teacher Portal" : user?.role === "admin" || user?.role === "school_admin" ? "Admin Portal" : "Management Portal"}
                 </span>
-                {user?.customSchoolId && (
+                {customId && (
                   <span className="typography-label text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20">
-                    {user.customSchoolId}
+                    {customId}
                   </span>
                 )}
               </div>
@@ -112,10 +148,22 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push("/school/admin/profile")}>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => {
+                const target = user?.role === "parent" ? "/parent/profile" : "/school/admin/profile"
+                router.push(target)
+              }}>
                 <User className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
+              {user?.role === "parent" && typeof window !== "undefined" && localStorage.getItem("available_schools") && JSON.parse(localStorage.getItem("available_schools") || "[]").length > 1 && (
+                <DropdownMenuItem onClick={() => router.push("/parent/school-select")}>
+                  <div className="flex items-center text-emerald-600">
+                    <LogOut className="mr-2 h-4 w-4 rotate-180" />
+                    <span>Switch School</span>
+                  </div>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-red-500 hover:text-red-600 focus:text-red-600">
                 <LogOut className="mr-2 h-4 w-4" />

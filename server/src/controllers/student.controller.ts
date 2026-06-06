@@ -15,6 +15,19 @@ export const getStudents = async (req: AuthenticatedRequest, res: Response, next
   }
 };
 
+export const getNextStudentId = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) {
+      return res.status(401).json({ success: false, message: 'School ID context missing' });
+    }
+    const nextId = await studentService.getNextStudentId(schoolId);
+    res.status(200).json({ success: true, data: nextId });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const createStudent = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.user?.schoolId;

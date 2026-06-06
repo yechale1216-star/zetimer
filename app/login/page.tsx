@@ -9,8 +9,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { authService } from '@/lib/auth/auth'
 import { CheckCircle2, Clock, ShieldCheck, Users } from 'lucide-react'
 import { Logo } from '@/components/logo'
+import { Suspense } from 'react'
 
-export default function LoginPage() {
+function LoginContent() {
   const [view, setView] = useState<'login' | 'admin-signup' | 'forgot-password' | 'reset-password'>('login')
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -30,6 +31,8 @@ export default function LoginPage() {
       router.push('/school/admin')
     } else if (user?.role === 'teacher') {
       router.push('/school/teacher')
+    } else if (user?.role === 'parent') {
+      router.push('/parent/dashboard')
     } else if (user?.role === 'super_admin') {
       router.push('/super-admin')
     }
@@ -141,6 +144,18 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 }
 

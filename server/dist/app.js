@@ -57,14 +57,24 @@ const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ limit: '10mb', extended: true }));
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+    console.log(`[DEBUG] ${req.method} ${req.url}`);
+    next();
+});
 // Health check and Auth (Public)
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 app.use('/api/auth', auth_routes_1.default);
-// Parent Login is public (no token required)
-app.post('/api/parent/login', parentController.loginParent);
-app.post('/api/parent/update-password', parentController.updatePassword);
+// Parent Login & Discovery are public (no token required)
+// Define them explicitly to ensure they are handled before tenantMiddleware
+const publicParentRouter = express_1.default.Router();
+publicParentRouter.get('/schools', parentController.listParentSchools);
+publicParentRouter.post('/login', parentController.loginParent);
+publicParentRouter.post('/update-password', parentController.updatePassword);
+publicParentRouter.get('/search', parentController.searchParent);
+app.use('/api/parent', publicParentRouter);
 // Apply Tenant Isolation Middleware to all other API routes
 app.use('/api', tenant_middleware_1.tenantMiddleware);
 // Routes
@@ -74,7 +84,7 @@ app.use('/api/schools', school_routes_1.default);
 app.use('/api/users', user_routes_1.default);
 app.use('/api/assignments', assignment_routes_1.default);
 app.use('/api/settings', settings_routes_1.default);
-app.use('/api/parent', parent_routes_1.default);
+app.use('/api/parent', parent_routes_1.default); // Re-use for other parent routes
 app.use('/api/attendance-analytics', attendance_analytics_routes_1.default);
 app.use('/api/messages', message_routes_1.default);
 // Error handling middleware

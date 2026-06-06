@@ -36,6 +36,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const userService = __importStar(require("../services/user.service"));
 const router = (0, express_1.Router)();
+// Get current user profile
+router.get('/profile', async (req, res, next) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const user = await userService.getUserById(userId);
+        res.status(200).json({ success: true, data: user });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 // Get user by email — used by auth login (Public or filtered)
 router.get('/by-email', async (req, res, next) => {
     try {

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Client } from 'pg';
 import dotenv from 'dotenv';
 import path from 'path';

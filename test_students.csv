@@ -1,0 +1,4 @@
+name,grade,section,stream,gender,date_of_birth,address,parent_name,parent_phone,parent_email,relationshipType,parent_address,parent_password
+Alice Test,Grade 9,A,,Female,2010-01-01,Addis,Parent Alice,+251900000001,alice@example.com,Mother,Addis,pass123
+Bob Test,Grade 11,B,Natural,Male,2008-01-01,Addis,Parent Bob,+251900000002,bob@example.com,Father,Addis,pass123
+Charlie Test,Grade 11,C,Social,Male,2008-05-01,Addis,Parent Charlie,+251900000003,charlie@example.com,Guardian,Addis,pass123

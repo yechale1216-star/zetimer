@@ -8,13 +8,15 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { parentDb, type ParentNotification, type ParentPreferences } from "@/lib/db/parent-db"
 import { useLanguage } from "@/lib/context/language-context"
-import { 
-  Bell, 
-  Settings, 
-  CheckCheck, 
-  Trash2, 
-  Smartphone, 
-  Mail, 
+import { formatLocalizedDate } from "@/lib/utils/date-utils"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
+import {
+  Bell,
+  Settings,
+  CheckCheck,
+  Trash2,
+  Smartphone,
+  Mail,
   Radio,
   Clock,
   XCircle,
@@ -43,10 +45,10 @@ export default function ParentNotifications() {
       try {
         const user = JSON.parse(userStr)
         setCurrentUser(user)
-        
+
         // Fetch notifications
         await fetchNotificationsList(user.phone)
-        
+
         // Fetch channel preferences
         const prefs = await parentDb.getPreferences(user.phone)
         if (prefs) setPreferences(prefs)
@@ -64,6 +66,14 @@ export default function ParentNotifications() {
 
   useEffect(() => {
     loadData()
+
+    const handleStudentChange = () => {
+      setIsLoading(true)
+      loadData()
+    }
+
+    window.addEventListener("studentChanged", handleStudentChange)
+    return () => window.removeEventListener("studentChanged", handleStudentChange)
   }, [])
 
   // 2. Mark notification as read
@@ -72,7 +82,7 @@ export default function ParentNotifications() {
     const success = await parentDb.markNotificationAsRead(notificationId)
     if (success) {
       // Update local state
-      setNotificationsList(prev => 
+      setNotificationsList(prev =>
         prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
       )
       // Trigger header badge refresh
@@ -82,11 +92,16 @@ export default function ParentNotifications() {
 
   // 2.5 Delete notification
   const handleDelete = async (notificationId: string) => {
-    if (!currentUser?.phone) return
-    const success = await parentDb.deleteNotification(notificationId)
-    if (success) {
-      setNotificationsList(prev => prev.filter(n => n.id !== notificationId))
-      window.dispatchEvent(new Event("refreshNotifications"))
+    // Optimistically remove from UI immediately
+    setNotificationsList(prev => prev.filter(n => n.id !== notificationId))
+    window.dispatchEvent(new Event("refreshNotifications"))
+    // Then persist to backend (no phone needed — only notification ID + auth token)
+    try {
+      await parentDb.deleteNotification(notificationId)
+    } catch (err) {
+      console.error("[Notifications] Delete error:", err)
+      // Re-fetch to restore list if server delete failed
+      if (currentUser?.phone) await fetchNotificationsList(currentUser.phone)
     }
   }
 
@@ -145,33 +160,51 @@ export default function ParentNotifications() {
   }
 
   const formatNotificationTime = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr)
-      return date.toLocaleDateString(language === "am" ? "am-ET" : "en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-      })
-    } catch {
-      return dateStr
+    return formatLocalizedDate(dateStr, language, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  // Returns localized title + message based on notification type and student gender.
+  // For attendance alerts, generates the text from t() keys with gender-specific Amharic variants.
+  // For announcements/emergency, falls back to raw backend strings.
+  const localizeNotification = (notification: ParentNotification): { title: string; message: string } => {
+    const studentName = notification.student?.fullName?.split(" ")[0] || ""
+    const isFemale = notification.student?.gender?.toLowerCase() === "female"
+    const suffix = isFemale ? "_f" : ""
+    switch (notification.type) {
+      case "absent":
+        return {
+          title: t(("alert_absent_title" + suffix) as any, { name: studentName }),
+          message: t(("alert_absent_msg" + suffix) as any, { name: studentName }),
+        }
+      case "late":
+        return {
+          title: t(("alert_late_title" + suffix) as any, { name: studentName }),
+          message: t(("alert_late_msg" + suffix) as any, { name: studentName }),
+        }
+      case "warning":
+        return {
+          title: t(("alert_warning_title" + suffix) as any, { name: studentName }),
+          message: t(("alert_warning_msg" + suffix) as any, { name: studentName }),
+        }
+      default:
+        return { title: notification.title, message: notification.message }
     }
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-28 w-full bg-card animate-pulse rounded-3xl" />
-        <div className="h-96 w-full bg-card animate-pulse rounded-3xl" />
-      </div>
-    )
+    return <PageSkeleton variant="cards" />
   }
 
   const unreadCount = notificationsList.filter(n => !n.isRead).length
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      
+
       {/* Page Header */}
       <div>
         <h1 className="typography-page-title text-foreground">{t("alerts_config")}</h1>
@@ -179,9 +212,9 @@ export default function ParentNotifications() {
       </div>
 
       {/* Tabs list layout switcher */}
-      <Tabs 
-        defaultValue="inbox" 
-        value={activeTab} 
+      <Tabs
+        defaultValue="inbox"
+        value={activeTab}
         onValueChange={(val) => setActiveTab(val as any)}
         className="space-y-4"
       >
@@ -223,17 +256,16 @@ export default function ParentNotifications() {
                 <div className="py-20 flex flex-col items-center justify-center text-muted-foreground text-center">
                   <Bell className="w-12 h-12 text-muted-foreground/30 mb-2" />
                   <p className="typography-label">{t("no_alerts")}</p>
-                  <span className="typography-label text-[10px] text-muted-foreground/60 mt-1">Check back later for school newsletters or attendance triggers.</span>
+                  <span className="typography-label text-[10px] text-muted-foreground/60 mt-1">{t("check_back_alerts")}</span>
                 </div>
               ) : (
                 notificationsList.map((notification) => (
-                  <div 
-                    key={notification.id} 
-                    className={`p-4 md:p-6 flex gap-4 transition-all relative ${
-                      !notification.isRead 
-                        ? "bg-emerald-500/5 dark:bg-emerald-500/[0.02]" 
+                  <div
+                    key={notification.id}
+                    className={`group p-4 md:p-6 flex gap-4 transition-all relative ${!notification.isRead
+                        ? "bg-emerald-500/5 dark:bg-emerald-500/[0.02]"
                         : "hover:bg-muted/10"
-                    }`}
+                      }`}
                   >
                     {!notification.isRead && (
                       <div className="w-1.5 bg-emerald-600 dark:bg-emerald-500 absolute left-0 top-0 bottom-0 shrink-0" />
@@ -244,22 +276,28 @@ export default function ParentNotifications() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <span className="typography-label text-foreground">{notification.title}</span>
-                          <span className="typography-label block text-[10px] text-muted-foreground mt-0.5">{formatNotificationTime(notification.createdAt)}</span>
+                          {(() => {
+                            const { title, message } = localizeNotification(notification)
+                            return (
+                              <>
+                                <span className="typography-label text-foreground">{title}</span>
+                                <span className="typography-label block text-[10px] text-muted-foreground mt-0.5">{formatNotificationTime(notification.createdAt)}</span>
+                                <p className="typography-label text-muted-foreground mt-2">{message}</p>
+                              </>
+                            )
+                          })()}
                         </div>
 
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(notification.id)}
-                          className="h-7 w-7 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 rounded-md shrink-0"
+                          className="h-7 w-7 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 rounded-md shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                           title="Dismiss alert"
                         >
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
-                      
-                      <p className="typography-label text-muted-foreground mt-2">{notification.message}</p>
                     </div>
 
                   </div>
@@ -277,7 +315,7 @@ export default function ParentNotifications() {
               <CardDescription className="typography-helper">{t("notifications_desc")}</CardDescription>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              
+
               {/* SMS Channel toggle */}
               <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/10 rounded-2xl">
                 <div className="flex items-start gap-3">
@@ -286,10 +324,10 @@ export default function ParentNotifications() {
                   </div>
                   <div>
                     <p className="typography-label text-foreground">{t("sms_alerts")}</p>
-                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">Receive text message triggers on Absents or Lates.</span>
+                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">{t("sms_alert_desc")}</span>
                   </div>
                 </div>
-                <Switch 
+                <Switch
                   checked={preferences.smsAlerts}
                   onCheckedChange={(checked) => handlePreferenceToggle("smsAlerts", checked)}
                   className="data-[state=checked]:bg-emerald-600"
@@ -304,10 +342,10 @@ export default function ParentNotifications() {
                   </div>
                   <div>
                     <p className="typography-label text-foreground">{t("email_alerts")}</p>
-                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">Receive monthly attendance PDF audit sheets.</span>
+                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">{t("email_alert_desc")}</span>
                   </div>
                 </div>
-                <Switch 
+                <Switch
                   checked={preferences.emailAlerts}
                   onCheckedChange={(checked) => handlePreferenceToggle("emailAlerts", checked)}
                   className="data-[state=checked]:bg-emerald-600"
@@ -322,10 +360,10 @@ export default function ParentNotifications() {
                   </div>
                   <div>
                     <p className="typography-label text-foreground">{t("push_alerts")}</p>
-                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">Receive active web-app updates when mark is altered.</span>
+                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">{t("push_alert_desc")}</span>
                   </div>
                 </div>
-                <Switch 
+                <Switch
                   checked={preferences.pushAlerts}
                   onCheckedChange={(checked) => handlePreferenceToggle("pushAlerts", checked)}
                   className="data-[state=checked]:bg-emerald-600"

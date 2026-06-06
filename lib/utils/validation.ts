@@ -33,8 +33,9 @@ export class ValidationService {
     return { isValid: true }
   }
 
-  static validateEmail(email: string): { isValid: boolean; error?: string } {
+  static validateEmail(email: string, optional: boolean = false): { isValid: boolean; error?: string } {
     if (!email || email.trim().length === 0) {
+      if (optional) return { isValid: true };
       return { isValid: false, error: "Email is required" }
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { authService } from "@/lib/auth/auth"
 import { db } from "@/lib/db/database"
-import { useToast } from "@/hooks/use-toast"
+import { notifications } from "@/lib/utils/notifications"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
+
 
 interface QuickActionsProps {
   onNavigate: (tab: string) => void
@@ -16,7 +17,8 @@ interface QuickActionsProps {
 export function QuickActions({ onNavigate }: QuickActionsProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [studentCount, setStudentCount] = useState(0)
-  const { toast } = useToast()
+
+
   const [isAdmin, setIsAdmin] = useState(false)
   const [user, setUser] = useState<any>(null)
 
@@ -67,26 +69,17 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       const existingAttendance = await db.getAttendanceByDate(today)
 
       if (existingAttendance.length > 0) {
-        toast({
-          title: "Attendance Already Taken",
-          description: `Attendance for ${today} has already been recorded.`,
-          variant: "default",
-        })
+        notifications.info("Attendance Already Taken", `Attendance for ${today} has already been recorded.`)
+
         onNavigate("attendance")
       } else {
-        toast({
-          title: "Quick Action",
-          description: "Navigating to attendance tracking...",
-          variant: "default",
-        })
+        notifications.info("Quick Action", "Navigating to attendance tracking...")
+
         onNavigate("attendance")
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to check attendance status",
-        variant: "destructive",
-      })
+      notifications.error("Error", "Failed to check attendance status")
+
     } finally {
       setIsLoading(false)
     }
@@ -99,26 +92,17 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - 7) // Last 7 days
 
-      toast({
-        title: "Generating Report",
-        description: "Creating weekly attendance report...",
-        variant: "default",
-      })
+      notifications.info("Generating Report", "Creating weekly attendance report...")
+
 
       setTimeout(() => {
         onNavigate("reports")
-        toast({
-          title: "Report Ready",
-          description: "Weekly attendance report is ready to view.",
-          variant: "default",
-        })
+        notifications.success("Report Ready", "Weekly attendance report is ready to view.")
+
       }, 1000)
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to generate report",
-        variant: "destructive",
-      })
+      notifications.error("Error", "Failed to generate report")
+
     } finally {
       setIsLoading(false)
     }

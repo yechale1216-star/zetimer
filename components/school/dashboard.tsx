@@ -14,9 +14,9 @@ import { useSubscription } from "@/lib/context/subscription-context"
 import { useSchoolSettings } from "@/hooks/use-school-settings"
 import { Progress } from "@/components/ui/progress"
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell, Legend, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip
 } from "recharts"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 
 interface DashboardStats {
   totalStudents: number
@@ -152,7 +152,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   useEffect(() => {
     if (!rawData) return
 
-    const { today, all, students } = rawData
+    const { today: rawToday, all: rawAll, students } = rawData
+
+    // If session-based, only consider records that have a session field
+    // to prevent old daily-mode records from polluting the dashboard.
+    const today = isSessionBased ? rawToday.filter(r => r.session) : rawToday
+    const all = isSessionBased ? rawAll.filter(r => r.session) : rawAll
 
     const sessionFilteredToday = sessionFilter === "total" 
       ? today 
@@ -162,13 +167,25 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       ? all 
       : all.filter(a => a.session?.toLowerCase() === sessionFilter.toLowerCase())
 
+    // Helper: status counts as present (Present or Late)
+    const isPresent = (status: string | undefined) => {
+      const s = status?.toLowerCase()
+      return s === "present" || s === "late"
+    }
+
     let presentToday = 0
     let lateToday = 0
     let absentToday = 0
     let excusedToday = 0
 
+    // NEW GRANULAR CLASSIFIER
+    const isP = (s: string | undefined) => s?.toLowerCase() === "present"
+    const isL = (s: string | undefined) => s?.toLowerCase() === "late"
+    const isE = (s: string | undefined) => s?.toLowerCase() === "excused"
+    const isA = (s: string | undefined) => s?.toLowerCase() === "absent"
+    const isAtt = (s: string | undefined) => isP(s) || isL(s)
+
     if (isSessionBased && sessionFilter === "total") {
-      // Group today's records by student ID to avoid double-counting
       const studentGroups: { [studentId: string]: any[] } = {}
       sessionFilteredToday.forEach(a => {
         if (!studentGroups[a.student_id]) studentGroups[a.student_id] = []
@@ -176,34 +193,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       })
 
       Object.values(studentGroups).forEach(records => {
-        const morning = records.find(r => r.session?.toLowerCase() === "morning")
-        const afternoon = records.find(r => r.session?.toLowerCase() === "afternoon")
+        const m = records.find(r => r.session?.toLowerCase() === "morning")
+        const a = records.find(r => r.session?.toLowerCase() === "afternoon")
 
-        const getWeights = (status: string | undefined) => {
-          const s = status?.toLowerCase()
-          return {
-            present: s === "present" ? 0.5 : 0,
-            late: s === "late" ? 0.5 : 0,
-            absent: s === "absent" ? 0.5 : 0,
-            excused: s === "excused" ? 0.5 : 0,
+        if (m && a) {
+          if (isP(m.status) && isP(a.status)) {
+            presentToday++
+          } else if (isAtt(m.status) && isAtt(a.status)) {
+            lateToday++
+          } else if (isE(m.status) && isE(a.status)) {
+            excusedToday++
+          } else if (isA(m.status) && isA(a.status)) {
+            absentToday++
           }
         }
-
-        const mWeight = morning ? getWeights(morning.status) : { present: 0, late: 0, absent: 0, excused: 0 }
-        const aWeight = afternoon ? getWeights(afternoon.status) : { present: 0, late: 0, absent: 0, excused: 0 }
-
-        const multiplier = (morning && afternoon) ? 1 : 2
-
-        presentToday += (mWeight.present + aWeight.present) * multiplier
-        lateToday += (mWeight.late + aWeight.late) * multiplier
-        absentToday += (mWeight.absent + aWeight.absent) * multiplier
-        excusedToday += (mWeight.excused + aWeight.excused) * multiplier
       })
-
-      presentToday = Math.round(presentToday)
-      lateToday = Math.round(lateToday)
-      absentToday = Math.round(absentToday)
-      excusedToday = Math.round(excusedToday)
     } else {
       presentToday = sessionFilteredToday.filter((a) => a.status?.toLowerCase() === "present").length
       lateToday = sessionFilteredToday.filter((a) => a.status?.toLowerCase() === "late").length
@@ -221,7 +225,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       return a.attendance_date === todayDate
     }).length
 
-    const attendanceRate = totalRecentRecords > 0 ? (recentAttendance.length / totalRecentRecords) * 100 : 0
+    const attendanceRate = isSessionBased && sessionFilter === "total"
+      ? (Object.keys(sessionFilteredToday).length > 0 
+          ? ((presentToday + lateToday + excusedToday) / Object.keys(sessionFilteredToday).length) * 100 
+          : 0)
+      : (totalRecentRecords > 0 ? (recentAttendance.length / totalRecentRecords) * 100 : 0)
 
     setStats({
       totalStudents: students.length,
@@ -273,29 +281,73 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       if (dayShort !== "Sat" && dayShort !== "Sun") {
         const dateStr = getTargetDateStr(d)
-        trendDataMap[dateStr] = { date: dateStr, present: 0, late: 0, total: 0 }
+        trendDataMap[dateStr] = { date: dateStr, present: 0, late: 0, total: 0, fullDayPresent: 0, totalStudents: 0 }
         daysFound++
       }
       dayOffset++
     }
 
-    sessionFilteredAll.forEach((record) => {
-      const d = record.attendance_date // Already YYYY-MM-DD from lib/db/database.ts
-      if (trendDataMap[d]) {
-        trendDataMap[d].total++
-        const status = record.status?.toLowerCase()
-        if (status === "present") trendDataMap[d].present++
-        else if (status === "late") trendDataMap[d].late++
-      }
-    })
+    if (isSessionBased && sessionFilter === "total") {
+      // Session-based Full Day view: apply Full Day Present logic per student per date.
+      // All records in 'all' are already session-filtered if isSessionBased is true.
+      
+      const sessionRecords = all.filter(r => trendDataMap[r.attendance_date])
+
+      // Group by date → studentId → { morning, afternoon }
+      const dateStudentMap: Record<string, Record<string, { morning?: string; afternoon?: string }>> = {}
+      sessionRecords.forEach((record) => {
+        const d = record.attendance_date
+        if (!dateStudentMap[d]) dateStudentMap[d] = {}
+        if (!dateStudentMap[d][record.student_id]) dateStudentMap[d][record.student_id] = {}
+        const sess = record.session?.toLowerCase()
+        if (sess === "morning") dateStudentMap[d][record.student_id].morning = record.status
+        else if (sess === "afternoon") dateStudentMap[d][record.student_id].afternoon = record.status
+      })
+
+      // Compute Full Day Present rate per date
+      Object.entries(dateStudentMap).forEach(([dateStr, studentMap]) => {
+        const totalStudentsOnDay = Object.keys(studentMap).length
+        const fullDayPresent = Object.values(studentMap).filter(
+          (entry) =>
+            entry.morning !== undefined &&
+            entry.afternoon !== undefined &&
+            isPresent(entry.morning) &&
+            isPresent(entry.afternoon)
+        ).length
+        if (trendDataMap[dateStr]) {
+          trendDataMap[dateStr].fullDayPresent = fullDayPresent
+          trendDataMap[dateStr].totalStudents = totalStudentsOnDay
+        }
+      })
+    } else {
+      // Non-session-based or single-session filter: count raw records
+      sessionFilteredAll.forEach((record) => {
+        const d = record.attendance_date
+        if (trendDataMap[d]) {
+          trendDataMap[d].total++
+          const status = record.status?.toLowerCase()
+          if (status === "present") trendDataMap[d].present++
+          else if (status === "late") trendDataMap[d].late++
+        }
+      })
+    }
 
     const trendData = Object.values(trendDataMap)
       .sort((a: any, b: any) => a.date.localeCompare(b.date))
-      .map((d: any) => ({
-        // Use T00:00:00 to force local time interpretation of the ISO date
-        date: new Date(d.date + "T00:00:00").toLocaleDateString("en-ET", { timeZone: TARGET_TZ, weekday: "short" }),
-        rate: d.total > 0 ? Math.round(((d.present + d.late) / d.total) * 100) : 0
-      }))
+      .map((d: any) => {
+        let rate = 0
+        if (isSessionBased && sessionFilter === "total") {
+          rate = d.totalStudents > 0
+            ? Math.round((d.fullDayPresent / d.totalStudents) * 100)
+            : 0
+        } else {
+          rate = d.total > 0 ? Math.round(((d.present + d.late) / d.total) * 100) : 0
+        }
+        return {
+          date: new Date(d.date + "T00:00:00").toLocaleDateString("en-ET", { timeZone: TARGET_TZ, weekday: "short" }),
+          rate
+        }
+      })
 
     setChartData({ trendData, statusData })
 
@@ -386,26 +438,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="typography-page-title text-foreground">Dashboard</h2>
-          <div className="typography-body text-muted-foreground">
-            {new Date().toLocaleDateString("en-ET", {
-              timeZone: "Africa/Addis_Ababa",
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </div>
-        </div>
-        <div className="text-center py-12 bg-card border border-border rounded-xl shadow-sm">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
-          <p className="typography-label mt-4 text-muted-foreground">Loading your dashboard insights...</p>
-        </div>
-      </div>
-    )
+    return <PageSkeleton variant="dashboard" />
   }
 
   return (
@@ -437,7 +470,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 size="sm"
                 className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
               >
-                Total
+                Full Day
               </Button>
               <Button 
                 variant={sessionFilter === "morning" ? "default" : "ghost"} 
@@ -487,10 +520,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
             <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
               <div className="flex items-center gap-2 mb-3">
-                <Clock className="h-5 w-5 text-yellow-500 dark:text-yellow-400" />
-                <p className="typography-label text-yellow-600 dark:text-yellow-400 uppercase">Late</p>
+                <Clock className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+                <p className="typography-label text-amber-600 dark:text-amber-400 uppercase">Late</p>
               </div>
-              <p className="typography-page-title text-yellow-600 dark:text-yellow-500">{stats.lateToday}</p>
+              <p className="typography-page-title text-amber-600 dark:text-amber-500">{stats.lateToday}</p>
+            </div>
+
+            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-5 w-5 text-indigo-500 dark:text-indigo-400" />
+                <p className="typography-label text-indigo-600 dark:text-indigo-400 uppercase">Excused</p>
+              </div>
+              <p className="typography-page-title text-indigo-600 dark:text-indigo-500">{stats.excusedToday}</p>
             </div>
 
             <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
@@ -499,14 +540,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <p className="typography-label text-red-600 dark:text-red-400 uppercase">Absent</p>
               </div>
               <p className="typography-page-title text-red-600 dark:text-red-500">{stats.absentToday}</p>
-            </div>
-
-            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                <p className="typography-label text-blue-600 dark:text-blue-400 uppercase">Excused</p>
-              </div>
-              <p className="typography-page-title text-blue-600 dark:text-blue-500">{stats.excusedToday}</p>
             </div>
 
             <div className="flex flex-col p-6 bg-gradient-to-br from-purple-500 to-indigo-600 dark:from-purple-600 dark:to-indigo-800 rounded-xl shadow-lg border-none transform transition-all hover:scale-[1.02] active:scale-[0.98]">
@@ -522,42 +555,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       <QuickActions onNavigate={onNavigate || (() => {})} />
 
-      {trialInfo && (
-        <Card className={`overflow-hidden border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800`}>
-          <CardHeader className="pb-0 border-none">
-            <CardTitle className="typography-card-title flex justify-between items-center">
-              <span className="flex items-center gap-2">
-                <Clock className={`w-5 h-5 ${trialInfo.status === "expired" ? "text-red-500" : "text-blue-600"}`} />
-                Trial Usage
-              </span>
-              <Badge variant={trialInfo.status === "expired" ? "destructive" : "default"} className="animate-pulse">
-                {trialInfo.status === "expired" ? "Expired" : `${trialInfo.daysLeft} Days Left`}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl space-y-4 border border-slate-200 dark:border-slate-700">
-              <div className="space-y-2">
-                <div className="typography-label flex justify-between">
-                  <span className="typography-label text-muted-foreground uppercase text-[10px]">Student Capacity</span>
-                  <span className={stats.totalStudents >= trialInfo.maxStudents ? "text-red-600 font-bold" : "text-foreground"}>
-                    {stats.totalStudents} / {trialInfo.maxStudents}
-                  </span>
-                </div>
-                <Progress 
-                  value={(stats.totalStudents / trialInfo.maxStudents) * 100} 
-                  className={`h-2.5 ${stats.totalStudents >= trialInfo.maxStudents ? "[&>div]:bg-red-500" : "[&>div]:bg-blue-600"}`}
-                />
-              </div>
-              <p className="typography-label text-muted-foreground">
-                {trialInfo.status === "expired" 
-                  ? "Your trial has expired. Upgrade your plan to increase your student capacity."
-                  : "You are currently using the free trial. Upgrade to unlock unlimited students and premium features."}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Analytics Dashboard Charts */}
       {chartData && (

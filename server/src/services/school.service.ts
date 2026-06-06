@@ -72,3 +72,24 @@ export const getAllSchools = async () => {
     orderBy: { createdAt: 'desc' },
   });
 };
+
+export const getGrades = async (schoolId: string) => {
+  return await prisma.grade.findMany({
+    where: { schoolId },
+    orderBy: { name: 'asc' }
+  });
+};
+
+export const getSections = async (schoolId: string) => {
+  return await prisma.section.findMany({
+    where: { schoolId },
+    orderBy: { name: 'asc' }
+  });
+};
+
+export const getStreams = async (schoolId: string) => {
+  return await prisma.stream.findMany({
+    where: { schoolId },
+    orderBy: { name: 'asc' }
+  });
+};

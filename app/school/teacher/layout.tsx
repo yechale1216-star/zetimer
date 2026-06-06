@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils/utils'
 import { ModeToggle } from '@/components/mode-toggle'
 import { Logo } from '@/components/logo'
 import { TopNav } from '@/components/layout/top-nav'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 
 function NavLink({ href, icon, label, active }: { href: string; icon: React.ReactNode; label: string; active: boolean }) {
   return (
@@ -55,7 +56,7 @@ export default function TeacherLayout({
   }
 
   if (!mounted) {
-    return <div className="flex h-screen bg-background items-center justify-center">Loading...</div>
+    return <PageSkeleton variant="dashboard" />
   }
 
   return (
@@ -76,9 +77,17 @@ export default function TeacherLayout({
 
         <div className="p-4 border-t border-border">
           <div className="flex items-center gap-3 px-4 py-2 mb-2">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-              {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-            </div>
+            {user?.profile_photo ? (
+              <img 
+                src={user.profile_photo} 
+                alt={user.name} 
+                className="h-8 w-8 rounded-full object-cover border border-primary/20"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs ring-1 ring-primary/20">
+                {user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+              </div>
+            )}
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
               <p className="text-xs text-muted-foreground truncate capitalize">{user?.role}</p>

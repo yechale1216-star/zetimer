@@ -1,5 +1,6 @@
 import prisma from '../config/db';
 import bcrypt from 'bcryptjs';
+import * as parentService from './parent.service';
 
 // Map database relational model to flat frontend model
 const mapStudentToFlat = (student: any) => {
@@ -27,14 +28,48 @@ export const getAllStudents = async (schoolId: string) => {
   return students.map(mapStudentToFlat);
 };
 
+export const getNextStudentId = async (schoolId: string) => {
+  const idPrefix = 'STU';
+  const latestStudent = await prisma.student.findFirst({
+    where: { 
+      schoolId,
+      student_id: { startsWith: idPrefix }
+    },
+    orderBy: { student_id: 'desc' },
+    select: { student_id: true }
+  });
+
+  let nextSequence = 1;
+  if (latestStudent && latestStudent.student_id) {
+    const currentSequence = parseInt(latestStudent.student_id.substring(idPrefix.length), 10);
+    if (!isNaN(currentSequence)) {
+      nextSequence = currentSequence + 1;
+    }
+  }
+
+  return `${idPrefix}${nextSequence.toString().padStart(4, '0')}`;
+};
+
 export const createStudent = async (data: any, schoolId: string) => {
-  if (!schoolId) throw new Error('School ID is required');
+  console.log(`[StudentService] createStudent called for schoolId: "${schoolId}"`);
+  
+  // Verify school exists
+  const school = await prisma.school.findUnique({ where: { id: schoolId } });
+  if (!school) {
+    console.error(`[StudentService] School not found for ID: "${schoolId}"`);
+    throw new Error('School context invalid - Please logout and login again (database was likely reset)');
+  }
+
+  let studentId = data.student_id;
+  if (!studentId) {
+    studentId = await getNextStudentId(schoolId);
+  }
 
   // Create or connect relations with schoolId scoping
   const newStudent = await prisma.student.create({
     data: {
       fullName: data.name,
-      student_id: data.student_id,
+      student_id: studentId,
       parent_email: data.parent_email || "",
       parent_phone: data.parent_phone || "",
       parent_name: data.parent_name || "",
@@ -68,80 +103,90 @@ export const createStudent = async (data: any, schoolId: string) => {
   });
 
   // Handle Parent User Account creation or linking
-  if (data.existingParentId) {
-    await prisma.parentStudentLink.upsert({
-      where: {
-        parentId_studentId: {
-          parentId: data.existingParentId,
-          studentId: newStudent.id
-        }
-      },
-      update: {
-        relationshipType: data.relationshipType || 'Guardian',
-        schoolId: schoolId
-      },
-      create: {
-        parentId: data.existingParentId,
-        studentId: newStudent.id,
-        schoolId: schoolId,
-        relationshipType: data.relationshipType || 'Guardian'
-      }
-    });
-  } else if (data.parent_phone && data.parent_password) {
-    const cleanPhone = data.parent_phone.replace(/\s+/g, '');
-    const hashedPassword = await bcrypt.hash(data.parent_password, 10);
-    // Use clear pattern for email if not provided to maintain uniqueness
-    const parentEmail = data.parent_email || `parent-${cleanPhone}-${schoolId}@zetime.com`;
+  const parent = await parentService.findOrCreateParentByPhone(data.parent_phone, {
+    name: data.parent_name,
+    email: data.parent_email,
+    password: data.parent_password,
+    address: data.parent_address,
+    schoolId: schoolId
+  });
 
-    const user = await prisma.user.upsert({
-      where: { email: parentEmail },
-      update: {
-        password_hash: hashedPassword,
-        full_name: data.parent_name || 'Parent',
-        phone: cleanPhone,
-        role: 'parent',
-        schoolId: schoolId,
-        address: data.parent_address || null
-      },
-      create: {
-        email: parentEmail,
-        password_hash: hashedPassword,
-        full_name: data.parent_name || 'Parent',
-        phone: cleanPhone,
-        role: 'parent',
-        schoolId: schoolId,
-        address: data.parent_address || null,
-        is_active: true
+  await prisma.parentStudentLink.upsert({
+    where: {
+      parentId_studentId: {
+        parentId: parent.id,
+        studentId: newStudent.id
       }
-    });
-
-    await prisma.parentStudentLink.create({
-      data: {
-        parentId: user.id,
-        studentId: newStudent.id,
-        schoolId: schoolId,
-        relationshipType: data.relationshipType || 'Guardian'
-      }
-    });
-  }
+    },
+    update: {
+      relationshipType: data.relationshipType || 'Guardian',
+      schoolId: schoolId
+    },
+    create: {
+      parentId: parent.id,
+      studentId: newStudent.id,
+      schoolId: schoolId,
+      relationshipType: data.relationshipType || 'Guardian'
+    }
+  });
 
   return mapStudentToFlat(newStudent);
+};
+export const generateStudentId = async (schoolId: string): Promise<string> => {
+  return await getNextStudentId(schoolId);
 };
 
 export const bulkUpsertStudents = async (students: any[], schoolId: string) => {
   if (!schoolId) throw new Error('School ID is required');
 
-  const results = {
-    created: 0,
-    updated: 0,
-    errors: [] as string[]
-  };
+  const results = { created: 0, updated: 0, errors: [] as string[] };
+
+  // Generate a base sequence for auto-generated IDs to avoid collisions during the same bulk operation
+  let autoGenSequenceOffset = 0;
+  const idPrefix = 'STU';
+
+  // Pre-calculate starting sequence if needed
+  const latestStudent = await prisma.student.findFirst({
+    where: {
+      schoolId: schoolId,
+      student_id: { startsWith: idPrefix }
+    },
+    orderBy: { student_id: 'desc' },
+    select: { student_id: true }
+  });
+
+  let nextBaseSequence = 1;
+  if (latestStudent && latestStudent.student_id) {
+    const currentSequence = parseInt(latestStudent.student_id.substring(idPrefix.length), 10);
+    if (!isNaN(currentSequence)) {
+      nextBaseSequence = currentSequence + 1;
+    }
+  }
 
   // Process in sequence to ensure stability and proper parent linking across siblings
   for (let i = 0; i < students.length; i++) {
     const data = students[i];
     try {
-      const studentId = String(data.student_id);
+      let studentId = data.student_id ? String(data.student_id).trim() : null;
+
+      // Auto-generate ID if missing
+      if (!studentId) {
+        studentId = `${idPrefix}${(nextBaseSequence + autoGenSequenceOffset).toString().padStart(4, '0')}`;
+        autoGenSequenceOffset++;
+      }
+
+      // Stream Validation (Ethiopian Standards)
+      const gradeName = String(data.grade).trim();
+      const gradeNum = parseInt(gradeName);
+      
+      if (!isNaN(gradeNum)) {
+        if (gradeNum >= 11 && !data.stream) {
+          throw new Error(`Stream selection (Natural/Social Science) is required for Grade ${gradeName}`);
+        }
+        if (gradeNum <= 10 && data.stream) {
+          data.stream = null; // Enforce no stream for Grades 1-10
+        }
+      }
       
       // 1. Handle Relations (Grade, Section, Stream)
       const grade = await prisma.grade.upsert({
@@ -208,30 +253,12 @@ export const bulkUpsertStudents = async (students: any[], schoolId: string) => {
       }
       // 3. Handle Parent Linking
       if (data.parent_phone) {
-        const cleanPhone = data.parent_phone.replace(/\s+/g, '');
-        const parentEmail = data.parent_email || `parent-${cleanPhone}-${schoolId}@zetime.com`;
-        const tempPassword = data.parent_password || "demo123456";
-        const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
-        const parent = await prisma.user.upsert({
-          where: { email: parentEmail },
-          update: {
-            full_name: data.parent_name || 'Parent',
-            phone: cleanPhone,
-            role: 'parent',
-            schoolId: schoolId,
-            address: data.parent_address || null
-          },
-          create: {
-            email: parentEmail,
-            password_hash: hashedPassword,
-            full_name: data.parent_name || 'Parent',
-            phone: cleanPhone,
-            role: 'parent',
-            schoolId: schoolId,
-            address: data.parent_address || null,
-            is_active: true
-          }
+        const parent = await parentService.findOrCreateParentByPhone(data.parent_phone, {
+          name: data.parent_name,
+          email: data.parent_email,
+          password: data.parent_password,
+          address: data.parent_address,
+          schoolId: schoolId
         });
 
         await prisma.parentStudentLink.upsert({

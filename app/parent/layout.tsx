@@ -119,6 +119,7 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
 
   // 4. Logout handler
   const handleLogout = () => {
+    localStorage.removeItem("attendance_token")
     localStorage.removeItem("attendance_current_user")
     localStorage.removeItem("parent_students")
     localStorage.removeItem("parent_selected_student_id")

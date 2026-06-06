@@ -672,7 +672,9 @@ export function AttendanceTracking() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
               <div className="flex items-center gap-2 mb-2">
-                <UserCheck className="h-4 w-4 text-green-500 dark:text-green-400" />
+                <div className="w-8 h-8 bg-green-100 dark:bg-green-950/40 rounded-lg flex items-center justify-center text-green-600 dark:text-green-400">
+                  <UserCheck className="h-4 w-4" />
+                </div>
                 <p className="typography-label text-[10px] text-muted-foreground uppercase">Present</p>
               </div>
               <p className="typography-page-title text-green-600 dark:text-green-500">{stats.present}</p>
@@ -680,7 +682,9 @@ export function AttendanceTracking() {
 
             <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
               <div className="flex items-center gap-2 mb-2">
-                <Clock className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />
+                <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-950/40 rounded-lg flex items-center justify-center text-yellow-600 dark:text-yellow-400">
+                  <Clock className="h-4 w-4" />
+                </div>
                 <p className="typography-label text-[10px] text-muted-foreground uppercase">Late</p>
               </div>
               <p className="typography-page-title text-yellow-600 dark:text-yellow-500">{stats.late}</p>
@@ -688,7 +692,9 @@ export function AttendanceTracking() {
 
             <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
               <div className="flex items-center gap-2 mb-2">
-                <UserX className="h-4 w-4 text-red-500 dark:text-red-400" />
+                <div className="w-8 h-8 bg-red-100 dark:bg-red-950/40 rounded-lg flex items-center justify-center text-red-600 dark:text-red-400">
+                  <UserX className="h-4 w-4" />
+                </div>
                 <p className="typography-label text-[10px] text-muted-foreground uppercase">Absent</p>
               </div>
               <p className="typography-page-title text-red-600 dark:text-red-500">{stats.absent}</p>
@@ -696,7 +702,9 @@ export function AttendanceTracking() {
 
             <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
               <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-950/40 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <AlertTriangle className="h-4 w-4" />
+                </div>
                 <p className="typography-label text-[10px] text-muted-foreground uppercase">Excused</p>
               </div>
               <p className="typography-page-title text-blue-600 dark:text-blue-500">{stats.excused}</p>

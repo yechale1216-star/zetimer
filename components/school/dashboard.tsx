@@ -412,7 +412,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     <div className="space-y-6 px-4 md:px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
         <div className="space-y-1.5 w-full md:w-auto">
-          <h2 className="typography-page-title text-4xl md:text-5xl font-extrabold text-foreground leading-tight">
+          <h2 className="typography-page-title text-4xl md:text-5xl font-semibold text-foreground leading-tight">
             {getGreeting()}, <span className="text-primary">{firstName}</span>
           </h2>
           <p className="typography-label text-muted-foreground">
@@ -468,53 +468,65 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-3">
-                <Users className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                <p className="typography-label text-foreground uppercase">Total Students</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex flex-row items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md cursor-pointer group">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-950/50 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50">
+                  <Users className="h-5 w-5" />
+                </div>
+                <p className="typography-label text-foreground uppercase text-[10px]">Total Students</p>
               </div>
-              <p className="typography-page-title text-foreground">{stats.totalStudents}</p>
+              <p className="typography-page-title text-foreground text-2xl">{stats.totalStudents}</p>
             </div>
 
-            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-3">
-                <UserCheck className="h-5 w-5 text-green-500 dark:text-green-400" />
-                <p className="typography-label text-green-600 dark:text-green-400 uppercase">Present</p>
+            <div className="flex flex-row items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md cursor-pointer group">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 dark:bg-green-950/50 rounded-lg flex items-center justify-center text-green-600 dark:text-green-400 border border-green-200/50 dark:border-green-800/50">
+                  <UserCheck className="h-5 w-5" />
+                </div>
+                <p className="typography-label text-green-600 dark:text-green-400 uppercase text-[10px]">Present</p>
               </div>
-              <p className="typography-page-title text-green-600 dark:text-green-500">{stats.presentToday}</p>
+              <p className="typography-page-title text-green-600 dark:text-green-500 text-2xl">{stats.presentToday}</p>
             </div>
 
-            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-3">
-                <Clock className="h-5 w-5 text-yellow-500 dark:text-yellow-400" />
-                <p className="typography-label text-yellow-600 dark:text-yellow-400 uppercase">Late</p>
+            <div className="flex flex-row items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md cursor-pointer group">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-950/50 rounded-lg flex items-center justify-center text-yellow-600 dark:text-yellow-400 border border-yellow-200/50 dark:border-yellow-800/50">
+                  <Clock className="h-5 w-5" />
+                </div>
+                <p className="typography-label text-yellow-600 dark:text-yellow-400 uppercase text-[10px]">Late</p>
               </div>
-              <p className="typography-page-title text-yellow-600 dark:text-yellow-500">{stats.lateToday}</p>
+              <p className="typography-page-title text-yellow-600 dark:text-yellow-500 text-2xl">{stats.lateToday}</p>
             </div>
 
-            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-3">
-                <UserX className="h-5 w-5 text-red-500 dark:text-red-400" />
-                <p className="typography-label text-red-600 dark:text-red-400 uppercase">Absent</p>
+            <div className="flex flex-row items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md cursor-pointer group">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 dark:bg-red-950/50 rounded-lg flex items-center justify-center text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-800/50">
+                  <UserX className="h-5 w-5" />
+                </div>
+                <p className="typography-label text-red-600 dark:text-red-400 uppercase text-[10px]">Absent</p>
               </div>
-              <p className="typography-page-title text-red-600 dark:text-red-500">{stats.absentToday}</p>
+              <p className="typography-page-title text-red-600 dark:text-red-500 text-2xl">{stats.absentToday}</p>
             </div>
 
-            <div className="flex flex-col p-6 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md cursor-pointer">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                <p className="typography-label text-blue-600 dark:text-blue-400 uppercase">Excused</p>
+            <div className="flex flex-row items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md cursor-pointer group">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-950/50 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <p className="typography-label text-blue-600 dark:text-blue-400 uppercase text-[10px]">Excused</p>
               </div>
-              <p className="typography-page-title text-blue-600 dark:text-blue-500">{stats.excusedToday}</p>
+              <p className="typography-page-title text-blue-600 dark:text-blue-500 text-2xl">{stats.excusedToday}</p>
             </div>
 
-            <div className="flex flex-col p-6 bg-gradient-to-br from-purple-500 to-indigo-600 dark:from-purple-600 dark:to-indigo-800 rounded-xl shadow-lg border-none transform transition-all hover:scale-[1.02] active:scale-[0.98]">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="h-5 w-5 text-white" />
-                <p className="typography-label text-white/80 uppercase">Rate</p>
+            <div className="flex flex-row items-center justify-between p-4 bg-gradient-to-br from-purple-500 to-indigo-600 dark:from-purple-600 dark:to-indigo-800 rounded-xl shadow-lg border-none transition-all hover:shadow-xl active:scale-[0.98] cursor-pointer">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center text-white border border-white/20">
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+                <p className="typography-label text-white uppercase text-[10px]">Rate</p>
               </div>
-              <p className="typography-page-title text-white">{stats.attendanceRate}%</p>
+              <p className="typography-page-title text-white text-2xl">{stats.attendanceRate}%</p>
             </div>
           </div>
         </CardContent>

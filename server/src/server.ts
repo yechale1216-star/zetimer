@@ -8,6 +8,6 @@ const httpServer = createServer(app);
 // Initialize Socket.IO
 initSocket(httpServer);
 
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, 'localhost', () => {
   console.log(`Server is running on port ${PORT}`);
 });

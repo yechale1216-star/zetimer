@@ -132,25 +132,50 @@ export default function ParentDashboard() {
 
   // ─── DATA CALCULATIONS ──────────────────────────────────────────────────
   
-  // Stats
-  const totalDays = attendance.length
-  const presents = attendance.filter(a => a.status?.toLowerCase() === "present").length
-  const absents = attendance.filter(a => a.status?.toLowerCase() === "absent").length
-  const lates = attendance.filter(a => a.status?.toLowerCase() === "late").length
-  const excused = attendance.filter(a => a.status?.toLowerCase() === "excused").length
+  // Stats - Aggregated by day (to handle session-based double counting)
+  const dailyMetrics = (() => {
+    const byDate: Record<string, string[]> = {}
+    attendance.forEach(a => {
+      const date = new Date(a.date).toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
+      if (!byDate[date]) byDate[date] = []
+      if (a.status) byDate[date].push(a.status.toLowerCase())
+    })
 
-  // Circular gauge percentage calculation (Late is counted as half-present in generic stats)
+    const results = Object.values(byDate).map(statuses => {
+      if (statuses.includes('absent')) return 'absent'
+      if (statuses.includes('late')) return 'late'
+      if (statuses.includes('excused')) return 'excused'
+      if (statuses.includes('present')) return 'present'
+      return 'unmarked'
+    }).filter(s => s !== 'unmarked')
+
+    return {
+      total: results.length,
+      presents: results.filter(s => s === 'present').length,
+      absents: results.filter(s => s === 'absent').length,
+      lates: results.filter(s => s === 'late').length,
+      excused: results.filter(s => s === 'excused').length
+    }
+  })()
+
+  const totalDays = dailyMetrics.total
+  const presents = dailyMetrics.presents
+  const absents = dailyMetrics.absents
+  const lates = dailyMetrics.lates
+  const excused = dailyMetrics.excused
+
+  // Circular gauge percentage calculation (Daily level)
   const attendanceRate = totalDays > 0 
-    ? Math.round(((presents + excused + lates * 0.5) / totalDays) * 100) 
+    ? Math.round(((presents + excused + lates * 0.8) / totalDays) * 100) 
     : 100
 
   // Today's attendance resolver
   const getTodayAttendance = () => {
-    const todayStr = new Date().toISOString().split("T")[0]
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
     
     // Filter records matching today's date in local standard format
     const todayRecords = attendance.filter(a => {
-      const recDate = new Date(a.date).toISOString().split("T")[0]
+      const recDate = new Date(a.date).toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
       return recDate === todayStr
     })
 
@@ -281,7 +306,7 @@ export default function ParentDashboard() {
       
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
         <div className="space-y-1.5 w-full md:w-auto">
-          <h2 className="typography-page-title text-4xl md:text-5xl font-extrabold text-foreground leading-tight">
+          <h2 className="typography-page-title text-4xl md:text-5xl font-semibold text-foreground leading-tight">
             {getGreeting()}, <span className="text-emerald-600 dark:text-emerald-400">{firstName}</span>
           </h2>
           <p className="typography-label text-muted-foreground">

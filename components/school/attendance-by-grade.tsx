@@ -178,8 +178,8 @@ export function AttendanceByGrade() {
         ].map((item, idx) => (
           <Card key={idx} className="border-none shadow-sm bg-white/95 dark:bg-slate-900/90 rounded-2xl transform transition-all hover:scale-[1.02] cursor-default border border-slate-200 dark:border-slate-800">
             <CardContent className="p-4">
-              <div className={`h-8 w-8 rounded-lg bg-${item.color}-500/10 flex items-center justify-center mb-3`}>
-                <item.icon className={`h-4 w-4 text-${item.color}-600 dark:text-${item.color}-400`} />
+              <div className={`h-10 w-10 rounded-xl bg-${item.color}-500/15 flex items-center justify-center mb-3 shadow-sm border border-${item.color}-500/20`}>
+                <item.icon className={`h-5 w-5 text-${item.color}-600 dark:text-${item.color}-400`} />
               </div>
               <p className="typography-label text-[10px] text-muted-foreground uppercase mb-1">{item.label}</p>
               <p className={`typography-section-title ${item.isRate ? 'text-primary' : 'text-foreground'}`}>{item.value}</p>

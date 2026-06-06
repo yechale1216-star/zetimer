@@ -93,19 +93,46 @@ export default function AttendanceHistory() {
   
   // Filter attendance records by selected month and year
   const filteredAttendance = attendance.filter(a => {
-    const date = new Date(a.date)
-    return date.getMonth() === selectedMonth && date.getFullYear() === selectedYear
+    const d = new Date(a.date)
+    const month = parseInt(new Intl.DateTimeFormat('en-US', { month: 'numeric', timeZone: 'Africa/Addis_Ababa' }).format(d)) - 1
+    const year = parseInt(new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'Africa/Addis_Ababa' }).format(d))
+    return month === selectedMonth && year === selectedYear
   })
 
-  // Monthly stats
-  const totalMonthlyDays = filteredAttendance.length
-  const monthlyPresents = filteredAttendance.filter(a => a.status?.toLowerCase() === "present").length
-  const monthlyAbsents = filteredAttendance.filter(a => a.status?.toLowerCase() === "absent").length
-  const monthlyLates = filteredAttendance.filter(a => a.status?.toLowerCase() === "late").length
-  const monthlyExcused = filteredAttendance.filter(a => a.status?.toLowerCase() === "excused").length
+  // Monthly stats - Aggregated by day
+  const monthlyMetrics = (() => {
+    const byDate: Record<string, string[]> = {}
+    filteredAttendance.forEach(a => {
+      const date = new Date(a.date).toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
+      if (!byDate[date]) byDate[date] = []
+      if (a.status) byDate[date].push(a.status.toLowerCase())
+    })
+
+    const results = Object.values(byDate).map(statuses => {
+      if (statuses.includes('absent')) return 'absent'
+      if (statuses.includes('late')) return 'late'
+      if (statuses.includes('excused')) return 'excused'
+      if (statuses.includes('present')) return 'present'
+      return 'unmarked'
+    }).filter(s => s !== 'unmarked')
+
+    return {
+      total: results.length,
+      presents: results.filter(s => s === 'present').length,
+      absents: results.filter(s => s === 'absent').length,
+      lates: results.filter(s => s === 'late').length,
+      excused: results.filter(s => s === 'excused').length
+    }
+  })()
+
+  const totalMonthlyDays = monthlyMetrics.total
+  const monthlyPresents = monthlyMetrics.presents
+  const monthlyAbsents = monthlyMetrics.absents
+  const monthlyLates = monthlyMetrics.lates
+  const monthlyExcused = monthlyMetrics.excused
 
   const monthlyRate = totalMonthlyDays > 0 
-    ? Math.round(((monthlyPresents + monthlyExcused + monthlyLates * 0.5) / totalMonthlyDays) * 100) 
+    ? Math.round(((monthlyPresents + monthlyExcused + monthlyLates * 0.8) / totalMonthlyDays) * 100) 
     : 100
 
   // ─── CALENDAR RENDERING GENERATORS ──────────────────────────────────────
@@ -149,15 +176,15 @@ export default function AttendanceHistory() {
 
   // Days of the month
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateObj = new Date(selectedYear, selectedMonth, d)
-    const dateStr = dateObj.toISOString().split("T")[0]
+    // Create date in Addis Ababa timezone
+    const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
     calendarCells.push({ day: d, dateStr })
   }
 
   // Find attendance status for a calendar day
   const getDayAttendance = (dateStr: string) => {
     const records = attendance.filter(a => {
-      const recDate = new Date(a.date).toISOString().split("T")[0]
+      const recDate = new Date(a.date).toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
       return recDate === dateStr
     })
 
@@ -205,7 +232,7 @@ export default function AttendanceHistory() {
         year: "numeric",
         month: "short",
         day: "numeric",
-        timeZone: "UTC"
+        timeZone: "Africa/Addis_Ababa"
       })
     } catch {
       return dateStr

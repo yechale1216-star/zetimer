@@ -48,7 +48,6 @@ export default function UsersPage() {
                 <option value="super_admin">Super Admin</option>
                 <option value="school_admin">School Admin</option>
                 <option value="teacher">Teacher</option>
-                <option value="student">Student</option>
               </select>
               <Button variant="outline" className="gap-2 w-full">
                 <Download className="w-4 h-4" />

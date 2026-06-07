@@ -79,7 +79,7 @@ export default function SubscriptionPricingPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Tier base rates ($ / student / month)</CardTitle>
+          <CardTitle>Tier base rates (ETB / student / month)</CardTitle>
           <CardDescription>Overrides apply to new calculations across the platform (mock store).</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -123,7 +123,7 @@ export default function SubscriptionPricingPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Label className="text-xs">Rate ($)</Label>
+                  <Label className="text-xs">Rate (ETB)</Label>
                   <Input
                     className="w-32 h-9"
                     type="number"

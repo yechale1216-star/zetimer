@@ -104,11 +104,11 @@ function ViewDetailsModal({ subscription, onClose }: ViewDetailsModalProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="typography-label text-muted-foreground uppercase">Period Total</p>
-              <p className="typography-card-title text-foreground">${(subscription.currentPeriodTotal ?? 0).toFixed(2)}</p>
+              <p className="typography-card-title text-foreground">ETB {(subscription.currentPeriodTotal ?? 0).toLocaleString()}</p>
             </div>
             <div>
               <p className="typography-label text-muted-foreground uppercase">Monthly Equiv.</p>
-              <p className="typography-label text-foreground">${(subscription.effectiveMonthly ?? 0).toFixed(2)}</p>
+              <p className="typography-label text-foreground">ETB {(subscription.effectiveMonthly ?? 0).toLocaleString()}</p>
             </div>
           </div>
 
@@ -277,8 +277,8 @@ export function SubscriptionsList({ searchQuery, statusFilter }: SubscriptionsLi
                         {sub.billingPeriod ?? sub.plan}
                       </td>
                       <td className="typography-label py-3 px-4">{seats}</td>
-                      <td className="typography-label py-3 px-4">${(sub.currentPeriodTotal ?? 0).toFixed(2)}</td>
-                      <td className="typography-label py-3 px-4">${(sub.effectiveMonthly ?? 0).toFixed(2)}</td>
+                      <td className="typography-label py-3 px-4">ETB {(sub.currentPeriodTotal ?? 0).toLocaleString()}</td>
+                      <td className="typography-label py-3 px-4">ETB {(sub.effectiveMonthly ?? 0).toLocaleString()}</td>
                       <td className="typography-body py-3 px-4 text-muted-foreground">{sub.renewalDate}</td>
                       <td className="py-3 px-4">
                         <Badge variant="outline" className={`typography-label ${getStatusColor(sub.status)} text-[10px] uppercase`}>

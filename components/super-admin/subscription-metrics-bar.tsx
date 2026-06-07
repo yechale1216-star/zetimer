@@ -46,8 +46,8 @@ export function SubscriptionMetricsBar() {
   }
 
   const items = [
-    { label: "Total Revenue (billed)", value: `$${m.totalRevenue.toLocaleString()}`, hint: "All-time completed", icon: CreditCard },
-    { label: "MRR (estimated)", value: `$${m.mrr.toLocaleString()}`, hint: "From active + trial", icon: TrendingUp },
+    { label: "Total Revenue (billed)", value: `ETB ${m.totalRevenue.toLocaleString()}`, hint: "All-time completed", icon: CreditCard },
+    { label: "MRR (estimated)", value: `ETB ${m.mrr.toLocaleString()}`, hint: "From active + trial", icon: TrendingUp },
     { label: "Active + Trial", value: String(m.activeSubscriptions), hint: "Subscriptions", icon: Users },
     { label: "Attention", value: String(m.expiringSoon + m.pendingPayment + m.suspended), hint: "Expiring / pending / suspended", icon: AlertTriangle },
   ]

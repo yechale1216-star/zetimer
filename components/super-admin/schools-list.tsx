@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Eye, Edit, Trash2, AlertCircle, UserCheck } from 'lucide-react'
 import Link from 'next/link'
 
 // Mock data
@@ -106,13 +106,24 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
                   <p className="typography-label text-foreground">{school.name}</p>
                   <p className="typography-helper text-muted-foreground">{school.code}</p>
                 </div>
-                <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                    <Eye className="w-4 h-4" />
+                 <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" asChild>
+                    <Link href={`/super-admin/schools/${school.id}`}>
+                      <Eye className="w-4 h-4" />
+                    </Link>
                   </Button>
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
                     <Edit className="w-4 h-4" />
                   </Button>
+                  {school.status === 'active' ? (
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-yellow-600">
+                      <AlertCircle className="w-4 h-4" />
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-green-600">
+                      <UserCheck className="w-4 h-4" />
+                    </Button>
+                  )}
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive">
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -173,17 +184,26 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
                       {school.status === 'active' ? 'Active' : 'Inactive'}
                     </Badge>
                   </td>
-                  <td className="py-3 px-4">
+                   <td className="py-3 px-4">
                     <div className="flex items-center gap-1">
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" asChild>
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="View Details" asChild>
                         <Link href={`/super-admin/schools/${school.id}`}>
                           <Eye className="w-4 h-4" />
                         </Link>
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Edit School">
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                      {school.status === 'active' ? (
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50" title="Suspend School">
+                          <AlertCircle className="w-4 h-4" />
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50" title="Activate School">
+                          <UserCheck className="w-4 h-4" />
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-red-50" title="Delete School">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>

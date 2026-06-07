@@ -71,6 +71,7 @@ export default function SettingsPage() {
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="system">System</TabsTrigger>
+          <TabsTrigger value="localization">Localization</TabsTrigger>
           <TabsTrigger value="email">Email</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="trial">Free Trial</TabsTrigger>
@@ -235,6 +236,62 @@ export default function SettingsPage() {
                   Configure Timeout
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Localization Settings */}
+        <TabsContent value="localization">
+          <Card>
+            <CardHeader>
+              <CardTitle>Localization Settings</CardTitle>
+              <CardDescription>Configure language, date, and region settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="defaultLanguage">Default Language</Label>
+                  <div className="flex gap-2">
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                      <option value="en">English</option>
+                      <option value="am">Amharic (አማርኛ)</option>
+                      <option value="om">Oromo (Afaan Oromoo)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="defaultTimezone">Default Timezone</Label>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                    <option value="Africa/Addis_Ababa">Africa/Addis Ababa (EAT)</option>
+                    <option value="UTC">Coordinated Universal Time (UTC)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-border">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  Ethiopian Localization
+                </h3>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Ethiopian Calendar Support</Label>
+                    <p className="text-sm text-muted-foreground">Show Ge'ez calendar options alongside Gregorian</p>
+                  </div>
+                  <Switch checked={true} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Local Time Format (12h Cycle)</Label>
+                    <p className="text-sm text-muted-foreground">Support Ethiopian local 6-to-6 time cycle</p>
+                  </div>
+                  <Switch checked={false} />
+                </div>
+              </div>
+
+              <Button onClick={handleSave} className="gap-2">
+                <Save className="w-4 h-4" />
+                Save Localization
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

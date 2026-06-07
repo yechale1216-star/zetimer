@@ -331,7 +331,9 @@ export default function StudentPromotionPage() {
       if (!rule) return false
       
       const targetGrade = grades.find(g => g.id === rule.gradeId)
-      if (targetGrade?.name === '11' && !rule.streamId) {
+      // Stream is required for Grade 11 and Grade 12
+      const targetGradeNum = parseInt((targetGrade?.name || '').replace(/[^\d]/g, '')) || 0
+      if (targetGradeNum >= 11 && !rule.streamId) {
         return false
       }
     }
@@ -537,7 +539,7 @@ export default function StudentPromotionPage() {
                                 <CardHeader className="p-4 flex flex-col space-y-2 relative">
                                   <div className="flex items-center justify-between">
                                     <Badge variant="outline" className={`transition-colors font-bold ${isSelected ? 'bg-primary text-white border-primary' : 'bg-primary/5 text-primary border-primary/20'}`}>
-                                      Grade {cohort.gradeName}
+                                      {cohort.gradeName}
                                     </Badge>
                                     <div className="flex items-center gap-2">
                                       {isSelected && (
@@ -733,7 +735,7 @@ export default function StudentPromotionPage() {
                         <div key={cohort.id} className="py-4 border-b border-border/50 last:border-0 group">
                           <div className="flex flex-col mb-3">
                             <span className="font-black text-sm text-slate-900 dark:text-white flex items-center justify-between">
-                              Grade {cohort.gradeName} - Sec {cohort.sectionName}
+                              {cohort.gradeName} - Sec {cohort.sectionName}
                               <Badge variant="secondary" className="text-[9px] font-black h-5">
                                 {promotionMode === 'bulk' ? cohort.count : selectedStudentIds[cohort.id]?.size}
                               </Badge>
@@ -758,30 +760,15 @@ export default function StudentPromotionPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   {grades.map(g => (
-                                    <SelectItem key={g.id} value={g.id}>Grade {g.name}</SelectItem>
+                                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                                   ))}
                                   <SelectItem value="GRADUATE">🎓 Graduation</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
 
-                            {promotionRules[cohort.id]?.gradeId !== 'GRADUATE' && (
-                              <div className="space-y-1">
-                                <Label className="text-[9px] font-black text-muted-foreground uppercase ml-1">Target Section Name</Label>
-                                <Input 
-                                  placeholder="e.g. A"
-                                  className="h-10 bg-slate-50/50 dark:bg-slate-950/50 border-none text-sm font-bold"
-                                  value={promotionRules[cohort.id]?.sectionName || ''}
-                                  onChange={(e) => setPromotionRules(prev => ({
-                                    ...prev,
-                                    [cohort.id]: { ...prev[cohort.id], sectionName: e.target.value }
-                                  }))}
-                                />
-                              </div>
-                            )}
-
-                            {/* Stream Selection logic (e.g. Grade 10 -> 11) */}
-                            {grades.find(g => g.id === promotionRules[cohort.id]?.gradeId)?.name === '11' && (
+                            {/* Stream Selection logic — required for Grade 11 & 12, shown before Section */}
+                            {(() => { const gn = parseInt((grades.find(g => g.id === promotionRules[cohort.id]?.gradeId)?.name || '').replace(/[^\d]/g, '')) || 0; return gn >= 11; })() && (
                               <div className="space-y-1">
                                 <Label className="text-[9px] font-black text-violet-600 uppercase ml-1 tracking-widest">Mandatory Stream</Label>
                                 <Select 
@@ -795,11 +782,33 @@ export default function StudentPromotionPage() {
                                     <SelectValue placeholder="Select Stream" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {streams.map(s => (
-                                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                    ))}
+                                    {streams
+                                      .filter(s => /natural/i.test(s.name))
+                                      .map(s => (
+                                        <SelectItem key={s.id} value={s.id}>Natural Science</SelectItem>
+                                      ))}
+                                    {streams
+                                      .filter(s => /social/i.test(s.name))
+                                      .map(s => (
+                                        <SelectItem key={s.id} value={s.id}>Social Science</SelectItem>
+                                      ))}
                                   </SelectContent>
                                 </Select>
+                              </div>
+                            )}
+
+                            {promotionRules[cohort.id]?.gradeId !== 'GRADUATE' && (
+                              <div className="space-y-1">
+                                <Label className="text-[9px] font-black text-muted-foreground uppercase ml-1">Target Section Name</Label>
+                                <Input 
+                                  placeholder="e.g. A"
+                                  className="h-10 bg-slate-50/50 dark:bg-slate-950/50 border-none text-sm font-bold"
+                                  value={promotionRules[cohort.id]?.sectionName || ''}
+                                  onChange={(e) => setPromotionRules(prev => ({
+                                    ...prev,
+                                    [cohort.id]: { ...prev[cohort.id], sectionName: e.target.value }
+                                  }))}
+                                />
                               </div>
                             )}
                           </div>

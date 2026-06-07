@@ -163,15 +163,15 @@ export function DynamicPriceCalculator() {
               {result.lineItems?.map((row: { label: string; amount: number }, i: number) => (
                 <div key={i} className="typography-body flex justify-between">
                   <span>{row.label}</span>
-                  <span className="typography-label">${row.amount.toFixed(2)}</span>
+                  <span className="typography-label">ETB {row.amount.toLocaleString()}</span>
                 </div>
               ))}
             </div>
             <div className="typography-card-title flex justify-between border-t border-border pt-3">
               <span>Total ({result.billingMonths} mo)</span>
-              <span>${result.total?.toFixed(2)}</span>
+              <span>ETB {result.total?.toLocaleString()}</span>
             </div>
-            <p className="typography-body text-muted-foreground">Effective monthly: ${result.effectiveMonthly?.toFixed(2)}</p>
+            <p className="typography-body text-muted-foreground">Effective monthly: ETB {result.effectiveMonthly?.toLocaleString()}</p>
           </div>
         )}
       </CardContent>

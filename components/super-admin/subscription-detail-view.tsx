@@ -144,11 +144,11 @@ export function SubscriptionDetailView() {
           <CardContent className="typography-body space-y-2">
             <div className="typography-card-title flex justify-between">
               <span>Period total</span>
-              <span>${(sub.priceBreakdown?.total ?? 0).toFixed(2)}</span>
+              <span>ETB {(sub.priceBreakdown?.total ?? 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Effective monthly</span>
-              <span>${(sub.priceBreakdown?.effectiveMonthly ?? 0).toFixed(2)}</span>
+              <span>ETB {(sub.priceBreakdown?.effectiveMonthly ?? 0).toLocaleString()}</span>
             </div>
           </CardContent>
         </Card>
@@ -217,7 +217,7 @@ export function SubscriptionDetailView() {
             {(sub.billingHistory || []).map((b: any) => (
               <div key={b.id} className="typography-body flex justify-between border-b border-border/60 py-2 last:border-0">
                 <div>
-                  <p className="typography-label">${b.amount}</p>
+                  <p className="typography-label">ETB {b.amount.toLocaleString()}</p>
                   <p className="typography-helper text-muted-foreground">{b.description}</p>
                 </div>
                 <span className="typography-helper text-muted-foreground">{b.date}</span>
@@ -237,7 +237,7 @@ export function SubscriptionDetailView() {
               {(sub.invoices || []).map((inv: any) => (
                 <div key={inv.id} className="typography-body flex justify-between py-1">
                   <span>{inv.number}</span>
-                  <span className="typography-label">${inv.amount}</span>
+                  <span className="typography-label">ETB {inv.amount.toLocaleString()}</span>
                 </div>
               ))}
             </div>
@@ -246,7 +246,7 @@ export function SubscriptionDetailView() {
               {(sub.transactions || []).map((t: any) => (
                 <div key={t.id} className="typography-body flex justify-between py-1">
                   <span className="capitalize">{t.type}</span>
-                  <span className={t.amount < 0 ? "text-green-600" : ""}>${t.amount}</span>
+                  <span className={t.amount < 0 ? "text-green-600" : ""}>ETB {t.amount.toLocaleString()}</span>
                 </div>
               ))}
             </div>

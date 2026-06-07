@@ -47,7 +47,7 @@ export function RevenueChart() {
                 border: '1px solid var(--border)',
                 borderRadius: '0.5rem',
               }}
-              formatter={(value) => `$${value.toLocaleString()}`}
+              formatter={(value) => `${value.toLocaleString()} ETB`}
             />
             <Legend />
             <Line
@@ -56,7 +56,7 @@ export function RevenueChart() {
               stroke="var(--chart-1)"
               strokeWidth={2}
               dot={false}
-              name="Revenue ($)"
+              name="Revenue (ETB)"
             />
             <Line
               type="monotone"

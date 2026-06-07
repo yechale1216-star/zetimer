@@ -75,6 +75,9 @@ export function UsersList({ searchQuery, roleFilter }: UsersListProps) {
   const itemsPerPage = 10
 
   const filteredUsers = mockUsers.filter((user) => {
+    // Standard rule for Super Admin: Students are managed within schools, not here
+    if (user.role === 'student') return false
+
     const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||

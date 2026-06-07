@@ -129,13 +129,14 @@ export class PromotionService {
       const toGrade = await prisma.grade.findUnique({ where: { id: toGradeId } });
       const fromGrade = gradeId ? await prisma.grade.findUnique({ where: { id: gradeId } }) : null;
       
-      // If promoting to Grade 11, stream is REQUIRED
-      if (toGrade?.name === '11' && !toStreamId) {
-        throw new Error('Stream assignment (Natural or Social Science) is required when promoting to Grade 11');
+      // If promoting to Grade 11 or 12, stream is REQUIRED
+      const toGradeNum = parseInt((toGrade?.name || '').replace(/[^\d]/g, '')) || 0;
+      if (toGradeNum >= 11 && !toStreamId) {
+        throw new Error('Stream assignment (Natural or Social Science) is required when promoting to Grade 11 or 12');
       }
 
       // If promoting to Grade <= 10, ensure stream is null
-      if (toGrade && (parseInt(toGrade.name) || 0) <= 10) {
+      if (toGradeNum > 0 && toGradeNum <= 10) {
         toStreamId = null as any;
       }
     }
@@ -211,7 +212,7 @@ export class PromotionService {
         // Update Student Record
         if (toGradeId && toGradeId !== 'GRADUATE') {
           const toGrade = await tx.grade.findUnique({ where: { id: toGradeId } });
-          const toGradeNum = toGrade ? parseInt(toGrade.name.replace(/[^\d]/g, '')) : 0;
+          const toGradeNum = toGrade ? parseInt((toGrade.name || '').replace(/[^\d]/g, '')) || 0 : 0;
           const isSecondary = toGradeNum >= 11;
 
           await tx.student.update({

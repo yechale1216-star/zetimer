@@ -73,7 +73,7 @@ export default function BillingHistoryPage() {
                 <tr key={r.id} className="border-b border-border/70">
                   <td className="py-3 pr-4 whitespace-nowrap">{r.date}</td>
                   <td className="py-3 pr-4 font-medium">{r.schoolName}</td>
-                  <td className="py-3 pr-4">${r.amount.toLocaleString()}</td>
+                  <td className="py-3 pr-4">ETB {r.amount.toLocaleString()}</td>
                   <td className="py-3 pr-4">
                     <Badge variant="secondary" className="capitalize">
                       {r.status}

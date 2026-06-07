@@ -480,13 +480,14 @@ export function StudentManagement() {
         "parent_address",
         "parent_password"
       ]
-      const example = [
+      // Example row 1: Grade 11 student WITH stream (required for Grade 11 & 12)
+      const example1 = [
         "John Doe",
-        "Grade 10",
+        "Grade 11",
         "Natural",
         "A",
         "Male",
-        "2009-05-15",
+        "2008-05-15",
         "Addis Ababa, Bole",
         "Jane Doe",
         "+251911223344",
@@ -494,6 +495,22 @@ export function StudentManagement() {
         "Mother",
         "Addis Ababa, Bole",
         "password123"
+      ]
+      // Example row 2: Grade 10 student WITHOUT stream (stream not required for Grade 1-10)
+      const example2 = [
+        "Sara Tadesse",
+        "Grade 10",
+        "",
+        "B",
+        "Female",
+        "2009-08-20",
+        "Addis Ababa, Kirkos",
+        "Tadesse Alemu",
+        "+251922334455",
+        "tadesse@example.com",
+        "Father",
+        "Addis Ababa, Kirkos",
+        "password456"
       ]
 
       const escapeCSV = (field: string) => {
@@ -505,7 +522,8 @@ export function StudentManagement() {
       }
 
       let csvContent = headers.map(escapeCSV).join(",") + "\n"
-      csvContent += example.map(escapeCSV).join(",") + "\n"
+      csvContent += example1.map(escapeCSV).join(",") + "\n"
+      csvContent += example2.map(escapeCSV).join(",") + "\n"
 
       console.log("[v0] CSV template content generated")
 

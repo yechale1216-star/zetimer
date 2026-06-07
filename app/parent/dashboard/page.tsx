@@ -7,13 +7,14 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { parentDb, type ParentNotification } from "@/lib/db/parent-db"
 import { useLanguage } from "@/lib/context/language-context"
-import { 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
-  BookOpen, 
+import { PageSkeleton } from "@/components/ui/page-skeleton"
+import {
+  Calendar,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  BookOpen,
   Activity,
   Heart,
   TrendingUp,
@@ -23,21 +24,26 @@ import {
   Megaphone,
   AlertOctagon,
   ArrowRight,
-  UserCheck
+  UserCheck,
+  X
 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { formatLocalizedDate } from "@/lib/utils/date-utils"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
 export default function ParentDashboard() {
   const router = useRouter()
   const { t } = useLanguage()
-  
+
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [firstName, setFirstName] = useState("Parent")
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
   const [attendance, setAttendance] = useState<any[]>([])
   const [notificationsList, setNotificationsList] = useState<ParentNotification[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [statsMode, setStatsMode] = useState<"daily" | "session">("daily")
+  const [statsSession, setStatsSession] = useState<"morning" | "afternoon">("morning")
 
   // 1. Initial Load & Auth verification
   const loadStudentData = async () => {
@@ -69,7 +75,7 @@ export default function ParentDashboard() {
       if (studentsStr && studentId) {
         const students = JSON.parse(studentsStr)
         const student = students.find((s: any) => s.id === studentId) || students[0]
-        
+
         if (student) {
           setSelectedStudent(student)
           await fetchStudentAttendance(student.id)
@@ -94,13 +100,21 @@ export default function ParentDashboard() {
   // 2. Fetch student's attendance list
   const fetchStudentAttendance = async (studentId: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/attendance?studentId=${studentId}`)
+      const token = localStorage.getItem("attendance_token") || "";
+      const schoolId = localStorage.getItem("x-school-id") || "";
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        ...(schoolId ? { "x-school-id": schoolId } : {})
+      };
+
+      const res = await fetch(`${API_URL}/api/attendance?studentId=${studentId}`, { headers })
       const data = await res.json()
       if (data.success && data.data) {
         setAttendance(data.data)
       } else {
         // Fallback to student relation directly if query fails
-        const studentRes = await fetch(`${API_URL}/api/students/${studentId}`)
+        const studentRes = await fetch(`${API_URL}/api/students/${studentId}`, { headers })
         const studentData = await studentRes.json()
         if (studentData.success && studentData.data?.attendance) {
           setAttendance(studentData.data.attendance)
@@ -130,77 +144,112 @@ export default function ParentDashboard() {
     return () => window.removeEventListener("studentChanged", handleStudentChange)
   }, [])
 
+  const handleDismissAlert = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const success = await parentDb.markNotificationAsRead(id);
+    if (success) {
+      setNotificationsList(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+      window.dispatchEvent(new Event("refreshNotifications"));
+    }
+  }
+
   // ─── DATA CALCULATIONS ──────────────────────────────────────────────────
-  
-  // Stats - Aggregated by day (to handle session-based double counting)
-  const dailyMetrics = (() => {
-    const byDate: Record<string, string[]> = {}
+
+  // ─── GLOBAL STATS CALCULATIONS ──────────────────────────────────────────
+
+  const isP = (s: string | undefined) => s?.toLowerCase() === "present"
+  const isL = (s: string | undefined) => s?.toLowerCase() === "late"
+  const isE = (s: string | undefined) => s?.toLowerCase() === "excused"
+  const isA = (s: string | undefined) => s?.toLowerCase() === "absent"
+  const isAtt = (s: string | undefined) => isP(s) || isL(s)
+
+  const { dashboardStats } = (() => {
+    // 1. Group by date
+    const byDate: Record<string, { morning?: any; afternoon?: any; daily?: any }> = {}
     attendance.forEach(a => {
-      const date = new Date(a.date).toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
-      if (!byDate[date]) byDate[date] = []
-      if (a.status) byDate[date].push(a.status.toLowerCase())
+      const dateStr = (a.date || "").slice(0, 10)
+      if (!byDate[dateStr]) byDate[dateStr] = {}
+      const sess = a.session?.toLowerCase()
+      if (sess === "morning") byDate[dateStr].morning = a
+      else if (sess === "afternoon") byDate[dateStr].afternoon = a
+      else byDate[dateStr].daily = a
     })
 
-    const results = Object.values(byDate).map(statuses => {
-      if (statuses.includes('absent')) return 'absent'
-      if (statuses.includes('late')) return 'late'
-      if (statuses.includes('excused')) return 'excused'
-      if (statuses.includes('present')) return 'present'
-      return 'unmarked'
-    }).filter(s => s !== 'unmarked')
+    const finalRecords: any[] = []
+    Object.values(byDate).forEach(entry => {
+      let status = ""
+      if (statsMode === "daily") {
+        if (entry.morning && entry.afternoon) {
+          if (isP(entry.morning.status) && isP(entry.afternoon.status)) status = "present"
+          else if (isAtt(entry.morning.status) && isAtt(entry.afternoon.status)) status = "late"
+          else if (isE(entry.morning.status) && isE(entry.afternoon.status)) status = "excused"
+          else if (isA(entry.morning.status) && isA(entry.afternoon.status)) status = "absent"
+        } else if (entry.morning || entry.afternoon || entry.daily) {
+          status = (entry.morning || entry.afternoon || entry.daily).status?.toLowerCase() || ""
+        }
+      } else {
+        const r = statsSession === "morning" ? entry.morning : entry.afternoon
+        status = r?.status?.toLowerCase() || ""
+      }
+      if (status) finalRecords.push({ status })
+    })
 
-    return {
-      total: results.length,
-      presents: results.filter(s => s === 'present').length,
-      absents: results.filter(s => s === 'absent').length,
-      lates: results.filter(s => s === 'late').length,
-      excused: results.filter(s => s === 'excused').length
+    const stats = {
+      total: finalRecords.length,
+      presents: finalRecords.filter(r => isP(r.status)).length,
+      absents: finalRecords.filter(r => isA(r.status)).length,
+      lates: finalRecords.filter(r => isL(r.status)).length,
+      excused: finalRecords.filter(r => isE(r.status)).length,
+      rate: 100
     }
+    const attending = stats.presents + stats.lates + stats.excused
+    stats.rate = stats.total > 0 ? Math.round((attending / stats.total) * 100) : 100
+
+    return { dashboardStats: stats }
   })()
-
-  const totalDays = dailyMetrics.total
-  const presents = dailyMetrics.presents
-  const absents = dailyMetrics.absents
-  const lates = dailyMetrics.lates
-  const excused = dailyMetrics.excused
-
-  // Circular gauge percentage calculation (Daily level)
-  const attendanceRate = totalDays > 0 
-    ? Math.round(((presents + excused + lates * 0.8) / totalDays) * 100) 
-    : 100
 
   // Today's attendance resolver
   const getTodayAttendance = () => {
     const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
-    
-    // Filter records matching today's date in local standard format
+
+    // Filter records matching today's date in local timezone
     const todayRecords = attendance.filter(a => {
       const recDate = new Date(a.date).toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
       return recDate === todayStr
     })
 
-    if (todayRecords.length === 0) {
-      return { status: t("unmarked"), morning: null, afternoon: null, isSessionBased: false }
-    }
+    const isP = (s: string | undefined) => s?.toLowerCase() === "present"
+    const isL = (s: string | undefined) => s?.toLowerCase() === "late"
+    const isE = (s: string | undefined) => s?.toLowerCase() === "excused"
+    const isA = (s: string | undefined) => s?.toLowerCase() === "absent"
+    const isAtt = (s: string | undefined) => isP(s) || isL(s)
 
     const morningRec = todayRecords.find(r => r.session?.toLowerCase() === "morning")
     const afternoonRec = todayRecords.find(r => r.session?.toLowerCase() === "afternoon")
     const dailyRec = todayRecords.find(r => !r.session)
 
-    if (morningRec || afternoonRec) {
-      return {
-        status: "Marked",
-        morning: morningRec?.status || "Unmarked",
-        afternoon: afternoonRec?.status || "Unmarked",
-        isSessionBased: true
-      }
+    let dailyStatus = t("unmarked")
+    if (morningRec && afternoonRec) {
+      if (isP(morningRec.status) && isP(afternoonRec.status)) dailyStatus = t("presents")
+      else if (isAtt(morningRec.status) && isAtt(afternoonRec.status)) dailyStatus = t("late_arrivals")
+      else if (isE(morningRec.status) && isE(afternoonRec.status)) dailyStatus = t("excused")
+      else if (isA(morningRec.status) && isA(afternoonRec.status)) dailyStatus = t("absents")
+      else dailyStatus = t("mixed")
+    } else if (morningRec || afternoonRec || dailyRec) {
+      const rec = (morningRec || afternoonRec || dailyRec);
+      const s = rec.status?.toLowerCase();
+      if (s === "present") dailyStatus = t("presents");
+      else if (s === "absent") dailyStatus = t("absents");
+      else if (s === "late") dailyStatus = t("late_arrivals");
+      else if (s === "excused") dailyStatus = t("excused");
+      else dailyStatus = rec.status || t("unmarked");
     }
 
     return {
-      status: dailyRec?.status || "Unmarked",
-      morning: null,
-      afternoon: null,
-      isSessionBased: false
+      daily: dailyRec?.status || null,
+      morning: morningRec?.status || null,
+      afternoon: afternoonRec?.status || null,
+      isSessionBased: !!(morningRec || afternoonRec)
     }
   }
 
@@ -211,20 +260,16 @@ export default function ParentDashboard() {
   const emergencyNotice = announcements.find(a => a.type === "emergency")
 
   // Child specific alerts (absent & late notifications)
-  const recentAlerts = notificationsList.filter(n => (n.type === "absent" || n.type === "late" || n.type === "warning") && n.studentId === selectedStudent?.id)
+  const recentAlerts = notificationsList.filter(n => !n.isRead && (n.type === "absent" || n.type === "late" || n.type === "warning") && n.studentId === selectedStudent?.id)
 
+  const { language } = useLanguage()
   const formatNotificationTime = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr)
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-      })
-    } catch {
-      return dateStr
-    }
+    return formatLocalizedDate(dateStr, language, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
   }
 
   // Visual status stylers
@@ -232,13 +277,13 @@ export default function ParentDashboard() {
     const s = status.toLowerCase()
     switch (s) {
       case "present":
-        return <Badge className="typography-label bg-emerald-500 hover:bg-emerald-600 border-none rounded-lg">{t("presents")}</Badge>
+        return <Badge className="typography-label bg-emerald-500 hover:bg-emerald-600 border-none rounded-lg px-3">{t("presents")}</Badge>
       case "absent":
-        return <Badge className="typography-label bg-rose-500 hover:bg-rose-600 border-none rounded-lg">{t("absents")}</Badge>
+        return <Badge className="typography-label bg-rose-500 hover:bg-rose-600 border-none rounded-lg px-3">{t("absents")}</Badge>
       case "late":
-        return <Badge className="typography-label bg-amber-500 hover:bg-amber-600 border-none rounded-lg">{t("late_arrivals")}</Badge>
+        return <Badge className="typography-label bg-amber-500 hover:bg-amber-600 border-none rounded-lg px-3">{t("late_arrivals")}</Badge>
       case "excused":
-        return <Badge className="typography-label bg-blue-500 hover:bg-blue-600 border-none rounded-lg">{t("excused")}</Badge>
+        return <Badge className="typography-label bg-blue-500 hover:bg-blue-600 border-none rounded-lg px-3">{t("excused")}</Badge>
       default:
         return <Badge variant="outline" className="typography-label rounded-lg px-3 py-1">{t("unmarked")}</Badge>
     }
@@ -288,22 +333,12 @@ export default function ParentDashboard() {
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-32 w-full bg-card animate-pulse rounded-3xl" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="h-40 bg-card animate-pulse rounded-3xl" />
-          <div className="h-40 bg-card animate-pulse rounded-3xl" />
-          <div className="h-40 bg-card animate-pulse rounded-3xl" />
-        </div>
-        <div className="h-64 bg-card animate-pulse rounded-3xl" />
-      </div>
-    )
+    return <PageSkeleton variant="dashboard" />
   }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
         <div className="space-y-1.5 w-full md:w-auto">
           <h2 className="typography-page-title text-4xl md:text-5xl font-semibold text-foreground leading-tight">
@@ -341,24 +376,33 @@ export default function ParentDashboard() {
                 <p className="typography-label text-emerald-600 dark:text-emerald-400 uppercase mb-1">{t("today_attendance")}</p>
                 <h2 className="typography-page-title text-foreground">{selectedStudent?.fullName}</h2>
                 <p className="typography-label text-foreground/80 dark:text-foreground/70 mt-1.5 flex items-center gap-2">
-                  <Badge variant="secondary" className="typography-label">Grade {selectedStudent?.grade}</Badge>
+                  <Badge variant="secondary" className="typography-label">{t("grade")} {selectedStudent?.grade}</Badge>
                   <span className="opacity-40">•</span>
-                  <Badge variant="secondary" className="typography-label">Section {selectedStudent?.section}</Badge>
+                  <Badge variant="secondary" className="typography-label">{t("section")} {selectedStudent?.section}</Badge>
                 </p>
               </div>
             </div>
 
-            <div className="flex-grow max-w-md w-full">
+            <div className="flex-grow max-w-lg w-full">
               {todayStatus.isSessionBased ? (
-                <div className="grid grid-cols-2 gap-3.5">
-                  {getSessionCard(t("morning_session"), todayStatus.morning)}
-                  {getSessionCard(t("afternoon_session"), todayStatus.afternoon)}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Morning */}
+                  <div className="p-5 bg-muted/40 border-2 border-border/10 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-sm hover:border-sky-500/20 transition-all">
+                    <span className="typography-label text-[10px] text-muted-foreground uppercase tracking-widest">{t("morning_session")}</span>
+                    {todayStatus.morning ? getStatusBadge(todayStatus.morning) : <span className="typography-label text-muted-foreground/40 italic">-</span>}
+                  </div>
+
+                  {/* Afternoon */}
+                  <div className="p-5 bg-muted/40 border-2 border-border/10 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-sm hover:border-sky-500/20 transition-all">
+                    <span className="typography-label text-[10px] text-muted-foreground uppercase tracking-widest">{t("afternoon_session")}</span>
+                    {todayStatus.afternoon ? getStatusBadge(todayStatus.afternoon) : <span className="typography-label text-muted-foreground/40 italic">-</span>}
+                  </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between p-4 bg-muted/40 border-2 border-border/10 rounded-2xl">
-                  <span className="typography-label text-foreground/70 uppercase">{t("today_attendance")}</span>
-                  <div className="flex items-center gap-2 scale-110 origin-right">
-                    {getStatusBadge(todayStatus.status)}
+                <div className="flex justify-center">
+                  <div className="p-6 bg-muted/40 border-2 border-border/10 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-sm max-w-xs w-full hover:border-emerald-500/20 transition-all">
+                    <span className="typography-label text-[10px] text-muted-foreground uppercase tracking-widest">{t("status_label")}</span>
+                    {todayStatus.daily ? getStatusBadge(todayStatus.daily) : <span className="typography-label text-muted-foreground/40 italic">{t("unmarked")}</span>}
                   </div>
                 </div>
               )}
@@ -369,12 +413,12 @@ export default function ParentDashboard() {
 
       {/* ─── QUICK STATS & CIRCULAR GAUGE ─────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Attendance Rate Circular Progress Card */}
         <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md flex flex-col justify-between">
           <CardHeader className="pb-4">
             <CardTitle className="typography-card-title uppercase text-foreground/80">{t("attendance_rate")}</CardTitle>
-            <CardDescription className="typography-label">Cumulative presence ratio</CardDescription>
+            <CardDescription className="typography-label">{t("attendance_rate_desc")}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center p-6 pt-0 flex-1">
             <div className="relative w-36 h-36 flex items-center justify-center">
@@ -396,16 +440,16 @@ export default function ParentDashboard() {
                   strokeWidth="8"
                   fill="transparent"
                   strokeDasharray={`${2 * Math.PI * 40}`}
-                  strokeDashoffset={`${2 * Math.PI * 40 * (1 - attendanceRate / 100)}`}
+                  strokeDashoffset={`${2 * Math.PI * 40 * (1 - dashboardStats.rate / 100)}`}
                   strokeLinecap="round"
                 />
               </svg>
               <div className="absolute flex flex-col items-center justify-center">
-                <span className="typography-page-title text-foreground">{attendanceRate}%</span>
+                <span className="typography-page-title text-foreground">{dashboardStats.rate}%</span>
                 <span className="typography-label text-muted-foreground uppercase mt-1 opacity-80">{t("rating")}</span>
               </div>
             </div>
-            
+
             <div className="typography-label flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mt-6 bg-emerald-500/10 p-2 px-4 rounded-full border border-emerald-500/20 shadow-sm">
               <TrendingUp className="w-4 h-4" />
               <span className="uppercase tracking-wide">{t("target_text")}</span>
@@ -415,46 +459,82 @@ export default function ParentDashboard() {
 
         {/* Attendance Metrics Numbers Card */}
         <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md lg:col-span-2 flex flex-col justify-between">
-          <CardHeader>
-            <CardTitle className="typography-card-title uppercase text-foreground/80">{t("term_summary")}</CardTitle>
-            <CardDescription className="typography-label">Out of {totalDays} {t("total_days")} recorded</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
+            <div>
+              <CardTitle className="typography-card-title uppercase text-foreground/80">{t("term_summary")}</CardTitle>
+              <CardDescription className="typography-label">Out of {dashboardStats.total} {t("total_days")} recorded</CardDescription>
+            </div>
+
+            {/* Mode Selector Dropdown */}
+            <div className="flex items-center gap-3">
+              <Select
+                value={statsMode}
+                onValueChange={(val: string) => setStatsMode(val as any)}
+              >
+                <SelectTrigger className="typography-label w-28 h-8 border-none bg-muted/40 hover:bg-muted/60 rounded-xl focus:ring-0 focus:ring-offset-0 px-3">
+                  <SelectValue placeholder="Mode" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-border/40 shadow-xl">
+                  <SelectItem value="daily" className="typography-helper rounded-lg">{t("daily_view")}</SelectItem>
+                  <SelectItem value="session" className="typography-helper rounded-lg">{t("session_view")}</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Session Filters (only if in session mode) */}
+              {statsMode === "session" && (
+                <div className="flex p-0.5 bg-sky-500/10 rounded-lg animate-in slide-in-from-left-2 duration-300">
+                  <button
+                    onClick={() => setStatsSession("morning")}
+                    className={`px-3 py-1 rounded-md typography-label text-[10px] uppercase transition-all ${statsSession === "morning" ? "bg-white dark:bg-slate-800 shadow-sm text-sky-600 font-bold" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {t("morning_session")}
+                  </button>
+                  <button
+                    onClick={() => setStatsSession("afternoon")}
+                    className={`px-3 py-1 rounded-md typography-label text-[10px] uppercase transition-all ${statsSession === "afternoon" ? "bg-white dark:bg-slate-800 shadow-sm text-sky-600 font-bold" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {t("afternoon_session")}
+                  </button>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-6 pt-0 flex-1 flex flex-col justify-center">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              
+
               <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl text-center space-y-1.5 shadow-sm">
                 <span className="typography-label text-emerald-700 dark:text-emerald-400 uppercase">{t("presents")}</span>
-                <p className="typography-page-title text-emerald-600 dark:text-emerald-400">{presents}</p>
-                <span className="typography-label text-muted-foreground/80 block">Days in class</span>
+                <p className="typography-page-title text-emerald-600 dark:text-emerald-400">{dashboardStats.presents}</p>
+                <span className="typography-label text-muted-foreground/80 block">{t("days_in_class")}</span>
               </div>
 
               <div className="p-4 bg-rose-500/5 border border-rose-500/10 rounded-2xl text-center space-y-1.5 shadow-sm">
                 <span className="typography-label text-rose-700 dark:text-rose-400 uppercase">{t("absents")}</span>
-                <p className="typography-page-title text-rose-600 dark:text-rose-400">{absents}</p>
-                <span className="typography-label text-muted-foreground/80 block">Unexcused cuts</span>
+                <p className="typography-page-title text-rose-600 dark:text-rose-400">{dashboardStats.absents}</p>
+                <span className="typography-label text-muted-foreground/80 block">{t("unexcused_cuts")}</span>
               </div>
 
               <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl text-center space-y-1.5 shadow-sm">
                 <span className="typography-label text-amber-700 dark:text-amber-400 uppercase">{t("late_arrivals")}</span>
-                <p className="typography-page-title text-amber-600 dark:text-amber-400">{lates}</p>
-                <span className="typography-label text-muted-foreground/80 block">Tardy logs</span>
+                <p className="typography-page-title text-amber-600 dark:text-amber-400">{dashboardStats.lates}</p>
+                <span className="typography-label text-muted-foreground/80 block">{t("tardy_logs")}</span>
               </div>
 
               <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl text-center space-y-1.5 shadow-sm">
                 <span className="typography-label text-blue-700 dark:text-blue-400 uppercase">{t("excused")}</span>
-                <p className="typography-page-title text-blue-600 dark:text-blue-400">{excused}</p>
-                <span className="typography-label text-muted-foreground/80 block">Approved leaves</span>
+                <p className="typography-page-title text-blue-600 dark:text-blue-400">{dashboardStats.excused}</p>
+                <span className="typography-label text-muted-foreground/80 block">{t("approved_leaves")}</span>
               </div>
 
             </div>
 
             <div className="typography-body mt-8 flex items-center justify-between border-t border-border/40 pt-5 px-1 text-foreground/70">
-              <span className="typography-label">Need to submit a leave request?</span>
-              <button 
+              <span className="typography-label">{t("leave_request_prompt")}</span>
+              <button
                 onClick={() => router.push("/parent/profile")}
                 className="typography-label text-emerald-600 dark:text-emerald-400 hover:underline underline-offset-4 flex items-center gap-2 group"
               >
-                <span>Contact Advisor</span>
+                <span>{t("contact_advisor")}</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
@@ -465,7 +545,7 @@ export default function ParentDashboard() {
 
       {/* ─── NOTIFICATIONS FEED & ANNOUNCEMENTS PANELS ───────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Left: Recent Absences & Late Alerts */}
         <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md">
           <CardHeader className="flex flex-row items-center justify-between border-b border-border/20 pb-4">
@@ -474,7 +554,7 @@ export default function ParentDashboard() {
                 <Bell className="w-5 h-5 text-emerald-500" />
                 <span>{t("recent_alerts")}</span>
               </CardTitle>
-              <CardDescription className="typography-label mt-1 italic text-muted-foreground/80">Critical notifications for {selectedStudent?.fullName}.</CardDescription>
+              <CardDescription className="typography-label mt-1 italic text-muted-foreground/80">{t("critical_notification_for", { name: selectedStudent?.fullName || "" })}</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="p-6 space-y-4 max-h-[300px] overflow-y-auto">
@@ -482,27 +562,34 @@ export default function ParentDashboard() {
               <div className="py-12 flex flex-col items-center justify-center text-muted-foreground bg-muted/10 rounded-3xl border-2 border-dashed border-border/20">
                 <CheckCircle className="w-12 h-12 text-emerald-500/50 mb-3" />
                 <p className="typography-label uppercase">{t("no_alerts")}</p>
-                <span className="typography-label text-muted-foreground/80 mt-2">Excellent attendance consistency!</span>
+                <span className="typography-label text-muted-foreground/80 mt-2">{t("excellent_consistency")}</span>
               </div>
             ) : (
               recentAlerts.slice(0, 5).map((alert) => (
-                <div 
-                  key={alert.id} 
-                  className={`flex gap-4 p-4 border-2 rounded-2xl transition-all shadow-sm ${
-                    alert.type === "absent" 
-                      ? "bg-rose-500/10 border-rose-500/20 shadow-rose-500/5" 
+                <div
+                  key={alert.id}
+                  className={`flex gap-4 p-4 border-2 rounded-2xl transition-all shadow-sm ${alert.type === "absent"
+                      ? "bg-rose-500/10 border-rose-500/20 shadow-rose-500/5"
                       : "bg-amber-500/10 border-amber-500/20 shadow-amber-500/5"
-                  }`}
+                    }`}
                 >
-                  <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center shadow-sm ${
-                    alert.type === "absent" ? "bg-rose-500 text-white" : "bg-amber-500 text-white"
-                  }`}>
+                  <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center shadow-sm ${alert.type === "absent" ? "bg-rose-500 text-white" : "bg-amber-500 text-white"
+                    }`}>
                     {alert.type === "absent" ? <XCircle className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="typography-label text-foreground uppercase">{alert.title}</span>
-                      <span className="typography-label text-muted-foreground opacity-70">{formatNotificationTime(alert.createdAt)}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="typography-label text-muted-foreground opacity-70">{formatNotificationTime(alert.createdAt)}</span>
+                        <button
+                          onClick={(e) => handleDismissAlert(alert.id, e)}
+                          className="text-muted-foreground hover:text-rose-500 transition-colors"
+                          title="Dismiss alert"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <p className="typography-label text-foreground/80 dark:text-foreground/70 mt-2">{alert.message}</p>
                   </div>
@@ -520,7 +607,7 @@ export default function ParentDashboard() {
                 <Megaphone className="w-5 h-5 text-emerald-500" />
                 <span>{t("school_announcements")}</span>
               </CardTitle>
-              <CardDescription className="typography-label mt-1 italic text-muted-foreground/80">Broad alerts from school administration.</CardDescription>
+              <CardDescription className="typography-label mt-1 italic text-muted-foreground/80">{t("notifications_desc")}</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="p-6 space-y-4 max-h-[300px] overflow-y-auto">
@@ -528,7 +615,7 @@ export default function ParentDashboard() {
               <div className="py-12 flex flex-col items-center justify-center text-muted-foreground bg-muted/10 rounded-3xl border-2 border-dashed border-border/20">
                 <BookOpen className="w-12 h-12 text-emerald-500/50 mb-3" />
                 <p className="typography-label uppercase">{t("no_announcements")}</p>
-                <span className="typography-label text-muted-foreground/80 mt-2">Check back later for school newsletters.</span>
+                <span className="typography-label text-muted-foreground/80 mt-2">{t("check_back_later_newsletters")}</span>
               </div>
             ) : (
               announcements.filter(a => a.type !== "emergency").slice(0, 5).map((announcement) => (

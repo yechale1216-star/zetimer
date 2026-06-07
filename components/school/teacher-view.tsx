@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { BookOpen } from "lucide-react"
 import { db, type Student } from "@/lib/db/database"
@@ -92,14 +93,7 @@ export function TeacherView() {
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <h2 className="typography-page-title text-foreground">My Class Assignments</h2>
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-        </div>
-      </div>
-    )
+    return <PageSkeleton variant="cards" />
   }
 
   return (

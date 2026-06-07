@@ -12,6 +12,7 @@ export interface ParentNotification {
   student?: {
     id: string;
     fullName: string;
+    gender?: string | null;
   } | null;
 }
 
@@ -24,22 +25,27 @@ export interface ParentPreferences {
 }
 
 class ParentDatabase {
-  private getHeaders(): Record<string, string> {
+  private getHeaders(schoolId?: string): Record<string, string> {
     const token = typeof window !== "undefined" ? localStorage.getItem("attendance_token") : null
+    // Prefer explicit schoolId param, then fall back to localStorage (set by layout on student switch)
+    const resolvedSchoolId = schoolId || (typeof window !== "undefined" ? localStorage.getItem("x-school-id") : null)
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
     if (token) {
       headers["Authorization"] = `Bearer ${token}`
     }
+    if (resolvedSchoolId) {
+      headers["x-school-id"] = resolvedSchoolId
+    }
     return headers
   }
 
   // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
-  async getNotifications(phone: string): Promise<ParentNotification[]> {
+  async getNotifications(phone: string, schoolId?: string): Promise<ParentNotification[]> {
     try {
       const res = await fetch(`${API_URL}/api/parent/notifications/${encodeURIComponent(phone)}`, {
-        headers: this.getHeaders(),
+        headers: this.getHeaders(schoolId),
       });
       if (!res.ok) throw new Error("Failed to fetch notifications");
       const result = await res.json();
@@ -50,11 +56,11 @@ class ParentDatabase {
     }
   }
 
-  async markNotificationAsRead(id: string): Promise<boolean> {
+  async markNotificationAsRead(id: string, schoolId?: string): Promise<boolean> {
     try {
       const res = await fetch(`${API_URL}/api/parent/notifications/${id}/read`, {
         method: "PATCH",
-        headers: this.getHeaders(),
+        headers: this.getHeaders(schoolId),
       });
       return res.ok;
     } catch (error) {
@@ -63,11 +69,24 @@ class ParentDatabase {
     }
   }
 
-  async markAllNotificationsAsRead(phone: string): Promise<boolean> {
+  async deleteNotification(id: string, schoolId?: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_URL}/api/parent/notifications/${id}`, {
+        method: "DELETE",
+        headers: this.getHeaders(schoolId),
+      });
+      return res.ok;
+    } catch (error) {
+      console.error("[parent-db] deleteNotification error:", error);
+      return false;
+    }
+  }
+
+  async markAllNotificationsAsRead(phone: string, schoolId?: string): Promise<boolean> {
     try {
       const res = await fetch(`${API_URL}/api/parent/notifications/read-all/${encodeURIComponent(phone)}`, {
         method: "PATCH",
-        headers: this.getHeaders(),
+        headers: this.getHeaders(schoolId),
       });
       return res.ok;
     } catch (error) {
@@ -77,10 +96,10 @@ class ParentDatabase {
   }
 
   // ─── PREFERENCES ──────────────────────────────────────────────────────────
-  async getPreferences(phone: string): Promise<ParentPreferences | null> {
+  async getPreferences(phone: string, schoolId?: string): Promise<ParentPreferences | null> {
     try {
       const res = await fetch(`${API_URL}/api/parent/preferences/${encodeURIComponent(phone)}`, {
-        headers: this.getHeaders(),
+        headers: this.getHeaders(schoolId),
       });
       if (!res.ok) throw new Error("Failed to fetch preferences");
       const result = await res.json();
@@ -91,11 +110,11 @@ class ParentDatabase {
     }
   }
 
-  async updatePreferences(phone: string, data: Partial<ParentPreferences>): Promise<ParentPreferences | null> {
+  async updatePreferences(phone: string, data: Partial<ParentPreferences>, schoolId?: string): Promise<ParentPreferences | null> {
     try {
       const res = await fetch(`${API_URL}/api/parent/preferences/${encodeURIComponent(phone)}`, {
         method: "PUT",
-        headers: this.getHeaders(),
+        headers: this.getHeaders(schoolId),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error("Failed to update preferences");

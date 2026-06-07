@@ -33,15 +33,29 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = void 0;
+exports.updateProfile = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.deleteNotification = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = exports.listParentSchools = void 0;
 const parentService = __importStar(require("../services/parent.service"));
+const listParentSchools = async (req, res, next) => {
+    try {
+        const { phone } = req.query;
+        if (!phone || typeof phone !== 'string') {
+            return res.status(400).json({ success: false, message: "Phone is required." });
+        }
+        const result = await parentService.listParentSchools(phone);
+        res.status(200).json(result);
+    }
+    catch (error) {
+        res.status(400).json({ success: false, message: error.message || "Failed to list schools." });
+    }
+};
+exports.listParentSchools = listParentSchools;
 const loginParent = async (req, res, next) => {
     try {
-        const { phone, password } = req.body;
+        const { phone, password, schoolId } = req.body;
         if (!phone || !password) {
             return res.status(400).json({ success: false, message: "Phone and password are required." });
         }
-        const result = await parentService.loginParent(phone, password);
+        const result = await parentService.loginParent(phone, password, schoolId);
         res.status(200).json(result);
     }
     catch (error) {
@@ -114,6 +128,20 @@ const markAsRead = async (req, res, next) => {
     }
 };
 exports.markAsRead = markAsRead;
+const deleteNotification = async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const { id } = req.params;
+        await parentService.deleteNotification(id, schoolId);
+        res.status(200).json({ success: true, message: "Notification deleted." });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.deleteNotification = deleteNotification;
 const markAllAsRead = async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;
@@ -130,8 +158,11 @@ const markAllAsRead = async (req, res, next) => {
 exports.markAllAsRead = markAllAsRead;
 const getPreferences = async (req, res, next) => {
     try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
-        const preferences = await parentService.getPreferences(phone);
+        const preferences = await parentService.getPreferences(phone, schoolId);
         res.status(200).json({ success: true, data: preferences });
     }
     catch (error) {
@@ -141,8 +172,11 @@ const getPreferences = async (req, res, next) => {
 exports.getPreferences = getPreferences;
 const updatePreferences = async (req, res, next) => {
     try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
-        const preferences = await parentService.updatePreferences(phone, req.body);
+        const preferences = await parentService.updatePreferences(phone, schoolId, req.body);
         res.status(200).json({ success: true, data: preferences, message: "Preferences updated successfully." });
     }
     catch (error) {
@@ -163,3 +197,21 @@ const postAnnouncement = async (req, res, next) => {
     }
 };
 exports.postAnnouncement = postAnnouncement;
+const updateProfile = async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const { phone } = req.params;
+        const { name, email, address } = req.body;
+        if (!name || !email) {
+            return res.status(400).json({ success: false, message: "Name and email are required." });
+        }
+        const result = await parentService.updateProfile(phone, schoolId, { name, email, address });
+        res.status(200).json(result);
+    }
+    catch (error) {
+        res.status(400).json({ success: false, message: error.message || "Failed to update profile." });
+    }
+};
+exports.updateProfile = updateProfile;

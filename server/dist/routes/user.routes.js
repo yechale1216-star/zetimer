@@ -36,6 +36,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const userService = __importStar(require("../services/user.service"));
 const router = (0, express_1.Router)();
+// Get current user profile
+router.get('/profile', async (req, res, next) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const user = await userService.getUserById(userId);
+        res.status(200).json({ success: true, data: user });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 // Get user by email — used by auth login (Public or filtered)
 router.get('/by-email', async (req, res, next) => {
     try {
@@ -62,14 +75,14 @@ router.get('/', async (req, res, next) => {
         next(error);
     }
 });
-// Get all contacts for a school (admin, teacher, parent, no students)
+// Get all contacts for a school (admin, teacher, parent) - restricted based on requesting user
 router.get('/contacts', async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;
         if (!schoolId) {
             return res.status(400).json({ success: false, message: 'School ID required' });
         }
-        const contacts = await userService.getContacts(schoolId);
+        const contacts = await userService.getContacts(schoolId, req.user);
         res.status(200).json({ success: true, data: contacts });
     }
     catch (error) {

@@ -104,8 +104,10 @@ function GradeDrillDownContent() {
                 <TableRow>
                   <TableHead>Student</TableHead>
                   <TableHead className="text-center">ID</TableHead>
-                  <TableHead className="text-center">{settings?.attendanceMode === 'session_based' ? "Present Sessions" : "Present"}</TableHead>
-                  <TableHead className="text-center">{settings?.attendanceMode === 'session_based' ? "Absent Sessions" : "Absent"}</TableHead>
+                  <TableHead className="text-center text-green-600">Present</TableHead>
+                  <TableHead className="text-center text-amber-500">Late</TableHead>
+                  <TableHead className="text-center text-indigo-500">Excused</TableHead>
+                  <TableHead className="text-center text-red-600">Absent</TableHead>
                   <TableHead className="text-right">Rate %</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
@@ -116,6 +118,8 @@ function GradeDrillDownContent() {
                     <TableCell className="font-medium">{student.fullName}</TableCell>
                     <TableCell className="text-center text-xs text-muted-foreground">{student.studentId}</TableCell>
                     <TableCell className="text-center font-bold text-green-600">{student.present}</TableCell>
+                    <TableCell className="text-center font-bold text-amber-500">{student.late}</TableCell>
+                    <TableCell className="text-center font-bold text-indigo-500">{student.excused}</TableCell>
                     <TableCell className="text-center font-bold text-red-600">{student.absent}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex flex-col items-end gap-1">

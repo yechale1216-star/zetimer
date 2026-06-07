@@ -21,6 +21,19 @@ export const tenantMiddleware = (req: AuthenticatedRequest, res: Response, next:
   const authHeader = req.headers.authorization;
   const schoolIdHeader = req.headers['x-school-id'];
 
+  // Public routes exclusion - use originalUrl since middleware is mounted at /api
+  const publicPaths = [
+    '/api/parent/schools',
+    '/api/parent/login',
+    '/api/auth',
+    '/health'
+  ];
+
+  const url = req.originalUrl.split('?')[0]; // strip query string for comparison
+  if (publicPaths.some(path => url.startsWith(path))) {
+    return next();
+  }
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, message: 'Authorization token required' });
   }
@@ -29,11 +42,18 @@ export const tenantMiddleware = (req: AuthenticatedRequest, res: Response, next:
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
+    
+    // For parents, allow overriding schoolId via header
+    let schoolId = decoded.schoolId;
+    if (decoded.role === 'parent' && schoolIdHeader) {
+      schoolId = schoolIdHeader as string;
+    }
+
     req.user = {
       id: decoded.id,
       email: decoded.email,
       role: decoded.role,
-      schoolId: decoded.schoolId,
+      schoolId: schoolId,
       customSchoolId: decoded.customSchoolId,
     };
     next();

@@ -68,12 +68,12 @@ export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
             </TableHead>
             <TableHead onClick={() => requestSort('section')} className="typography-label cursor-pointer text-[10px] uppercase text-center">Section</TableHead>
             <TableHead className="typography-label text-[10px] uppercase text-center">Stream</TableHead>
-            <TableHead onClick={() => requestSort('totalStudents')} className="typography-label cursor-pointer text-[10px] uppercase text-center">Total</TableHead>
-            <TableHead className="typography-label text-[10px] uppercase text-center text-green-600">Present</TableHead>
-            <TableHead className="typography-label text-[10px] uppercase text-center text-red-600">Absent</TableHead>
-            <TableHead className="typography-label text-[10px] uppercase text-center text-amber-500">Late</TableHead>
-            <TableHead className="typography-label text-[10px] uppercase text-center text-indigo-500">Excused</TableHead>
-            <TableHead onClick={() => requestSort('attendanceRate')} className="typography-label cursor-pointer text-[10px] uppercase w-[200px]">
+            <TableHead onClick={() => requestSort('totalStudents')} className="typography-label cursor-pointer text-[10px] uppercase text-center w-20">Total</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-green-600 w-24">Present</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-red-600 w-24">Absent</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-amber-500 w-24">Late</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-indigo-500 w-24">Excused</TableHead>
+            <TableHead onClick={() => requestSort('attendanceRate')} className="typography-label cursor-pointer text-[10px] uppercase w-[160px]">
               <div className="flex items-center gap-1">Rate % {sortConfig?.key === 'attendanceRate' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>)}</div>
             </TableHead>
           </TableRow>
@@ -103,7 +103,7 @@ export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
           ))}
           {sortedData.length === 0 && (
             <TableRow>
-              <TableCell colSpan={9} className="typography-label h-32 text-center text-muted-foreground">
+              <TableCell colSpan={10} className="typography-label h-32 text-center text-muted-foreground">
                 No attendance data found for the selected filters.
               </TableCell>
             </TableRow>

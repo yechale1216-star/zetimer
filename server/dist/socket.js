@@ -1,9 +1,14 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initSocket = void 0;
 const socket_io_1 = require("socket.io");
 const client_1 = require("@prisma/client");
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma = new client_1.PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-long-enough';
 const initSocket = (server) => {
     const io = new socket_io_1.Server(server, {
         cors: {
@@ -15,12 +20,23 @@ const initSocket = (server) => {
     const socketData = new Map(); // socketId -> data
     io.on('connection', (socket) => {
         console.log('A user connected:', socket.id);
-        socket.on('authenticate', async ({ userId, schoolId }) => {
-            userSockets.set(userId, socket.id);
-            socketData.set(socket.id, { userId, schoolId });
-            console.log(`User ${userId} from school ${schoolId} authenticated with socket ${socket.id}`);
-            // Notify friends/contacts that user is online
-            socket.broadcast.emit('user_online', userId);
+        socket.on('authenticate', async ({ token }) => {
+            try {
+                const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+                const { id: userId, schoolId } = decoded;
+                if (!userId || !schoolId) {
+                    throw new Error('Invalid token mission user data');
+                }
+                userSockets.set(userId, socket.id);
+                socketData.set(socket.id, { userId, schoolId });
+                console.log(`User ${userId} from school ${schoolId} authenticated with socket ${socket.id}`);
+                // Notify friends/contacts that user is online
+                socket.broadcast.emit('user_online', userId);
+            }
+            catch (error) {
+                console.error('Socket authentication failed:', error);
+                socket.emit('auth_error', { message: 'Authentication failed' });
+            }
         });
         socket.on('join_conversation', (conversationId) => {
             socket.join(conversationId);
@@ -28,25 +44,38 @@ const initSocket = (server) => {
         });
         socket.on('send_message', async (data) => {
             const tenant = socketData.get(socket.id);
-            if (!tenant)
+            if (!tenant || tenant.userId !== data.senderId) {
+                console.error('Unauthorized message attempt');
                 return;
+            }
             try {
+                // Verify conversation belongs to this school
+                const conversation = await prisma.conversation.findFirst({
+                    where: { id: data.conversationId, schoolId: tenant.schoolId }
+                });
+                if (!conversation) {
+                    console.error(`Conversation ${data.conversationId} not found in school ${tenant.schoolId}`);
+                    return;
+                }
                 const messageData = {
                     conversationId: data.conversationId,
                     senderId: data.senderId,
                     schoolId: tenant.schoolId,
                     content: data.content,
                     type: data.type,
+                    metadata: data.content ? {
+                        links: Array.from(data.content.matchAll(/((https?:\/\/[^\s]+)|(www\.[^\s]+))/g)).map(m => m[0])
+                    } : undefined,
                 };
-                if (data.attachment) {
-                    messageData.attachments = {
-                        create: {
+                if (data.attachment && data.attachment.url) {
+                    messageData.attachments = [
+                        {
                             url: data.attachment.url,
                             name: data.attachment.name,
                             type: data.attachment.type,
                             size: data.attachment.size,
                         }
-                    };
+                    ];
                 }
                 const message = await prisma.message.create({
                     data: messageData,
@@ -62,7 +91,7 @@ const initSocket = (server) => {
                 });
                 io.to(data.conversationId).emit('new_message', message);
                 await prisma.conversation.update({
-                    where: { id: data.conversationId, schoolId: tenant.schoolId },
+                    where: { id: data.conversationId }, // schoolId check already done above
                     data: { updatedAt: new Date() },
                 });
             }
@@ -76,9 +105,15 @@ const initSocket = (server) => {
         });
         socket.on('mark_as_read', async (data) => {
             const tenant = socketData.get(socket.id);
-            if (!tenant)
+            if (!tenant || tenant.userId !== data.userId)
                 return;
             try {
+                // Verify message belongs to this school
+                const msg = await prisma.message.findFirst({
+                    where: { id: data.messageId, schoolId: tenant.schoolId }
+                });
+                if (!msg)
+                    return;
                 await prisma.messageRead.upsert({
                     where: {
                         messageId_userId: {
@@ -102,8 +137,16 @@ const initSocket = (server) => {
         // --- WebRTC Signaling ---
         socket.on('call_user', async (data) => {
             const tenant = socketData.get(socket.id);
-            if (!tenant)
+            if (!tenant || tenant.userId !== data.from)
                 return;
+            // Verify target user belongs to the same school
+            const targetUser = await prisma.user.findFirst({
+                where: { id: data.to, schoolId: tenant.schoolId, is_active: true }
+            });
+            if (!targetUser) {
+                console.error('Call target not found in school');
+                return;
+            }
             const targetSocketId = userSockets.get(data.to);
             // Create call session
             const session = await prisma.callSession.create({

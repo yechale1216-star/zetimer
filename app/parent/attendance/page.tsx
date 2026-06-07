@@ -6,19 +6,25 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { 
-  CalendarDays, 
-  ListOrdered, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
+import { useLanguage } from "@/lib/context/language-context"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
+import {
+  CalendarDays,
+  ListOrdered,
+  CheckCircle2,
+  XCircle,
+  Clock,
   Activity,
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Filter,
   UserCheck
 } from "lucide-react"
-import { useLanguage } from "@/lib/context/language-context"
+import { formatLocalizedDate } from "@/lib/utils/date-utils"
+import { db } from "@/lib/db/database"
+import { toEthiopianDate, ET_MONTHS_AM, ET_MONTHS_EN } from "@/lib/utils/ethiopian-calendar"
+import { useRef } from "react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
@@ -32,13 +38,13 @@ export default function AttendanceHistory() {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth())
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [activeTab, setActiveTab] = useState<"calendar" | "table">("calendar")
+  const [attendanceMode, setAttendanceMode] = useState<"daily" | "session">("daily")
+  const [sessionFilter, setSessionFilter] = useState<"morning" | "afternoon">("morning")
 
-  const months = [
+  const months = language === 'am' ? ET_MONTHS_AM : [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ]
-  
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 
   // 1. Initial Load & Auth verification
   const loadData = async () => {
@@ -50,6 +56,35 @@ export default function AttendanceHistory() {
       const student = students.find((s: any) => s.id === studentId) || students[0]
       if (student) {
         setSelectedStudent(student)
+        
+        // Fetch academic year from settings
+        try {
+          const settings = await db.getSettings()
+          if (settings?.academicYear) {
+            const yearMatch = settings.academicYear.match(/\d{4}/)
+            if (yearMatch) {
+              const gYear = parseInt(yearMatch[0])
+              if (language === 'am') {
+                // Approximate convert: GC Jan 1st of that year
+                const ec = toEthiopianDate(new Date(gYear, 4, 1)) // May is safe to stay in same EC year mostly
+                setSelectedYear(ec.year)
+              } else {
+                setSelectedYear(gYear)
+              }
+            }
+          } else {
+             // Fallback to current year if no settings
+             const now = new Date()
+             if (language === 'am') {
+               setSelectedYear(toEthiopianDate(now).year)
+             } else {
+               setSelectedYear(now.getFullYear())
+             }
+          }
+        } catch (err) {
+          console.error("Failed to load school settings:", err)
+        }
+
         await fetchStudentAttendance(student.id)
       }
     }
@@ -59,13 +94,21 @@ export default function AttendanceHistory() {
   // 2. Fetch student's attendance list
   const fetchStudentAttendance = async (studentId: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/attendance?studentId=${studentId}`)
+      const token = localStorage.getItem("attendance_token") || "";
+      const schoolId = localStorage.getItem("x-school-id") || "";
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        ...(schoolId ? { "x-school-id": schoolId } : {})
+      };
+
+      const res = await fetch(`${API_URL}/api/attendance?studentId=${studentId}`, { headers })
       const data = await res.json()
       if (data.success && data.data) {
         setAttendance(data.data)
       } else {
         // Fallback
-        const studentRes = await fetch(`${API_URL}/api/students/${studentId}`)
+        const studentRes = await fetch(`${API_URL}/api/students/${studentId}`, { headers })
         const studentData = await studentRes.json()
         if (studentData.success && studentData.data?.attendance) {
           setAttendance(studentData.data.attendance)
@@ -89,65 +132,147 @@ export default function AttendanceHistory() {
     return () => window.removeEventListener("studentChanged", handleStudentChange)
   }, [])
 
-  // ─── FILTER CALCULATIONS ────────────────────────────────────────────────
-  
-  // Filter attendance records by selected month and year
-  const filteredAttendance = attendance.filter(a => {
-    const d = new Date(a.date)
-    const month = parseInt(new Intl.DateTimeFormat('en-US', { month: 'numeric', timeZone: 'Africa/Addis_Ababa' }).format(d)) - 1
-    const year = parseInt(new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'Africa/Addis_Ababa' }).format(d))
-    return month === selectedMonth && year === selectedYear
-  })
+  // 1.5 Handle language change to sync calendar selection
+  const lastLang = useRef(language)
+  useEffect(() => {
+    if (lastLang.current !== language) {
+       // Convert current selection to the other calendar
+       if (language === 'am') {
+         // GC -> EC
+         const gcDate = new Date(selectedYear, selectedMonth, 15) // Use middle of month
+         const ec = toEthiopianDate(gcDate)
+         setSelectedMonth(ec.month)
+         setSelectedYear(ec.year)
+       } else {
+         // EC -> GC
+         const jdn = ethiopicToJDN(selectedYear, selectedMonth, 15)
+         const gc = jdnToGregorian(jdn)
+         setSelectedMonth(gc.getMonth())
+         setSelectedYear(gc.getFullYear())
+       }
+       lastLang.current = language
+    }
+  }, [language, selectedMonth, selectedYear])
 
-  // Monthly stats - Aggregated by day
-  const monthlyMetrics = (() => {
-    const byDate: Record<string, string[]> = {}
-    filteredAttendance.forEach(a => {
-      const date = new Date(a.date).toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
-      if (!byDate[date]) byDate[date] = []
-      if (a.status) byDate[date].push(a.status.toLowerCase())
+  // ─── FILTER CALCULATIONS ────────────────────────────────────────────────
+
+  const isP = (s: string | undefined) => s?.toLowerCase() === "present"
+  const isL = (s: string | undefined) => s?.toLowerCase() === "late"
+  const isE = (s: string | undefined) => s?.toLowerCase() === "excused"
+  const isA = (s: string | undefined) => s?.toLowerCase() === "absent"
+  const isAtt = (s: string | undefined) => isP(s) || isL(s)
+
+  // Groups and metrics calculation based on current mode
+  const { filteredAttendance, monthlyStats, calendarData } = (() => {
+    const isAm = language === 'am'
+    const selectedMonthStr = String(selectedMonth + 1).padStart(2, "0")
+    const selectedMonthPrefix = `${selectedYear}-${selectedMonthStr}`
+
+    // 1. Group by date to handle daily logic
+    const byDate: Record<string, { morning?: any; afternoon?: any; daily?: any }> = {}
+    attendance.forEach(a => {
+      const dateStr = (a.date || "").slice(0, 10)
+      if (!byDate[dateStr]) byDate[dateStr] = {}
+      const sess = a.session?.toLowerCase()
+      if (sess === "morning") byDate[dateStr].morning = a
+      else if (sess === "afternoon") byDate[dateStr].afternoon = a
+      else byDate[dateStr].daily = a
     })
 
-    const results = Object.values(byDate).map(statuses => {
-      if (statuses.includes('absent')) return 'absent'
-      if (statuses.includes('late')) return 'late'
-      if (statuses.includes('excused')) return 'excused'
-      if (statuses.includes('present')) return 'present'
-      return 'unmarked'
-    }).filter(s => s !== 'unmarked')
+    // 2. Derive records based on Mode
+    const calendarData: Record<string, string> = {}
+    const finalMonthlyRecords: any[] = []
+
+    Object.entries(byDate).forEach(([dateStr, entry]) => {
+      if (isAm) {
+        const d = new Date(dateStr)
+        const ec = toEthiopianDate(d)
+        if (ec.month !== selectedMonth || ec.year !== selectedYear) return
+      } else {
+        if (!dateStr.startsWith(selectedMonthPrefix)) return
+      }
+
+      let status = ""
+      if (attendanceMode === "daily") {
+        if (entry.morning && entry.afternoon) {
+          if (isP(entry.morning.status) && isP(entry.afternoon.status)) status = "present"
+          else if (isAtt(entry.morning.status) && isAtt(entry.afternoon.status)) status = "late"
+          else if (isE(entry.morning.status) && isE(entry.afternoon.status)) status = "excused"
+          else if (isA(entry.morning.status) && isA(entry.afternoon.status)) status = "absent"
+        } else if (entry.morning || entry.afternoon || entry.daily) {
+          const r = entry.morning || entry.afternoon || entry.daily
+          status = r.status?.toLowerCase() || ""
+        }
+        if (status) {
+          calendarData[dateStr] = status
+          finalMonthlyRecords.push({ id: dateStr, date: dateStr, status })
+        }
+      } else {
+        // Session Mode
+        const r = sessionFilter === "morning" ? entry.morning : entry.afternoon
+        if (r) {
+          status = r.status?.toLowerCase() || ""
+          calendarData[dateStr] = status
+          finalMonthlyRecords.push(r)
+        }
+      }
+    })
+
+    // 3. Stats from current month view
+    const stats = {
+      total: finalMonthlyRecords.length,
+      presents: finalMonthlyRecords.filter(r => isP(r.status)).length,
+      absents: finalMonthlyRecords.filter(r => isA(r.status)).length,
+      lates: finalMonthlyRecords.filter(r => isL(r.status)).length,
+      excused: finalMonthlyRecords.filter(r => isE(r.status)).length,
+      rate: 100
+    }
+    const attending = stats.presents + stats.lates + stats.excused
+    stats.rate = stats.total > 0 ? Math.round((attending / stats.total) * 100) : 100
 
     return {
-      total: results.length,
-      presents: results.filter(s => s === 'present').length,
-      absents: results.filter(s => s === 'absent').length,
-      lates: results.filter(s => s === 'late').length,
-      excused: results.filter(s => s === 'excused').length
+      filteredAttendance: finalMonthlyRecords.sort((a, b) => a.date.localeCompare(b.date)),
+      monthlyStats: stats,
+      calendarData
     }
   })()
 
-  const totalMonthlyDays = monthlyMetrics.total
-  const monthlyPresents = monthlyMetrics.presents
-  const monthlyAbsents = monthlyMetrics.absents
-  const monthlyLates = monthlyMetrics.lates
-  const monthlyExcused = monthlyMetrics.excused
-
-  const monthlyRate = totalMonthlyDays > 0 
-    ? Math.round(((monthlyPresents + monthlyExcused + monthlyLates * 0.8) / totalMonthlyDays) * 100) 
-    : 100
-
   // ─── CALENDAR RENDERING GENERATORS ──────────────────────────────────────
 
+  const getEthioDaysInMonth = (year: number, month: number) => {
+    if (month < 12) return 30
+    // Pagume
+    const isLeap = (year + 1) % 4 === 0
+    return isLeap ? 6 : 5
+  }
+
+  const getEthioFirstDayOfMonth = (year: number, month: number) => {
+    // Meskerem 1, 1 EC was a Monday (index 1)
+    // Meskerem 1, 2016 EC was a Tuesday (index 2)? No, Sept 12 2023 was Tuesday.
+    // Calculation of start day for EC:
+    const jdn = ethiopicToJDN(year, month, 1)
+    return (Math.floor(jdn + 1.5) % 7) // 0 = Sunday, 1 = Monday etc.
+  }
+
+  function ethiopicToJDN(year: number, month: number, day: number): number {
+    const era = 1723856
+    return era + 365 * year + Math.floor(year / 4) + 30 * month + day - 1
+  }
+
   const getDaysInMonth = (year: number, month: number) => {
+    if (language === 'am') return getEthioDaysInMonth(year, month)
     return new Date(year, month + 1, 0).getDate()
   }
 
   const getFirstDayOfMonth = (year: number, month: number) => {
-    return new Date(year, month, 1).getDay() // 0 = Sunday, 1 = Monday etc.
+    if (language === 'am') return getEthioFirstDayOfMonth(year, month)
+    return new Date(year, month, 1).getDay()
   }
 
   const handlePrevMonth = () => {
+    const maxMonths = language === 'am' ? 13 : 12
     if (selectedMonth === 0) {
-      setSelectedMonth(11)
+      setSelectedMonth(maxMonths - 1)
       setSelectedYear(prev => prev - 1)
     } else {
       setSelectedMonth(prev => prev - 1)
@@ -155,7 +280,8 @@ export default function AttendanceHistory() {
   }
 
   const handleNextMonth = () => {
-    if (selectedMonth === 11) {
+    const maxMonths = language === 'am' ? 13 : 12
+    if (selectedMonth === maxMonths - 1) {
       setSelectedMonth(0)
       setSelectedYear(prev => prev + 1)
     } else {
@@ -166,9 +292,9 @@ export default function AttendanceHistory() {
   // Generate calendar days grid
   const daysInMonth = getDaysInMonth(selectedYear, selectedMonth)
   const firstDayIndex = getFirstDayOfMonth(selectedYear, selectedMonth)
-  
+
   const calendarCells = []
-  
+
   // Blank days before 1st of month
   for (let i = 0; i < firstDayIndex; i++) {
     calendarCells.push({ day: null, dateStr: null })
@@ -176,35 +302,39 @@ export default function AttendanceHistory() {
 
   // Days of the month
   for (let d = 1; d <= daysInMonth; d++) {
-    // Create date in Addis Ababa timezone
-    const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    let dateStr = ""
+    if (language === 'am') {
+      // Find the Gregorian date for this Ethiopian date
+      const jdn = ethiopicToJDN(selectedYear, selectedMonth, d)
+      const g = jdnToGregorian(jdn)
+      const mm = String(g.getMonth() + 1).padStart(2, "0")
+      const dd = String(g.getDate()).padStart(2, "0")
+      dateStr = `${g.getFullYear()}-${mm}-${dd}`
+    } else {
+      const mm = String(selectedMonth + 1).padStart(2, "0")
+      const dd = String(d).padStart(2, "0")
+      dateStr = `${selectedYear}-${mm}-${dd}`
+    }
     calendarCells.push({ day: d, dateStr })
+  }
+
+  function jdnToGregorian(jdn: number): Date {
+    const z = Math.floor(jdn + 0.5)
+    const a = Math.floor((z - 1867216.25) / 36524.25)
+    const b = z + 1 + a - Math.floor(a / 4)
+    const c = b + 1524
+    const d = Math.floor((c - 122.1) / 365.25)
+    const e = Math.floor(365.25 * d)
+    const g = Math.floor((c - e) / 30.6001)
+    const day = c - e - Math.floor(30.6001 * g)
+    const month = g < 14 ? g - 2 : g - 14
+    const year = month > 1 ? d - 4716 : d - 4715
+    return new Date(year, month, day)
   }
 
   // Find attendance status for a calendar day
   const getDayAttendance = (dateStr: string) => {
-    const records = attendance.filter(a => {
-      const recDate = new Date(a.date).toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
-      return recDate === dateStr
-    })
-
-    if (records.length === 0) return null
-
-    // If session based, check if there's any absent or late
-    const morning = records.find(r => r.session?.toLowerCase() === "morning")
-    const afternoon = records.find(r => r.session?.toLowerCase() === "afternoon")
-    const daily = records.find(r => !r.session)
-
-    if (morning || afternoon) {
-      // Aggregate: if either is absent, color as absent. Otherwise late, otherwise present
-      const statuses = [morning?.status, afternoon?.status].filter(Boolean)
-      if (statuses.some(s => s.toLowerCase() === "absent")) return "absent"
-      if (statuses.some(s => s.toLowerCase() === "late")) return "late"
-      if (statuses.some(s => s.toLowerCase() === "excused")) return "excused"
-      return "present"
-    }
-
-    return daily?.status?.toLowerCase() || null
+    return calendarData[dateStr] || null
   }
 
   // Visual classes for calendar circles
@@ -225,18 +355,12 @@ export default function AttendanceHistory() {
   }
 
   const formatTableDate = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr)
-      return date.toLocaleDateString(language === "am" ? "am-ET" : "en-US", {
-        weekday: "short",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        timeZone: "Africa/Addis_Ababa"
-      })
-    } catch {
-      return dateStr
-    }
+    return formatLocalizedDate(dateStr, language, {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
   }
 
   const getStatusBadge = (status: string) => {
@@ -256,17 +380,12 @@ export default function AttendanceHistory() {
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-28 w-full bg-card animate-pulse rounded-3xl" />
-        <div className="h-96 w-full bg-card animate-pulse rounded-3xl" />
-      </div>
-    )
+    return <PageSkeleton variant="table" />
   }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      
+
       {/* ─── TITLE & MONTH SELECTOR BAR ────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -274,34 +393,72 @@ export default function AttendanceHistory() {
           <p className="typography-label text-muted-foreground mt-0.5">{t("attendance_history_desc")}</p>
         </div>
 
-        <div className="flex items-center gap-2 bg-card/60 backdrop-blur-md p-1.5 rounded-2xl border border-border/40 shrink-0">
-          <Select 
-            value={selectedMonth.toString()} 
+        <div className="flex flex-wrap items-center gap-3 bg-card/60 backdrop-blur-md p-1.5 rounded-2xl border border-border/40 shrink-0">
+
+          {/* Mode Selector Dropdown */}
+          <Select
+            value={attendanceMode}
+            onValueChange={(val) => setAttendanceMode(val as any)}
+          >
+            <SelectTrigger className="typography-label w-32 h-9 border-none bg-muted/40 hover:bg-muted/60 rounded-xl focus:ring-0 focus:ring-offset-0 px-3">
+              <SelectValue placeholder="Mode" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-border/40 shadow-xl">
+              <SelectItem value="daily" className="typography-helper rounded-lg">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{t("daily_view")}</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="session" className="typography-helper rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-sky-600" />
+                  <span>{t("session_view")}</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Session Sub-Selector (only if mode is session) */}
+          {attendanceMode === "session" && (
+            <div className="flex p-0.5 bg-sky-500/10 rounded-xl animate-in slide-in-from-left-2 duration-300">
+              <button
+                onClick={() => setSessionFilter("morning")}
+                className={`px-4 py-1.5 rounded-lg typography-label text-[11px] uppercase transition-all flex items-center gap-1.5 ${sessionFilter === "morning" ? "bg-white dark:bg-slate-800 shadow-md text-sky-600 font-bold" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {t("morning_session")}
+              </button>
+              <button
+                onClick={() => setSessionFilter("afternoon")}
+                className={`px-4 py-1.5 rounded-lg typography-label text-[11px] uppercase transition-all flex items-center gap-1.5 ${sessionFilter === "afternoon" ? "bg-white dark:bg-slate-800 shadow-md text-sky-600 font-bold" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {t("afternoon_session")}
+              </button>
+            </div>
+          )}
+
+          <div className="h-6 w-px bg-border/40 mx-1 hidden sm:block" />
+
+          <Select
+            value={selectedMonth.toString()}
             onValueChange={(val) => setSelectedMonth(parseInt(val))}
           >
-            <SelectTrigger className="typography-label w-36 h-9 border-none bg-transparent hover:bg-muted rounded-xl focus:ring-0 focus:ring-offset-0">
+            <SelectTrigger className="typography-label w-32 h-9 border-none bg-transparent hover:bg-muted rounded-xl focus:ring-0 focus:ring-offset-0 px-3">
               <SelectValue placeholder={t("month")} />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
               {months.map((m, idx) => (
-                <SelectItem key={m} value={idx.toString()} className="typography-helper rounded-lg">{m}</SelectItem>
+                <SelectItem key={m} value={idx.toString()} className="typography-helper rounded-lg">
+                  {language === 'am' ? m : t(m.toLowerCase() as any)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Select 
-            value={selectedYear.toString()} 
-            onValueChange={(val) => setSelectedYear(parseInt(val))}
-          >
-            <SelectTrigger className="typography-label w-24 h-9 border-none bg-transparent hover:bg-muted rounded-xl focus:ring-0 focus:ring-offset-0">
-              <SelectValue placeholder={t("year")} />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-              {years.map((y) => (
-                <SelectItem key={y} value={y.toString()} className="typography-helper rounded-lg">{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="h-9 px-3 flex items-center bg-muted/20 rounded-xl border border-border/10">
+             <span className="typography-label text-muted-foreground mr-2">{t("year")}:</span>
+             <span className="typography-label font-bold text-foreground">{selectedYear}</span>
+          </div>
         </div>
       </div>
 
@@ -309,7 +466,7 @@ export default function AttendanceHistory() {
       <Card className="border-border/40 shadow-xl rounded-3xl bg-card/60 backdrop-blur-md overflow-hidden">
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-center">
-            
+
             {/* Monthly attendance circular rate */}
             <div className="flex items-center gap-4 md:col-span-2 md:border-r border-border/20 md:pr-6">
               <div className="relative w-18 h-18 shrink-0 flex items-center justify-center">
@@ -323,36 +480,42 @@ export default function AttendanceHistory() {
                     strokeWidth="10"
                     fill="transparent"
                     strokeDasharray={`${2 * Math.PI * 40}`}
-                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - monthlyRate / 100)}`}
+                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - monthlyStats.rate / 100)}`}
                     strokeLinecap="round"
                   />
                 </svg>
-                <span className="typography-label absolute text-foreground">{monthlyRate}%</span>
+                <span className="typography-label absolute text-foreground">{monthlyStats.rate}%</span>
               </div>
               <div>
                 <p className="typography-label text-[10px] text-muted-foreground uppercase">{t("monthly_score")}</p>
-                <h3 className="typography-card-title">{language === "am" ? t(months[selectedMonth].toLowerCase() as any) : months[selectedMonth]} {selectedYear}</h3>
-                <span className="typography-label text-[10px] text-muted-foreground">{t("active_child")}: {selectedStudent?.fullName.split(" ")[0]}</span>
+                <h3 className="typography-card-title">{t(months[selectedMonth].toLowerCase() as any)} {selectedYear}</h3>
+                <span className="typography-label text-[10px] text-muted-foreground">
+                  {attendanceMode === "session" ? t(sessionFilter === "morning" ? "morning_session" : "afternoon_session") : t("daily_view")} {t("for", { name: selectedStudent?.fullName.split(" ")[0] || "" })}
+                </span>
               </div>
             </div>
 
             {/* Quick breakdown metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:col-span-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:col-span-3">
               <div className="text-center space-y-0.5">
                 <p className="typography-label text-[10px] text-muted-foreground">{t("total_days")}</p>
-                <span className="typography-card-title text-foreground">{totalMonthlyDays}</span>
+                <span className="typography-card-title text-foreground">{monthlyStats.total}</span>
               </div>
               <div className="text-center space-y-0.5">
                 <p className="typography-label text-[10px] text-muted-foreground text-emerald-600 dark:text-emerald-400">{t("presents")}</p>
-                <span className="typography-card-title text-emerald-600 dark:text-emerald-400">{monthlyPresents}</span>
+                <span className="typography-card-title text-emerald-600 dark:text-emerald-400">{monthlyStats.presents}</span>
               </div>
               <div className="text-center space-y-0.5">
                 <p className="typography-label text-[10px] text-muted-foreground text-rose-600 dark:text-rose-400">{t("absents")}</p>
-                <span className="typography-card-title text-rose-600 dark:text-rose-400">{monthlyAbsents}</span>
+                <span className="typography-card-title text-rose-600 dark:text-rose-400">{monthlyStats.absents}</span>
               </div>
               <div className="text-center space-y-0.5">
                 <p className="typography-label text-[10px] text-muted-foreground text-amber-600 dark:text-amber-400">{t("late_arrivals")}</p>
-                <span className="typography-card-title text-amber-600 dark:text-amber-400">{monthlyLates}</span>
+                <span className="typography-card-title text-amber-600 dark:text-amber-400">{monthlyStats.lates}</span>
+              </div>
+              <div className="text-center space-y-0.5">
+                <p className="typography-label text-[10px] text-muted-foreground text-blue-600 dark:text-blue-400">{t("excused")}</p>
+                <span className="typography-card-title text-blue-600 dark:text-blue-400">{monthlyStats.excused}</span>
               </div>
             </div>
 
@@ -361,9 +524,9 @@ export default function AttendanceHistory() {
       </Card>
 
       {/* ─── CALENDAR / TABLE TABS DISPLAY ────────────────────────────────── */}
-      <Tabs 
-        defaultValue="calendar" 
-        value={activeTab} 
+      <Tabs
+        defaultValue="calendar"
+        value={activeTab}
         onValueChange={(val) => setActiveTab(val as any)}
         className="space-y-4"
       >
@@ -406,18 +569,18 @@ export default function AttendanceHistory() {
             <CardHeader className="flex flex-row items-center justify-between border-b border-border/20 py-4 px-6">
               <div className="space-y-0.5">
                 <CardTitle className="typography-label uppercase text-foreground">
-                  {language === "am" ? t(months[selectedMonth].toLowerCase() as any) : months[selectedMonth]} {selectedYear}
+                  {language === 'am' ? months[selectedMonth] : t(months[selectedMonth].toLowerCase() as any)} {selectedYear}
                 </CardTitle>
                 <CardDescription className="typography-helper">{t("attendance_history_desc")}</CardDescription>
               </div>
               <div className="flex items-center gap-1 bg-muted/40 p-0.5 rounded-lg border border-border/10">
-                <button 
+                <button
                   onClick={handlePrevMonth}
                   className="p-1.5 hover:bg-background rounded-md text-muted-foreground hover:text-foreground transition-all"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <button 
+                <button
                   onClick={handleNextMonth}
                   className="p-1.5 hover:bg-background rounded-md text-muted-foreground hover:text-foreground transition-all"
                 >
@@ -426,16 +589,16 @@ export default function AttendanceHistory() {
               </div>
             </CardHeader>
             <CardContent className="p-6">
-              
+
               {/* Calendar Grid Header */}
               <div className="typography-label grid grid-cols-7 text-center uppercase text-muted-foreground/80 mb-4 pb-2 border-b border-border/20">
-                <span>{language === "am" ? "እሁድ" : "Sun"}</span>
-                <span>{language === "am" ? "ሰኞ" : "Mon"}</span>
-                <span>{language === "am" ? "ማክሰ" : "Tue"}</span>
-                <span>{language === "am" ? "ረቡዕ" : "Wed"}</span>
-                <span>{language === "am" ? "ሐሙስ" : "Thu"}</span>
-                <span>{language === "am" ? "ዓርብ" : "Fri"}</span>
-                <span>{language === "am" ? "ቅዳሜ" : "Sat"}</span>
+                <span>{t("sun")}</span>
+                <span>{t("mon")}</span>
+                <span>{t("tue")}</span>
+                <span>{t("wed")}</span>
+                <span>{t("thu")}</span>
+                <span>{t("fri")}</span>
+                <span>{t("sat")}</span>
               </div>
 
               {/* Calendar Days */}
@@ -447,19 +610,20 @@ export default function AttendanceHistory() {
 
                   const dayStatus = getDayAttendance(cell.dateStr)
                   return (
-                    <div 
+                    <div
                       key={cell.dateStr}
-                      className={`aspect-square flex flex-col items-center justify-center border border-border/10 rounded-2xl transition-all relative group select-none ${getCalendarDayColor(dayStatus)}`}
+                      className={`aspect-square flex flex-col items-center justify-center p-1 border border-border/10 rounded-2xl transition-all relative group select-none ${getCalendarDayColor(dayStatus)}`}
                     >
-                      <span className="typography-label">{cell.day}</span>
-                      
-                      {/* Optional miniature dot indicator */}
+                      <span className="typography-label text-sm sm:text-base font-semibold">{cell.day}</span>
+
+                      {/* Status Icon */}
                       {dayStatus && (
-                        <div className={`w-1.5 h-1.5 rounded-full absolute bottom-1.5 shrink-0 ${
-                          dayStatus === "present" ? "bg-emerald-500" :
-                          dayStatus === "absent" ? "bg-rose-500" :
-                          dayStatus === "late" ? "bg-amber-500" : "bg-blue-500"
-                        }`} />
+                        <div className="mt-1 flex justify-center items-center opacity-90">
+                          {dayStatus === "present" && <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
+                          {dayStatus === "absent" && <XCircle className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
+                          {dayStatus === "late" && <Clock className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
+                          {dayStatus === "excused" && <AlertTriangle className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
+                        </div>
                       )}
                     </div>
                   )
@@ -502,7 +666,7 @@ export default function AttendanceHistory() {
                               {record.session === "morning" ? t("morning_session") : t("afternoon_session")}
                             </Badge>
                           ) : (
-                            <span className="typography-helper italic text-muted-foreground/60">{language === "am" ? "ሙሉ ቀን" : "Full Day"}</span>
+                            <span className="typography-helper italic text-muted-foreground/60">{t("full_day")}</span>
                           )}
                         </TableCell>
                         <TableCell className="py-4 px-6">{getStatusBadge(record.status)}</TableCell>

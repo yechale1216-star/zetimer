@@ -37,15 +37,28 @@ const express_1 = require("express");
 const schoolService = __importStar(require("../services/school.service"));
 const tenant_middleware_1 = require("../middleware/tenant.middleware");
 const router = (0, express_1.Router)();
-// Create or ensure a school exists (called on admin signup)
+// Create or Update a school
 router.post('/', async (req, res, next) => {
     try {
         const { id, name } = req.body;
         if (!name) {
             return res.status(400).json({ success: false, message: 'School name is required' });
         }
-        const school = await schoolService.createSchool({ id, name });
-        res.status(201).json({ success: true, data: {
+        let school;
+        if (id) {
+            // Check if school exists
+            const existing = await schoolService.getSchoolById(id);
+            if (existing) {
+                school = await schoolService.updateSchool(id, { name });
+            }
+            else {
+                school = await schoolService.createSchool({ id, name });
+            }
+        }
+        else {
+            school = await schoolService.createSchool({ name });
+        }
+        res.status(200).json({ success: true, data: {
                 id: school.id,
                 schoolId: school.schoolId,
                 name: school.name,

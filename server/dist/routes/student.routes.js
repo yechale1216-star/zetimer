@@ -42,5 +42,6 @@ router.post('/', validate_1.validateStudent, studentController.createStudent);
 router.get('/parent/:phone', studentController.getStudentsByParentPhone);
 router.get('/:id', studentController.getStudentById);
 router.put('/:id', studentController.updateStudent);
+router.post('/bulk', studentController.bulkCreateStudents);
 router.delete('/:id', studentController.deleteStudent);
 exports.default = router;

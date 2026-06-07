@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Users, UserCheck, UserX, Clock, AlertTriangle, TrendingUp, Download, Table as TableIcon } from "lucide-react"
+import { Users, UserCheck, UserX, Clock, AlertTriangle, TrendingUp, Download, Table as TableIcon, Clock3 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { db } from "@/lib/db/database"
@@ -10,6 +10,7 @@ import { GradeAttendanceTable } from "./grade-attendance-table"
 import { AttendanceAnalyticsCharts } from "./attendance-analytics-charts"
 import { useToast } from "@/hooks/use-toast"
 import { notifications } from "@/lib/utils/notifications"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 
 export function AttendanceByGrade() {
   const [summary, setSummary] = useState<any>(null)
@@ -93,12 +94,7 @@ export function AttendanceByGrade() {
   }
 
   if (isLoading && !summary) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[400px] gap-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="typography-label text-muted-foreground">Crunching attendance data...</p>
-      </div>
-    )
+    return <PageSkeleton variant="table" />
   }
 
   const gradeRateData = gradeStats.map(s => ({
@@ -106,11 +102,13 @@ export function AttendanceByGrade() {
     rate: s.attendanceRate
   })).slice(0, 10).sort((a, b) => b.rate - a.rate)
 
+  const isFullDay = !filters.session || filters.session === 'total'
+
   const distributionData = [
     { name: 'Present', value: summary?.present || 0 },
-    { name: 'Absent', value: summary?.absent || 0 },
     { name: 'Late', value: summary?.late || 0 },
     { name: 'Excused', value: summary?.excused || 0 },
+    { name: 'Absent', value: summary?.absent || 0 },
   ].filter(d => d.value > 0)
 
   return (
@@ -171,9 +169,9 @@ export function AttendanceByGrade() {
         {[
           { label: "Total Students", value: summary?.totalStudents || 0, icon: Users, color: "blue" },
           { label: "Present", value: summary?.present || 0, icon: UserCheck, color: "green" },
-          { label: "Absent", value: summary?.absent || 0, icon: UserX, color: "red" },
           { label: "Late", value: summary?.late || 0, icon: Clock, color: "yellow" },
           { label: "Excused", value: summary?.excused || 0, icon: AlertTriangle, color: "indigo" },
+          { label: "Absent", value: summary?.absent || 0, icon: UserX, color: "red" },
           { label: "Overall Rate", value: `${summary?.attendanceRate || 0}%`, icon: TrendingUp, color: "purple", isRate: true },
         ].map((item, idx) => (
           <Card key={idx} className="border-none shadow-sm bg-white/95 dark:bg-slate-900/90 rounded-2xl transform transition-all hover:scale-[1.02] cursor-default border border-slate-200 dark:border-slate-800">

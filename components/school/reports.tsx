@@ -13,6 +13,7 @@ import { ValidationService } from "@/lib/utils/validation"
 import { authService } from "@/lib/auth/auth"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
 import { useSchoolSettings } from "@/hooks/use-school-settings"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
@@ -30,8 +31,6 @@ interface StudentReport {
   morningRate?: number
   afternoonPresent?: number
   afternoonRate?: number
-  fullDays?: number
-  halfDays?: number
 }
 
 export function Reports() {
@@ -178,58 +177,58 @@ export function Reports() {
             dateGroups[r.attendance_date].push(r)
           })
 
-          let fullDays = 0
-          let halfDays = 0
-          let morningPresentCount = 0
-          let morningTotal = 0
-          let afternoonPresentCount = 0
-          let afternoonTotal = 0
-
           let presentDays = 0
           let lateDays = 0
           let absentDays = 0
           let excusedDays = 0
+          let morningPresentCount = 0
+          let morningTotal = 0
+          let afternoonPresentCount = 0
+          let afternoonTotal = 0
           const totalDays = Object.keys(dateGroups).length
 
           Object.values(dateGroups).forEach(records => {
-            const morning = records.find(r => r.session?.toLowerCase() === "morning")
-            const afternoon = records.find(r => r.session?.toLowerCase() === "afternoon")
+            const m = records.find(r => r.session?.toLowerCase() === "morning")
+            const a = records.find(r => r.session?.toLowerCase() === "afternoon")
 
-            let isMorningPresent = false
-            if (morning) {
+            const isP = (s: string | undefined) => s?.toLowerCase() === "present"
+            const isL = (s: string | undefined) => s?.toLowerCase() === "late"
+            const isE = (s: string | undefined) => s?.toLowerCase() === "excused"
+            const isA = (s: string | undefined) => s?.toLowerCase() === "absent"
+            const isAtt = (s: string | undefined) => isP(s) || isL(s)
+
+            if (m && a) {
+              if (isP(m.status) && isP(a.status)) {
+                presentDays++
+              } else if (isAtt(m.status) && isAtt(a.status)) {
+                lateDays++
+              } else if (isE(m.status) && isE(a.status)) {
+                excusedDays++
+              } else if (isA(m.status) && isA(a.status)) {
+                absentDays++
+              }
+            } else if (m || a) {
+              const r = m || a
+              if (isP(r.status)) presentDays++
+              else if (isL(r.status)) lateDays++
+              else if (isE(r.status)) excusedDays++
+              else if (isA(r.status)) absentDays++
+            }
+            
+            if (m) {
               morningTotal++
-              const status = morning.status?.toLowerCase()
-              if (status === "present" || status === "late") {
-                morningPresentCount++
-                isMorningPresent = true
-              }
-              if (status === "present") presentDays++
-              else if (status === "late") lateDays++
-              else if (status === "absent") absentDays++
-              else if (status === "excused") excusedDays++
+              if (isAtt(m.status)) morningPresentCount++
             }
-
-            let isAfternoonPresent = false
-            if (afternoon) {
+            if (a) {
               afternoonTotal++
-              const status = afternoon.status?.toLowerCase()
-              if (status === "present" || status === "late") {
-                afternoonPresentCount++
-                isAfternoonPresent = true
-              }
-              if (status === "present") presentDays++
-              else if (status === "late") lateDays++
-              else if (status === "absent") absentDays++
-              else if (status === "excused") excusedDays++
+              if (isAtt(a.status)) afternoonPresentCount++
             }
-
-            if (isMorningPresent && isAfternoonPresent) fullDays++
-            else if (isMorningPresent || isAfternoonPresent) halfDays++
           })
 
           const morningRate = morningTotal > 0 ? (morningPresentCount / morningTotal) * 100 : 0
           const afternoonRate = afternoonTotal > 0 ? (afternoonPresentCount / afternoonTotal) * 100 : 0
-          const attendanceRate = totalDays > 0 ? ((fullDays + (halfDays * 0.5)) / totalDays) * 100 : 0
+          const totalAttending = presentDays + lateDays + excusedDays
+          const attendanceRate = totalDays > 0 ? (totalAttending / totalDays) * 100 : 0
 
           return {
             student,
@@ -243,8 +242,6 @@ export function Reports() {
             morningRate: Math.round(morningRate * 100) / 100,
             afternoonPresent: afternoonPresentCount,
             afternoonRate: Math.round(afternoonRate * 100) / 100,
-            fullDays,
-            halfDays
           }
         } else {
           const presentDays = studentAttendance.filter((record) => record.status?.toLowerCase() === "present").length
@@ -318,7 +315,7 @@ export function Reports() {
         "Stream",
         "Section",
         "Total Days",
-        ...(isSessionBased && sessionFilter === "total" ? ["Full Days", "Half Days", "Morning %", "Afternoon %"] : []),
+        ...(isSessionBased && sessionFilter === "total" ? ["Morning %", "Afternoon %"] : []),
         "Present",
         "Late",
         "Absent",
@@ -333,7 +330,7 @@ export function Reports() {
         `"${report.student.stream || ""}"`,
         report.student.section,
         report.totalDays,
-        ...(isSessionBased && sessionFilter === "total" ? [report.fullDays, report.halfDays, report.morningRate, report.afternoonRate] : []),
+        ...(isSessionBased && sessionFilter === "total" ? [report.morningRate, report.afternoonRate] : []),
         report.presentDays,
         report.lateDays,
         report.absentDays,
@@ -478,6 +475,10 @@ export function Reports() {
   }))
 
   if (!mounted) return null
+
+  if (isLoading) {
+    return <PageSkeleton variant="dashboard" />
+  }
 
   return (
     <div className="space-y-6">
@@ -788,19 +789,11 @@ export function Reports() {
                     <th className="typography-label px-4 py-4 text-left text-[10px] text-muted-foreground uppercase">Stream</th>
                     <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Section</th>
                     <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Total</th>
-                    {isSessionBased && sessionFilter === "total" && (
-                      <>
-                        <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Full-Days</th>
-                        <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Half-Days</th>
-                        <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Morning %</th>
-                        <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Afternoon %</th>
-                      </>
-                    )}
                     <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Present</th>
                     <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Late</th>
                     <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Absent</th>
                     <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Excused</th>
-                    <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Rate</th>
+                    <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Rate %</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -814,8 +807,6 @@ export function Reports() {
                       <td className="typography-label px-4 py-4 text-center text-foreground">{report.totalDays}</td>
                       {isSessionBased && sessionFilter === "total" && (
                         <>
-                          <td className="typography-label px-4 py-4 text-center text-green-600 dark:text-green-500">{report.fullDays}</td>
-                          <td className="typography-label px-4 py-4 text-center text-yellow-600 dark:text-yellow-500">{report.halfDays}</td>
                           <td className="typography-label px-4 py-4 text-center text-foreground">{report.morningRate}%</td>
                           <td className="typography-label px-4 py-4 text-center text-foreground">{report.afternoonRate}%</td>
                         </>

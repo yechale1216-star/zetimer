@@ -37,6 +37,7 @@ const express_1 = require("express");
 const userService = __importStar(require("../services/user.service"));
 const schoolService = __importStar(require("../services/school.service"));
 const jwt_1 = require("../utils/jwt");
+const email_1 = require("../utils/email");
 const router = (0, express_1.Router)();
 // Login
 router.post('/login', async (req, res, next) => {
@@ -54,10 +55,17 @@ router.post('/login', async (req, res, next) => {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
         let customSchoolId = '';
+        let schoolName = 'My School';
+        let schoolLogo = '';
         if (user.schoolId) {
             const school = await schoolService.getSchoolById(user.schoolId);
             if (school) {
                 customSchoolId = school.schoolId || '';
+                schoolName = school.name || 'My School';
+                // Get logo from settings
+                if (school.settings) {
+                    schoolLogo = school.settings.school_logo || '';
+                }
             }
         }
         const token = (0, jwt_1.generateToken)({
@@ -78,7 +86,9 @@ router.post('/login', async (req, res, next) => {
                     role: user.role,
                     schoolId: user.schoolId,
                     customSchoolId,
-                }
+                },
+                schoolName,
+                schoolLogo
             }
         });
     }
@@ -125,12 +135,69 @@ router.post('/signup', async (req, res, next) => {
                     role: user.role,
                     schoolId: user.schoolId,
                     customSchoolId,
-                }
+                },
+                schoolName: schoolName || 'My School',
+                schoolLogo: ''
             }
         });
     }
     catch (error) {
         next(error);
+    }
+});
+// Forgot Password
+router.post('/forgot-password', async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, message: 'Email is required' });
+        }
+        const token = await userService.createPasswordResetToken(email);
+        // We send success even if user not found for security (prevent email enumeration)
+        if (token) {
+            await (0, email_1.sendResetPasswordEmail)(email, token);
+        }
+        res.status(200).json({
+            success: true,
+            message: 'If an account with that email exists, we have sent password reset instructions.'
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Verify Reset Token
+router.get('/verify-reset-token', async (req, res, next) => {
+    try {
+        const { token } = req.query;
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ success: false, message: 'Token is required' });
+        }
+        const user = await userService.getUserByResetToken(token);
+        if (!user) {
+            return res.status(400).json({ success: false, valid: false, message: 'Invalid or expired token' });
+        }
+        res.status(200).json({ success: true, valid: true, email: user.email });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Reset Password
+router.post('/reset-password', async (req, res, next) => {
+    try {
+        const { token, password } = req.body;
+        if (!token || !password) {
+            return res.status(400).json({ success: false, message: 'Token and password are required' });
+        }
+        await userService.resetPasswordByToken(token, password);
+        res.status(200).json({
+            success: true,
+            message: 'Password successfully reset. You can now login with your new password.'
+        });
+    }
+    catch (error) {
+        res.status(400).json({ success: false, message: error instanceof Error ? error.message : 'Failed to reset password' });
     }
 });
 exports.default = router;

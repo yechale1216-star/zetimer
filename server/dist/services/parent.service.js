@@ -1,19 +1,79 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchParentByPhone = exports.updatePassword = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getNotifications = exports.loginParent = void 0;
+exports.updateProfile = exports.searchParentByPhone = exports.updatePassword = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllNotificationsAsRead = exports.deleteNotification = exports.markNotificationAsRead = exports.getNotifications = exports.loginParent = exports.listParentSchools = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const jwt_1 = require("../utils/jwt");
+const schoolService = __importStar(require("./school.service"));
+/**
+ * List all schools associated with a parent's phone number.
+ */
+const listParentSchools = async (phone) => {
+    const cleanPhone = phone.replace(/\s+/g, '');
+    const users = await db_1.default.user.findMany({
+        where: { phone: cleanPhone, role: 'parent' },
+        include: {
+            school: {
+                include: { settings: true }
+            }
+        }
+    });
+    const schools = users.map(u => ({
+        schoolId: u.schoolId,
+        schoolName: u.school?.name || 'My School',
+        schoolLogo: u.school?.settings?.school_logo || '',
+    }));
+    return { success: true, data: schools };
+};
+exports.listParentSchools = listParentSchools;
 /**
  * Login Parent and establish session.
  * Syncs ParentStudent relation records.
  */
-const loginParent = async (phone, password) => {
+const loginParent = async (phone, password, schoolId) => {
     const cleanPhone = phone.replace(/\s+/g, '');
     const user = await db_1.default.user.findFirst({
-        where: { phone: cleanPhone, role: 'parent' },
+        where: {
+            phone: cleanPhone,
+            role: 'parent',
+            ...(schoolId && { schoolId })
+        },
         include: { school: true }
     });
     if (!user) {
@@ -65,12 +125,36 @@ const loginParent = async (phone, password) => {
         section: s.section?.name || '',
         stream: s.stream?.name || null,
     }));
+    // Generate a token for the parent
+    let customSchoolId = '';
+    let schoolName = user.school?.name || 'My School';
+    let schoolLogo = '';
+    const firstStudent = students[0];
+    const resolvedSchoolId = user.schoolId || firstStudent?.schoolId || '';
+    if (resolvedSchoolId) {
+        const school = await schoolService.getSchoolById(resolvedSchoolId);
+        if (school) {
+            customSchoolId = school.schoolId || '';
+            schoolName = school.name || schoolName;
+            schoolLogo = school.settings?.school_logo || '';
+        }
+    }
+    const token = (0, jwt_1.generateToken)({
+        id: user.id,
+        email: user.email || `parent-${cleanPhone}@zetime.com`,
+        role: 'parent',
+        schoolId: resolvedSchoolId,
+        customSchoolId,
+    });
     return {
         success: true,
         id: user.id,
+        token,
         parentName: user.full_name || students[0]?.parent_name || "Parent",
         parentPhone: cleanPhone,
-        schoolId: user.schoolId || students[0]?.schoolId,
+        schoolId: resolvedSchoolId,
+        schoolName,
+        schoolLogo,
         students: mappedStudents
     };
 };
@@ -115,6 +199,12 @@ const markNotificationAsRead = async (id, schoolId) => {
     });
 };
 exports.markNotificationAsRead = markNotificationAsRead;
+const deleteNotification = async (id, schoolId) => {
+    return await db_1.default.parentNotification.deleteMany({
+        where: { id, schoolId }
+    });
+};
+exports.deleteNotification = deleteNotification;
 const markAllNotificationsAsRead = async (phone, schoolId) => {
     const cleanPhone = phone.replace(/\s+/g, '');
     const user = await db_1.default.user.findFirst({
@@ -140,13 +230,14 @@ const markAllNotificationsAsRead = async (phone, schoolId) => {
     });
 };
 exports.markAllNotificationsAsRead = markAllNotificationsAsRead;
-const getPreferences = async (phone) => {
+const getPreferences = async (phone, schoolId) => {
     const cleanPhone = phone.replace(/\s+/g, '');
     return await db_1.default.parentPreferences.upsert({
-        where: { parentPhone: cleanPhone },
+        where: { parentPhone_schoolId: { parentPhone: cleanPhone, schoolId } },
         update: {},
         create: {
             parentPhone: cleanPhone,
+            schoolId,
             emailNotifications: true,
             smsNotifications: false,
             pushNotifications: true
@@ -154,10 +245,10 @@ const getPreferences = async (phone) => {
     });
 };
 exports.getPreferences = getPreferences;
-const updatePreferences = async (phone, data) => {
+const updatePreferences = async (phone, schoolId, data) => {
     const cleanPhone = phone.replace(/\s+/g, '');
     return await db_1.default.parentPreferences.upsert({
-        where: { parentPhone: cleanPhone },
+        where: { parentPhone_schoolId: { parentPhone: cleanPhone, schoolId } },
         update: {
             emailNotifications: data.emailNotifications ?? true,
             smsNotifications: data.smsNotifications ?? false,
@@ -165,6 +256,7 @@ const updatePreferences = async (phone, data) => {
         },
         create: {
             parentPhone: cleanPhone,
+            schoolId,
             emailNotifications: data.emailNotifications ?? true,
             smsNotifications: data.smsNotifications ?? false,
             pushNotifications: data.pushNotifications ?? true
@@ -207,7 +299,7 @@ const searchParentByPhone = async (phone, schoolId) => {
     const cleanPhone = phone.replace(/\s+/g, '');
     const user = await db_1.default.user.findFirst({
         where: { phone: cleanPhone, role: 'parent', schoolId },
-        select: { id: true, full_name: true, email: true, phone: true }
+        select: { id: true, full_name: true, email: true, phone: true, address: true }
     });
     if (!user) {
         return { success: false, message: "No parent found with this phone number." };
@@ -215,3 +307,32 @@ const searchParentByPhone = async (phone, schoolId) => {
     return { success: true, data: user };
 };
 exports.searchParentByPhone = searchParentByPhone;
+const updateProfile = async (phone, schoolId, data) => {
+    const cleanPhone = phone.replace(/\s+/g, '');
+    const user = await db_1.default.user.findFirst({
+        where: { phone: cleanPhone, role: 'parent', schoolId }
+    });
+    if (!user) {
+        throw new Error("Parent not found.");
+    }
+    const updatedUser = await db_1.default.user.update({
+        where: { id: user.id },
+        data: {
+            full_name: data.name,
+            email: data.email,
+            address: data.address
+        }
+    });
+    return {
+        success: true,
+        message: "Profile updated successfully.",
+        data: {
+            id: updatedUser.id,
+            name: updatedUser.full_name,
+            email: updatedUser.email,
+            phone: updatedUser.phone,
+            address: updatedUser.address
+        }
+    };
+};
+exports.updateProfile = updateProfile;

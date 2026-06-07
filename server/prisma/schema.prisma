@@ -11,7 +11,7 @@ datasource db {
 model School {
   id                   String                @id @default(uuid())
   schoolId             String?               @unique
-  name                 String                @unique
+  name                 String
   subscriptionStatus   String                @default("ACTIVE")
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
@@ -36,6 +36,7 @@ model School {
   users                User[]
   reports              AttendanceReport[]
   auditLogs            AuditLog[]
+  promotions           StudentPromotion[]
 }
 
 model User {
@@ -44,7 +45,7 @@ model User {
   password_hash              String
   full_name                  String
   role                       String
-  phone                      String?
+  phone                      String?              @unique
   is_active                  Boolean              @default(true)
   teacher_id                 String?
   schoolId                   String?
@@ -69,7 +70,6 @@ model User {
   parentStudents             ParentStudentLink[]
   school                     School?              @relation(fields: [schoolId], references: [id])
 
-  @@unique([phone, schoolId, role])
   @@index([email])
   @@index([schoolId])
 }
@@ -99,16 +99,22 @@ model TeacherAssignment {
   id         String   @id @default(uuid())
   teacher_id String
   schoolId   String?
-  grade      String
-  section    String
+  gradeId    String
+  sectionId  String
   subject    String?
-  stream     String?
+  streamId   String?
   createdAt  DateTime @default(now())
   school     School?  @relation(fields: [schoolId], references: [id])
   teacher    Teacher  @relation(fields: [teacher_id], references: [id])
+  grade      Grade    @relation(fields: [gradeId], references: [id])
+  section    Section  @relation(fields: [sectionId], references: [id])
+  stream     Stream?  @relation(fields: [streamId], references: [id])
 
   @@index([schoolId])
   @@index([teacher_id])
+  @@index([gradeId])
+  @@index([sectionId])
+  @@index([streamId])
 }
 
 model SchoolSettings {
@@ -137,6 +143,9 @@ model Grade {
   name     String
   school   School?   @relation(fields: [schoolId], references: [id])
   students Student[]
+  assignments TeacherAssignment[]
+  fromPromotions StudentPromotion[] @relation("FromGrade")
+  toPromotions   StudentPromotion[] @relation("ToGrade")
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -148,6 +157,9 @@ model Section {
   name     String
   school   School?   @relation(fields: [schoolId], references: [id])
   students Student[]
+  assignments TeacherAssignment[]
+  fromPromotions StudentPromotion[] @relation("FromSection")
+  toPromotions   StudentPromotion[] @relation("ToSection")
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -159,6 +171,9 @@ model Stream {
   name     String
   school   School?   @relation(fields: [schoolId], references: [id])
   students Student[]
+  assignments TeacherAssignment[]
+  fromPromotions StudentPromotion[] @relation("FromStream")
+  toPromotions   StudentPromotion[] @relation("ToStream")
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -175,6 +190,7 @@ model Student {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   fullName            String
+  status              String               @default("ACTIVE")
   gradeId             String
   schoolId            String?
   sectionId           String
@@ -187,12 +203,43 @@ model Student {
   school              School?              @relation(fields: [schoolId], references: [id])
   section             Section              @relation(fields: [sectionId], references: [id])
   stream              Stream?              @relation(fields: [streamId], references: [id])
+  promotions          StudentPromotion[]
 
   @@unique([student_id, schoolId])
   @@index([schoolId])
   @@index([gradeId])
   @@index([sectionId])
   @@index([streamId])
+}
+
+model StudentPromotion {
+  id               String   @id @default(uuid())
+  schoolId         String
+  studentId        String
+  academicYear     String
+  fromGradeId      String
+  fromSectionId    String
+  toGradeId        String?  // null = graduated
+  toSectionId      String?
+  fromStreamId     String?
+  toStreamId       String?
+  promotedByUserId String
+  promotedAt       DateTime @default(now())
+  notes            String?
+  
+  school           School   @relation(fields: [schoolId], references: [id])
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromGrade        Grade    @relation("FromGrade", fields: [fromGradeId], references: [id])
+  fromSection      Section  @relation("FromSection", fields: [fromSectionId], references: [id])
+  toGrade          Grade?   @relation("ToGrade", fields: [toGradeId], references: [id])
+  toSection        Section? @relation("ToSection", fields: [toSectionId], references: [id])
+  fromStream       Stream?  @relation("FromStream", fields: [fromStreamId], references: [id])
+  toStream         Stream?  @relation("ToStream", fields: [toStreamId], references: [id])
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([fromGradeId])
+  @@index([toGradeId])
 }
 
 model Attendance {

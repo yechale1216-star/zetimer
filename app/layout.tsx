@@ -54,6 +54,9 @@ export const viewport: Viewport = {
 
 import { ThemeProvider } from "@/components/theme-provider"
 import { LanguageProvider } from "@/lib/context/language-context"
+import { SchoolProvider } from "@/lib/context/school-context"
+
+import { Toaster as SonnerToaster } from "sonner"
 
 export default function RootLayout({
   children,
@@ -73,8 +76,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <LanguageProvider>
-            {children}
-            <Toaster />
+            <SchoolProvider>
+              {children}
+              <Toaster />
+              <SonnerToaster position="top-right" richColors />
+            </SchoolProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

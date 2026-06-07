@@ -66,5 +66,37 @@ router.get('/', authorize(['super_admin']), async (req: AuthenticatedRequest, re
   }
 });
 
+
+// Get all grades for a school
+router.get('/me/grades', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const grades = await schoolService.getGrades(schoolId);
+    res.status(200).json({ success: true, data: grades });
+  } catch (error) { next(error); }
+});
+
+// Get all sections for a school
+router.get('/me/sections', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const sections = await schoolService.getSections(schoolId);
+    res.status(200).json({ success: true, data: sections });
+  } catch (error) { next(error); }
+});
+
+// Get all streams for a school
+router.get('/me/streams', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const streams = await schoolService.getStreams(schoolId);
+    res.status(200).json({ success: true, data: streams });
+  } catch (error) { next(error); }
+});
+
 export default router;
+
 

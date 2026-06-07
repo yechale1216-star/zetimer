@@ -13,19 +13,20 @@ const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-
 const tenantMiddleware = (req, res, next) => {
     const authHeader = req.headers.authorization;
     const schoolIdHeader = req.headers['x-school-id'];
+    // Public routes exclusion - use originalUrl since middleware is mounted at /api
+    const publicPaths = [
+        '/api/parent/schools',
+        '/api/parent/login',
+        '/api/parent/update-password',
+        '/api/parent/search',
+        '/api/auth',
+        '/health'
+    ];
+    const url = req.originalUrl.split('?')[0]; // strip query string for comparison
+    if (publicPaths.some(path => url.startsWith(path))) {
+        return next();
+    }
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        // If no JWT, we might allow if optional or for public routes, 
-        // but for secure data, we should reject.
-        // However, during migration, we might temporarily allow x-school-id header.
-        if (schoolIdHeader) {
-            req.user = {
-                id: 'system',
-                email: 'system@zetime.com',
-                role: 'school_admin',
-                schoolId: schoolIdHeader,
-            };
-            return next();
-        }
         return res.status(401).json({ success: false, message: 'Authorization token required' });
     }
     const token = authHeader.split(' ')[1];

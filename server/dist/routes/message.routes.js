@@ -37,6 +37,6 @@ const express_1 = require("express");
 const messageController = __importStar(require("../controllers/message.controller"));
 const router = (0, express_1.Router)();
 router.get('/conversations/:userId', messageController.getConversations);
-router.get('/messages/:conversationId', messageController.getMessages);
+router.get('/:conversationId', messageController.getMessages);
 router.post('/conversations', messageController.createConversation);
 exports.default = router;

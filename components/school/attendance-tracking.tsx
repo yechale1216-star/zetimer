@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -30,8 +31,8 @@ import { db, type Student } from "@/lib/db/database"
 import { notifications, combinedNotificationService, emailService } from "@/lib/utils/notifications"
 import { useSchoolSettings } from "@/hooks/use-school-settings"
 import { authService } from "@/lib/auth/auth"
-import { useToast } from "@/hooks/use-toast"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
+
 
 interface AttendanceState {
   [studentId: string]: {
@@ -61,7 +62,7 @@ export function AttendanceTracking() {
   const [showSessionConfirm, setShowSessionConfirm] = useState(false)
   const [pendingSession, setPendingSession] = useState<"morning" | "afternoon" | null>(null)
   const { settings } = useSchoolSettings()
-  const { toast } = useToast()
+
   const [isTeacher, setIsTeacher] = useState(false)
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set())
   const [uiType, setUiType] = useState<"card_based" | "tabular">("card_based")
@@ -243,10 +244,7 @@ export function AttendanceTracking() {
       ...newAttendanceState,
     }))
     notifications.success("Success", `Marked ${filteredStudents.length} students as present`)
-    toast({
-      title: "Success",
-      description: `Marked ${filteredStudents.length} students as present`,
-    })
+
   }
 
   const markSelectedAbsent = () => {
@@ -306,31 +304,20 @@ export function AttendanceTracking() {
 
       if (attendanceRecords.length === 0) {
         notifications.warning("No Data", "Please mark attendance for at least one student")
-        toast({
-          title: "No Data",
-          description: "Please mark attendance for at least one student",
-          variant: "destructive",
-        })
+
         return
       }
 
       await db.markAttendance(attendanceRecords)
 
       notifications.success("Attendance Saved Successfully", "The student attendance records have been updated.")
-      toast({
-        title: "Attendance Saved Successfully",
-        description: "The student attendance records have been updated.",
-      })
+
 
       await loadAttendanceForDate()
     } catch (error) {
       console.error("[v0] Error saving attendance:", error)
       notifications.error("Error", "Failed to save attendance. Please try again.")
-      toast({
-        title: "Error",
-        description: "Failed to save attendance. Please try again.",
-        variant: "destructive",
-      })
+
     } finally {
       setIsSaving(false)
     }
@@ -550,10 +537,7 @@ export function AttendanceTracking() {
 
     setAttendanceState(newAttendanceState)
     notifications.success("Cleared", `Cleared ${clearedCount} absent student${clearedCount !== 1 ? "s" : ""}`)
-    toast({
-      title: "Cleared",
-      description: `Cleared ${clearedCount} absent student${clearedCount !== 1 ? "s" : ""}`,
-    })
+
   }
 
 
@@ -595,18 +579,11 @@ export function AttendanceTracking() {
       }, 100)
 
       notifications.success("Export Complete", `Exported attendance for ${filteredStudents.length} students`)
-      toast({
-        title: "Export Complete",
-        description: `Exported attendance for ${filteredStudents.length} students`,
-      })
+
     } catch (error) {
       console.error("[v0] CSV export error:", error)
       notifications.error("Export Failed", "Failed to export attendance. Please try again.")
-      toast({
-        title: "Export Failed",
-        description: "Failed to export attendance. Please try again.",
-        variant: "destructive",
-      })
+
     }
   }
 
@@ -869,12 +846,9 @@ export function AttendanceTracking() {
       </Card>
 
       {isLoading ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading students...</p>
-        </div>
+        <PageSkeleton variant="table" />
       ) : filteredStudents.length === 0 ? (
-        <div className="text-center py-8">
+        <div className="text-center py-20 bg-white/50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
           <p className="text-gray-600">No students found</p>
         </div>
       ) : uiType === "card_based" ? (

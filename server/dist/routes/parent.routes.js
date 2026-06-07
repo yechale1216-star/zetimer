@@ -37,16 +37,20 @@ const express_1 = require("express");
 const parentController = __importStar(require("../controllers/parent.controller"));
 const router = (0, express_1.Router)();
 // Authentication / Verification
+router.get('/schools', parentController.listParentSchools);
 router.post('/login', parentController.loginParent);
 router.post('/update-password', parentController.updatePassword);
 router.get('/search', parentController.searchParent);
 // Notifications & Announcements
 router.get('/notifications/:phone', parentController.getNotifications);
 router.patch('/notifications/:id/read', parentController.markAsRead);
+router.delete('/notifications/:id', parentController.deleteNotification);
 router.patch('/notifications/read-all/:phone', parentController.markAllAsRead);
 // Announcements Publisher (Admins/Teachers or test suite)
 router.post('/announcements', parentController.postAnnouncement);
 // Preferences
 router.get('/preferences/:phone', parentController.getPreferences);
 router.put('/preferences/:phone', parentController.updatePreferences);
+// Profile
+router.put('/profile/:phone', parentController.updateProfile);
 exports.default = router;

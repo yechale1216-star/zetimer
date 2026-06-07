@@ -4,6 +4,16 @@ import { AuthenticatedRequest } from '../middleware/tenant.middleware';
 
 const router = Router();
 
+// Get current user profile
+router.get('/profile', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const user = await userService.getUserById(userId);
+    res.status(200).json({ success: true, data: user });
+  } catch (error) { next(error); }
+});
+
 // Get user by email — used by auth login (Public or filtered)
 router.get('/by-email', async (req: Request, res: Response, next: NextFunction) => {
   try {

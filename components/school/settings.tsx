@@ -12,11 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { EmailStatus } from "@/components/school/email-status"
 import { db } from "@/lib/db/database"
 import { authService } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
-import { useToast } from "@/hooks/use-toast"
+
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
 import { Lock, Edit2, Check, Calendar } from "lucide-react"
 
@@ -31,17 +32,22 @@ export function Settings() {
   const [isEditingSchoolInfo, setIsEditingSchoolInfo] = useState(false)
   const [emailConfigPassword, setEmailConfigPassword] = useState("")
   const [isEmailConfigUnlocked, setIsEmailConfigUnlocked] = useState(false)
-  const { toast } = useToast()
-  const user = authService.getCurrentUser()
+  const [user, setUser] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
+
 
   useEffect(() => {
+    const currentUser = authService.getCurrentUser()
+    setUser(currentUser)
+    setMounted(true)
     loadSettings()
-    if (user) {
+    if (currentUser) {
       setSchoolInfo({
-        schoolName: user.schoolName || "",
-        schoolLogo: user.schoolLogo || "",
+        schoolName: currentUser.schoolName || "",
+        schoolLogo: currentUser.schoolLogo || "",
       })
-      if (user.role === "admin" && user.schoolName === "Setup Required") {
+      if (currentUser.role === "admin" && currentUser.schoolName === "Setup Required") {
         setIsEditingSchoolInfo(true)
       }
     }
@@ -66,11 +72,8 @@ export function Settings() {
       const currentSettings = await db.getSettings()
       setSettings(currentSettings)
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load settings",
-        variant: "destructive",
-      })
+      notifications.error("Error", "Failed to load settings")
+
     } finally {
       setIsLoading(false)
     }
@@ -90,11 +93,8 @@ export function Settings() {
         )
 
         if (!result.success) {
-          toast({
-            title: "Error",
-            description: result.error || "Failed to update school information",
-            variant: "destructive",
-          })
+          notifications.error("Error", result.error || "Failed to update school information")
+
           setIsSaving(false)
           return
         }
@@ -114,13 +114,10 @@ export function Settings() {
       setSettings(updatedSettings)
       setIsEditingSchoolInfo(false)
 
-      toast({
-        title: "Settings Saved",
-        description: "All settings have been updated successfully.",
-        variant: "default",
-      })
-      notifications.success("Settings Saved", "Settings updated successfully")
+      notifications.success("Settings Saved", "All settings have been updated successfully.")
+
       console.log("[v0] Save settings completed successfully")
+
 
       // Reload if school info was changed
       if (user?.role === "admin" && isEditingSchoolInfo) {
@@ -128,11 +125,8 @@ export function Settings() {
       }
     } catch (error) {
       console.error("[v0] Error saving settings:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save settings",
-        variant: "destructive",
-      })
+      notifications.error("Error", "Failed to save settings")
+
     } finally {
       setIsSaving(false)
     }
@@ -144,17 +138,11 @@ export function Settings() {
       try {
         await db.resetSettings()
         await loadSettings()
-        toast({
-          title: "Settings Reset",
-          description: "All settings have been reset to default values.",
-          variant: "default",
-        })
+        notifications.success("Settings Reset", "All settings have been reset to default values.")
+
       } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to reset settings",
-          variant: "destructive",
-        })
+        notifications.error("Error", "Failed to reset settings")
+
       } finally {
         setIsLoading(false)
       }
@@ -170,18 +158,13 @@ export function Settings() {
       setIsLoading(true)
       try {
         await db.clearAllData()
-        toast({
-          title: "Data Cleared",
-          description: "All data has been permanently deleted.",
-          variant: "default",
-        })
-        notifications.success("Data Cleared", "All data cleared successfully")
+        notifications.success("Data Cleared", "All data has been permanently deleted.")
+
+
+
       } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to clear data",
-          variant: "destructive",
-        })
+        notifications.error("Error", "Failed to clear data")
+
       } finally {
         setIsLoading(false)
       }
@@ -213,17 +196,11 @@ export function Settings() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      toast({
-        title: "Export Complete",
-        description: "System data has been exported successfully.",
-        variant: "default",
-      })
+      notifications.success("Export Complete", "System data has been exported successfully.")
+
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to export data",
-        variant: "destructive",
-      })
+      notifications.error("Error", "Failed to export data")
+
     }
   }
 
@@ -258,19 +235,14 @@ export function Settings() {
             setSettings(importData.settings)
           }
 
-          toast({
-            title: "Import Complete",
-            description: "Data has been imported successfully.",
-            variant: "default",
-          })
-          notifications.success("Import Complete", "Data imported successfully")
+          notifications.success("Import Complete", "Data has been imported successfully.")
+
+
+
         }
       } catch (error) {
-        toast({
-          title: "Import Error",
-          description: "Failed to import data. Please check the file format.",
-          variant: "destructive",
-        })
+        notifications.error("Import Error", "Failed to import data. Please check the file format.")
+
       } finally {
         setIsLoading(false)
         event.target.value = ""
@@ -285,24 +257,14 @@ export function Settings() {
       setEmailConfigPassword("")
       notifications.success("Access Granted", "Email configuration unlocked")
     } else {
-      toast({
-        title: "Access Denied",
-        description: "Incorrect password",
-        variant: "destructive",
-      })
+      notifications.error("Access Denied", "Incorrect password")
+
       setEmailConfigPassword("")
     }
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading settings...</p>
-        </div>
-      </div>
-    )
+    return <PageSkeleton variant="form" />
   }
 
   return (
@@ -334,7 +296,7 @@ export function Settings() {
                   <CardTitle>School Information</CardTitle>
                   <CardDescription>Basic information about your school</CardDescription>
                 </div>
-                {(user?.role === "admin" || user?.role === "super_admin") && !isEditingSchoolInfo && (
+                {mounted && (user?.role === "admin" || user?.role === "super_admin") && !isEditingSchoolInfo && (
                   <Button
                     onClick={() => setIsEditingSchoolInfo(true)}
                     variant="outline"
@@ -399,7 +361,7 @@ export function Settings() {
                     id="academicYear"
                     value={settings.academicYear || ""}
                     onChange={(e) => setSettings({ ...settings, academicYear: e.target.value })}
-                    placeholder="2024-2025"
+                    placeholder="e.g. 2026/2018"
                   />
                 </div>
                 <div>
@@ -680,7 +642,7 @@ export function Settings() {
                 </div>
                 <div>
                   <Label>Last Login</Label>
-                  <p className="font-mono">{new Date().toLocaleString()}</p>
+                  <p className="font-mono">{mounted ? new Date().toLocaleString() : ""}</p>
                 </div>
                 <div>
                   <Label>Version</Label>

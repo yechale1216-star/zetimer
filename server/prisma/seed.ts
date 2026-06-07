@@ -28,11 +28,14 @@ async function main() {
 
   // ── 1. Demo School ────────────────────────────────────────────────────────
   console.log('🏫  Creating Demo School …');
-  const demoSchool = await prisma.school.upsert({
+  let demoSchool = await prisma.school.findFirst({
     where: { name: 'Demo High School' },
-    update: {},
-    create: { name: 'Demo High School' },
   });
+  if (!demoSchool) {
+    demoSchool = await prisma.school.create({
+      data: { name: 'Demo High School', schoolId: 'DEMO001' },
+    });
+  }
   console.log(`   ✓ School: "${demoSchool.name}" (id: ${demoSchool.id})\n`);
 
   // ── 2. Grades, Sections, Streams for Demo School ──────────────────────────
@@ -188,25 +191,31 @@ async function main() {
       },
     });
 
-    // Create TeacherAssignment
-    const existingAssign = await prisma.teacherAssignment.findFirst({
-      where: {
-        teacher_id: teacher.id,
-        schoolId: demoSchool.id,
-        grade: t.grade,
-        section: t.section,
-      },
-    });
-    if (!existingAssign) {
-      await prisma.teacherAssignment.create({
-        data: {
+    // Find Grade/Section records
+    const gRecord = await prisma.grade.findFirst({ where: { schoolId: demoSchool.id, name: t.grade } });
+    const sRecord = await prisma.section.findFirst({ where: { schoolId: demoSchool.id, name: t.section } });
+
+    if (gRecord && sRecord) {
+      // Create TeacherAssignment
+      const existingAssign = await prisma.teacherAssignment.findFirst({
+        where: {
           teacher_id: teacher.id,
           schoolId: demoSchool.id,
-          grade: t.grade,
-          section: t.section,
-          subject: t.subject,
+          gradeId: gRecord.id,
+          sectionId: sRecord.id,
         },
       });
+      if (!existingAssign) {
+        await prisma.teacherAssignment.create({
+          data: {
+            teacher_id: teacher.id,
+            schoolId: demoSchool.id,
+            gradeId: gRecord.id,
+            sectionId: sRecord.id,
+            subject: t.subject,
+          },
+        });
+      }
     }
 
     console.log(`   ✓ ${t.name} — ${t.subject} (Grade ${t.grade}${t.section}) | login: ${t.userEmail}`);
@@ -240,7 +249,14 @@ async function main() {
 
   let createdStudents = 0;
   for (const s of studentsData) {
-    const existing = await prisma.student.findUnique({ where: { student_id: s.student_id } });
+    const existing = await prisma.student.findUnique({ 
+      where: { 
+        student_id_schoolId: {
+          student_id: s.student_id,
+          schoolId: demoSchool.id
+        }
+      } 
+    });
     if (!existing) {
       await prisma.student.create({
         data: {
@@ -264,11 +280,14 @@ async function main() {
 
   // ── 7. Second School (for multi-tenant testing) ───────────────────────────
   console.log('🏫  Creating Second School (for multi-tenant testing) …');
-  const school2 = await prisma.school.upsert({
+  let school2 = await prisma.school.findFirst({
     where: { name: 'Green Valley Academy' },
-    update: {},
-    create: { name: 'Green Valley Academy' },
   });
+  if (!school2) {
+    school2 = await prisma.school.create({
+      data: { name: 'Green Valley Academy', schoolId: 'GRVN001' },
+    });
+  }
 
   await prisma.schoolSettings.upsert({
     where: { schoolId: school2.id },

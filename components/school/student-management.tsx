@@ -8,16 +8,19 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Trash2, Edit, Plus, Search, Upload, Download, AlertCircle, Users, CheckCircle2, Clock, ShieldCheck, Eye, X, Calendar, Mail, Phone, GraduationCap } from "lucide-react"
+import { Trash2, Edit, Plus, Search, Upload, Download, AlertCircle, Users, CheckCircle2, Clock, ShieldCheck, Eye, X, Calendar, Mail, Phone, GraduationCap, UploadCloud } from "lucide-react"
 import { db, type Student } from "@/lib/db/database"
+import { StudentImportPreview } from "./student-import-preview"
+import { motion, AnimatePresence } from "framer-motion"
 import { notifications } from "@/lib/utils/notifications"
 import { ValidationService } from "@/lib/utils/validation"
 import { authService } from "@/lib/auth/auth"
-import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
+
 
 
 export function StudentManagement() {
@@ -30,6 +33,9 @@ export function StudentManagement() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importPreviewData, setImportPreviewData] = useState<any[] | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isTeacher, setIsTeacher] = useState(false)
@@ -61,12 +67,13 @@ export function StudentManagement() {
   const [linkExistingParent, setLinkExistingParent] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [showUploadDialog, setShowUploadDialog] = useState(false)
-  const { toast } = useToast()
+
+
 
   // Parent Search Trigger (Automatic)
   useEffect(() => {
     const cleanPhone = formData.parent_phone.replace(/\s+/g, '');
-    if (cleanPhone.length >= 13 && cleanPhone.startsWith('+251')) {
+    if (cleanPhone.length >= 10 && (cleanPhone.startsWith('+251') || cleanPhone.startsWith('09') || cleanPhone.startsWith('9'))) {
       handleSearchParent();
     } else {
       setFoundParent(null);
@@ -150,12 +157,25 @@ export function StudentManagement() {
       setIsLoading(false)
     }
   }
+ 
+  const fetchNextStudentId = async () => {
+    try {
+      const nextId = await db.getNextStudentId()
+      if (nextId) {
+        setFormData(prev => ({ ...prev, student_id: nextId }));
+      } else {
+        setFormData(prev => ({ ...prev, student_id: "Auto-Gen" }));
+      }
+    } catch (error) {
+      console.error("Error fetching next student ID:", error);
+      setFormData(prev => ({ ...prev, student_id: "Auto-Gen" }));
+    }
+  }
 
   const resetForm = () => {
-    const generatedId = Math.floor(100000 + Math.random() * 900000).toString();
     setFormData({
       name: "",
-      student_id: generatedId,
+      student_id: "...", // Fetching...
       grade: "",
       stream: "",
       section: "",
@@ -170,6 +190,7 @@ export function StudentManagement() {
       date_of_birth: "",
       address: "",
     })
+    fetchNextStudentId()
     setEditingStudent(null)
     setValidationErrors([])
     setFoundParent(null)
@@ -193,7 +214,7 @@ export function StudentManagement() {
     const isLinkingExisting = Boolean(formData.existingParentId)
     const parentEmailValidation = isLinkingExisting
       ? { isValid: true, errors: [] }
-      : ValidationService.validateEmail(formData.parent_email)
+      : ValidationService.validateEmail(formData.parent_email, true)
     const parentPhoneValidation = isLinkingExisting
       ? { isValid: true, errors: [] }
       : ValidationService.validatePhone(formData.parent_phone)
@@ -228,20 +249,14 @@ export function StudentManagement() {
       if (editingStudent) {
         await db.updateStudent(editingStudent.id, formData)
         notifications.success("Student Updated Successfully", "The student information has been updated.")
-        toast({
-          title: "Student Updated Successfully",
-          description: "The student information has been updated.",
-        })
+
         await loadStudents()
         setIsAddModalOpen(false)
         resetForm()
       } else {
         await db.addStudent(formData)
         notifications.success("Student Enrolled Successfully", "New student has been added to the system.")
-        toast({
-          title: "Student Enrolled Successfully",
-          description: "New student has been added to the system.",
-        })
+
         await loadStudents()
         setShowSuccess(true)
         setTimeout(() => {
@@ -250,13 +265,9 @@ export function StudentManagement() {
           resetForm()
         }, 2500)
       }
-    } catch (error) {
-      notifications.error("Error", "Failed to save student")
-      toast({
-        title: "Error",
-        description: "Failed to save student",
-        variant: "destructive",
-      })
+    } catch (error: any) {
+      notifications.error("Error", error.message || "Failed to save student")
+
     } finally {
       setIsSaving(false)
     }
@@ -267,8 +278,8 @@ export function StudentManagement() {
     setFormData((prev) => {
       const updated = { ...prev, grade: gradeValue };
       if (isNaN(gradeNum) || gradeNum < 11) {
-        updated.stream = "General";
-      } else if (prev.stream === "General" || !prev.stream) {
+        updated.stream = "";
+      } else if (prev.stream === "" || !prev.stream) {
         updated.stream = "";
       }
       return updated;
@@ -302,7 +313,7 @@ export function StudentManagement() {
 
   const handleSearchParent = async () => {
     const cleanPhone = formData.parent_phone.replace(/\s+/g, "")
-    if (cleanPhone.length < 13) return;
+    if (cleanPhone.length < 10) return;
     
     // Prevent redundant searches if already found for this phone
     if (foundParent && foundParent.phone === cleanPhone) return;
@@ -366,11 +377,37 @@ export function StudentManagement() {
           return
         }
 
-        const headers = lines[0].split(",").map((h) => h.trim().toLowerCase())
+        // 1. Move helper to top of function for use in headers
+        const splitCSVLine = (line: string) => {
+          const result = []
+          let startValueIndex = 0
+          let inQuotes = false
+
+          for (let i = 0; i < line.length; i++) {
+            if (line[i] === '"') {
+              inQuotes = !inQuotes
+            }
+            if (line[i] === "," && !inQuotes) {
+              let value = line.substring(startValueIndex, i).trim()
+              if (value.startsWith('"') && value.endsWith('"')) {
+                value = value.substring(1, value.length - 1).replace(/""/g, '"')
+              }
+              result.push(value)
+              startValueIndex = i + 1
+            }
+          }
+          let lastValue = line.substring(startValueIndex).trim()
+          if (lastValue.startsWith('"') && lastValue.endsWith('"')) {
+            lastValue = lastValue.substring(1, lastValue.length - 1).replace(/""/g, '"')
+          }
+          result.push(lastValue)
+          return result
+        }
+
+        const headers = splitCSVLine(lines[0]).map((h) => h.toLowerCase())
 
         const requiredHeaders = [
           "name",
-          "student_id",
           "grade",
           "section",
           "parent_phone",
@@ -383,101 +420,45 @@ export function StudentManagement() {
           return
         }
 
-        const studentsToImport = []
-        const importErrors = []
-        // For CSV import, we allow existing IDs because we support updates (upsert)
-        // But we still track IDs within the same CSV to prevent duplicates in the file itself
-        const studentIdsInCsv: string[] = []
-
+        const rowsToPreview = []
         for (let i = 1; i < lines.length; i++) {
-          const rawValues = lines[i].split(",").map((v) => v.trim())
+          const rawValues = splitCSVLine(lines[i])
           if (rawValues.length === 0 || (rawValues.length === 1 && rawValues[0] === "")) continue
-
-          const values = headers.map((_, index) => rawValues[index] || "")
 
           const student: any = {}
           headers.forEach((header, index) => {
-            student[header] = values[index] || ""
+            student[header] = rawValues[index] || ""
           })
-
-          if (!student.name || !student.student_id || !student.grade) {
-            importErrors.push(`Row ${i + 1}: Missing student name, ID, or grade`)
-            continue
-          }
-
-          // Parent defaults
-          if (!student.parent_name || student.parent_name.trim() === "") {
-            student.parent_name = `Parent of ${student.name}`
-          }
-          
-          let phone = student.parent_phone || ""
-          phone = phone.replace(/[\s\-\(\)]/g, "")
-          if (phone.startsWith("0")) {
-            phone = "+251" + phone.substring(1)
-          } else if (phone.startsWith("251") && !phone.startsWith("+")) {
-            phone = "+" + phone
-          } else if (!phone.startsWith("+") && phone.length > 0) {
-            phone = "+251" + phone
-          }
-          if (phone.trim() === "" || phone === "+251") {
-            phone = "+251900000000"
-          }
-          student.parent_phone = phone
-
-          // Validate student (pass an empty array to validateStudentId to bypass existence check, 
-          // but we use studentIdsInCsv to catch duplicates within the file)
-          const nameValidation = ValidationService.validateName(student.name)
-          const studentIdValidation = ValidationService.validateStudentId(student.student_id, studentIdsInCsv)
-          const phoneValidation = ValidationService.validatePhone(student.parent_phone)
-          
-          const validationResult = ValidationService.combineValidationResults(
-            nameValidation,
-            studentIdValidation,
-            phoneValidation
-          )
-
-          if (validationResult.isValid) {
-            studentsToImport.push(student)
-            studentIdsInCsv.push(student.student_id)
-          } else {
-            importErrors.push(`Row ${i + 1} (${student.name}): ${validationResult.errors.join(", ")}`)
-          }
-        }
-
-        if (importErrors.length > 0) {
-          notifications.warning("Import Warnings", `${importErrors.length} rows had errors and were skipped`)
-          console.warn("Import errors:", importErrors)
-        }
-
-        if (studentsToImport.length === 0) {
-          notifications.error("Import Failed", "No valid students found to import")
-          return
-        }
-
-        const importResult = await db.bulkAddStudents(studentsToImport)
-
-        if (importResult.success) {
-          notifications.success(
-            "Import Successful",
-            `${importResult.data.created} students processed. ${importResult.data.errors.length} rows had issues.`,
-          )
-          if (importResult.data.errors.length > 0) {
-            console.warn("Bulk import errors:", importResult.data.errors)
-          }
-        } else {
-          notifications.error("Import Failed", importResult.message || "Failed to import students")
+          rowsToPreview.push(student)
         }
         
-        await loadStudents()
+        // Set data for preview instead of direct import
+        setImportPreviewData(rowsToPreview)
       } catch (error) {
-        console.error("CSV Import Error:", error)
-        notifications.error("Error", "Failed to import CSV file")
+        console.error("Import error:", error)
+        notifications.error("Import Failed", "Failed to process CSV file.")
       }
     }
     reader.readAsText(file)
+  }
 
-    // Reset file input
-    event.target.value = ""
+  const handleFinalImport = async (validData: Student[]) => {
+    setIsImporting(true)
+    try {
+      const result = await db.bulkAddStudents(validData)
+      notifications.success(
+        "Import Successful",
+        `Successfully imported ${result.data.created} students.`
+      )
+      setImportPreviewData(null)
+      setShowUploadDialog(false)
+      loadStudents() // Refresh list
+    } catch (error: any) {
+      console.error("Bulk add error:", error)
+      notifications.error("Import Failed", "An error occurred during final data persistence.")
+    } finally {
+      setIsImporting(false)
+    }
   }
 
   const downloadCSVTemplate = () => {
@@ -486,7 +467,6 @@ export function StudentManagement() {
     try {
       const headers = [
         "name",
-        "student_id",
         "grade",
         "stream",
         "section",
@@ -502,7 +482,6 @@ export function StudentManagement() {
       ]
       const example = [
         "John Doe",
-        "S001",
         "Grade 10",
         "Natural",
         "A",
@@ -517,8 +496,16 @@ export function StudentManagement() {
         "password123"
       ]
 
-      let csvContent = headers.join(",") + "\n"
-      csvContent += example.join(",") + "\n"
+      const escapeCSV = (field: string) => {
+        const stringField = String(field || "")
+        if (stringField.includes(",") || stringField.includes('"') || stringField.includes("\n")) {
+          return `"${stringField.replace(/"/g, '""')}"`
+        }
+        return stringField
+      }
+
+      let csvContent = headers.map(escapeCSV).join(",") + "\n"
+      csvContent += example.map(escapeCSV).join(",") + "\n"
 
       console.log("[v0] CSV template content generated")
 
@@ -675,6 +662,9 @@ export function StudentManagement() {
                       </div>
                       <div>
                         <DialogTitle className="typography-section-title">{editingStudent ? "Update Student Profile" : "Enroll New Student"}</DialogTitle>
+                        <DialogDescription className="sr-only">
+                          {editingStudent ? "Update the selected student's profile information." : "Enter the details to enroll a new student in the system."}
+                        </DialogDescription>
                         <p className="typography-helper text-slate-500 dark:text-slate-400 mt-0.5">Provide complete personal and guardian contact fields.</p>
                       </div>
                     </div>
@@ -740,29 +730,30 @@ export function StudentManagement() {
                           <div className="space-y-2">
                             <Label htmlFor="stream" className="typography-label">Stream</Label>
                             {!formData.grade ? (
-                              <Input
-                                id="stream"
-                                placeholder="Select grade first"
-                                readOnly
-                                disabled
-                                className="typography-body h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed"
-                              />
-                            ) : (
-                              (() => {
-                                const gradeNum = parseInt(formData.grade.replace(/[^\d]/g, ""), 10);
-                                if (!isNaN(gradeNum) && gradeNum < 11) {
-                                  return (
-                                    <Input
-                                      id="stream"
-                                      value={formData.stream || "General"}
-                                      readOnly
-                                      className="typography-body h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed"
-                                    />
-                                  );
+                            <Input
+                              id="stream"
+                              value={formData.stream || ""}
+                              placeholder="Select grade first"
+                              readOnly
+                              disabled
+                              className="typography-body h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed"
+                            />
+                          ) : (
+                            (() => {
+                              const gradeNum = parseInt(formData.grade.replace(/[^\d]/g, ""), 10);
+                              if (!isNaN(gradeNum) && gradeNum < 11) {
+                                return (
+                                  <Input
+                                    id="stream"
+                                    value="N/A"
+                                    readOnly
+                                    className="typography-body h-11 rounded-xl bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-70 cursor-not-allowed"
+                                  />
+                                );
                                 } else {
                                   return (
                                     <Select
-                                      value={formData.stream}
+                                      value={formData.stream || ""}
                                       onValueChange={(value) => setFormData((prev) => ({ ...prev, stream: value }))}
                                     >
                                       <SelectTrigger className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800">
@@ -771,7 +762,6 @@ export function StudentManagement() {
                                       <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800">
                                         <SelectItem value="Natural">Natural Science</SelectItem>
                                         <SelectItem value="Social">Social Science</SelectItem>
-                                        <SelectItem value="General">General</SelectItem>
                                       </SelectContent>
                                     </Select>
                                   );
@@ -845,19 +835,36 @@ export function StudentManagement() {
                                 value={formData.parent_phone || ""}
                                 onChange={(e) => {
                                   let val = e.target.value.replace(/[^\d+]/g, "")
+                                  if (val.startsWith("0")) {
+                                    val = "+251" + val.substring(1)
+                                  } else if (val.startsWith("251") && !val.startsWith("+")) {
+                                    val = "+" + val
+                                  } else if (!val.startsWith("+") && val.length > 0) {
+                                    val = "+251" + val
+                                  }
                                   if (val.lastIndexOf("+") > 0) val = "+" + val.replace(/\+/g, "")
-                                  if (!val.startsWith("+251") && val.length > 0 && !val.startsWith("+")) val = "+251" + val
                                   setFormData((prev) => ({ ...prev, parent_phone: val }))
                                 }}
                                 required
                                 className={`typography-body h-12 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all ${foundParent ? 'border-emerald-500 bg-emerald-50/30' : ''}`}
                               />
-                              {foundParent && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                  {foundParent ? (
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                  ) : (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-slate-400 hover:text-emerald-500"
+                                      onClick={handleSearchParent}
+                                      disabled={isSearchingParent}
+                                    >
+                                      <Search className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                 </div>
-                              )}
-                            </div>
+                              </div>
                             <p className="text-[10px] text-muted-foreground italic">Phone number is used for automatic account detection.</p>
                           </div>
 
@@ -1027,43 +1034,51 @@ export function StudentManagement() {
 
       {/* Import Section */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl bg-card/95 backdrop-blur-xl p-8">
-          <DialogHeader className="mb-6">
+        <DialogContent className="!max-w-none !w-screen !h-screen !translate-x-0 !translate-y-0 !top-0 !left-0 rounded-none border-none shadow-2xl bg-card/98 backdrop-blur-xl p-0 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-8 py-4 border-b border-border/50 bg-background/50">
             <DialogTitle className="typography-page-title">Import Student Data</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-6">
-            <Label htmlFor="csv-upload" className="cursor-pointer group">
-              <div className="border-2 border-dashed border-border/60 rounded-3xl p-10 text-center group-hover:border-primary/40 group-hover:bg-primary/[0.02] transition-all bg-muted/20 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative z-10">
-                  <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                    <Upload className="w-8 h-8 text-primary" />
-                  </div>
-                  <p className="typography-card-title text-foreground">Click or Drag CSV File</p>
-                  <p className="typography-body text-muted-foreground mt-2 max-w-xs mx-auto">
-                    Supported columns: name, id, grade, stream, section, gender, dob, parent info
-                  </p>
-                  <div className="mt-6 flex justify-center gap-2">
-                    <Badge variant="outline" className="typography-label bg-background/50 border-border/50 text-[10px]">MAX 5MB</Badge>
-                    <Badge variant="outline" className="typography-label bg-background/50 border-border/50 text-[10px]">.CSV ONLY</Badge>
+            <DialogDescription className="sr-only">
+              Upload a CSV file to bulk import student records into the database.
+            </DialogDescription>
+          </div>
+          <div className="flex-1 overflow-hidden px-8 py-6">
+            {importPreviewData ? (
+              <StudentImportPreview 
+                data={importPreviewData}
+                onCancel={() => setImportPreviewData(null)}
+                onImport={handleFinalImport}
+                isImporting={isImporting}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-border/50 rounded-3xl py-24 px-6 bg-muted/20 h-full">
+                <div className="p-4 bg-primary/10 rounded-full mb-4">
+                  <UploadCloud className="w-10 h-10 text-primary" />
+                </div>
+                <h3 className="text-lg font-bold mb-2">Upload Student Roster</h3>
+                <p className="text-sm text-muted-foreground text-center max-w-xs mb-8">
+                  Upload a CSV file containing your student records. You'll be able to preview and correct data before finalized import.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+                  <Button variant="outline" onClick={downloadCSVTemplate} className="typography-label flex-1 h-12 rounded-2xl border-border/50 bg-background/50 hover:bg-muted">
+                    <Download className="w-4 h-4 mr-2 text-primary" />
+                    Get Template
+                  </Button>
+                  
+                  <div className="flex-1 relative">
+                    <Input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleCSVImport}
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    />
+                    <Button className="typography-label w-full h-12 rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
+                      Select File
+                    </Button>
                   </div>
                 </div>
               </div>
-              <Input id="csv-upload" type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
-            </Label>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 p-4 rounded-2xl bg-muted/30 border border-border/50">
-                <p className="typography-label text-[10px] uppercase text-muted-foreground/70 mb-2">Need Help?</p>
-                <p className="typography-helper text-muted-foreground">
-                  Download our pre-formatted template to ensure your student data is imported correctly without errors.
-                </p>
-              </div>
-              <Button variant="outline" onClick={downloadCSVTemplate} className="typography-label h-auto py-4 rounded-2xl border-border/50 bg-background/50 hover:bg-muted">
-                <Download className="w-4 h-4 mr-2 text-primary" />
-                Get Template
-              </Button>
-            </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -1131,15 +1146,7 @@ export function StudentManagement() {
       {/* Main List Area */}
       <div className="bg-white/80 dark:bg-slate-900/80 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 backdrop-blur-md shadow-sm overflow-hidden min-h-[400px]">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-32 space-y-4">
-            <div className="relative">
-              <div className="h-16 w-16 border-4 border-primary/10 border-t-primary rounded-full animate-spin" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Users className="w-6 h-6 text-primary animate-pulse" />
-              </div>
-            </div>
-            <p className="typography-label text-muted-foreground">Syncing student database...</p>
-          </div>
+          <PageSkeleton variant="table" />
         ) : filteredStudents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 space-y-6 animate-in zoom-in-95 duration-500">
             <div className="w-24 h-24 bg-muted/50 rounded-full flex items-center justify-center border border-border/50">
@@ -1355,3 +1362,4 @@ export function StudentManagement() {
     </div>
   )
 }
+

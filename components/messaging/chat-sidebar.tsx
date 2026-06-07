@@ -47,8 +47,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       (c.phone && c.phone.replace(/\s+/g, '').includes(searchQuery.replace(/\s+/g, '')));
     
     if (activeTab === 'All') return matchesSearch;
-    if (activeTab === 'Staff') return matchesSearch && (c.role === 'teacher' || c.role === 'admin');
-    if (activeTab === 'Parents') return matchesSearch && c.role === 'parent';
+    if (activeTab === 'Teacher') return matchesSearch && (c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin');
+    if (activeTab === 'Parents') return matchesSearch && c.role?.toLowerCase() === 'parent';
     if (activeTab === 'Unread') return matchesSearch && (c.unreadCount ?? 0) > 0;
     
     return matchesSearch;
@@ -73,8 +73,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
           <FilterTab label={t("all")} active={activeTab === 'All'} onClick={() => setActiveTab('All')} count={conversations.length} />
-          <FilterTab label={t("staff")} active={activeTab === 'Staff'} onClick={() => setActiveTab('Staff')} count={conversations.filter(c => c.role === 'teacher' || c.role === 'admin').length} />
-          <FilterTab label={t("parents")} active={activeTab === 'Parents'} onClick={() => setActiveTab('Parents')} count={conversations.filter(c => c.role === 'parent').length} />
+          <FilterTab label={t("staff")} active={activeTab === 'Teacher'} onClick={() => setActiveTab('Teacher')} count={conversations.filter(c => c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin').length} />
+          <FilterTab label={t("parents")} active={activeTab === 'Parents'} onClick={() => setActiveTab('Parents')} count={conversations.filter(c => c.role?.toLowerCase() === 'parent').length} />
           <FilterTab label={t("unread")} active={activeTab === 'Unread'} onClick={() => setActiveTab('Unread')} count={conversations.filter(c => (c.unreadCount ?? 0) > 0).length} />
         </div>
 
@@ -130,7 +130,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                    <div className="flex items-center justify-between mb-0.5">
                      <div className="flex flex-col">
                        <span className="typography-label truncate text-[15px]">{chat.name}</span>
-                       <span className="typography-label text-[10px] opacity-70 uppercase">{chat.role}</span>
+                       <span className="typography-label text-[10px] opacity-70 uppercase">{t(chat.role?.toLowerCase() as any)}</span>
                      </div>
                      <span className={cn(
                        "text-[10px] whitespace-nowrap ml-2",
@@ -189,7 +189,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
                  <div className="flex-1 min-w-0 text-left">
                    <span className="typography-label text-[14px]">{chat.name}</span>
-                   <p className="typography-label text-[10px] text-muted-foreground uppercase">{chat.role}</p>
+                   <p className="typography-label text-[10px] text-muted-foreground uppercase">{t(chat.role?.toLowerCase() as any)}</p>
                  </div>
                  
                  <div className="p-2 rounded-lg bg-primary/5 text-primary opacity-0 group-hover:opacity-100 transition-all">

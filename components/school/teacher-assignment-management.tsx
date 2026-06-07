@@ -4,11 +4,12 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { useToast } from "@/hooks/use-toast"
 import { Trash2, Plus, GraduationCap, Users, CheckCircle2, RefreshCw } from "lucide-react"
+
 import { authService } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 import { db } from "@/lib/db/database"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 
 interface Teacher {
   id: string
@@ -32,6 +33,9 @@ interface TeacherAssignment {
   grade?: string
   section?: string
   stream?: string
+  gradeId?: string
+  sectionId?: string
+  streamId?: string
   teacher?: {
     id: string
     full_name: string
@@ -53,11 +57,10 @@ export function TeacherAssignmentManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [schoolId, setSchoolId] = useState<string>("")
-  const { toast } = useToast()
 
-  const GRADES = Array.from({ length: 12 }, (_, i) => (i + 1).toString())
-  const SECTIONS = ["A", "B", "C", "D", "E"]
-  const STREAMS = ["Natural", "Social"]
+  const [availableGrades, setAvailableGrades] = useState<any[]>([])
+  const [availableSections, setAvailableSections] = useState<any[]>([])
+  const [availableStreams, setAvailableStreams] = useState<any[]>([])
 
   const getInitials = (name: string) => {
     if (!name) return "T"
@@ -91,20 +94,29 @@ export function TeacherAssignmentManagement() {
         await loadAllData(user.schoolId)
       } catch (error) {
         console.error("[v0] Error initializing teacher assignment:", error)
-        toast({ title: "Error", description: "Failed to initialize. Please refresh the page.", variant: "destructive" })
+        notifications.error("Error", "Failed to initialize. Please refresh the page.")
         setIsLoading(false)
       }
     }
     initializeAndLoad()
-  }, [toast])
+  }, [])
 
   const loadAllData = async (school: string) => {
     try {
       setIsLoading(true)
-      const teachersData = await db.getTeachers()
-      const assignmentsData = await db.getTeacherAssignments()
+      const [teachersData, assignmentsData, gradesData, sectionsData, streamsData] = await Promise.all([
+        db.getTeachers(),
+        db.getTeacherAssignments(),
+        db.getGrades(),
+        db.getSections(),
+        db.getStreams()
+      ])
+      
       setTeachers(teachersData)
       setAssignments(assignmentsData as any)
+      setAvailableGrades(gradesData)
+      setAvailableSections(sectionsData)
+      setAvailableStreams(streamsData)
     } catch (error) {
       console.error("[v0] Error loading data:", error)
       notifications.error("Error", "Failed to load data")
@@ -137,9 +149,9 @@ export function TeacherAssignmentManagement() {
     const isDuplicate = assignments.some(
       (assign) =>
         assign.teacher_id === selectedTeacher &&
-        assign.grade === selectedGrade &&
-        assign.section === selectedSection &&
-        (assign.stream || "") === (selectedStream || "")
+        assign.gradeId === selectedGrade &&
+        assign.sectionId === selectedSection &&
+        (assign.streamId || "") === (selectedStream || "")
     )
 
     if (isDuplicate) {
@@ -178,14 +190,7 @@ export function TeacherAssignmentManagement() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="typography-label mt-4 text-slate-500 animate-pulse">Loading assignments...</p>
-        </div>
-      </div>
-    )
+    return <PageSkeleton variant="cards" />
   }
 
   return (
@@ -280,7 +285,7 @@ export function TeacherAssignmentManagement() {
                       className="typography-body w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                     >
                       <option value="">-- Grade --</option>
-                      {GRADES.map((g) => <option key={g} value={g}>Grade {g}</option>)}
+                      {availableGrades.map((g) => <option key={g.id} value={g.id}>Grade {g.name}</option>)}
                     </select>
                   </div>
 
@@ -295,7 +300,7 @@ export function TeacherAssignmentManagement() {
                       className="typography-body w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                     >
                       <option value="">-- Section --</option>
-                      {SECTIONS.map((s) => <option key={s} value={s}>Section {s}</option>)}
+                      {availableSections.map((s) => <option key={s.id} value={s.id}>Section {s.name}</option>)}
                     </select>
                   </div>
                 </div>
@@ -303,10 +308,7 @@ export function TeacherAssignmentManagement() {
                 {/* Stream */}
                 <div className="space-y-2">
                   <label className="typography-label text-slate-700 dark:text-slate-300 uppercase">
-                    Stream {(selectedGrade === "11" || selectedGrade === "12") && <span className="text-red-500 ml-1">*</span>}
-                    {selectedGrade && selectedGrade !== "11" && selectedGrade !== "12" && (
-                      <span className="typography-body text-slate-400 normal-case ml-1">(optional)</span>
-                    )}
+                    Stream {/* High grade check logic would need the actual grade name/type here */}
                   </label>
                   <select
                     value={selectedStream}
@@ -315,9 +317,9 @@ export function TeacherAssignmentManagement() {
                     className="typography-body w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50"
                   >
                     <option value="">
-                      {selectedGrade === "11" || selectedGrade === "12" ? "-- Choose Stream (Required) --" : "-- Choose Stream (Optional) --"}
+                      -- Choose Stream (Optional) --
                     </option>
-                    {STREAMS.map((s) => <option key={s} value={s}>{s}</option>)}
+                    {availableStreams.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
 
@@ -325,8 +327,7 @@ export function TeacherAssignmentManagement() {
                 {selectedGrade && selectedSection && (
                   <div className="p-3 bg-blue-50/60 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/40">
                     <p className="typography-label text-blue-700 dark:text-blue-400">
-                      Assigning to: <strong>Grade {selectedGrade}</strong> - <strong>Section {selectedSection}</strong>
-                      {selectedStream && <> - <strong>{selectedStream}</strong></>}
+                      Assigning to selected Class entities.
                     </p>
                   </div>
                 )}
@@ -342,8 +343,7 @@ export function TeacherAssignmentManagement() {
                       isAssigning ||
                       !selectedTeacher ||
                       !selectedGrade ||
-                      !selectedSection ||
-                      ((selectedGrade === "11" || selectedGrade === "12") && !selectedStream)
+                      !selectedSection
                     }
                     className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md px-6 min-w-[140px] flex items-center justify-center"
                   >

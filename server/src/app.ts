@@ -13,6 +13,7 @@ import parentRoutes from './routes/parent.routes';
 import attendanceAnalyticsRoutes from './routes/attendance-analytics.routes';
 import messageRoutes from './routes/message.routes';
 import authRoutes from './routes/auth.routes';
+import promotionRoutes from './routes/promotion.routes';
 import { tenantMiddleware } from './middleware/tenant.middleware';
 import * as parentController from './controllers/parent.controller';
 
@@ -23,15 +24,24 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+  console.log(`[DEBUG] ${req.method} ${req.url}`);
+  next();
+});
+
 // Health check and Auth (Public)
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 app.use('/api/auth', authRoutes);
 
-// Parent Login is public (no token required)
-app.post('/api/parent/login', parentController.loginParent);
-app.post('/api/parent/update-password', parentController.updatePassword);
+// Parent Login & Discovery are public (no token required)
+// Define them explicitly to ensure they are handled before tenantMiddleware
+const publicParentRouter = express.Router();
+publicParentRouter.get('/schools', parentController.listParentSchools);
+publicParentRouter.post('/login', parentController.loginParent);
+app.use('/api/parent', publicParentRouter);
 
 // Apply Tenant Isolation Middleware to all other API routes
 app.use('/api', tenantMiddleware);
@@ -43,9 +53,10 @@ app.use('/api/schools', schoolRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/parent', parentRoutes);
+app.use('/api/parent', parentRoutes); // Re-use for other parent routes
 app.use('/api/attendance-analytics', attendanceAnalyticsRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/promotions', promotionRoutes);
 
 
 // Error handling middleware

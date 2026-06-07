@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { User, Mail, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { authService } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
@@ -18,16 +19,27 @@ export function UserProfile() {
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
-        const currentUser = authService.getCurrentUser()
-        if (currentUser) {
-          // In localStorage mode, we already have the user from authService
-          setUser(currentUser)
-          setFormData(currentUser)
+        // First get from localStorage for immediate display
+        const cachedUser = authService.getCurrentUser()
+        if (cachedUser) {
+          setUser(cachedUser)
+          setFormData(cachedUser)
+        }
 
-          if (currentUser.schoolId) {
+        // Then refresh from server for latest data
+        const freshUser = await authService.refreshUserProfile()
+        if (freshUser) {
+          setUser(freshUser)
+          setFormData(freshUser)
+          
+          if (freshUser.schoolId) {
             const schoolData = await db.getSettings()
             setSchool(schoolData)
           }
+        } else if (cachedUser && cachedUser.schoolId) {
+          // Fallback if refresh fails but we have cached schoolId
+          const schoolData = await db.getSettings()
+          setSchool(schoolData)
         }
       } catch (error) {
         console.error("[v0] Error loading profile:", error)
@@ -45,6 +57,18 @@ export function UserProfile() {
       ...prev,
       [field]: value,
     }))
+  }
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string
+      setFormData((prev: any) => ({ ...prev, profile_photo: base64 }))
+    }
+    reader.readAsDataURL(file)
   }
 
   const handleSaveProfile = async () => {
@@ -75,6 +99,10 @@ export function UserProfile() {
         email: formData.email.trim(),
       }
 
+      if (formData.profile_photo !== undefined) {
+        updatePayload.profile_photo = formData.profile_photo
+      }
+
       if (formData.password) {
         updatePayload.password_hash = formData.password
       }
@@ -86,7 +114,8 @@ export function UserProfile() {
         ...user, 
         name: updatePayload.full_name,
         full_name: updatePayload.full_name,
-        email: updatePayload.email
+        email: updatePayload.email,
+        profile_photo: updatePayload.profile_photo || user.profile_photo
       }
       localStorage.setItem("attendance_current_user", JSON.stringify(updatedUser))
       setUser(updatedUser)
@@ -115,28 +144,40 @@ export function UserProfile() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
+    return <PageSkeleton variant="form" />
   }
 
   return (
     <div className="max-w-2xl mx-auto">
       <div className="bg-gradient-to-br from-primary via-indigo-600 to-indigo-700 text-white rounded-2xl p-8 mb-8 shadow-lg shadow-primary/20">
         <div className="flex items-center gap-6">
-          {user?.profile_photo ? (
-            <img
-              src={user.profile_photo}
-              alt={user.full_name || user.name}
-              className="w-20 h-20 rounded-full object-cover shadow-lg ring-4 ring-white/30 ring-offset-2 ring-offset-indigo-600"
-            />
-          ) : (
-            <div className="bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-full p-4 shadow-inner">
-              <User className="w-10 h-10" />
-            </div>
-          )}
+          <div className="relative group">
+            {(formData.profile_photo || user?.profile_photo) ? (
+              <img
+                src={formData.profile_photo || user.profile_photo}
+                alt={user?.full_name || user?.name}
+                className="w-20 h-20 rounded-full object-cover shadow-lg ring-4 ring-white/30 ring-offset-2 ring-offset-indigo-600"
+              />
+            ) : (
+              <div className="bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-full p-4 shadow-inner">
+                <User className="w-10 h-10" />
+              </div>
+            )}
+            {isEditing && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                <label htmlFor="profile-photo-upload" className="cursor-pointer p-2 bg-white/20 rounded-full hover:bg-white/40 transition-colors">
+                  <User className="w-6 h-6 text-white" />
+                  <input
+                    id="profile-photo-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoUpload}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
           <div>
             <p className="typography-label text-indigo-100/80 mb-1">{getGreeting()}</p>
             <h1 className="typography-page-title">{user?.full_name || user?.name}</h1>

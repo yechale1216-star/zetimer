@@ -3,9 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyPassword = exports.deleteUser = exports.updateUser = exports.createUser = exports.getContacts = exports.getUsers = exports.getUserById = exports.getUserByEmail = void 0;
-const db_1 = __importDefault(require("../config/db"));
+exports.getUserByResetToken = exports.resetPasswordByToken = exports.createPasswordResetToken = exports.verifyPassword = exports.deleteUser = exports.updateUser = exports.createUser = exports.getContacts = exports.getUsers = exports.getUserById = exports.getUserByEmail = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const crypto_1 = __importDefault(require("crypto"));
+const db_1 = __importDefault(require("../config/db"));
 const getUserByEmail = async (email) => {
     return await db_1.default.user.findUnique({
         where: { email },
@@ -29,26 +30,20 @@ const getUsers = async (schoolId) => {
     });
 };
 exports.getUsers = getUsers;
-const getContacts = async (schoolId) => {
+const getContacts = async (schoolId, currentUser) => {
     if (!schoolId)
         throw new Error('School ID is required');
-    // Extract all parent phones from students in this school for legacy linking
-    const students = await db_1.default.student.findMany({
-        where: { schoolId },
-        select: { parent_phone: true }
-    });
-    const parentPhones = students
-        .map(s => s.parent_phone ? s.parent_phone.replace(/\s+/g, '') : '')
-        .filter(p => p !== '');
+    let allowedRoles = ['admin', 'school_admin', 'teacher', 'parent'];
+    // Parents should only see admins and teachers
+    if (currentUser?.role === 'parent') {
+        allowedRoles = ['admin', 'school_admin', 'teacher'];
+    }
     const users = await db_1.default.user.findMany({
         where: {
-            OR: [
-                { schoolId: schoolId },
-                { parentStudents: { some: { student: { schoolId } } } },
-                { phone: { in: parentPhones }, role: 'parent' }
-            ],
-            role: { in: ['admin', 'school_admin', 'teacher', 'parent'] },
-            is_active: true
+            schoolId: schoolId,
+            role: { in: allowedRoles },
+            is_active: true,
+            ...(currentUser?.id ? { id: { not: currentUser.id } } : {})
         },
         select: {
             id: true,
@@ -56,15 +51,11 @@ const getContacts = async (schoolId) => {
             profile_photo: true,
             role: true,
             phone: true,
-        }
+            email: true,
+        },
+        orderBy: { full_name: 'asc' }
     });
-    const uniqueUsers = new Map();
-    for (const u of users) {
-        if (!uniqueUsers.has(u.id)) {
-            uniqueUsers.set(u.id, u);
-        }
-    }
-    return Array.from(uniqueUsers.values());
+    return users;
 };
 exports.getContacts = getContacts;
 const createUser = async (data) => {
@@ -223,3 +214,52 @@ const verifyPassword = (plain, hash) => {
     return plain === hash;
 };
 exports.verifyPassword = verifyPassword;
+const createPasswordResetToken = async (email) => {
+    const user = await db_1.default.user.findUnique({ where: { email } });
+    if (!user)
+        return null;
+    const token = crypto_1.default.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 3600000); // 1 hour
+    await db_1.default.user.update({
+        where: { id: user.id },
+        data: {
+            reset_password_token: token,
+            reset_password_expires: expires,
+        },
+    });
+    return token;
+};
+exports.createPasswordResetToken = createPasswordResetToken;
+const resetPasswordByToken = async (token, newPassword) => {
+    const user = await db_1.default.user.findFirst({
+        where: {
+            reset_password_token: token,
+            reset_password_expires: { gt: new Date() },
+        },
+    });
+    if (!user) {
+        throw new Error('Invalid or expired reset token');
+    }
+    const hashedPassword = !newPassword.startsWith('$2')
+        ? bcryptjs_1.default.hashSync(newPassword, 10)
+        : newPassword;
+    await db_1.default.user.update({
+        where: { id: user.id },
+        data: {
+            password_hash: hashedPassword,
+            reset_password_token: null,
+            reset_password_expires: null,
+        },
+    });
+    return user;
+};
+exports.resetPasswordByToken = resetPasswordByToken;
+const getUserByResetToken = async (token) => {
+    return await db_1.default.user.findFirst({
+        where: {
+            reset_password_token: token,
+            reset_password_expires: { gt: new Date() },
+        },
+    });
+};
+exports.getUserByResetToken = getUserByResetToken;

@@ -16,7 +16,11 @@ import {
   Clock, 
   AlertCircle,
   HelpCircle,
-  ArrowRight
+  ArrowRight,
+  Plus,
+  Bell,
+  Shield,
+  Settings
 } from 'lucide-react'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
 import {
@@ -139,6 +143,34 @@ export default function SuperAdminDashboard() {
             Performance
           </Button>
         </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Button variant="secondary" className="justify-start gap-2 h-11" asChild>
+          <Link href="/super-admin/schools">
+            <Plus className="w-4 h-4" />
+            New School
+          </Link>
+        </Button>
+        <Button variant="secondary" className="justify-start gap-2 h-11" asChild>
+          <Link href="/super-admin/communication">
+            <Bell className="w-4 h-4" />
+            Broadcast
+          </Link>
+        </Button>
+        <Button variant="secondary" className="justify-start gap-2 h-11" asChild>
+          <Link href="/super-admin/audit-logs">
+            <Shield className="w-4 h-4" />
+            Audit Logs
+          </Link>
+        </Button>
+        <Button variant="secondary" className="justify-start gap-2 h-11" asChild>
+          <Link href="/super-admin/settings">
+            <Settings className="w-4 h-4" />
+            Maintenance
+          </Link>
+        </Button>
       </div>
 
       {/* Hero Stats */}

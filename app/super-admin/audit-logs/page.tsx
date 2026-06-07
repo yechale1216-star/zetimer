@@ -4,56 +4,143 @@ import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AuditLogsTable } from '@/components/super-admin/audit-logs-table'
-import { Search, Download, Filter } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Search, Filter, Clock, User, Shield, Info } from 'lucide-react'
+
+// Mock Audit Logs
+const mockLogs = [
+  {
+    id: '1',
+    action: 'SCHOOL_SUSPENDED',
+    actor: 'Super Admin',
+    target: 'Highland Academy',
+    details: 'Reason: Non-payment of subscription',
+    timestamp: '2024-06-07 10:15 AM',
+    severity: 'high'
+  },
+  {
+    id: '2',
+    action: 'PRICING_UPDATED',
+    actor: 'Super Admin',
+    target: 'Standard Tier',
+    details: 'Base rate changed from 200 to 250 ETB',
+    timestamp: '2024-06-07 09:30 AM',
+    severity: 'medium'
+  },
+  {
+    id: '3',
+    action: 'BACKUP_STARTED',
+    actor: 'System (Auto)',
+    target: 'Database Cluster',
+    details: 'Full automated snapshot',
+    timestamp: '2024-06-07 00:00 AM',
+    severity: 'low'
+  },
+  {
+    id: '4',
+    action: 'SCHOOL_ACTIVATED',
+    actor: 'Super Admin',
+    target: 'Riverside Primary',
+    details: 'Manual activation after renewal',
+    timestamp: '2024-06-06 04:45 PM',
+    severity: 'medium'
+  },
+  {
+    id: '5',
+    action: 'USER_DELETED',
+    actor: 'Super Admin',
+    target: 'john.smith@deprecated.io',
+    details: 'Account purged per GDPR request',
+    timestamp: '2024-06-06 02:10 PM',
+    severity: 'high'
+  }
+]
 
 export default function AuditLogsPage() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [actionFilter, setActionFilter] = useState('all')
+  const [search, setSearch] = useState('')
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'high': return 'bg-red-500/10 text-red-600 border-red-500/20'
+      case 'medium': return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+      default: return 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+    }
+  }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Audit Logs</h1>
-        <p className="text-muted-foreground mt-1">Monitor all system activities and user actions</p>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex flex-col md:row items-start md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Audit Logs</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            History of all sensitive operations on the platform
+          </p>
+        </div>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by user, action, or resource..."
+              <Input 
+                placeholder="Search logs by actor, action or target..." 
                 className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <select
-              className="px-3 py-2 rounded-lg border border-border bg-background text-foreground"
-              value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
-            >
-              <option value="all">All Actions</option>
-              <option value="create">Create</option>
-              <option value="update">Update</option>
-              <option value="delete">Delete</option>
-              <option value="login">Login</option>
-              <option value="export">Export</option>
-            </select>
             <Button variant="outline" className="gap-2">
-              <Download className="w-4 h-4" />
-              Export
+              <Filter className="w-4 h-4" />
+              Filter
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            {mockLogs.map((log) => (
+              <div 
+                key={log.id} 
+                className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl border border-border/60 hover:bg-secondary/20 transition-all group"
+              >
+                <div className="flex items-center gap-4 flex-1">
+                  <div className={`p-2.5 rounded-lg border ${getSeverityColor(log.severity)}`}>
+                    {log.severity === 'high' ? <Shield className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-foreground">{log.action.replace(/_/g, ' ')}</span>
+                      <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                        {log.severity}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <User className="w-3.5 h-3.5" />
+                      <span>{log.actor}</span>
+                      <span className="mx-1">•</span>
+                      <span>Target: {log.target}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground/80 flex items-start gap-1.5 pt-1">
+                      <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      {log.details}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                    {log.timestamp}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 pt-4 border-t border-border flex justify-center">
+            <Button variant="ghost" className="text-muted-foreground text-sm">
+              Load more logs
             </Button>
           </div>
         </CardContent>
       </Card>
-
-      {/* Audit Logs Table */}
-      <AuditLogsTable searchQuery={searchQuery} actionFilter={actionFilter} />
     </div>
   )
 }

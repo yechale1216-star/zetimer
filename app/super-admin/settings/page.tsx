@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Save } from 'lucide-react'
 
@@ -72,7 +73,7 @@ export default function SettingsPage() {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="system">System</TabsTrigger>
           <TabsTrigger value="localization">Localization</TabsTrigger>
-          <TabsTrigger value="email">Email</TabsTrigger>
+          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="trial">Free Trial</TabsTrigger>
         </TabsList>
@@ -205,37 +206,66 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Security Settings */}
-        <TabsContent value="security">
+        {/* Maintenance & Backups */}
+        <TabsContent value="maintenance">
           <Card>
             <CardHeader>
-              <CardTitle>Security Settings</CardTitle>
-              <CardDescription>Security and access control</CardDescription>
+              <CardTitle>Maintenance & Backups</CardTitle>
+              <CardDescription>Manage database backups and platform maintenance</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4 bg-secondary/50 p-4 rounded-lg border border-border">
-                <h3 className="font-semibold text-foreground">Two-Factor Authentication</h3>
-                <p className="text-sm text-muted-foreground">Enable 2FA for all admin accounts</p>
-                <Button variant="outline" size="sm">
-                  Configure 2FA
+              <div className="p-4 rounded-lg border border-primary/20 bg-primary/5 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="font-semibold">Database Backup</p>
+                  <p className="text-sm text-muted-foreground">Last backup: Today at 02:00 AM (Daily Auto)</p>
+                </div>
+                <Button variant="default" size="sm">
+                  Run Backup Now
                 </Button>
               </div>
 
-              <div className="space-y-4 bg-secondary/50 p-4 rounded-lg border border-border">
-                <h3 className="font-semibold text-foreground">IP Whitelist</h3>
-                <p className="text-sm text-muted-foreground">Restrict admin access to specific IP addresses</p>
-                <Button variant="outline" size="sm">
-                  Manage IP Whitelist
-                </Button>
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Backup History</h3>
+                <div className="space-y-2">
+                  {[
+                    { date: '2024-06-07 02:00', size: '24.5 MB', type: 'Automatic' },
+                    { date: '2024-06-06 02:00', size: '24.2 MB', type: 'Automatic' },
+                    { date: '2024-06-05 11:30', size: '23.9 MB', type: 'Manual' },
+                  ].map((b, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border text-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <span className="font-medium">{b.date}</span>
+                        <Badge variant="outline" className="text-[10px]">{b.type}</Badge>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-muted-foreground">{b.size}</span>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs">Download</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="space-y-4 bg-secondary/50 p-4 rounded-lg border border-border">
-                <h3 className="font-semibold text-foreground">Session Timeout</h3>
-                <p className="text-sm text-muted-foreground">Auto-logout inactive sessions after 30 minutes</p>
-                <Button variant="outline" size="sm">
-                  Configure Timeout
-                </Button>
+              <div className="pt-6 border-t border-border space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-red-500">Maintenance Mode</Label>
+                    <p className="text-sm text-muted-foreground">Take the entire platform offline for updates</p>
+                  </div>
+                  <Switch checked={false} />
+                </div>
+                <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-lg">
+                  <p className="text-xs text-red-600 font-medium">
+                    Warning: Maintenance mode will disconnect all active users (Admins, Teachers, Parents) 
+                    and show a maintenance page.
+                  </p>
+                </div>
               </div>
+
+              <Button variant="destructive" className="w-full">
+                Verify System Integrity
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

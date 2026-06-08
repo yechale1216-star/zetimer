@@ -55,19 +55,19 @@ const navigationItems = [
     icon: Receipt,
   },
   {
-    label: 'Transactions',
-    href: '/super-admin/subscriptions/transactions',
-    icon: ArrowLeftRight,
+    label: 'Help Desk',
+    href: '/super-admin/support',
+    icon: MessageSquare,
+  },
+  {
+    label: 'Communication',
+    href: '/super-admin/communication',
+    icon: Bell,
   },
   {
     label: 'Audit Logs',
     href: '/super-admin/audit-logs',
     icon: Shield,
-  },
-  {
-    label: 'Communication',
-    href: '/super-admin/communication',
-    icon: MessageSquare,
   },
   {
     label: 'Settings',

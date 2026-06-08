@@ -337,8 +337,10 @@ export default function SuperAdminDashboard() {
             ))}
           </CardContent>
           <div className="p-4 pt-0">
-            <Button variant="outline" size="sm" className="w-full text-xs">
-              Open Support Dashboard
+            <Button variant="ghost" size="sm" asChild className="w-full text-xs text-muted-foreground hover:text-primary">
+              <Link href="/super-admin/support" className="flex items-center justify-center gap-2">
+                Open Support Dashboard <ArrowRight className="w-3 h-3" />
+              </Link>
             </Button>
           </div>
         </Card>

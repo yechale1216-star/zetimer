@@ -251,6 +251,8 @@ export const translations = {
     ready_connection: "Ready for connection",
     voice_call: "Voice Call",
     video_call: "Video Call",
+    error_loading: "Could not load attendance records",
+    retry: "Try Again",
   },
   am: {
     // Nav & General
@@ -508,6 +510,8 @@ export const translations = {
     ready_connection: "ግንኙነት ዝግጁ ነው",
     voice_call: "የድምጽ ጥሪ",
     video_call: "የቪዲዮ ጥሪ",
+    error_loading: "የመገኘት መረጃ መጫን አልተቻለም",
+    retry: "እንደገና ይሞክሩ",
   }
 };
 

@@ -9,12 +9,14 @@ datasource db {
 }
 
 model School {
-  id                   String                @id @default(uuid())
-  schoolId             String?               @unique
-  name                 String
-  subscriptionStatus   String                @default("ACTIVE")
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  id                     String                @id @default(uuid())
+  schoolId               String?               @unique
+  name                   String
+  schoolEmail            String?
+  onboardingCompleted    Boolean               @default(false)
+  subscriptionStatus     String                @default("ACTIVE")
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
   attendance           Attendance[]
   callHistories        CallHistory[]
   callParticipants     CallParticipant[]

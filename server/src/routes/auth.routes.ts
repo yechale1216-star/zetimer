@@ -3,8 +3,37 @@ import * as userService from '../services/user.service';
 import * as schoolService from '../services/school.service';
 import { generateToken } from '../utils/jwt';
 import { sendResetPasswordEmail } from '../utils/email';
+import prisma from '../config/db';
 
 const router = Router();
+
+// Check email availability
+router.get('/check-email', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email } = req.query;
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    res.status(200).json({ success: true, available: !existing });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Check phone availability
+router.get('/check-phone', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { phone } = req.query;
+    if (!phone || typeof phone !== 'string') {
+      return res.status(400).json({ success: false, message: 'Phone is required' });
+    }
+    const existing = await prisma.user.findFirst({ where: { phone: phone.trim() } });
+    res.status(200).json({ success: true, available: !existing });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Login
 router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
@@ -28,12 +57,14 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     let customSchoolId = '';
     let schoolName = 'My School';
     let schoolLogo = '';
+    let onboardingCompleted = false;
 
     if (user.schoolId) {
       const school = await schoolService.getSchoolById(user.schoolId);
       if (school) {
         customSchoolId = school.schoolId || '';
         schoolName = school.name || 'My School';
+        onboardingCompleted = school.onboardingCompleted ?? false;
         // Get logo from settings
         if (school.settings) {
           schoolLogo = school.settings.school_logo || '';
@@ -62,7 +93,8 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
           customSchoolId,
         },
         schoolName,
-        schoolLogo
+        schoolLogo,
+        onboardingCompleted,
       }
     });
   } catch (error) {
@@ -74,6 +106,14 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
 router.post('/signup', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password, name, schoolName, role, phone } = req.body;
+
+    // Server-side validation
+    if (!name || name.trim().length < 2) {
+      return res.status(400).json({ success: false, message: 'Admin name must be at least 2 characters' });
+    }
+    if (!password || password.length < 8) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
+    }
 
     // Create school first if admin
     let schoolId = '';
@@ -115,7 +155,8 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
           customSchoolId,
         },
         schoolName: schoolName || 'My School',
-        schoolLogo: ''
+        schoolLogo: '',
+        onboardingCompleted: false
       }
     });
   } catch (error) {

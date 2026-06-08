@@ -10,6 +10,8 @@ const PUBLIC_ROOT_FILES = new Set([
   "/placeholder.svg",
   "/placeholder-logo.svg",
   "/school_login_illustration_1778883405545.png",
+  "/zetime-logo.png",
+  "/branding/app-icon.png",
 ])
 
 export function proxy(request: NextRequest) {
@@ -31,7 +33,7 @@ export function proxy(request: NextRequest) {
   }
 
   // Public paths that don't require authentication
-  const publicPaths = ["/", "/login", "/register", "/forgot-password", "/reset-password", "/about", "/privacy", "/terms", "/pricing"]
+  const publicPaths = ["/", "/login", "/register", "/forgot-password", "/reset-password", "/about", "/privacy", "/terms", "/pricing", "/onboarding"]
   const isPublicPath = publicPaths.includes(pathname)
 
   // Super admin and protected routes will handle auth on the client side using localStorage

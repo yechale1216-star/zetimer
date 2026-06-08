@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { AuthWrapper } from "@/components/auth/auth-wrapper"
-import { SchoolSetup } from "@/components/school/school-setup"
 import { Header } from "@/components/layout/header"
 import { Navigation } from "@/components/layout/navigation"
 import { Dashboard } from "@/components/school/dashboard"
@@ -28,7 +27,6 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [activeTab, setActiveTab] = useState("dashboard")
   const [isLoading, setIsLoading] = useState(true)
-  const [needsSchoolSetup, setNeedsSchoolSetup] = useState(false)
 
   useEffect(() => {
     const registerServiceWorker = async () => {
@@ -75,9 +73,7 @@ export default function Home() {
 
       if (authenticated) {
         const user = authService.getCurrentUser()
-        if (user?.role === "admin" && !user?.schoolId) {
-          setNeedsSchoolSetup(true)
-        }
+        console.log("[RedirectDebug] app/page.tsx authenticated user:", user?.role, "schoolId:", user?.schoolId)
       }
 
       setIsLoading(false)
@@ -89,9 +85,9 @@ export default function Home() {
   const handleAuthSuccess = () => {
     setIsAuthenticated(true)
     const user = authService.getCurrentUser()
-    if (user?.role === "admin" && !user?.schoolId) {
-      setNeedsSchoolSetup(true)
-    } else if (user?.role === "admin") {
+    console.log("[RedirectDebug] handleAuthSuccess user:", user?.role)
+    
+    if (user?.role === "admin") {
       window.location.href = "/school/admin"
     } else if (user?.role === "teacher") {
       window.location.href = "/school/teacher"
@@ -100,10 +96,6 @@ export default function Home() {
     }
   }
 
-  const handleSchoolSetupComplete = () => {
-    setNeedsSchoolSetup(false)
-    window.location.href = "/school/admin"
-  }
 
   if (isLoading) {
     return (
@@ -120,13 +112,10 @@ export default function Home() {
     return <AuthWrapper onAuthSuccess={handleAuthSuccess} />
   }
 
-  if (needsSchoolSetup) {
-    return <SchoolSetup onSetupComplete={handleSchoolSetupComplete} />
-  }
-
   // If already authenticated and setup is complete, redirect to dashboard.
   if (typeof window !== "undefined") {
     const user = authService.getCurrentUser()
+    console.log("[RedirectDebug] app/page.tsx root redirect triggered for role:", user?.role)
     if (user?.role === "super_admin") {
       window.location.replace("/super-admin")
     } else if (user?.role === "teacher") {

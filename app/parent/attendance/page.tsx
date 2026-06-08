@@ -33,6 +33,7 @@ export default function AttendanceHistory() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
   const [attendance, setAttendance] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   // Filters state
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth())
@@ -93,6 +94,7 @@ export default function AttendanceHistory() {
 
   // 2. Fetch student's attendance list
   const fetchStudentAttendance = async (studentId: string) => {
+    setFetchError(null)
     try {
       const token = localStorage.getItem("attendance_token") || "";
       const schoolId = localStorage.getItem("x-school-id") || "";
@@ -102,20 +104,22 @@ export default function AttendanceHistory() {
         ...(schoolId ? { "x-school-id": schoolId } : {})
       };
 
-      const res = await fetch(`${API_URL}/api/attendance?studentId=${studentId}`, { headers })
+      // Use the dedicated per-student endpoint (ordered desc, no extra joins)
+      const res = await fetch(`${API_URL}/api/attendance/student/${studentId}`, { headers })
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(errBody.message || `HTTP ${res.status}`)
+      }
       const data = await res.json()
-      if (data.success && data.data) {
+      if (data.success && Array.isArray(data.data)) {
         setAttendance(data.data)
       } else {
-        // Fallback
-        const studentRes = await fetch(`${API_URL}/api/students/${studentId}`, { headers })
-        const studentData = await studentRes.json()
-        if (studentData.success && studentData.data?.attendance) {
-          setAttendance(studentData.data.attendance)
-        }
+        setAttendance([])
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("[AttendanceHistory] Fetch error:", err)
+      setFetchError(err?.message || "Failed to load attendance records.")
+      setAttendance([])
     }
   }
 
@@ -125,6 +129,8 @@ export default function AttendanceHistory() {
 
     const handleStudentChange = () => {
       setIsLoading(true)
+      setAttendance([])   // Clear stale data immediately on student switch
+      setFetchError(null)
       loadData()
     }
 
@@ -381,6 +387,24 @@ export default function AttendanceHistory() {
 
   if (isLoading) {
     return <PageSkeleton variant="table" />
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 space-y-4">
+        <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
+          <XCircle className="w-8 h-8 text-rose-500" />
+        </div>
+        <h3 className="typography-section-title text-foreground">{t("error_loading")}</h3>
+        <p className="typography-label text-muted-foreground max-w-xs text-center">{fetchError}</p>
+        <button
+          onClick={() => selectedStudent && fetchStudentAttendance(selectedStudent.id)}
+          className="typography-label px-6 py-2.5 rounded-xl bg-primary text-white hover:bg-primary/90 transition-all"
+        >
+          {t("retry")}
+        </button>
+      </div>
+    )
   }
 
   return (

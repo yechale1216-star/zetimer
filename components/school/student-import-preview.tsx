@@ -269,7 +269,7 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className={`group border-border/40 transition-colors ${!row.isValid ? "bg-rose-50/30 hover:bg-rose-50/50" : "hover:bg-muted/30"}`}
+                    className={`group border-border/40 transition-colors ${!row.isValid ? "bg-rose-50/30 dark:bg-rose-900/20 hover:bg-rose-50/50 dark:hover:bg-rose-900/30" : "hover:bg-muted/30"}`}
                   >
                     <TableCell className="py-3 font-medium text-sm">
                       {row.name}
@@ -285,18 +285,18 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
                         <span className="text-sm font-medium">{row.parent_name}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">{row.parent_phone}</span>
-                          {row.isNewParent && <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-blue-50 text-blue-600 border-blue-200">New</Badge>}
+                          {row.isNewParent && <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700">New</Badge>}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="py-3">
                       {row.isValid ? (
-                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 rounded-lg py-0.5 font-bold text-[10px]">
+                        <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700 gap-1 rounded-lg py-0.5 font-bold text-[10px]">
                           <CheckCircle2 className="w-3 h-3" />
                           VALID
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 gap-1 rounded-lg py-0.5 font-bold text-[10px]">
+                        <Badge variant="outline" className="bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-700 gap-1 rounded-lg py-0.5 font-bold text-[10px]">
                           <XCircle className="w-3 h-3" />
                           ERROR
                         </Badge>
@@ -306,7 +306,7 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
                       {!row.isValid ? (
                         <div className="flex flex-wrap gap-1">
                           {row.errors.map((err, i) => (
-                            <span key={i} className="text-[11px] font-medium text-rose-600 bg-rose-100/50 px-2 py-0.5 rounded-md border border-rose-200/50">
+                            <span key={i} className="text-[11px] font-medium text-rose-600 dark:text-rose-400 bg-rose-100/50 dark:bg-rose-900/30 px-2 py-0.5 rounded-md border border-rose-200/50 dark:border-rose-700/50">
                               {err}
                             </span>
                           ))}
@@ -339,16 +339,16 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
 
 function StatCard({ icon, label, value, subValue, color }: { icon: React.ReactNode, label: string, value: number, subValueText?: string, subValueTextSecondary?: string, color: string, subValue?: string }) {
   const colorMap: Record<string, string> = {
-    emerald: "border-emerald-200 bg-emerald-50/30",
-    rose: "border-rose-200 bg-rose-50/30",
-    blue: "border-blue-200 bg-blue-50/30",
+    emerald: "border-emerald-200 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-900/20",
+    rose: "border-rose-200 dark:border-rose-800 bg-rose-50/30 dark:bg-rose-900/20",
+    blue: "border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-900/20",
   }
 
   return (
     <Card className={`${colorMap[color]} shadow-none border transition-all hover:shadow-md`}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
-          <div className="p-2 bg-white rounded-xl shadow-sm border border-border/20">
+          <div className="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-border/20">
             {icon}
           </div>
           <div className="text-right">

@@ -24,10 +24,10 @@ const ZetimeFallbackLogo = ({ size }: { size: number }) => (
         <stop offset="100%" stopColor="#0f1535" />
       </linearGradient>
     </defs>
-    <rect width="120" height="120" rx="24" fill="url(#bgGrad)" />
+    <rect width="120" height="120" rx="32" fill="url(#bgGrad)" />
     {/* Z letter */}
     <path d="M30 30 L90 30 L90 42 L52 82 L90 82 L90 95 L30 95 L30 82 L68 42 L30 42 Z" 
-          fill="url(#goldGrad)" opacity="0.9" />
+          fill="url(#goldGrad)" opacity="0.9" stroke="url(#goldGrad)" strokeWidth="2" strokeLinejoin="round" />
     {/* Clock circle */}
     <circle cx="65" cy="62" r="22" fill="none" stroke="url(#goldGrad)" strokeWidth="3" />
     <circle cx="65" cy="62" r="1.5" fill="#F5C542" />
@@ -69,10 +69,12 @@ export const Logo: React.FC<LogoProps> = ({
 
   const content = (
     <div className={cn("flex items-center gap-3 group", className)}>
-      <div className={cn("transition-transform group-hover:scale-105 duration-300 flex-shrink-0 relative", dimensions[size].cls)}>
+      <div className={cn("transition-transform group-hover:scale-105 duration-300 flex-shrink-0 relative overflow-hidden rounded-xl", dimensions[size].cls)}>
         <div className="absolute inset-0 bg-white/20 blur-xl rounded-full dark:opacity-50 opacity-0 transition-opacity" />
         {imgError ? (
-          <ZetimeFallbackLogo size={dimensions[size].px} />
+          <div className="rounded-xl overflow-hidden">
+            <ZetimeFallbackLogo size={dimensions[size].px} />
+          </div>
         ) : (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
@@ -80,7 +82,7 @@ export const Logo: React.FC<LogoProps> = ({
             alt="Zetime Logo"
             width={dimensions[size].px}
             height={dimensions[size].px}
-            className="object-contain w-full h-full relative z-10 dark:drop-shadow-[0_0_10px_rgba(147,197,253,0.5)]"
+            className="object-contain w-full h-full relative z-10 dark:drop-shadow-[0_0_10px_rgba(147,197,253,0.5)] rounded-xl"
             onError={() => setImgError(true)}
           />
         )}

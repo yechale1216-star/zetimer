@@ -28,6 +28,7 @@ export interface User {
   teacherId: string
   isSuperAdmin: boolean
   profile_photo?: string
+  onboardingCompleted?: boolean
 }
 
 export interface AuthResponse {
@@ -95,6 +96,7 @@ class AuthService {
         teacherId: dbUser.teacher_id || "",
         isSuperAdmin: dbUser.role === "super_admin",
         profile_photo: dbUser.profile_photo || "",
+        onboardingCompleted: data.data.onboardingCompleted ?? true,
       }
 
       if (this.isClient()) {
@@ -299,6 +301,7 @@ class AuthService {
         teacherId: "",
         isSuperAdmin: false,
         profile_photo: newUser.profile_photo || "",
+        onboardingCompleted: false, // new accounts always start onboarding
       }
 
       if (this.isClient()) {
@@ -397,6 +400,59 @@ class AuthService {
     } catch (error) {
       console.error("[pg] updateSchoolInfo error:", error)
       return { success: false, message: "Failed to setup school", error: error instanceof Error ? error.message : "Unknown error" }
+    }
+  }
+
+  // ─── UNIQUENESS CHECKS ────────────────────────────────────────────────────
+  async checkEmailAvailability(email: string): Promise<{ available: boolean }> {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/check-email?email=${encodeURIComponent(email)}`)
+      const data = await res.json()
+      return { available: data.available ?? true }
+    } catch {
+      return { available: true } // fail open so user isn't blocked on network errors
+    }
+  }
+
+  async checkPhoneAvailability(phone: string): Promise<{ available: boolean }> {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/check-phone?phone=${encodeURIComponent(phone)}`)
+      const data = await res.json()
+      return { available: data.available ?? true }
+    } catch {
+      return { available: true }
+    }
+  }
+
+  // ─── ONBOARDING ───────────────────────────────────────────────────────────
+  async completeOnboarding(payload: {
+    schoolEmail?: string
+    address?: string
+    logoUrl?: string
+    academicYear?: string
+    attendanceMode?: string
+    attendanceThreshold?: number
+    allowLateMark?: boolean
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`${API_URL}/api/schools/onboarding`, {
+        method: "POST",
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        // Update local user
+        const user = this.getCurrentUser()
+        if (user && this.isClient()) {
+          const updated = { ...user, onboardingCompleted: true }
+          localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(updated))
+        }
+        return { success: true, message: data.message }
+      }
+      return { success: false, message: data.message || "Failed to save onboarding" }
+    } catch {
+      return { success: false, message: "Network error" }
     }
   }
 

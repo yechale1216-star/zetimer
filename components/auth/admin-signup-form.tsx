@@ -1,18 +1,39 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { authService, type SignupCredentials } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
-import { ArrowLeft, User, Phone, Mail, Lock, ShieldCheck, Loader2 } from "lucide-react"
+import { ArrowLeft, User, Phone, Mail, Lock, ShieldCheck, Loader2, Eye, EyeOff, CheckCircle2, ExternalLink } from "lucide-react"
+import Link from "next/link"
 
 interface AdminSignupFormProps {
   onSignupSuccess: () => void
   onBack: () => void
+}
+
+type PasswordStrength = "weak" | "medium" | "strong"
+
+function getPasswordStrength(password: string): PasswordStrength {
+  if (password.length < 8) return "weak"
+  const hasUpper = /[A-Z]/.test(password)
+  const hasLower = /[a-z]/.test(password)
+  const hasNumber = /\d/.test(password)
+  const hasSpecial = /[^A-Za-z0-9]/.test(password)
+  const score = [hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length
+  if (score >= 3 && password.length >= 10) return "strong"
+  if (score >= 2) return "medium"
+  return "weak"
+}
+
+const strengthConfig = {
+  weak: { label: "Weak", color: "bg-destructive", textColor: "text-destructive", width: "w-1/3" },
+  medium: { label: "Medium", color: "bg-yellow-500", textColor: "text-yellow-500", width: "w-2/3" },
+  strong: { label: "Strong", color: "bg-emerald-500", textColor: "text-emerald-500", width: "w-full" },
 }
 
 export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProps) {
@@ -29,6 +50,17 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
   const [isLoading, setIsLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [generalError, setGeneralError] = useState<string>("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [checkingEmail, setCheckingEmail] = useState(false)
+  const [checkingPhone, setCheckingPhone] = useState(false)
+  const emailDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const phoneDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const passwordStrength = credentials.password ? getPasswordStrength(credentials.password) : null
+
+  // ─── Field handlers ───────────────────────────────────────────────────────
 
   const handleNameChange = (name: string) => {
     setCredentials((prev) => ({ ...prev, name }))
@@ -44,17 +76,46 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
     setFieldErrors((prev) => ({ ...prev, phone: "" }))
   }
 
+  const handleEmailBlur = useCallback((email: string) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return
+    if (emailDebounce.current) clearTimeout(emailDebounce.current)
+    emailDebounce.current = setTimeout(async () => {
+      setCheckingEmail(true)
+      const { available } = await authService.checkEmailAvailability(email)
+      setCheckingEmail(false)
+      if (!available) {
+        setFieldErrors((prev) => ({ ...prev, email: "This email is already registered" }))
+      }
+    }, 400)
+  }, [])
+
+  const handlePhoneBlur = useCallback((phone: string) => {
+    if (!phone || phone.length !== 13) return
+    if (phoneDebounce.current) clearTimeout(phoneDebounce.current)
+    phoneDebounce.current = setTimeout(async () => {
+      setCheckingPhone(true)
+      const { available } = await authService.checkPhoneAvailability(phone)
+      setCheckingPhone(false)
+      if (!available) {
+        setFieldErrors((prev) => ({ ...prev, phone: "This phone number is already registered" }))
+      }
+    }, 400)
+  }, [])
+
+  // ─── Validation ────────────────────────────────────────────────────────────
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
     if (!credentials.name.trim()) {
       newErrors.name = "Admin name is required"
+    } else if (credentials.name.trim().length < 2) {
+      newErrors.name = "Name must be at least 2 characters"
     }
-    
+
     if (!credentials.schoolName?.trim()) {
       newErrors.schoolName = "School name is required"
     }
-
 
     if (!credentials.phone.trim()) {
       newErrors.phone = "Phone number is required"
@@ -74,17 +135,28 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
 
     if (!credentials.password) {
       newErrors.password = "Password is required"
-    } else if (credentials.password.length < 6) {
-      newErrors.password = "Minimum 6 characters"
+    } else if (credentials.password.length < 8) {
+      newErrors.password = "Minimum 8 characters required"
     }
 
     if (credentials.password !== credentials.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match"
     }
 
-    setFieldErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    if (!termsAccepted) {
+      newErrors.terms = "You must accept the Terms & Conditions"
+    }
+
+    // Preserve any async field errors already set (e.g., email/phone taken)
+    const merged = { ...newErrors }
+    if (fieldErrors.email && !newErrors.email) merged.email = fieldErrors.email
+    if (fieldErrors.phone && !newErrors.phone) merged.phone = fieldErrors.phone
+
+    setFieldErrors(merged)
+    return Object.keys(merged).length === 0
   }
+
+  // ─── Submit ─────────────────────────────────────────────────────────────
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -103,17 +175,17 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
       if (result.success && result.user) {
         notifications.success(
           "Admin Account Created",
-          `Welcome ${result.user.name}! Please set up your school information.`
+          `Welcome ${result.user.name}! Let's set up your school.`
         )
         setTimeout(() => {
           onSignupSuccess()
-        }, 1500)
+        }, 1000)
       } else {
         const errorMessage = result.error || "Failed to create account"
         setGeneralError(errorMessage)
         notifications.error("Signup Failed", errorMessage)
       }
-    } catch (error) {
+    } catch {
       setGeneralError("An unexpected error occurred.")
       notifications.error("Signup Error", "An unexpected error occurred")
     } finally {
@@ -137,6 +209,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
           Register your school and start tracking attendance
         </CardDescription>
       </CardHeader>
+
       <CardContent className="px-6 sm:px-8 pb-8">
         {generalError && (
           <div className="typography-body bg-destructive/10 border border-destructive/20 rounded-xl p-4 mb-6 animate-in slide-in-from-top-2">
@@ -148,6 +221,8 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Admin Name */}
           <div className="space-y-1.5">
             <Label htmlFor="name">Admin Name</Label>
             <div className="relative group">
@@ -168,6 +243,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
             {fieldErrors.name && <p className="text-[10px] text-destructive ml-1">{fieldErrors.name}</p>}
           </div>
 
+          {/* School Name */}
           <div className="space-y-1.5">
             <Label htmlFor="schoolName">School Name</Label>
             <div className="relative group">
@@ -179,8 +255,8 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                 placeholder="Enter your school name"
                 value={credentials.schoolName}
                 onChange={(e) => {
-                    setCredentials((prev) => ({ ...prev, schoolName: e.target.value }))
-                    setFieldErrors((prev) => ({ ...prev, schoolName: "" }))
+                  setCredentials((prev) => ({ ...prev, schoolName: e.target.value }))
+                  setFieldErrors((prev) => ({ ...prev, schoolName: "" }))
                 }}
                 required
                 className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
@@ -191,7 +267,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
             {fieldErrors.schoolName && <p className="text-[10px] text-destructive ml-1">{fieldErrors.schoolName}</p>}
           </div>
 
-
+          {/* Phone */}
           <div className="space-y-1.5">
             <Label htmlFor="phone">Phone Number</Label>
             <div className="relative group">
@@ -205,16 +281,23 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                 maxLength={13}
                 value={credentials.phone}
                 onChange={(e) => handlePhoneChange(e.target.value)}
+                onBlur={(e) => handlePhoneBlur(e.target.value)}
                 required
                 className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
                   fieldErrors.phone ? "border-destructive ring-destructive/10" : ""
                 }`}
               />
+              {checkingPhone && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                </div>
+              )}
             </div>
             <p className="text-[10px] text-muted-foreground ml-1">Format: +251 911 223344</p>
             {fieldErrors.phone && <p className="text-[10px] text-destructive ml-1">{fieldErrors.phone}</p>}
           </div>
 
+          {/* Email */}
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <div className="relative group">
@@ -230,73 +313,170 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                   setCredentials((prev) => ({ ...prev, email: e.target.value }))
                   setFieldErrors((prev) => ({ ...prev, email: "" }))
                 }}
+                onBlur={(e) => handleEmailBlur(e.target.value)}
                 required
                 className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
                   fieldErrors.email ? "border-destructive ring-destructive/10" : ""
                 }`}
               />
+              {checkingEmail && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                </div>
+              )}
             </div>
             {fieldErrors.email && <p className="text-[10px] text-destructive ml-1">{fieldErrors.email}</p>}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative group">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Min 6 chars"
-                  value={credentials.password}
-                  onChange={(e) => {
-                    setCredentials((prev) => ({ ...prev, password: e.target.value }))
-                    setFieldErrors((prev) => ({ ...prev, password: "" }))
-                  }}
-                  required
-                  className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
-                    fieldErrors.password ? "border-destructive ring-destructive/10" : ""
-                  }`}
-                />
+          {/* Password */}
+          <div className="space-y-1.5">
+            <Label htmlFor="password">Password</Label>
+            <div className="relative group">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                <Lock className="w-4 h-4" />
               </div>
-              {fieldErrors.password && <p className="text-[10px] text-destructive ml-1">{fieldErrors.password}</p>}
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Min 8 characters"
+                value={credentials.password}
+                onChange={(e) => {
+                  setCredentials((prev) => ({ ...prev, password: e.target.value }))
+                  setFieldErrors((prev) => ({ ...prev, password: "" }))
+                }}
+                required
+                className={`pl-10 pr-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
+                  fieldErrors.password ? "border-destructive ring-destructive/10" : ""
+                }`}
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="confirmPassword">Confirm</Label>
-              <div className="relative group">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
-                  <ShieldCheck className="w-4 h-4" />
+            {/* Password strength indicator */}
+            {credentials.password && passwordStrength && (
+              <div className="space-y-1 mt-1">
+                <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${strengthConfig[passwordStrength].color} ${strengthConfig[passwordStrength].width}`}
+                  />
                 </div>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Repeat"
-                  value={credentials.confirmPassword}
-                  onChange={(e) => {
-                    setCredentials((prev) => ({ ...prev, confirmPassword: e.target.value }))
-                    setFieldErrors((prev) => ({ ...prev, confirmPassword: "" }))
-                  }}
-                  required
-                  className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
-                    fieldErrors.confirmPassword ? "border-destructive ring-destructive/10" : ""
-                  }`}
-                />
+                <p className={`text-[10px] ml-1 font-medium ${strengthConfig[passwordStrength].textColor}`}>
+                  Password strength: {strengthConfig[passwordStrength].label}
+                </p>
               </div>
-              {fieldErrors.confirmPassword && <p className="text-[10px] text-destructive ml-1">{fieldErrors.confirmPassword}</p>}
-            </div>
+            )}
+
+            {fieldErrors.password && <p className="text-[10px] text-destructive ml-1">{fieldErrors.password}</p>}
           </div>
 
+          {/* Confirm Password */}
+          <div className="space-y-1.5">
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <div className="relative group">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <Input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Repeat your password"
+                value={credentials.confirmPassword}
+                onChange={(e) => {
+                  setCredentials((prev) => ({ ...prev, confirmPassword: e.target.value }))
+                  setFieldErrors((prev) => ({ ...prev, confirmPassword: "" }))
+                }}
+                required
+                className={`pl-10 pr-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
+                  fieldErrors.confirmPassword ? "border-destructive ring-destructive/10" : ""
+                }`}
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+              {credentials.confirmPassword && credentials.password === credentials.confirmPassword && (
+                <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                </div>
+              )}
+            </div>
+            {fieldErrors.confirmPassword && <p className="text-[10px] text-destructive ml-1">{fieldErrors.confirmPassword}</p>}
+          </div>
+
+          {/* Terms & Conditions */}
+          <div className="space-y-1">
+            <label className="flex gap-3 items-start cursor-pointer group select-none">
+              <div
+                className={`mt-0.5 w-4 h-4 shrink-0 rounded border transition-colors flex items-center justify-center ${
+                  termsAccepted
+                    ? "bg-primary border-primary"
+                    : fieldErrors.terms
+                    ? "border-destructive bg-destructive/5"
+                    : "border-border/70 bg-background/50 group-hover:border-primary/50"
+                }`}
+                onClick={() => {
+                  setTermsAccepted((v) => !v)
+                  setFieldErrors((prev) => ({ ...prev, terms: "" }))
+                }}
+              >
+                {termsAccepted && (
+                  <svg className="w-2.5 h-2.5 text-primary-foreground" fill="none" viewBox="0 0 12 12">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
+              <input
+                type="checkbox"
+                id="terms"
+                checked={termsAccepted}
+                onChange={(e) => {
+                  setTermsAccepted(e.target.checked)
+                  setFieldErrors((prev) => ({ ...prev, terms: "" }))
+                }}
+                className="sr-only"
+              />
+              <span className="text-xs text-muted-foreground leading-relaxed">
+                I agree to the{" "}
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  className="text-primary underline underline-offset-2 hover:text-primary/80 inline-flex items-center gap-0.5"
+                >
+                  Terms &amp; Conditions
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </Link>{" "}
+                and consent to my school data being processed by Zetime.
+              </span>
+            </label>
+            {fieldErrors.terms && <p className="text-[10px] text-destructive ml-1">{fieldErrors.terms}</p>}
+          </div>
+
+          {/* Info banner */}
           <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 flex gap-3 items-start animate-in zoom-in-95 duration-500 delay-150">
             <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
             <p className="typography-helper text-muted-foreground">
-              <strong className="text-foreground">Full Admin Control:</strong> You will be able to manage students, teachers, and generate comprehensive school reports.
+              <strong className="text-foreground">Full Admin Control:</strong> You&apos;ll complete school setup in a quick onboarding wizard after registration.
             </p>
           </div>
 
-          <Button type="submit" className="typography-card-title w-full h-11 rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-[0.98] mt-2" disabled={isLoading}>
+          <Button
+            type="submit"
+            className="typography-card-title w-full h-11 rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-[0.98] mt-2"
+            disabled={isLoading || !termsAccepted}
+          >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -320,6 +500,3 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
     </Card>
   )
 }
-
-
-

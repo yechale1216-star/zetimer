@@ -32,9 +32,26 @@ export default function SchoolAdminLayout({
 
   React.useEffect(() => {
     setIsMounted(true)
-    setUser(authService.getCurrentUser())
+    const currentUser = authService.getCurrentUser()
+    setUser(currentUser)
     setIsAdmin(authService.isAdmin())
-  }, [])
+
+    console.log("[RedirectDebug] SchoolAdminLayout mount:", {
+      hasUser: !!currentUser,
+      role: currentUser?.role,
+      onboardingCompleted: currentUser?.onboardingCompleted,
+      pathname
+    })
+
+    // Redirect new admins to onboarding wizard if they haven't completed setup.
+    // Use explicit === false check so existing users without the field don't get redirected.
+    if (currentUser?.role === 'admin' && currentUser?.onboardingCompleted === false) {
+      if (pathname !== "/onboarding") {
+        console.log("[RedirectDebug] Redirecting to /onboarding")
+        router.replace('/onboarding')
+      }
+    }
+  }, [router, pathname])
 
   const isActive = (path: string) => pathname === path
 

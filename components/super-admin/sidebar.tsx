@@ -17,6 +17,8 @@ import {
   Receipt,
   ArrowLeftRight,
   LogOut,
+  Bell,
+  Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/utils'
 import { authService } from '@/lib/auth/auth'
@@ -68,6 +70,11 @@ const navigationItems = [
     label: 'Audit Logs',
     href: '/super-admin/audit-logs',
     icon: Shield,
+  },
+  {
+    label: 'Roles & Permissions',
+    href: '/super-admin/rbac',
+    icon: Lock,
   },
   {
     label: 'Settings',

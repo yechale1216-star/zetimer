@@ -37,11 +37,14 @@ const express_1 = require("express");
 const studentController = __importStar(require("../controllers/student.controller"));
 const validate_1 = require("../middleware/validate");
 const router = (0, express_1.Router)();
+// Static routes MUST come before dynamic /:id routes
 router.get('/', studentController.getStudents);
-router.post('/', validate_1.validateStudent, studentController.createStudent);
+router.get('/auto/next-id', studentController.getNextStudentId);
 router.get('/parent/:phone', studentController.getStudentsByParentPhone);
+router.post('/', validate_1.validateStudent, studentController.createStudent);
+router.post('/bulk', studentController.bulkCreateStudents);
+// Dynamic routes last
 router.get('/:id', studentController.getStudentById);
 router.put('/:id', studentController.updateStudent);
-router.post('/bulk', studentController.bulkCreateStudents);
 router.delete('/:id', studentController.deleteStudent);
 exports.default = router;

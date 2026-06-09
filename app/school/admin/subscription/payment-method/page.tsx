@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2, AlertCircle, ArrowLeft, CreditCard } from 'lucide-react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
-import { authService } from '@/lib/auth/auth'
+import { authService, getApiUrl } from '@/lib/auth/auth'
 import type { TierPlan, BillingPeriod } from '@/lib/utils/subscription-types'
 import { TIER_CONFIG, calculateDynamicPrice } from '@/lib/utils/pricing-utils'
 
@@ -28,7 +28,13 @@ function PaymentMethodContent() {
       try {
         const user = authService.getCurrentUser()
         const schoolId = user?.schoolId || 's1'
-        const res = await fetch(`/api/subscriptions/school/${schoolId}`)
+        const apiUrl = getApiUrl()
+        const token = localStorage.getItem('attendance_token')
+        const res = await fetch(`${apiUrl}/api/subscriptions/schools/${schoolId}/subscription`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
         const json = await parseJsonResponse<any>(res)
         if (json.success) {
           setStudentCount(json.data.studentCount || 0)
@@ -46,9 +52,14 @@ function PaymentMethodContent() {
       setError(null)
       const user = authService.getCurrentUser()
       const schoolId = user?.schoolId || 's1' // fallback for demo/dev
-      const res = await fetch(`/api/payments/initialize`, {
+      const apiUrl = getApiUrl()
+      const token = localStorage.getItem('attendance_token')
+      const res = await fetch(`${apiUrl}/api/payments/initialize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ 
           schoolId, 
           tier, 

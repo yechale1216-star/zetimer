@@ -1,4 +1,13 @@
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
+
+const debugLog = (msg: string) => {
+  const logMsg = `[${new Date().toISOString()}] ${msg}\n`;
+  try {
+    fs.appendFileSync(path.join(process.cwd(), 'email_debug.log'), logMsg);
+  } catch (err) {}
+};
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
@@ -8,6 +17,15 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+});
+
+// Verify connection configuration
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('SMTP Transporter error:', error);
+  } else {
+    console.log('SMTP Server is ready to take our messages');
+  }
 });
 
 export const sendResetPasswordEmail = async (email: string, token: string) => {
@@ -32,10 +50,15 @@ export const sendResetPasswordEmail = async (email: string, token: string) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    debugLog(`Attempting to send reset email to: ${email}`);
+    console.log(`Attempting to send reset email to: ${email}`);
+    const info = await transporter.sendMail(mailOptions);
+    debugLog(`Email sent successfully: ${info.messageId}`);
+    console.log('Email sent successfully:', info.messageId);
     return true;
   } catch (error) {
-    console.error('Email send error:', error);
+    debugLog(`Email send error: ${error instanceof Error ? error.message : String(error)}`);
+    console.error('Detailed Email send error:', error);
     return false;
   }
 };

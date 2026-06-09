@@ -16,6 +16,7 @@ export const initSocket = (server: HttpServer) => {
 
   const userSockets = new Map<string, string>(); // userId -> socketId
   const socketData = new Map<string, { userId: string; schoolId: string }>(); // socketId -> data
+  const onlineUsers = new Set<string>(); // Set of online userIds
 
   io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
@@ -31,9 +32,14 @@ export const initSocket = (server: HttpServer) => {
 
         userSockets.set(userId, socket.id);
         socketData.set(socket.id, { userId, schoolId });
+        onlineUsers.add(userId);
+        
         console.log(`User ${userId} from school ${schoolId} authenticated with socket ${socket.id}`);
         
-        // Notify friends/contacts that user is online
+        // 1. Send the current list of online users to the newly authenticated user
+        socket.emit('initial_online_users', Array.from(onlineUsers));
+        
+        // 2. Notify friends/contacts that user is online
         socket.broadcast.emit('user_online', userId);
       } catch (error) {
         console.error('Socket authentication failed:', error);
@@ -282,12 +288,25 @@ export const initSocket = (server: HttpServer) => {
       }
     });
 
-    socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
+    socket.on('disconnect', async () => {
+      console.log('A user disconnected:', socket.id);
       const data = socketData.get(socket.id);
       if (data) {
-        userSockets.delete(data.userId);
-        socket.broadcast.emit('user_offline', data.userId);
+        const { userId, schoolId } = data;
+        
+        // Update lastActive in DB
+        try {
+          await prisma.user.update({
+            where: { id: userId },
+            data: { lastActive: new Date() }
+          });
+        } catch (err) {
+          console.error('Failed to update lastActive on disconnect:', err);
+        }
+
+        userSockets.delete(userId);
+        onlineUsers.delete(userId);
+        socket.broadcast.emit('user_offline', userId);
       }
       socketData.delete(socket.id);
     });

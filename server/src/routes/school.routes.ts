@@ -1,59 +1,47 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import * as schoolService from '../services/school.service';
 import { authorize, AuthenticatedRequest } from '../middleware/tenant.middleware';
 import prisma from '../config/db';
+import * as schoolService from '../services/school.service';
+import * as onboardingService from '../services/onboarding.service';
+import * as SuperAdminService from '../services/super-admin.service';
 
 const router = Router();
 
-// Create or Update a school
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+// Create a school (Super Admin Only)
+router.post('/', authorize(['super_admin']), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id, name } = req.body;
+    const { name, adminName, adminEmail, adminPhone, tier } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ success: false, message: 'School name is required' });
+    if (!name || !adminName || !adminEmail) {
+      return res.status(400).json({ success: false, message: 'School name, admin name, and admin email are required' });
     }
 
-    let school;
-    if (id) {
-      // Check if school exists
-      const existing = await schoolService.getSchoolById(id);
-      if (existing) {
-        school = await schoolService.updateSchool(id, { name });
-      } else {
-        school = await schoolService.createSchool({ id, name });
+    const { school, admin } = await onboardingService.startOnboarding({
+      schoolName: name,
+      adminName,
+      adminEmail,
+      adminPhone,
+      subscriptionTier: tier || 'standard'
+    });
+
+    res.status(201).json({ 
+      success: true, 
+      data: { 
+        id: school.id, 
+        schoolId: school.schoolId, 
+        name: school.name,
+        subscriptionStatus: school.subscriptionStatus,
+        adminUser: {
+          email: admin.email,
+          generatedPassword: admin.generatedPassword
+        }
       }
-    } else {
-      school = await schoolService.createSchool({ name });
-    }
-
-    res.status(200).json({ success: true, data: { 
-      id: school.id, 
-      schoolId: school.schoolId, 
-      name: school.name,
-      subscriptionStatus: school.subscriptionStatus
-    }});
+    });
   } catch (error) {
-    next(error);
-  }
-});
-
-// Get school by ID (UUID or SCH-XXXX)
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    let school;
-    
-    if (id.startsWith('SCH-')) {
-      school = await schoolService.getSchoolByCustomId(id);
-    } else {
-      school = await schoolService.getSchoolById(id);
-    }
-
-    if (!school) return res.status(404).json({ success: false, message: 'School not found' });
-    res.status(200).json({ success: true, data: school });
-  } catch (error) {
-    next(error);
+    res.status(400).json({ 
+      success: false, 
+      message: error instanceof Error ? error.message : 'Failed to create school' 
+    });
   }
 });
 
@@ -66,6 +54,7 @@ router.get('/', authorize(['super_admin']), async (req: AuthenticatedRequest, re
     next(error);
   }
 });
+
 
 
 // Get all grades for a school
@@ -114,14 +103,16 @@ router.post('/onboarding', authorize(['admin']), async (req: AuthenticatedReques
       allowLateMark,
     } = req.body;
 
-    // Update school record
-    await prisma.school.update({
-      where: { id: schoolId },
-      data: {
-        ...(schoolEmail !== undefined && { schoolEmail }),
-        onboardingCompleted: true,
-      },
-    });
+    // Use centralized service to mark as complete
+    await onboardingService.updateOnboardingStatus(schoolId, 'SETUP_COMPLETE');
+
+    // Update school record email
+    if (schoolEmail !== undefined) {
+      await prisma.school.update({
+        where: { id: schoolId },
+        data: { schoolEmail },
+      });
+    }
 
     // Update school settings
     await prisma.schoolSettings.upsert({
@@ -151,6 +142,56 @@ router.post('/onboarding', authorize(['admin']), async (req: AuthenticatedReques
   }
 });
 
+
+// ─── Help Desk (Support Tickets) ──────────────────────────────────────────────
+router.get('/support', authorize(['admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const data = await SuperAdminService.getSupportTickets({
+      schoolId,
+      status: req.query.status as string,
+      page: req.query.page ? parseInt(req.query.page as string) : 1,
+      limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+    });
+    res.json({ success: true, data });
+  } catch (error) { next(error); }
+});
+
+router.post('/support', authorize(['admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    const authorId = req.user?.id;
+    if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const ticket = await SuperAdminService.createTicket({
+      ...req.body,
+      schoolId,
+      authorId,
+    });
+    res.status(201).json({ success: true, data: ticket });
+  } catch (error) { next(error); }
+});
+
+// Get school by ID (UUID or SCH-XXXX)
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    let school;
+    
+    if (id.startsWith('SCH-')) {
+      school = await schoolService.getSchoolByCustomId(id);
+    } else {
+      school = await schoolService.getSchoolById(id);
+    }
+
+    if (!school) return res.status(404).json({ success: false, message: 'School not found' });
+    res.status(200).json({ success: true, data: school });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;
 

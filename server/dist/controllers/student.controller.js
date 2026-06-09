@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.bulkCreateStudents = exports.getStudentsByParentPhone = exports.deleteStudent = exports.updateStudent = exports.getStudentById = exports.createStudent = exports.getStudents = void 0;
+exports.bulkCreateStudents = exports.getStudentsByParentPhone = exports.deleteStudent = exports.updateStudent = exports.getStudentById = exports.createStudent = exports.getNextStudentId = exports.getStudents = void 0;
 const studentService = __importStar(require("../services/student.service"));
 const getStudents = async (req, res, next) => {
     try {
@@ -49,6 +49,20 @@ const getStudents = async (req, res, next) => {
     }
 };
 exports.getStudents = getStudents;
+const getNextStudentId = async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId) {
+            return res.status(401).json({ success: false, message: 'School ID context missing' });
+        }
+        const nextId = await studentService.getNextStudentId(schoolId);
+        res.status(200).json({ success: true, data: nextId });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getNextStudentId = getNextStudentId;
 const createStudent = async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;

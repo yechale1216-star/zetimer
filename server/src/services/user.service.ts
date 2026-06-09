@@ -58,6 +58,21 @@ export const createUser = async (data: any) => {
   let teacherId = data.teacher_id || null;
   const schoolId = data.schoolId || null;
 
+  // Enforce SaaS user limits
+  if (schoolId) {
+    const { getSchoolLimits } = require('./subscription.service');
+    const limits = await getSchoolLimits(schoolId);
+    
+    // Only count active users in this school
+    const currentCount = await prisma.user.count({ 
+      where: { schoolId, is_active: true } 
+    });
+
+    if (limits.maxUsers !== -1 && currentCount >= limits.maxUsers) {
+      throw new Error(`User limit reached (${limits.maxUsers}). Please upgrade your Zetime plan to add more users.`);
+    }
+  }
+
   // Prevent duplicate phone for teachers within the same school (or globally if required)
   if (data.role === 'teacher' && data.phone) {
     const cleanPhone = data.phone.trim();

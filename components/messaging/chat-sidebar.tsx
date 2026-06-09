@@ -185,6 +185,9 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                        {chat.name.slice(0, 2).toUpperCase()}
                      </AvatarFallback>
                    </Avatar>
+                   {chat.isOnline && (
+                     <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-background rounded-full" />
+                   )}
                  </div>
 
                  <div className="flex-1 min-w-0 text-left">

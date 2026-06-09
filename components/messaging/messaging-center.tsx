@@ -111,6 +111,7 @@ export function MessagingCenter() {
             role: otherMember?.role || (isGroup ? 'Group' : 'User'),
             realContactId: otherMember?.id || null,
             isNewContact: false,
+            lastActive: otherMember?.lastActive,
           });
         }
       }
@@ -135,6 +136,7 @@ export function MessagingCenter() {
           role: contact.role,
           realContactId: contact.id,
           isNewContact: true,
+          lastActive: contact.lastActive,
         });
 
         handledUserIds.add(contact.id);
@@ -196,7 +198,7 @@ export function MessagingCenter() {
         senderName: m.sender?.full_name || 'Unknown',
         content: m.content,
         timestamp: formatLocalizedTime(m.createdAt, language),
-        status: 'read',
+        status: m.readBy && m.readBy.length > 0 ? 'read' : 'sent',
         type: m.type || 'TEXT',
         attachments: m.attachments,
         isMe: m.senderId === userRef.current?.id,
@@ -277,6 +279,50 @@ export function MessagingCenter() {
     [user, socket, isConnected, loadMessages, t, toast]
   );
 
+  // Sync activeConversationData when conversations list updates (for real-time presence)
+  useEffect(() => {
+    if (activeConversationId) {
+      const updated = conversations.find(c => c.id === activeConversationId);
+      if (updated) {
+        setActiveConversationData(updated);
+      }
+    }
+  }, [conversations, activeConversationId]);
+
+  // ── Mark as Read Logic ──────────────────────────────────────────────────────
+  const markMessagesAsRead = useCallback((conversationId: string, msgs: any[]) => {
+    if (!socket || !isConnected || !user) return;
+    
+    // Only mark messages SENT BY OTHERS as read BY ME
+    const unreadMessages = msgs.filter(m => !m.isMe && m.status !== 'read');
+    
+    unreadMessages.forEach(msg => {
+      socket.emit('mark_as_read', {
+        messageId: msg.id,
+        userId: user.id,
+        conversationId
+      });
+    });
+
+    if (unreadMessages.length > 0) {
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [conversationId]: prev[conversationId].map(m => 
+          !m.isMe && m.status !== 'read' ? { ...m, status: 'read' } : m
+        )
+      }));
+    }
+  }, [socket, isConnected, user]);
+
+  useEffect(() => {
+    if (activeConversationId) {
+      const msgs = messagesByConversation[activeConversationId];
+      if (msgs) {
+        markMessagesAsRead(activeConversationId, msgs);
+      }
+    }
+  }, [activeConversationId, messagesByConversation, markMessagesAsRead]);
+
   // ── Socket: authenticate + listen for new messages ────────────────────────
   useEffect(() => {
     if (!socket || !isConnected || !user) return;
@@ -294,7 +340,7 @@ export function MessagingCenter() {
         senderName: message.sender?.full_name || 'Unknown',
         content: message.content,
         timestamp: formatLocalizedTime(message.createdAt || new Date(), language),
-        status: 'delivered',
+        status: 'sent',
         type: message.type || 'TEXT',
         attachments: message.attachments,
         isMe: message.senderId === currentUser?.id,
@@ -327,10 +373,49 @@ export function MessagingCenter() {
       );
     };
 
+    const handleMessageRead = (data: { messageId: string; userId: string; conversationId: string }) => {
+      const { messageId, conversationId } = data;
+      setMessagesByConversation(prev => {
+        const msgs = prev[conversationId];
+        if (!msgs) return prev;
+        return {
+          ...prev,
+          [conversationId]: msgs.map(m => m.id === messageId ? { ...m, status: 'read' } : m)
+        };
+      });
+    };
+
+    const handleInitialOnlineUsers = (userIds: string[]) => {
+      setConversations(prev => prev.map(c => ({
+        ...c,
+        isOnline: !c.isGroup && c.memberIds?.some((id: string) => id !== userRef.current?.id && userIds.includes(id))
+      })));
+    };
+
+    const handleUserOnline = (userId: string) => {
+      setConversations(prev => prev.map(c => 
+        !c.isGroup && c.memberIds?.includes(userId) ? { ...c, isOnline: true } : c
+      ));
+    };
+
+    const handleUserOffline = (userId: string) => {
+      setConversations(prev => prev.map(c => 
+        !c.isGroup && c.memberIds?.includes(userId) ? { ...c, isOnline: false, lastActive: new Date() } : c
+      ));
+    };
+
     socket.on('new_message', handleNewMessage);
+    socket.on('message_read', handleMessageRead);
+    socket.on('initial_online_users', handleInitialOnlineUsers);
+    socket.on('user_online', handleUserOnline);
+    socket.on('user_offline', handleUserOffline);
 
     return () => {
       socket.off('new_message', handleNewMessage);
+      socket.off('message_read', handleMessageRead);
+      socket.off('initial_online_users', handleInitialOnlineUsers);
+      socket.off('user_online', handleUserOnline);
+      socket.off('user_offline', handleUserOffline);
     };
   }, [socket, isConnected, user]);
 

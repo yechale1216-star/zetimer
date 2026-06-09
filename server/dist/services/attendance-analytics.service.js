@@ -160,9 +160,12 @@ const getGradeStats = async (schoolId, filters) => {
     });
     const groups = {};
     students.forEach(student => {
-        const key = `${student.grade.name}-${student.section.name}-${student.stream?.name || 'none'}`;
+        const key = `${student.gradeId}-${student.sectionId}-${student.streamId || 'none'}`;
         if (!groups[key]) {
             groups[key] = {
+                gradeId: student.gradeId,
+                sectionId: student.sectionId,
+                streamId: student.streamId || null,
                 grade: student.grade.name,
                 section: student.section.name,
                 stream: student.stream?.name || null,
@@ -308,9 +311,14 @@ const getAttendanceTrends = async (schoolId, filters) => {
 };
 exports.getAttendanceTrends = getAttendanceTrends;
 const getDrillDownStats = async (schoolId, gradeId, filters) => {
-    const { startDate, endDate, section, stream } = filters;
+    const { startDate, endDate, sectionId, streamId } = filters;
     const students = await db_1.default.student.findMany({
-        where: { schoolId, gradeId, ...(section ? { sectionId: section } : {}), ...(stream ? { streamId: stream } : {}) },
+        where: {
+            schoolId,
+            gradeId,
+            ...(sectionId ? { sectionId } : {}),
+            ...(streamId ? { streamId } : {})
+        },
         include: {
             section: true,
             stream: true,

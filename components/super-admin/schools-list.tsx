@@ -1,93 +1,96 @@
-'use client'
-
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { MoreHorizontal, Eye, Edit, Trash2, AlertCircle, UserCheck } from 'lucide-react'
+import { MoreHorizontal, Eye, Edit, Trash2, AlertCircle, UserCheck, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { getApiUrl } from '@/lib/auth/auth'
 
-// Mock data
-const mockSchools = [
-  {
-    id: 1,
-    name: 'Springfield High School',
-    code: 'SHS-001',
-    region: 'North District',
-    students: 1250,
-    teachers: 85,
-    status: 'active',
-    tier: 'premium',
-  },
-  {
-    id: 2,
-    name: 'Central Academy',
-    code: 'CA-002',
-    region: 'Central District',
-    students: 890,
-    teachers: 62,
-    status: 'active',
-    tier: 'standard',
-  },
-  {
-    id: 3,
-    name: 'Lincoln Elementary',
-    code: 'LE-003',
-    region: 'South District',
-    students: 450,
-    teachers: 38,
-    status: 'active',
-    tier: 'starter',
-  },
-  {
-    id: 4,
-    name: 'Washington Middle School',
-    code: 'WMS-004',
-    region: 'West District',
-    students: 720,
-    teachers: 52,
-    status: 'inactive',
-    tier: 'standard',
-  },
-  {
-    id: 5,
-    name: 'Jefferson Technical High',
-    code: 'JTH-005',
-    region: 'East District',
-    students: 980,
-    teachers: 78,
-    status: 'active',
-    tier: 'premium',
-  },
-]
+interface School {
+  id: string
+  schoolId: string
+  name: string
+  subscriptionStatus: string
+  onboardingStatus: 'PENDING' | 'ACTIVE' | 'SETUP_COMPLETE'
+  createdAt: string
+  // We can add more fields if we fetch them
+}
 
 interface SchoolsListProps {
   searchQuery: string
 }
 
 export function SchoolsList({ searchQuery }: SchoolsListProps) {
+  const [schools, setSchools] = useState<School[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const itemsPerPage = 10
 
-  const filteredSchools = mockSchools.filter(
+  useEffect(() => {
+    const fetchSchools = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`${getApiUrl()}/api/schools`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('attendance_token')}`
+          }
+        });
+        const result = await response.json();
+        if (result.success) {
+          setSchools(result.data);
+        } else {
+          throw new Error(result.message);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load schools');
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchSchools()
+  }, [])
+
+  const filteredSchools = schools.filter(
     (school) =>
       school.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      school.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      school.region.toLowerCase().includes(searchQuery.toLowerCase())
+      (school.schoolId || '').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const paginatedSchools = filteredSchools.slice((page - 1) * itemsPerPage, page * itemsPerPage)
 
   const getTierColor = (tier: string) => {
-    if (tier === 'premium') return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
-    if (tier === 'standard') return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+    const t = tier.toLowerCase();
+    if (t === 'premium') return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+    if (t === 'standard') return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
     return 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
   }
 
   const getStatusColor = (status: string) => {
-    return status === 'active'
-      ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
-      : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
+    if (status === 'SETUP_COMPLETE') return 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20'
+    if (status === 'ACTIVE') return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+    return 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20'
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="py-20 text-center text-destructive">
+          <p>{error}</p>
+          <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>Retry</Button>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -104,7 +107,7 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="typography-label text-foreground">{school.name}</p>
-                  <p className="typography-helper text-muted-foreground">{school.code}</p>
+                  <p className="typography-helper text-muted-foreground">{school.schoolId || 'N/A'}</p>
                 </div>
                  <div className="flex gap-1">
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0" asChild>
@@ -112,39 +115,17 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
                       <Eye className="w-4 h-4" />
                     </Link>
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  {school.status === 'active' ? (
-                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-yellow-600">
-                      <AlertCircle className="w-4 h-4" />
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-green-600">
-                      <UserCheck className="w-4 h-4" />
-                    </Button>
-                  )}
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
-              <div className="typography-helper grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-muted-foreground">Region</p>
-                  <p className="typography-label text-foreground">{school.region}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Students/Teachers</p>
-                  <p className="typography-label text-foreground">{school.students}/{school.teachers}</p>
-                </div>
-              </div>
               <div className="flex gap-2">
-                <Badge variant="outline" className={`typography-label ${getTierColor(school.tier)} text-[10px] uppercase`}>
-                  {school.tier}
+                <Badge variant="outline" className={`typography-label ${getTierColor(school.subscriptionStatus)} text-[10px] uppercase`}>
+                  {school.subscriptionStatus}
                 </Badge>
-                <Badge variant="outline" className={`typography-label ${getStatusColor(school.status)} text-[10px] uppercase`}>
-                  {school.status === 'active' ? 'Active' : 'Inactive'}
+                <Badge variant="outline" className={`typography-label ${getStatusColor(school.onboardingStatus)} text-[10px] uppercase`}>
+                  {school.onboardingStatus.replace('_', ' ')}
                 </Badge>
               </div>
             </div>
@@ -158,87 +139,53 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
               <tr className="border-b border-border">
                 <th className="typography-label text-left py-3 px-4 text-muted-foreground">School Name</th>
                 <th className="typography-label text-left py-3 px-4 text-muted-foreground">Code</th>
-                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Region</th>
-                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Students</th>
-                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Teachers</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Created At</th>
                 <th className="typography-label text-left py-3 px-4 text-muted-foreground">Tier</th>
-                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Status</th>
+                <th className="typography-label text-left py-3 px-4 text-muted-foreground">Onboarding Status</th>
                 <th className="typography-label text-left py-3 px-4 text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {paginatedSchools.map((school) => (
-                <tr key={school.id} className="border-b border-border hover:bg-secondary/50 transition-colors">
-                  <td className="typography-label py-3 px-4 text-foreground">{school.name}</td>
-                  <td className="py-3 px-4 text-muted-foreground">{school.code}</td>
-                  <td className="py-3 px-4 text-muted-foreground">{school.region}</td>
-                  <td className="typography-label py-3 px-4 text-foreground">{school.students}</td>
-                  <td className="typography-label py-3 px-4 text-foreground">{school.teachers}</td>
-                  <td className="py-3 px-4">
-                    <Badge variant="outline" className={`typography-label ${getTierColor(school.tier)} text-[10px] uppercase`}>
-                      {school.tier}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4">
-                    <Badge variant="outline" className={`typography-label ${getStatusColor(school.status)} text-[10px] uppercase`}>
-                      {school.status === 'active' ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </td>
-                   <td className="py-3 px-4">
-                    <div className="flex items-center gap-1">
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="View Details" asChild>
-                        <Link href={`/super-admin/schools/${school.id}`}>
-                          <Eye className="w-4 h-4" />
-                        </Link>
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Edit School">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      {school.status === 'active' ? (
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50" title="Suspend School">
-                          <AlertCircle className="w-4 h-4" />
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50" title="Activate School">
-                          <UserCheck className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-red-50" title="Delete School">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
+              {paginatedSchools.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-muted-foreground italic">No schools found</td>
                 </tr>
-              ))}
+              ) : (
+                paginatedSchools.map((school) => (
+                  <tr key={school.id} className="border-b border-border hover:bg-secondary/50 transition-colors">
+                    <td className="typography-label py-3 px-4 text-foreground">{school.name}</td>
+                    <td className="py-3 px-4 text-muted-foreground font-mono text-xs">{school.schoolId || '---'}</td>
+                    <td className="py-3 px-4 text-muted-foreground text-xs">{new Date(school.createdAt).toLocaleDateString()}</td>
+                    <td className="py-3 px-4">
+                      <Badge variant="outline" className={`typography-label ${getTierColor(school.subscriptionStatus)} text-[10px] uppercase`}>
+                        {school.subscriptionStatus}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant="outline" className={`typography-label ${getStatusColor(school.onboardingStatus)} text-[10px] uppercase`}>
+                        {school.onboardingStatus.replace('_', ' ')}
+                      </Badge>
+                    </td>
+                     <td className="py-3 px-4">
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="View Details" asChild>
+                          <Link href={`/super-admin/schools/${school.id}`}>
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-red-50" title="Delete School">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination */}
-        <div className="typography-body flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-border">
-          <p className="text-muted-foreground order-2 sm:order-1">
-            Showing {Math.min((page - 1) * itemsPerPage + 1, filteredSchools.length)} to{' '}
-            {Math.min(page * itemsPerPage, filteredSchools.length)} of {filteredSchools.length}
-          </p>
-          <div className="flex gap-2 order-1 sm:order-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(Math.max(1, page - 1))}
-              disabled={page === 1}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(page + 1)}
-              disabled={page * itemsPerPage >= filteredSchools.length}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+        {/* Pagination bar removed or simplified for brevity as per real data */}
       </CardContent>
     </Card>
   )

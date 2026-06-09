@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllSchools = exports.getSchoolByCustomId = exports.getSchoolById = exports.updateSchool = exports.createSchool = void 0;
+exports.getStreams = exports.getSections = exports.getGrades = exports.getAllSchools = exports.getSchoolByCustomId = exports.getSchoolById = exports.updateSchool = exports.createSchool = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const school_id_1 = require("../utils/school-id");
 const createSchool = async (data) => {
@@ -74,3 +74,24 @@ const getAllSchools = async () => {
     });
 };
 exports.getAllSchools = getAllSchools;
+const getGrades = async (schoolId) => {
+    return await db_1.default.grade.findMany({
+        where: { schoolId },
+        orderBy: { name: 'asc' }
+    });
+};
+exports.getGrades = getGrades;
+const getSections = async (schoolId) => {
+    return await db_1.default.section.findMany({
+        where: { schoolId },
+        orderBy: { name: 'asc' }
+    });
+};
+exports.getSections = getSections;
+const getStreams = async (schoolId) => {
+    return await db_1.default.stream.findMany({
+        where: { schoolId },
+        orderBy: { name: 'asc' }
+    });
+};
+exports.getStreams = getStreams;

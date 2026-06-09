@@ -5,10 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Download, Loader2, ArrowUpRight } from 'lucide-react'
+import { Download, Loader2, ArrowUpRight, History } from 'lucide-react'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
-
-const SCHOOL_ID = 's1'
+import { getApiUrl } from '@/lib/auth/auth'
 
 interface BillingRecord {
   id: string
@@ -18,6 +17,7 @@ interface BillingRecord {
   status: 'completed' | 'failed' | 'pending'
   description: string
   invoiceUrl?: string
+  paymentMethod?: string
 }
 
 export default function BillingHistoryPage() {
@@ -30,26 +30,32 @@ export default function BillingHistoryPage() {
 
   const fetchBillingHistory = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('zetime_user') || '{}')
-      const schoolId = user.schoolId || 's1'
-
-      const res = await fetch(`/api/transactions/school/${schoolId}`)
+      const token = localStorage.getItem('attendance_token')
+      // Use the authenticated /me/billing endpoint — same as the overview page
+      const res = await fetch(`${getApiUrl()}/api/subscriptions/me/billing`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
       const json = await parseJsonResponse<any>(res)
       if (json.success) {
-        const mappedHistory = json.data.map((tx: any) => ({
+        const mapped: BillingRecord[] = (json.data || []).map((tx: any) => ({
           id: tx.id,
-          subscriptionId: tx.id, // Using tx.id as fallback
+          subscriptionId: tx.subscriptionId || tx.id,
           amount: tx.amount,
           date: new Date(tx.createdAt).toLocaleDateString('en-ET', { timeZone: 'Africa/Addis_Ababa' }),
-          status: tx.status === 'completed' || tx.status === 'success' ? 'completed' : 
-                  tx.status === 'failed' ? 'failed' : 'pending',
+          status:
+            tx.status === 'completed' || tx.status === 'success'
+              ? 'completed'
+              : tx.status === 'failed'
+              ? 'failed'
+              : 'pending',
           description: tx.description,
-          invoiceUrl: tx.invoiceUrl
+          invoiceUrl: tx.invoiceUrl,
+          paymentMethod: tx.paymentMethod,
         }))
-        setBillingHistory(mappedHistory)
+        setBillingHistory(mapped)
       }
     } catch (err) {
-      console.error('[v0] Error fetching billing history:', err)
+      console.error('[subscription] Error fetching billing history:', err)
     } finally {
       setLoading(false)
     }
@@ -70,18 +76,23 @@ export default function BillingHistoryPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg font-bold">Billing History</CardTitle>
-              <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-70">View and download your past transactions</CardDescription>
+              <CardDescription className="text-xs font-bold uppercase tracking-widest opacity-70">
+                View and download your past transactions
+              </CardDescription>
             </div>
-            <Button variant="outline" className="gap-2 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl font-bold uppercase tracking-tight text-xs h-10 hover:scale-[1.02] transition-transform">
+            <Button
+              variant="outline"
+              className="gap-2 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl font-bold uppercase tracking-tight text-xs h-10 hover:scale-[1.02] transition-transform"
+            >
               <Download className="w-4 h-4" />
               Export All
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           {billingHistory.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground flex flex-col items-center justify-center">
-              <HistoryIcon className="w-12 h-12 mx-auto mb-4 opacity-20" />
+            <div className="text-center py-16 text-muted-foreground flex flex-col items-center justify-center">
+              <History className="w-12 h-12 mx-auto mb-4 opacity-20" />
               <p className="font-bold uppercase tracking-widest text-[10px]">No billing history found.</p>
               <p className="text-xs mt-1 font-medium">Your past transactions will appear here.</p>
             </div>
@@ -92,6 +103,7 @@ export default function BillingHistoryPage() {
                   <TableRow className="border-b border-slate-200/60 dark:border-slate-800/60 hover:bg-transparent">
                     <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Date</TableHead>
                     <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Method</TableHead>
                     <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Amount</TableHead>
                     <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</TableHead>
                     <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">Action</TableHead>
@@ -99,31 +111,57 @@ export default function BillingHistoryPage() {
                 </TableHeader>
                 <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {billingHistory.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-white/80 dark:hover:bg-slate-800/80 transition-colors border-none">
-                      <TableCell className="font-bold text-sm whitespace-nowrap">
-                        {record.date}
-                      </TableCell>
+                    <TableRow
+                      key={record.id}
+                      className="hover:bg-white/80 dark:hover:bg-slate-800/80 transition-colors border-none"
+                    >
+                      <TableCell className="font-bold text-sm whitespace-nowrap">{record.date}</TableCell>
                       <TableCell className="font-medium text-sm">{record.description}</TableCell>
-                      <TableCell className="font-black text-sm">{record.amount.toFixed(2)} ETB</TableCell>
                       <TableCell>
-                        <Badge 
+                        {record.paymentMethod ? (
+                          <Badge variant="outline" className="text-[9px] h-4 px-1.5 uppercase tracking-tighter bg-secondary/50 border-slate-300 dark:border-slate-600">
+                            {record.paymentMethod}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-black text-sm">{record.amount.toLocaleString('en-ET')} ETB</TableCell>
+                      <TableCell>
+                        <Badge
                           variant={
-                            record.status === 'completed' ? 'default' : 
-                            record.status === 'pending' ? 'secondary' : 'destructive'
+                            record.status === 'completed'
+                              ? 'default'
+                              : record.status === 'pending'
+                              ? 'secondary'
+                              : 'destructive'
                           }
-                          className={`text-[9px] uppercase tracking-tighter font-black ${record.status === 'completed' ? 'bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/20 border-green-200 dark:border-green-800' : ''}`}
+                          className={`text-[9px] uppercase tracking-tighter font-black ${
+                            record.status === 'completed'
+                              ? 'bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-500/20 border-green-200 dark:border-green-800'
+                              : ''
+                          }`}
                         >
                           {record.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         {record.invoiceUrl ? (
-                          <Button variant="ghost" size="sm" className="gap-1 rounded-lg h-8 hover:bg-slate-100 dark:hover:bg-slate-800">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 rounded-lg h-8 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            onClick={() => window.open(record.invoiceUrl, '_blank')}
+                          >
                             <Download className="w-3.5 h-3.5" />
                             <span className="sr-only sm:not-sr-only text-[10px] font-bold uppercase tracking-wider">Receipt</span>
                           </Button>
                         ) : (
-                          <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground rounded-lg h-8 hover:bg-slate-100 dark:hover:bg-slate-800">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 text-muted-foreground rounded-lg h-8 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          >
                             <ArrowUpRight className="w-3.5 h-3.5" />
                             <span className="text-[10px] font-bold uppercase tracking-wider">Details</span>
                           </Button>
@@ -140,25 +178,3 @@ export default function BillingHistoryPage() {
     </div>
   )
 }
-
-function HistoryIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M12 7v5l4 2" />
-    </svg>
-  )
-}
-

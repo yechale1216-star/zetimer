@@ -9,55 +9,52 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Save } from 'lucide-react'
+import { getApiUrl } from '@/lib/auth/auth'
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    platformName: 'Zetime',
-    supportEmail: 'support@zetime.io',
-    maintenanceMode: false,
-    apiRateLimit: 10000,
-    maxUploadSize: 100,
-    emailNotifications: true,
-    autoBackup: true,
-  })
-
-  const [trialSettings, setTrialSettings] = useState({
-    enabled: true,
-    durationDays: 14,
-    studentCapacity: 100
-  })
+  const [config, setConfig] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/super-admin/settings/trial')
+    fetch(`${getApiUrl()}/api/super-admin/settings`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('attendance_token')}`
+      }
+    })
       .then(res => res.json())
       .then(json => {
         if (json.success && json.data) {
-          setTrialSettings(json.data)
+          setConfig(json.data)
         }
       })
-      .catch(err => console.error("Error fetching trial settings:", err))
+      .catch(err => console.error("Error fetching platform settings:", err))
+      .finally(() => setLoading(false))
   }, [])
 
-  const handleSave = () => {
-    console.log('Settings saved:', settings)
-  }
-
-  const handleSaveTrial = async () => {
+  const handleSave = async (updatedData: any) => {
     try {
-      const res = await fetch('/api/super-admin/settings/trial', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(trialSettings)
+      const res = await fetch(`${getApiUrl()}/api/super-admin/settings`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('attendance_token')}`
+        },
+        body: JSON.stringify(updatedData)
       })
       const json = await res.json()
       if (json.success) {
-        alert("Trial settings saved successfully!")
+        setConfig(json.data)
+        alert("Settings updated successfully!")
       } else {
-        alert("Failed to save trial settings: " + json.error)
+        alert("Failed to update settings: " + json.error)
       }
     } catch (err) {
-      alert("Error saving trial settings")
+      alert("Error saving settings")
     }
+  }
+
+  if (loading || !config) {
+    return <div className="p-20 text-center text-muted-foreground">Loading settings...</div>
   }
 
   return (
@@ -90,8 +87,8 @@ export default function SettingsPage() {
                 <Label htmlFor="platformName">Platform Name</Label>
                 <Input
                   id="platformName"
-                  value={settings.platformName}
-                  onChange={(e) => setSettings({ ...settings, platformName: e.target.value })}
+                  value={config.platformName}
+                  onChange={(e) => setConfig({ ...config, platformName: e.target.value })}
                 />
               </div>
 
@@ -100,8 +97,8 @@ export default function SettingsPage() {
                 <Input
                   id="supportEmail"
                   type="email"
-                  value={settings.supportEmail}
-                  onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
+                  value={config.supportEmail}
+                  onChange={(e) => setConfig({ ...config, supportEmail: e.target.value })}
                 />
               </div>
 
@@ -111,12 +108,12 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Take platform offline for maintenance</p>
                 </div>
                 <Switch
-                  checked={settings.maintenanceMode}
-                  onCheckedChange={(checked) => setSettings({ ...settings, maintenanceMode: checked })}
+                  checked={config.maintenanceMode}
+                  onCheckedChange={(checked) => setConfig({ ...config, maintenanceMode: checked })}
                 />
               </div>
 
-              <Button onClick={handleSave} className="gap-2">
+              <Button onClick={() => handleSave(config)} className="gap-2">
                 <Save className="w-4 h-4" />
                 Save Changes
               </Button>
@@ -137,8 +134,8 @@ export default function SettingsPage() {
                 <Input
                   id="apiRateLimit"
                   type="number"
-                  value={settings.apiRateLimit}
-                  onChange={(e) => setSettings({ ...settings, apiRateLimit: parseInt(e.target.value) })}
+                  value={config.apiRateLimit}
+                  onChange={(e) => setConfig({ ...config, apiRateLimit: parseInt(e.target.value) })}
                 />
               </div>
 
@@ -147,8 +144,8 @@ export default function SettingsPage() {
                 <Input
                   id="maxUploadSize"
                   type="number"
-                  value={settings.maxUploadSize}
-                  onChange={(e) => setSettings({ ...settings, maxUploadSize: parseInt(e.target.value) })}
+                  value={config.maxUploadSize}
+                  onChange={(e) => setConfig({ ...config, maxUploadSize: parseInt(e.target.value) })}
                 />
               </div>
 
@@ -158,12 +155,12 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Daily automatic database backups</p>
                 </div>
                 <Switch
-                  checked={settings.autoBackup}
-                  onCheckedChange={(checked) => setSettings({ ...settings, autoBackup: checked })}
+                  checked={config.autoBackup}
+                  onCheckedChange={(checked) => setConfig({ ...config, autoBackup: checked })}
                 />
               </div>
 
-              <Button onClick={handleSave} className="gap-2">
+              <Button onClick={() => handleSave(config)} className="gap-2">
                 <Save className="w-4 h-4" />
                 Save Changes
               </Button>
@@ -185,8 +182,8 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Send system notifications via email</p>
                 </div>
                 <Switch
-                  checked={settings.emailNotifications}
-                  onCheckedChange={(checked) => setSettings({ ...settings, emailNotifications: checked })}
+                  checked={config.emailNotifications || false}
+                  onCheckedChange={(checked) => setConfig({ ...config, emailNotifications: checked })}
                 />
               </div>
 
@@ -198,7 +195,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <Button onClick={handleSave} className="gap-2">
+              <Button onClick={() => handleSave(config)} className="gap-2">
                 <Save className="w-4 h-4" />
                 Save Changes
               </Button>
@@ -253,7 +250,10 @@ export default function SettingsPage() {
                     <Label className="text-red-500">Maintenance Mode</Label>
                     <p className="text-sm text-muted-foreground">Take the entire platform offline for updates</p>
                   </div>
-                  <Switch checked={false} />
+                  <Switch 
+                    checked={config.maintenanceMode} 
+                    onCheckedChange={(checked) => setConfig({ ...config, maintenanceMode: checked })}
+                  />
                 </div>
                 <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-lg">
                   <p className="text-xs text-red-600 font-medium">
@@ -265,6 +265,62 @@ export default function SettingsPage() {
 
               <Button variant="destructive" className="w-full">
                 Verify System Integrity
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Security Settings */}
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <CardTitle>Security Configuration</CardTitle>
+              <CardDescription>Configure platform-wide security policies and access controls</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="sessionTimeout">Session Timeout (Minutes)</Label>
+                <Input
+                  id="sessionTimeout"
+                  type="number"
+                  value={config.sessionTimeout}
+                  onChange={(e) => setConfig({ ...config, sessionTimeout: parseInt(e.target.value) || 0 })}
+                />
+                <p className="text-xs text-muted-foreground">Inactivity period before a user is automatically logged out.</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+                <Input
+                  id="maxLoginAttempts"
+                  type="number"
+                  value={config.maxLoginAttempts}
+                  onChange={(e) => setConfig({ ...config, maxLoginAttempts: parseInt(e.target.value) || 0 })}
+                />
+                <p className="text-xs text-muted-foreground">Number of failed attempts before an account is temporarily locked.</p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div>
+                  <Label>Multi-Factor Authentication (MFA)</Label>
+                  <p className="text-sm text-muted-foreground">Enforce 2FA for all administrative accounts</p>
+                </div>
+                <Switch
+                  checked={config.twoFactorEnabled}
+                  onCheckedChange={(checked) => setConfig({ ...config, twoFactorEnabled: checked })}
+                />
+              </div>
+
+              <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-lg">
+                <p className="text-xs text-amber-600 font-medium">
+                  Note: Changes to security policies will apply to new sessions. 
+                  Enforcing MFA will require admins to set up a secondary factor on their next login.
+                </p>
+              </div>
+
+              <Button onClick={() => handleSave(config)} className="gap-2">
+                <Save className="w-4 h-4" />
+                Save Security Settings
               </Button>
             </CardContent>
           </Card>
@@ -318,7 +374,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <Button onClick={handleSave} className="gap-2">
+              <Button onClick={() => handleSave(config)} className="gap-2">
                 <Save className="w-4 h-4" />
                 Save Localization
               </Button>
@@ -340,8 +396,8 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Automatically provision a free trial for new registrations</p>
                 </div>
                 <Switch
-                  checked={trialSettings.enabled}
-                  onCheckedChange={(checked) => setTrialSettings({ ...trialSettings, enabled: checked })}
+                  checked={config.trialEnabled}
+                  onCheckedChange={(checked) => setConfig({ ...config, trialEnabled: checked })}
                 />
               </div>
 
@@ -350,8 +406,8 @@ export default function SettingsPage() {
                 <Input
                   id="trialDuration"
                   type="number"
-                  value={trialSettings.durationDays}
-                  onChange={(e) => setTrialSettings({ ...trialSettings, durationDays: parseInt(e.target.value) || 0 })}
+                  value={config.trialDuration}
+                  onChange={(e) => setConfig({ ...config, trialDuration: parseInt(e.target.value) || 0 })}
                 />
               </div>
 
@@ -360,12 +416,12 @@ export default function SettingsPage() {
                 <Input
                   id="trialCapacity"
                   type="number"
-                  value={trialSettings.studentCapacity}
-                  onChange={(e) => setTrialSettings({ ...trialSettings, studentCapacity: parseInt(e.target.value) || 0 })}
+                  value={config.trialCapacity}
+                  onChange={(e) => setConfig({ ...config, trialCapacity: parseInt(e.target.value) || 0 })}
                 />
               </div>
 
-              <Button onClick={handleSaveTrial} className="gap-2">
+              <Button onClick={() => handleSave(config)} className="gap-2">
                 <Save className="w-4 h-4" />
                 Save Trial Settings
               </Button>

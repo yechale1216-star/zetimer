@@ -50,6 +50,8 @@ const parent_routes_1 = __importDefault(require("./routes/parent.routes"));
 const attendance_analytics_routes_1 = __importDefault(require("./routes/attendance-analytics.routes"));
 const message_routes_1 = __importDefault(require("./routes/message.routes"));
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
+const promotion_routes_1 = __importDefault(require("./routes/promotion.routes"));
+const subscription_routes_1 = __importDefault(require("./routes/subscription.routes"));
 const tenant_middleware_1 = require("./middleware/tenant.middleware");
 const parentController = __importStar(require("./controllers/parent.controller"));
 const app = (0, express_1.default)();
@@ -72,9 +74,9 @@ app.use('/api/auth', auth_routes_1.default);
 const publicParentRouter = express_1.default.Router();
 publicParentRouter.get('/schools', parentController.listParentSchools);
 publicParentRouter.post('/login', parentController.loginParent);
-publicParentRouter.post('/update-password', parentController.updatePassword);
-publicParentRouter.get('/search', parentController.searchParent);
 app.use('/api/parent', publicParentRouter);
+// Subscription & Feature Management (No school tenant required — Super Admin manages plans globally)
+app.use('/api', subscription_routes_1.default);
 // Apply Tenant Isolation Middleware to all other API routes
 app.use('/api', tenant_middleware_1.tenantMiddleware);
 // Routes
@@ -87,6 +89,7 @@ app.use('/api/settings', settings_routes_1.default);
 app.use('/api/parent', parent_routes_1.default); // Re-use for other parent routes
 app.use('/api/attendance-analytics', attendance_analytics_routes_1.default);
 app.use('/api/messages', message_routes_1.default);
+app.use('/api/promotions', promotion_routes_1.default);
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);

@@ -8,15 +8,139 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model SubscriptionPlan {
+  id                      String               @id @default(uuid())
+  name                    String
+  slug                    String               @unique
+  description             String?
+  pricePerStudentMonthly  Decimal              @default(0) @db.Decimal(10, 2)
+  pricePerStudentSemester Decimal              @default(0) @db.Decimal(10, 2)
+  pricePerStudentYearly   Decimal              @default(0) @db.Decimal(10, 2)
+  maxStudents             Int                  @default(250)
+  maxUsers                Int                  @default(-1)
+  isActive                Boolean              @default(true)
+  isCustom                Boolean              @default(false)
+  sortOrder               Int                  @default(0)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  monthlyTotal            Decimal              @default(0) @db.Decimal(10, 2)
+  semesterTotal           Decimal              @default(0) @db.Decimal(10, 2)
+  yearlyTotal             Decimal              @default(0) @db.Decimal(10, 2)
+  features                PlanFeature[]
+  subscriptions           SchoolSubscription[]
+
+  @@map("subscription_plans")
+}
+
+model Feature {
+  id          String                  @id @default(uuid())
+  key         String                  @unique
+  name        String
+  description String?
+  category    String                  @default("general")
+  isCore      Boolean                 @default(false)
+  isActive    Boolean                 @default(true)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  plans       PlanFeature[]
+  overrides   SchoolFeatureOverride[]
+
+  @@map("features")
+}
+
+model PlanFeature {
+  id        String           @id @default(uuid())
+  planId    String
+  featureId String
+  createdAt DateTime         @default(now())
+  feature   Feature          @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureId])
+  @@map("plan_features")
+}
+
+model SchoolSubscription {
+  id              String             @id @default(uuid())
+  schoolId        String             @unique
+  planId          String
+  billingPeriod   BillingPeriod      @default(monthly)
+  studentCount    Int                @default(0)
+  status          SubscriptionStatus @default(trial)
+  discountPercent Decimal            @default(0) @db.Decimal(5, 2)
+  billingStart    DateTime           @default(now())
+  billingEnd      DateTime
+  renewalDate     DateTime
+  trialEndsAt     DateTime?
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  plan            SubscriptionPlan   @relation(fields: [planId], references: [id])
+  school          School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([planId])
+  @@index([status])
+  @@map("school_subscriptions")
+}
+
+model SchoolFeatureOverride {
+  id        String   @id @default(uuid())
+  schoolId  String
+  featureId String
+  granted   Boolean
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  feature   Feature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, featureId])
+  @@index([schoolId])
+  @@map("school_feature_overrides")
+}
+
+model Addon {
+  id            String        @id @default(uuid())
+  name          String
+  description   String?
+  monthlyFlat   Decimal       @db.Decimal(10, 2)
+  perUnit       Boolean       @default(false)
+  unitLabel     String?
+  isActive      Boolean       @default(true)
+  featureKey    String?       @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  subscriptions SchoolAddon[]
+
+  @@map("addons")
+}
+
+model SchoolAddon {
+  id        String   @id @default(uuid())
+  schoolId  String
+  addonId   String
+  quantity  Int      @default(1)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  addon     Addon    @relation(fields: [addonId], references: [id], onDelete: Cascade)
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, addonId])
+  @@map("school_addons")
+}
+
 model School {
-  id                     String                @id @default(uuid())
-  schoolId               String?               @unique
-  name                   String
-  schoolEmail            String?
-  onboardingCompleted    Boolean               @default(false)
-  subscriptionStatus     String                @default("ACTIVE")
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
+  id                   String                  @id @default(uuid())
+  schoolId             String?                 @unique
+  name                 String
+  schoolEmail          String?
+  onboardingStatus     OnboardingStatus        @default(PENDING)
+  onboardingCompleted  Boolean                 @default(false)
+  subscriptionStatus   String                  @default("ACTIVE")
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
   attendance           Attendance[]
   callHistories        CallHistory[]
   callParticipants     CallParticipant[]
@@ -33,12 +157,16 @@ model School {
   sections             Section[]
   streams              Stream[]
   students             Student[]
+  promotions           StudentPromotion[]
   teachers             Teacher[]
   assignments          TeacherAssignment[]
   users                User[]
   reports              AttendanceReport[]
   auditLogs            AuditLog[]
-  promotions           StudentPromotion[]
+  addons               SchoolAddon[]
+  featureOverrides     SchoolFeatureOverride[]
+  subscription         SchoolSubscription?
+  supportTickets       SupportTicket[]
 }
 
 model User {
@@ -63,6 +191,7 @@ model User {
   reset_password_expires     DateTime?
   reset_password_token       String?              @unique
   address                    String?
+  lastActive                 DateTime?
   callHistory                CallHistory[]
   callSessions               CallParticipant[]
   conversations              ConversationMember[]
@@ -106,11 +235,11 @@ model TeacherAssignment {
   subject    String?
   streamId   String?
   createdAt  DateTime @default(now())
-  school     School?  @relation(fields: [schoolId], references: [id])
-  teacher    Teacher  @relation(fields: [teacher_id], references: [id])
   grade      Grade    @relation(fields: [gradeId], references: [id])
+  school     School?  @relation(fields: [schoolId], references: [id])
   section    Section  @relation(fields: [sectionId], references: [id])
   stream     Stream?  @relation(fields: [streamId], references: [id])
+  teacher    Teacher  @relation(fields: [teacher_id], references: [id])
 
   @@index([schoolId])
   @@index([teacher_id])
@@ -140,42 +269,42 @@ model SchoolSettings {
 }
 
 model Grade {
-  id       String    @id @default(uuid())
-  schoolId String?
-  name     String
-  school   School?   @relation(fields: [schoolId], references: [id])
-  students Student[]
-  assignments TeacherAssignment[]
-  fromPromotions StudentPromotion[] @relation("FromGrade")
-  toPromotions   StudentPromotion[] @relation("ToGrade")
+  id             String              @id @default(uuid())
+  schoolId       String?
+  name           String
+  school         School?             @relation(fields: [schoolId], references: [id])
+  students       Student[]
+  fromPromotions StudentPromotion[]  @relation("FromGrade")
+  toPromotions   StudentPromotion[]  @relation("ToGrade")
+  assignments    TeacherAssignment[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
 }
 
 model Section {
-  id       String    @id @default(uuid())
-  schoolId String?
-  name     String
-  school   School?   @relation(fields: [schoolId], references: [id])
-  students Student[]
-  assignments TeacherAssignment[]
-  fromPromotions StudentPromotion[] @relation("FromSection")
-  toPromotions   StudentPromotion[] @relation("ToSection")
+  id             String              @id @default(uuid())
+  schoolId       String?
+  name           String
+  school         School?             @relation(fields: [schoolId], references: [id])
+  students       Student[]
+  fromPromotions StudentPromotion[]  @relation("FromSection")
+  toPromotions   StudentPromotion[]  @relation("ToSection")
+  assignments    TeacherAssignment[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
 }
 
 model Stream {
-  id       String    @id @default(uuid())
-  schoolId String?
-  name     String
-  school   School?   @relation(fields: [schoolId], references: [id])
-  students Student[]
-  assignments TeacherAssignment[]
-  fromPromotions StudentPromotion[] @relation("FromStream")
-  toPromotions   StudentPromotion[] @relation("ToStream")
+  id             String              @id @default(uuid())
+  schoolId       String?
+  name           String
+  school         School?             @relation(fields: [schoolId], references: [id])
+  students       Student[]
+  fromPromotions StudentPromotion[]  @relation("FromStream")
+  toPromotions   StudentPromotion[]  @relation("ToStream")
+  assignments    TeacherAssignment[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -221,21 +350,20 @@ model StudentPromotion {
   academicYear     String
   fromGradeId      String
   fromSectionId    String
-  toGradeId        String?  // null = graduated
+  toGradeId        String?
   toSectionId      String?
   fromStreamId     String?
   toStreamId       String?
   promotedByUserId String
   promotedAt       DateTime @default(now())
   notes            String?
-  
-  school           School   @relation(fields: [schoolId], references: [id])
-  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   fromGrade        Grade    @relation("FromGrade", fields: [fromGradeId], references: [id])
   fromSection      Section  @relation("FromSection", fields: [fromSectionId], references: [id])
+  fromStream       Stream?  @relation("FromStream", fields: [fromStreamId], references: [id])
+  school           School   @relation(fields: [schoolId], references: [id])
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   toGrade          Grade?   @relation("ToGrade", fields: [toGradeId], references: [id])
   toSection        Section? @relation("ToSection", fields: [toSectionId], references: [id])
-  fromStream       Stream?  @relation("FromStream", fields: [fromStreamId], references: [id])
   toStream         Stream?  @relation("ToStream", fields: [toStreamId], references: [id])
 
   @@index([schoolId])
@@ -499,4 +627,78 @@ model PendingRegistration {
   @@index([email])
   @@index([token])
   @@index([schoolId])
+}
+
+model PlatformConfig {
+  id               String   @id @default("singleton")
+  platformName     String   @default("Zetime")
+  supportEmail     String   @default("support@zetime.io")
+  maintenanceMode  Boolean  @default(false)
+  autoBackup       Boolean  @default(true)
+  apiRateLimit     Int      @default(1000)
+  maxUploadSize    Int      @default(50)
+  trialEnabled     Boolean  @default(true)
+  trialDuration    Int      @default(14)
+  trialCapacity    Int      @default(100)
+  updatedAt        DateTime @updatedAt
+  maxLoginAttempts Int      @default(5)
+  sessionTimeout   Int      @default(30)
+  twoFactorEnabled Boolean  @default(false)
+
+  @@map("platform_configs")
+}
+
+model SupportTicket {
+  id           String   @id @default(cuid())
+  ticketNumber String   @unique
+  schoolId     String
+  authorId     String?
+  subject      String
+  description  String
+  category     String   @default("General")
+  status       String   @default("open")
+  priority     String   @default("normal")
+  assignee     String?
+  resolution   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model BroadcastLog {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  type      String   @default("info")
+  sentCount Int      @default(0)
+  sentAt    DateTime @default(now())
+
+  @@map("broadcast_logs")
+}
+
+enum OnboardingStatus {
+  PENDING
+  ACTIVE
+  SETUP_COMPLETE
+}
+
+enum BillingPeriod {
+  monthly
+  semester
+  yearly
+}
+
+enum SubscriptionStatus {
+  active
+  trial
+  expired
+  suspended
+  pending_payment
+  expiring
+  cancelled
+  paused
 }

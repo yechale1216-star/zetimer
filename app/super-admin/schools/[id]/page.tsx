@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, Building2, MapPin, Phone, Mail, User } from "lucide-react"
+import { ChevronLeft, Building2, MapPin, Phone, Mail, User, Sliders, Package } from "lucide-react"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
+import { getApiUrl } from "@/lib/auth/auth"
 import { SchoolSubscriptionTab } from "@/components/super-admin/school-subscription-tab"
+import { SchoolFeatureOverrides } from "@/components/super-admin/school-feature-overrides"
+import { SchoolAddonsTab } from "@/components/super-admin/school-addons-tab"
 
 export default function SchoolDetailPage() {
   const params = useParams()
@@ -20,7 +23,10 @@ export default function SchoolDetailPage() {
   useEffect(() => {
     ;(async () => {
       try {
-        const res = await fetch(`/api/super-admin/schools/${id}`)
+        const token = localStorage.getItem("attendance_token")
+        const res = await fetch(`${getApiUrl()}/api/super-admin/schools/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         const json = await parseJsonResponse<any>(res)
         if (json.success) setSchool(json.data)
       } catch (err) {
@@ -67,9 +73,12 @@ export default function SchoolDetailPage() {
       </div>
 
       <Tabs defaultValue="info" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-xs grid-cols-3">
           <TabsTrigger value="info">General Info</TabsTrigger>
           <TabsTrigger value="subscription">Subscription</TabsTrigger>
+          <TabsTrigger value="addons" className="gap-1.5 text-xs sm:text-sm">
+            <Package className="w-3 h-3" /> Add-ons
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="info" className="mt-6 space-y-6">
@@ -124,6 +133,11 @@ export default function SchoolDetailPage() {
 
         <TabsContent value="subscription" className="mt-6">
           <SchoolSubscriptionTab schoolId={id} />
+        </TabsContent>
+
+
+        <TabsContent value="addons" className="mt-6">
+          <SchoolAddonsTab schoolId={id} />
         </TabsContent>
       </Tabs>
     </div>

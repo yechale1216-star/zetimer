@@ -17,8 +17,6 @@ const tenantMiddleware = (req, res, next) => {
     const publicPaths = [
         '/api/parent/schools',
         '/api/parent/login',
-        '/api/parent/update-password',
-        '/api/parent/search',
         '/api/auth',
         '/health'
     ];
@@ -32,11 +30,16 @@ const tenantMiddleware = (req, res, next) => {
     const token = authHeader.split(' ')[1];
     try {
         const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        // For parents, allow overriding schoolId via header
+        let schoolId = decoded.schoolId;
+        if (decoded.role === 'parent' && schoolIdHeader) {
+            schoolId = schoolIdHeader;
+        }
         req.user = {
             id: decoded.id,
             email: decoded.email,
             role: decoded.role,
-            schoolId: decoded.schoolId,
+            schoolId: schoolId,
             customSchoolId: decoded.customSchoolId,
         };
         next();

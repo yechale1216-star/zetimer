@@ -11,7 +11,7 @@ import { parseJsonResponse } from '@/lib/utils/parse-json-response'
 import { PricingCards } from '@/components/subscription/pricing-cards'
 import type { TierPlan, BillingPeriod } from '@/lib/utils/subscription-types'
 import { recommendPlanUpgrade } from '@/lib/utils/pricing-utils'
-import { authService } from '@/lib/auth/auth'
+import { authService, getApiUrl } from '@/lib/auth/auth'
 
 export default function UpgradePlanPage() {
   const [currentTier, setCurrentTier] = useState<TierPlan>('starter')
@@ -28,14 +28,19 @@ export default function UpgradePlanPage() {
 
   const fetchSubscription = async () => {
     try {
-      const user = authService.getCurrentUser()
-      const schoolId = user?.schoolId || 's1' // fallback for demo/dev
-      const res = await fetch(`/api/subscriptions/school/${schoolId}`)
+      const token = localStorage.getItem('attendance_token')
+      const apiUrl = getApiUrl()
+
+      const res = await fetch(`${apiUrl}/api/subscriptions/me/overview`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       const json = await parseJsonResponse<any>(res)
       if (json.success) {
         const subData = json.data
-        setCurrentTier(subData.tier || 'standard')
-        setStudentCount(subData.studentCount ?? 0)
+        setCurrentTier(subData.plan?.slug || 'starter')
+        setStudentCount(subData.currentUsage?.students || 0)
         setBillingPeriod(subData.billingPeriod || 'monthly')
       } else {
         setError(json.error || 'Failed to load subscription')

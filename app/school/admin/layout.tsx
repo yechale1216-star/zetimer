@@ -53,12 +53,29 @@ export default function SchoolAdminLayout({
     }
   }, [router, pathname])
 
+  const isPublicPage = pathname === "/school/admin/signup"
+
   const isActive = (path: string) => pathname === path
 
   const handleLogout = async () => {
     await authService.logout()
     notifications.info("Logged Out", "You have been successfully logged out")
     router.push('/login')
+  }
+
+  if (!isMounted) return null
+
+  if (isPublicPage) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+        <div className="p-6">
+          <Logo size="md" href="/" />
+        </div>
+        <main className="flex-1">
+          {children}
+        </main>
+      </div>
+    )
   }
 
   return (
@@ -95,6 +112,7 @@ export default function SchoolAdminLayout({
                 <NavLink href="/school/admin/subscription" icon={<CreditCard className="w-4 h-4" />} label="Subscription & Pricing" active={pathname.startsWith('/school/admin/subscription')} />
                 {isAdmin && <NavLink href="/school/admin/settings" icon={<Settings className="w-4 h-4" />} label="Settings" active={isActive('/school/admin/settings')} />}
                 <NavLink href="/school/admin/profile" icon={<User className="w-4 h-4" />} label="Profile" active={isActive('/school/admin/profile')} />
+                <NavLink href="/school/admin/support" icon={<MessageSquare className="w-4 h-4" />} label="Help & Support" active={isActive('/school/admin/support')} />
               </nav>
 
               <div className="p-4 border-t border-border">

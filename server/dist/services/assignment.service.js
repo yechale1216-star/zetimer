@@ -61,9 +61,9 @@ const createAssignment = async (data, schoolId) => {
         where: {
             schoolId,
             teacher_id: teacherId,
-            grade: data.grade,
-            section: data.section,
-            stream: data.stream || null,
+            gradeId: data.gradeId,
+            sectionId: data.sectionId,
+            streamId: data.streamId || null,
             subject: data.subject || null,
         }
     });
@@ -74,12 +74,12 @@ const createAssignment = async (data, schoolId) => {
         data: {
             teacher_id: teacherId,
             schoolId: schoolId,
-            grade: data.grade,
-            section: data.section,
+            gradeId: data.gradeId,
+            sectionId: data.sectionId,
             subject: data.subject || null,
-            stream: data.stream || null,
+            streamId: data.streamId || null,
         },
-        include: { teacher: true },
+        include: { teacher: true, grade: true, section: true, stream: true },
     });
 };
 exports.createAssignment = createAssignment;

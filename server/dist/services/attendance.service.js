@@ -107,11 +107,11 @@ const getAttendance = async (filters, schoolId) => {
     if (session)
         where.session = session;
     if (grade || section) {
-        where.student = { schoolId }; // Ensure student filtering is also scoped
+        where.student = { schoolId };
         if (grade)
-            where.student.grade = { name: grade };
+            where.student.gradeId = grade;
         if (section)
-            where.student.section = { name: section };
+            where.student.sectionId = section;
     }
     return await db_1.default.attendance.findMany({
         where,

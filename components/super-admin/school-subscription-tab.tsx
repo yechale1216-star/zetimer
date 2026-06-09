@@ -9,6 +9,7 @@ import { TIER_CONFIG } from "@/lib/utils/pricing-utils"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
 import { CreditCard, Calendar, Users, ArrowUpRight } from "lucide-react"
 import Link from "next/link"
+import { getApiUrl } from "@/lib/auth/auth"
 
 interface Props {
   schoolId: string
@@ -21,8 +22,11 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
   useEffect(() => {
     ;(async () => {
       try {
-        const res = await fetch(`/api/subscriptions/school/${schoolId}`)
-        const json = await parseJsonResponse<any>(res)
+        const token = localStorage.getItem("attendance_token")
+        const res = await fetch(`${getApiUrl()}/api/schools/${schoolId}/subscription`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const json = await res.json()
         if (json.success) setSub(json.data)
       } catch (err) {
         console.error("Failed to load school subscription:", err)
@@ -55,10 +59,10 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
     )
   }
 
-  const tierInfo = TIER_CONFIG[sub.tier as keyof typeof TIER_CONFIG]
-  const studentLimit = tierInfo?.maxStudentsSoft || 0
-  const studentCount = sub.studentCount || 0
-  const usagePercent = studentLimit > 0 ? (studentCount / studentLimit) * 100 : 0
+  const tierInfo = sub?.plan
+  const studentLimit = tierInfo?.maxStudents === -1 ? Infinity : (tierInfo?.maxStudents || 0)
+  const studentCount = sub?.studentCount || 0
+  const usagePercent = studentLimit > 0 && studentLimit !== Infinity ? (studentCount / studentLimit) * 100 : 0
 
   return (
     <div className="space-y-6">
@@ -73,7 +77,7 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <p className="typography-page-title capitalize">{sub.tier}</p>
+                <p className="typography-page-title capitalize">{sub?.plan?.name ?? sub?.planId}</p>
                 <p className="typography-helper text-muted-foreground capitalize">{sub.billingPeriod} billing</p>
               </div>
               <Badge variant={sub.status === 'active' ? 'default' : 'outline'} className="capitalize">
@@ -109,7 +113,9 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="typography-page-title">{sub.renewalDate}</p>
+            <p className="typography-page-title">
+              {sub.renewalDate ? new Date(sub.renewalDate).toLocaleDateString() : "N/A"}
+            </p>
             <p className="typography-helper text-muted-foreground">Auto-renews: Yes</p>
           </CardContent>
         </Card>
@@ -133,16 +139,20 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
         <CardContent>
           <div className="space-y-4">
             <div className="typography-body flex justify-between items-center">
-              <span className="text-muted-foreground">Effective monthly rate</span>
-              <span className="typography-label">${sub.effectiveMonthly?.toFixed(2)}</span>
+              <span className="text-muted-foreground">Billing period</span>
+              <span className="typography-label capitalize">{sub.billingPeriod}</span>
             </div>
             <div className="typography-body flex justify-between items-center">
-              <span className="text-muted-foreground">Total period amount</span>
-              <span className="typography-label">${sub.currentPeriodTotal?.toFixed(2)}</span>
+              <span className="text-muted-foreground">Billing start</span>
+              <span className="typography-label">{sub.billingStart ? new Date(sub.billingStart).toLocaleDateString() : "N/A"}</span>
+            </div>
+            <div className="typography-body flex justify-between items-center">
+              <span className="text-muted-foreground">Billing end</span>
+              <span className="typography-label">{sub.billingEnd ? new Date(sub.billingEnd).toLocaleDateString() : "N/A"}</span>
             </div>
             <div className="typography-body flex justify-between items-center">
               <span className="text-muted-foreground">Applied discount</span>
-              <span className="typography-label text-green-600">-{sub.discountPercent || 0}%</span>
+              <span className="typography-label text-green-600">-{Number(sub.discountPercent) || 0}%</span>
             </div>
           </div>
         </CardContent>

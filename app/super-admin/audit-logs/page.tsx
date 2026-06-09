@@ -1,11 +1,12 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Search, Filter, Clock, User, Shield, Info } from 'lucide-react'
+import { getApiUrl } from '@/lib/auth/auth'
 
 // Mock Audit Logs
 const mockLogs = [
@@ -57,14 +58,51 @@ const mockLogs = [
 ]
 
 export default function AuditLogsPage() {
+  const [logs, setLogs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'high': return 'bg-red-500/10 text-red-600 border-red-500/20'
-      case 'medium': return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
-      default: return 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        setLoading(true)
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: '20'
+        })
+        const res = await fetch(`${getApiUrl()}/api/super-admin/audit-logs?${params}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('attendance_token')}`
+          }
+        })
+        const json = await res.json()
+        if (json.success) {
+          setLogs(json.data.logs)
+          setTotal(json.data.total)
+        }
+      } catch (err) {
+        console.error("Error fetching audit logs:", err)
+      } finally {
+        setLoading(false)
+      }
     }
+    fetchLogs()
+  }, [page])
+
+  const getSeverityColor = (action: string) => {
+    const a = action.toUpperCase()
+    if (a.includes('DELETE') || a.includes('SUSPEND') || a.includes('STOP')) return 'bg-red-500/10 text-red-600 border-red-500/20'
+    if (a.includes('UPDATE') || a.includes('CREATE')) return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+    return 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+  }
+
+  const getSeverityLabel = (action: string) => {
+    const a = action.toUpperCase()
+    if (a.includes('DELETE') || a.includes('SUSPEND')) return 'high'
+    if (a.includes('UPDATE') || a.includes('CREATE')) return 'medium'
+    return 'low'
   }
 
   return (
@@ -97,48 +135,64 @@ export default function AuditLogsPage() {
           </div>
 
           <div className="space-y-4">
-            {mockLogs.map((log) => (
+            {logs.map((log) => (
               <div 
                 key={log.id} 
                 className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl border border-border/60 hover:bg-secondary/20 transition-all group"
               >
                 <div className="flex items-center gap-4 flex-1">
-                  <div className={`p-2.5 rounded-lg border ${getSeverityColor(log.severity)}`}>
-                    {log.severity === 'high' ? <Shield className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                  <div className={`p-2.5 rounded-lg border ${getSeverityColor(log.action)}`}>
+                    {getSeverityLabel(log.action) === 'high' ? <Shield className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
                   </div>
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-foreground">{log.action.replace(/_/g, ' ')}</span>
-                      <Badge variant="outline" className="text-[10px] uppercase font-bold">
-                        {log.severity}
+                       <span className="font-semibold text-foreground uppercase tracking-tight">
+                         {log.action.replace(/_/g, ' ')}
+                       </span>
+                      <Badge variant="outline" className={`text-[10px] uppercase font-bold ${getSeverityColor(log.action)}`}>
+                        {getSeverityLabel(log.action)}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <User className="w-3.5 h-3.5" />
-                      <span>{log.actor}</span>
+                      <span>{log.actor || log.user}</span>
                       <span className="mx-1">•</span>
-                      <span>Target: {log.target}</span>
+                      <span>School: {log.school}</span>
                     </div>
-                    <p className="text-sm text-muted-foreground/80 flex items-start gap-1.5 pt-1">
-                      <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      {log.details}
-                    </p>
+                    {log.details && (
+                      <p className="text-sm text-muted-foreground/80 flex items-start gap-1.5 pt-1">
+                        <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        {typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                    {log.timestamp}
+                    {new Date(log.timestamp).toLocaleString()}
                   </p>
                 </div>
               </div>
             ))}
+            {logs.length === 0 && !loading && (
+              <div className="py-20 text-center text-muted-foreground italic">
+                No activity logs found.
+              </div>
+            )}
           </div>
 
-          <div className="mt-8 pt-4 border-t border-border flex justify-center">
-            <Button variant="ghost" className="text-muted-foreground text-sm">
-              Load more logs
-            </Button>
-          </div>
+          {total > logs.length && (
+            <div className="mt-8 pt-4 border-t border-border flex justify-center">
+              <Button 
+                variant="ghost" 
+                className="text-muted-foreground text-sm"
+                onClick={() => setPage(p => p + 1)}
+                disabled={loading}
+              >
+                {loading ? 'Loading...' : 'Load more logs'}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

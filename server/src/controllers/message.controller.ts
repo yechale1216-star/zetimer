@@ -83,6 +83,7 @@ export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
             id: true,
             full_name: true,
             profile_photo: true,
+            lastActive: true,
           },
         },
         readBy: {

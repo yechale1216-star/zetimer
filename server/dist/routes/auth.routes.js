@@ -32,13 +32,46 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const userService = __importStar(require("../services/user.service"));
 const schoolService = __importStar(require("../services/school.service"));
+const onboardingService = __importStar(require("../services/onboarding.service"));
 const jwt_1 = require("../utils/jwt");
 const email_1 = require("../utils/email");
+const db_1 = __importDefault(require("../config/db"));
 const router = (0, express_1.Router)();
+// Check email availability
+router.get('/check-email', async (req, res, next) => {
+    try {
+        const { email } = req.query;
+        if (!email || typeof email !== 'string') {
+            return res.status(400).json({ success: false, message: 'Email is required' });
+        }
+        const existing = await db_1.default.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+        res.status(200).json({ success: true, available: !existing });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Check phone availability
+router.get('/check-phone', async (req, res, next) => {
+    try {
+        const { phone } = req.query;
+        if (!phone || typeof phone !== 'string') {
+            return res.status(400).json({ success: false, message: 'Phone is required' });
+        }
+        const existing = await db_1.default.user.findFirst({ where: { phone: phone.trim() } });
+        res.status(200).json({ success: true, available: !existing });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 // Login
 router.post('/login', async (req, res, next) => {
     try {
@@ -57,11 +90,13 @@ router.post('/login', async (req, res, next) => {
         let customSchoolId = '';
         let schoolName = 'My School';
         let schoolLogo = '';
+        let onboardingCompleted = false;
         if (user.schoolId) {
             const school = await schoolService.getSchoolById(user.schoolId);
             if (school) {
                 customSchoolId = school.schoolId || '';
                 schoolName = school.name || 'My School';
+                onboardingCompleted = school.onboardingCompleted ?? false;
                 // Get logo from settings
                 if (school.settings) {
                     schoolLogo = school.settings.school_logo || '';
@@ -88,7 +123,8 @@ router.post('/login', async (req, res, next) => {
                     customSchoolId,
                 },
                 schoolName,
-                schoolLogo
+                schoolLogo,
+                onboardingCompleted,
             }
         });
     }
@@ -99,50 +135,53 @@ router.post('/login', async (req, res, next) => {
 // Signup (Admin creates school and account)
 router.post('/signup', async (req, res, next) => {
     try {
-        const { email, password, name, schoolName, role, phone } = req.body;
-        // Create school first if admin
-        let schoolId = '';
-        let customSchoolId = '';
-        if (role === 'admin' && schoolName) {
-            const school = await schoolService.createSchool({ name: schoolName });
-            schoolId = school.id;
-            customSchoolId = school.schoolId || '';
+        const { email, password, name, schoolName, phone } = req.body;
+        // Server-side validation
+        if (!name || name.trim().length < 2) {
+            return res.status(400).json({ success: false, message: 'Admin name must be at least 2 characters' });
         }
-        // Create user
-        const user = await userService.createUser({
-            email,
-            password_hash: password,
-            full_name: name,
-            role,
-            phone,
-            schoolId: schoolId || null,
+        if (!password || password.length < 8) {
+            return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
+        }
+        const { school, admin } = await onboardingService.startOnboarding({
+            schoolName,
+            adminName: name,
+            adminEmail: email,
+            adminPhone: phone,
+            adminPassword: password,
+            subscriptionTier: 'starter' // Default for public signup
         });
         const token = (0, jwt_1.generateToken)({
-            id: user.id,
-            email: user.email,
-            role: user.role,
-            schoolId: user.schoolId || '',
-            customSchoolId: customSchoolId,
+            id: admin.id,
+            email: admin.email,
+            role: admin.role,
+            schoolId: school.id,
+            customSchoolId: school.schoolId || '',
         });
         res.status(201).json({
             success: true,
             data: {
                 token,
                 user: {
-                    id: user.id,
-                    email: user.email,
-                    name: user.full_name,
-                    role: user.role,
-                    schoolId: user.schoolId,
-                    customSchoolId,
+                    id: admin.id,
+                    email: admin.email,
+                    name: admin.name,
+                    role: admin.role,
+                    schoolId: school.id,
+                    customSchoolId: school.schoolId,
                 },
-                schoolName: schoolName || 'My School',
-                schoolLogo: ''
+                schoolName: school.name,
+                schoolLogo: '',
+                onboardingCompleted: false,
+                onboardingStatus: school.onboardingStatus
             }
         });
     }
     catch (error) {
-        next(error);
+        res.status(400).json({
+            success: false,
+            message: error instanceof Error ? error.message : 'Signup failed'
+        });
     }
 });
 // Forgot Password

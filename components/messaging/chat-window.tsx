@@ -5,7 +5,7 @@ import {
   Send, Paperclip, Smile, MoreVertical, Phone, Video, ChevronLeft, 
   Check, CheckCheck, Reply, Forward, Trash2, Heart, Search, X, 
   Pin, Copy, FileText, FileJson, FileType, Music, Play, ExternalLink, 
-  Download, Globe, FileArchive
+  Download, Globe, FileArchive, Mic, MicOff, StopCircle, ImageIcon, File as FileIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -40,7 +40,7 @@ interface Message {
   content: string;
   timestamp: string;
   status: 'sending' | 'sent' | 'read';
-  type: 'TEXT' | 'IMAGE' | 'FILE' | 'CALL_VOICE' | 'CALL_VIDEO' | 'CALL_MISSED_VOICE' | 'CALL_MISSED_VIDEO';
+  type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'VIDEO_MESSAGE' | 'CALL_VOICE' | 'CALL_VIDEO' | 'CALL_MISSED_VOICE' | 'CALL_MISSED_VIDEO';
   isMe: boolean;
   attachments?: {
     url: string;
@@ -72,9 +72,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [attachedFile, setAttachedFile] = useState<{ file: File; type: 'IMAGE' | 'FILE'; preview: string } | null>(null);
+  const [attachedFile, setAttachedFile] = useState<{ file: File; type: 'IMAGE' | 'VIDEO' | 'FILE'; preview: string } | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  // Recording
+  const [recordMode, setRecordMode] = useState<'audio' | 'video'>('audio');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const videoPreviewRef = useRef<HTMLVideoElement>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setCurrentUser(authService.getCurrentUser());
@@ -84,6 +97,33 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     setSelectedIds(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
+  };
+
+  const formatLastSeen = (date: string | Date | null) => {
+    if (!date) return t("last_seen_a_long_time_ago");
+    const d = typeof date === 'string' ? new Date(date) : date;
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    
+    if (minutes < 1) return t("last_seen_just_now");
+    if (minutes < 60) return t("last_seen_minutes_ago", { n: minutes });
+    
+    if (days === 0 && now.getDate() === d.getDate()) {
+      return t("last_seen_today_at", { t: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) });
+    }
+    
+    if (days === 1 || (days === 0 && now.getDate() !== d.getDate())) {
+      return t("last_seen_yesterday_at", { t: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) });
+    }
+    
+    if (days < 7) {
+      return t("last_seen_on", { d: d.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }) });
+    }
+    
+    return t("last_seen_on", { d: d.toLocaleDateString() });
   };
 
   const deleteSelected = () => {
@@ -101,18 +141,83 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   }, [messages]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, forcedType?: 'IMAGE' | 'VIDEO' | 'FILE') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const isImage = file.type.startsWith('image/');
-    const preview = isImage ? URL.createObjectURL(file) : '';
+    const isVideo = file.type.startsWith('video/');
+    const type = forcedType ?? (isImage ? 'IMAGE' : isVideo ? 'VIDEO' : 'FILE');
+    const preview = (isImage || isVideo) ? URL.createObjectURL(file) : '';
 
-    setAttachedFile({
-      file,
-      type: isImage ? 'IMAGE' : 'FILE',
-      preview
-    });
+    setAttachedFile({ file, type, preview });
+    setShowAttachMenu(false);
+    e.target.value = '';
+  };
+
+  // ── Recording ─────────────────────────────────────────
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(
+        recordMode === 'video' 
+          ? { audio: true, video: { width: { ideal: 400 }, height: { ideal: 400 }, facingMode: 'user' } } 
+          : { audio: true }
+      );
+      
+      if (recordMode === 'video') {
+        setCameraStream(stream);
+        if (videoPreviewRef.current) {
+          videoPreviewRef.current.srcObject = stream;
+        }
+      }
+
+      const mr = new MediaRecorder(stream);
+      mediaRecorderRef.current = mr;
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+    } catch (err: any) {
+      console.error('Recording error:', err);
+      if (err.name === 'NotReadableError') {
+        toast.error('Camera or microphone is already in use by another application.');
+      } else {
+        toast.error(recordMode === 'video' ? 'Camera/Mic access denied' : 'Microphone access denied');
+      }
+    }
+  };
+
+  const stopRecording = (send: boolean) => {
+    if (!mediaRecorderRef.current) return;
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    const mr = mediaRecorderRef.current;
+    
+    mr.onstop = async () => {
+      const mimeType = recordMode === 'video' ? 'video/webm' : 'audio/webm';
+      const blob = new Blob(audioChunksRef.current, { type: mimeType });
+      mr.stream.getTracks().forEach(t => t.stop());
+      setCameraStream(null);
+
+      if (send && blob.size > 0) {
+        setUploading(true);
+        try {
+          const ext = recordMode === 'video' ? 'webm' : 'webm';
+          const prefix = recordMode === 'video' ? 'video' : 'voice';
+          const file = new File([blob], `${prefix}-${Date.now()}.${ext}`, { type: mimeType });
+          const url = await uploadFile(file);
+          onSendMessage(recordMode === 'video' ? '📹 Video message' : '🎤 Voice message', {
+            type: recordMode === 'video' ? 'VIDEO_MESSAGE' : 'FILE',
+            attachment: { url, name: file.name, type: file.type, size: file.size }
+          });
+        } catch { toast.error(`Failed to send ${recordMode} message`); }
+        finally { setUploading(false); }
+      }
+    };
+    mr.stop();
+    setIsRecording(false);
+    setRecordingSeconds(0);
   };
 
   const uploadFile = async (file: File): Promise<string> => {
@@ -154,7 +259,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         attachmentUrl = await uploadFile(attachedFile.file);
       }
 
-      onSendMessage(inputValue || (attachedFile?.type === 'IMAGE' ? 'Image' : 'File'), {
+      onSendMessage(inputValue || (attachedFile?.type === 'IMAGE' ? 'Image' : attachedFile?.type === 'VIDEO' ? 'Video' : 'File'), {
         type: attachedFile?.type || 'TEXT',
         attachment: attachedFile ? {
           url: attachmentUrl,
@@ -222,18 +327,25 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               <ChevronLeft className="h-5 w-5" />
             </Button>
           )}
-          <Avatar className="h-10 w-10 border border-border overflow-hidden rounded-full">
-            <AvatarImage src={activeConversation?.avatar || undefined} />
-            <AvatarFallback className="typography-label bg-primary/10 text-primary flex items-center justify-center h-full w-full">
-              {activeConversation.name.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative shrink-0">
+            <Avatar className="h-10 w-10 border border-border overflow-hidden rounded-full">
+              <AvatarImage src={activeConversation?.avatar || undefined} />
+              <AvatarFallback className="typography-label bg-primary/10 text-primary flex items-center justify-center h-full w-full">
+                {activeConversation.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            {activeConversation.isOnline && (
+              <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-background rounded-full" />
+            )}
+          </div>
           <div className="flex flex-col">
             <span className="typography-label text-[15px]">{activeConversation.name}</span>
             {activeConversation.isOnline ? (
-              <span className="typography-label text-[11px] text-green-500">{t("online")}</span>
+              <span className="typography-label text-[11px] text-green-500 font-medium">{t("online")}</span>
             ) : (
-              <span className="text-[11px] text-muted-foreground">{t("last_seen")}</span>
+              <span className="text-[11px] text-muted-foreground/80">
+                {formatLastSeen(activeConversation.lastActive)}
+              </span>
             )}
           </div>
         </div>
@@ -337,43 +449,138 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Message Input */}
       <div className="p-4 bg-background/80 backdrop-blur-md border-t border-border z-40 sticky bottom-0">
         <div className="max-w-4xl mx-auto space-y-2">
-          {/* File Preview Area */}
+
+          {/* Recording UI */}
+          <AnimatePresence>
+            {isRecording && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3"
+              >
+                <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shrink-0" />
+                <div className="flex-1 flex items-center gap-1">
+                  {Array.from({ length: 20 }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="w-0.5 bg-red-500 rounded-full"
+                      animate={{ height: [4, Math.random() * 24 + 4, 4] }}
+                      transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.05 }}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm font-mono text-red-500 shrink-0">
+                  {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}
+                </span>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground" onClick={() => stopRecording(false)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* File Preview */}
           <AnimatePresence>
             {attachedFile && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="bg-secondary/30 rounded-xl p-2 flex items-center gap-3 border border-border/50 mb-2"
+                className="bg-secondary/30 rounded-xl p-2 flex items-center gap-3 border border-border/50"
               >
                 {attachedFile.type === 'IMAGE' ? (
-                  <div className="h-12 w-12 rounded-lg overflow-hidden border border-border">
-                    <img src={attachedFile.preview} alt="Attachment preview" className="w-full h-full object-cover" />
+                  <div className="h-12 w-12 rounded-lg overflow-hidden border border-border shrink-0">
+                    <img src={attachedFile.preview} alt="preview" className="w-full h-full object-cover" />
+                  </div>
+                ) : attachedFile.type === 'VIDEO' ? (
+                  <div className="h-12 w-12 rounded-lg overflow-hidden border border-border bg-black shrink-0 relative">
+                    <video src={attachedFile.preview} className="w-full h-full object-cover opacity-70" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Video className="h-5 w-5 text-white" />
+                    </div>
                   </div>
                 ) : (
-                  <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <Paperclip className="h-5 w-5 text-primary" />
+                  <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+                    <FileIcon className="h-5 w-5 text-primary" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="typography-label truncate">{attachedFile.file.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{(attachedFile.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                  <p className="typography-label truncate text-sm">{attachedFile.file.name}</p>
+                  <p className="text-[10px] text-muted-foreground capitalize">{attachedFile.type.toLowerCase()} • {(attachedFile.file.size / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={() => setAttachedFile(null)}>
+                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full shrink-0" onClick={() => setAttachedFile(null)}>
                   <X className="h-3 w-3" />
                 </Button>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 relative">
+            {/* Hidden file inputs */}
+            <input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => handleFileSelect(e, 'IMAGE')} className="hidden" />
+            <input type="file" ref={videoInputRef} accept="video/*" onChange={(e) => handleFileSelect(e, 'VIDEO')} className="hidden" />
+            <input type="file" ref={docInputRef} accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt" onChange={(e) => handleFileSelect(e, 'FILE')} className="hidden" />
+
+            {/* Attachment button + popup */}
+            <div className="relative shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full h-11 w-11 text-muted-foreground hover:text-primary"
+                onClick={() => setShowAttachMenu(v => !v)}
+              >
+                <Paperclip className="h-5 w-5" />
+              </Button>
+              <AnimatePresence>
+                {showAttachMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    className="absolute bottom-14 left-0 bg-background border border-border shadow-xl rounded-2xl p-2 flex flex-col gap-1 min-w-[170px] z-50"
+                  >
+                    <button
+                      className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-secondary/60 text-sm text-left transition-colors"
+                      onClick={() => { fileInputRef.current?.click(); }}
+                    >
+                      <div className="h-9 w-9 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+                        <ImageIcon className="h-5 w-5 text-blue-500" />
+                      </div>
+                      <span className="font-medium">Photo</span>
+                    </button>
+                    <button
+                      className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-secondary/60 text-sm text-left transition-colors"
+                      onClick={() => { videoInputRef.current?.click(); }}
+                    >
+                      <div className="h-9 w-9 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
+                        <Video className="h-5 w-5 text-red-500" />
+                      </div>
+                      <span className="font-medium">Video</span>
+                    </button>
+                    <button
+                      className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-secondary/60 text-sm text-left transition-colors"
+                      onClick={() => { docInputRef.current?.click(); }}
+                    >
+                      <div className="h-9 w-9 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                        <FileText className="h-5 w-5 text-amber-500" />
+                      </div>
+                      <span className="font-medium">Document</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Text input */}
             <div className="bg-secondary/50 rounded-2xl flex-1 flex items-end p-1.5 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
               <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 text-muted-foreground hover:text-primary shrink-0">
                 <Smile className="h-5 w-5" />
               </Button>
               <textarea
-                placeholder={t("write_message")}
+                placeholder={isRecording ? 'Recording…' : t('write_message')}
                 value={inputValue}
+                disabled={isRecording}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -382,36 +589,76 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   }
                 }}
                 rows={1}
-                className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none py-2 px-3 text-[15px] resize-none max-h-32 scrollbar-hide"
-                style={{ height: 'auto' }}
+                className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none py-2 px-3 text-[15px] resize-none max-h-32 scrollbar-hide disabled:opacity-50"
               />
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="rounded-full h-9 w-9 text-muted-foreground hover:text-primary shrink-0"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Paperclip className="h-5 w-5" />
-              </Button>
             </div>
-            <Button 
-              onClick={handleSend} 
-              disabled={(!inputValue.trim() && !attachedFile) || uploading}
-              className={cn(
-                "rounded-full h-11 w-11 shrink-0 shadow-lg transition-all active:scale-95",
-                inputValue.trim() ? "bg-primary hover:bg-primary/90" : "bg-muted text-muted-foreground"
-              )}
-            >
-              <Send className="h-5 w-5 text-white" />
-            </Button>
+
+            {/* Send / Mic / Video button */}
+            {(inputValue.trim() || attachedFile) ? (
+              <Button
+                onClick={handleSend}
+                disabled={uploading}
+                className="rounded-full h-11 w-11 shrink-0 shadow-lg bg-primary hover:bg-primary/90 transition-all active:scale-95"
+              >
+                {uploading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="h-5 w-5 text-white" />}
+              </Button>
+            ) : isRecording ? (
+              <Button
+                onClick={() => stopRecording(true)}
+                className="rounded-full h-11 w-11 shrink-0 shadow-lg bg-red-500 hover:bg-red-600 transition-all active:scale-95 animate-pulse"
+              >
+                <StopCircle className="h-5 w-5 text-white" />
+              </Button>
+            ) : (
+              <div className="flex items-center">
+                <Button
+                  onMouseDown={startRecording}
+                  onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
+                  className={cn(
+                    "rounded-full h-11 w-11 shrink-0 shadow-lg transition-all active:scale-95",
+                    recordMode === 'video' ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground hover:text-primary"
+                  )}
+                  title={recordMode === 'video' ? "Hold to record video message" : "Hold to record voice message"}
+                >
+                  {recordMode === 'video' ? <Video className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </Button>
+                {!isRecording && (
+                   <Button 
+                     variant="ghost" 
+                     size="icon" 
+                     className="ml-1 h-8 w-8 text-muted-foreground/30 hover:text-primary"
+                     onClick={() => setRecordMode(m => m === 'audio' ? 'video' : 'audio')}
+                   >
+                     {recordMode === 'video' ? <Mic className="h-3 w-3" /> : <Video className="h-3 w-3" />}
+                   </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Video Recording Preview */}
+        <AnimatePresence>
+          {isRecording && recordMode === 'video' && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              className="absolute bottom-24 right-4 w-40 h-40 rounded-full border-4 border-primary shadow-2xl overflow-hidden z-50 bg-black"
+            >
+              <video 
+                ref={videoPreviewRef} 
+                autoPlay 
+                muted 
+                playsInline 
+                className="w-full h-full object-cover scale-x-[-1]" 
+              />
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/50 px-2 py-0.5 rounded text-[10px] text-white font-mono">
+                REC
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Image Preview Modal */}
@@ -464,7 +711,77 @@ const ImagePreviewListener = ({ onPreview }: { onPreview: (url: string) => void 
   }, [onPreview]);
   return null;
 };
-const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact }: { file: any, onImageClick: (url: string) => void, isCompact?: boolean }) => {
+
+const CustomAudioPlayer = ({ url, isMe }: { url: string, isMe: boolean }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) audioRef.current.pause();
+      else audioRef.current.play();
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) setDuration(audioRef.current.duration);
+  };
+
+  const formatTime = (time: number) => {
+    if (isNaN(time)) return "0:00";
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className={cn(
+      "flex items-center gap-3 py-2 px-3 rounded-2xl min-w-[200px] border border-white/10 shadow-sm",
+      isMe ? "bg-primary-foreground/10 text-white" : "bg-secondary text-foreground"
+    )}>
+      <audio 
+        ref={audioRef} 
+        src={url} 
+        onTimeUpdate={handleTimeUpdate} 
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={() => setIsPlaying(false)}
+      />
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className={cn(
+          "h-10 w-10 rounded-full shrink-0 shadow-lg active:scale-95 transition-all",
+          isMe ? "bg-white text-primary hover:bg-white/90" : "bg-primary text-white hover:bg-primary/90"
+        )}
+        onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+      >
+        {isPlaying ? <div className="flex gap-0.5"><div className="w-1 h-3 bg-current rounded-full" /><div className="w-1 h-3 bg-current rounded-full" /></div> : <Play className="h-5 w-5 ml-1 fill-current" />}
+      </Button>
+      <div className="flex-1 flex flex-col gap-1.5 pr-2">
+        <div className="h-1.5 bg-current/10 rounded-full overflow-hidden relative">
+          <motion.div 
+            className="absolute top-0 left-0 h-full bg-current"
+            initial={false}
+            animate={{ width: `${(currentTime/duration) * 100 || 0}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[10px] font-medium opacity-60">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe }: { file: any, onImageClick: (url: string) => void, isCompact?: boolean, isMe: boolean }) => {
   const file = rawFile.create ? rawFile.create : rawFile;
   const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.url);
   const isVideo = file.type?.startsWith('video/') || /\.(mp4|webm|ogg)$/i.test(file.url);
@@ -501,29 +818,35 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact }: { file: 
     );
   }
 
-  if (isVideo) {
+  if (isVideo || rawFile.type === 'VIDEO_MESSAGE') {
+    const isCircular = rawFile.type === 'VIDEO_MESSAGE';
     return (
       <div className={cn(
-        "overflow-hidden border border-border/10 bg-black relative",
-        isCompact ? "rounded-lg" : "rounded-xl"
+        "overflow-hidden relative bg-black",
+        isCircular 
+          ? "rounded-full w-48 h-48 border-4 border-white/20 shadow-xl mx-auto my-2" 
+          : (isCompact ? "rounded-lg" : "rounded-xl border border-border/10")
       )}>
-        <video src={file.url} controls className="w-full h-auto max-h-[400px]" />
+        <video 
+          src={file.url} 
+          controls={!isCircular} 
+          autoPlay={isCircular} 
+          loop={isCircular} 
+          muted={isCircular}
+          className={cn(
+            "w-full h-full",
+            isCircular ? "object-cover" : "max-h-[400px]"
+          )} 
+        />
+        {isCircular && (
+           <div className="absolute inset-0 border-[6px] border-black/10 rounded-full pointer-events-none" />
+        )}
       </div>
     );
   }
 
   if (isAudio) {
-    return (
-      <div className={cn(
-        "bg-background/40 dark:bg-slate-800/40 border border-border/10 flex items-center gap-3 backdrop-blur-sm",
-        isCompact ? "rounded-lg p-2" : "rounded-xl p-3"
-      )}>
-        <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-          <Music className="h-5 w-5 text-primary" />
-        </div>
-        <audio src={file.url} controls className="w-full h-8 custom-audio-player" />
-      </div>
-    );
+    return <CustomAudioPlayer url={file.url} isMe={isMe} />;
   }
 
   return (
@@ -630,8 +953,8 @@ const MessageBubble = ({
 }) => {
   const isMe = message.isMe;
   const hasAttachments = message.attachments && message.attachments.length > 0;
-  const isMediaOnly = hasAttachments && 
-    (!message.content || message.content === 'Image' || message.content === 'File');
+  const isMediaOnly = (hasAttachments && 
+    (!message.content || message.content === 'Image' || message.content === 'File')) || message.type === 'VIDEO_MESSAGE';
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -652,7 +975,7 @@ const MessageBubble = ({
     >
       <div className={cn(
         "relative transition-all shadow-sm overflow-hidden",
-        isMediaOnly 
+        isMediaOnly || message.type === 'VIDEO_MESSAGE' 
           ? "p-1 rounded-xl bg-white dark:bg-slate-900 border border-border/40" 
           : cn(
               "pl-3 pr-12 py-2 rounded-2xl text-[15px]",
@@ -679,6 +1002,7 @@ const MessageBubble = ({
                       file={file} 
                       onImageClick={(url) => (window as any).showImagePreview?.(url)} 
                       isCompact={isMediaOnly}
+                      isMe={isMe}
                     />
                   ))}
                 </div>

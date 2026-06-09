@@ -26,6 +26,8 @@ export const tenantMiddleware = (req: AuthenticatedRequest, res: Response, next:
     '/api/parent/schools',
     '/api/parent/login',
     '/api/auth',
+    '/api/subscriptions/plans',
+    '/api/subscriptions/addons',
     '/health'
   ];
 

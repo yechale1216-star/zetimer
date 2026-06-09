@@ -1,11 +1,20 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import * as userService from '../services/user.service';
 import * as schoolService from '../services/school.service';
+import * as onboardingService from '../services/onboarding.service';
 import { generateToken } from '../utils/jwt';
 import { sendResetPasswordEmail } from '../utils/email';
 import prisma from '../config/db';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
+
+// Startup Debug
+console.log('Auth Routes Loaded');
+try {
+  fs.appendFileSync(path.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Auth Routes Loaded\n`);
+} catch (err) {}
 
 // Check email availability
 router.get('/check-email', async (req: Request, res: Response, next: NextFunction) => {
@@ -105,7 +114,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
 // Signup (Admin creates school and account)
 router.post('/signup', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name, schoolName, role, phone } = req.body;
+    const { email, password, name, schoolName, phone } = req.body;
 
     // Server-side validation
     if (!name || name.trim().length < 2) {
@@ -115,31 +124,21 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
       return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
     }
 
-    // Create school first if admin
-    let schoolId = '';
-    let customSchoolId = '';
-    if (role === 'admin' && schoolName) {
-      const school = await schoolService.createSchool({ name: schoolName });
-      schoolId = school.id;
-      customSchoolId = school.schoolId || '';
-    }
-
-    // Create user
-    const user = await userService.createUser({
-      email,
-      password_hash: password,
-      full_name: name,
-      role,
-      phone,
-      schoolId: schoolId || null,
+    const { school, admin } = await onboardingService.startOnboarding({
+      schoolName,
+      adminName: name,
+      adminEmail: email,
+      adminPhone: phone,
+      adminPassword: password,
+      subscriptionTier: 'starter' // Default for public signup
     });
 
     const token = generateToken({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      schoolId: user.schoolId || '',
-      customSchoolId: customSchoolId,
+      id: admin.id,
+      email: admin.email,
+      role: admin.role,
+      schoolId: school.id,
+      customSchoolId: school.schoolId || '',
     });
 
     res.status(201).json({
@@ -147,25 +146,33 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
       data: {
         token,
         user: {
-          id: user.id,
-          email: user.email,
-          name: user.full_name,
-          role: user.role,
-          schoolId: user.schoolId,
-          customSchoolId,
+          id: admin.id,
+          email: admin.email,
+          name: admin.name,
+          role: admin.role,
+          schoolId: school.id,
+          customSchoolId: school.schoolId,
         },
-        schoolName: schoolName || 'My School',
+        schoolName: school.name,
         schoolLogo: '',
-        onboardingCompleted: false
+        onboardingCompleted: false,
+        onboardingStatus: school.onboardingStatus
       }
     });
   } catch (error) {
-    next(error);
+    res.status(400).json({ 
+      success: false, 
+      message: error instanceof Error ? error.message : 'Signup failed' 
+    });
   }
 });
 
 // Forgot Password
 router.post('/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
+  console.log('Forgot password request received:', req.body.email);
+  try {
+    fs.appendFileSync(path.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Forgot password request for: ${req.body.email}\n`);
+  } catch (err) {}
   try {
     const { email } = req.body;
     if (!email) {

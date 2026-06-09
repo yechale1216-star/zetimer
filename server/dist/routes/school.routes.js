@@ -32,41 +32,49 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const schoolService = __importStar(require("../services/school.service"));
 const tenant_middleware_1 = require("../middleware/tenant.middleware");
+const db_1 = __importDefault(require("../config/db"));
+const schoolService = __importStar(require("../services/school.service"));
+const onboardingService = __importStar(require("../services/onboarding.service"));
 const router = (0, express_1.Router)();
-// Create or Update a school
+// Create a school (Super Admin / Onboarding Start)
 router.post('/', async (req, res, next) => {
     try {
-        const { id, name } = req.body;
-        if (!name) {
-            return res.status(400).json({ success: false, message: 'School name is required' });
+        const { name, adminName, adminEmail, adminPhone, tier } = req.body;
+        if (!name || !adminName || !adminEmail) {
+            return res.status(400).json({ success: false, message: 'School name, admin name, and admin email are required' });
         }
-        let school;
-        if (id) {
-            // Check if school exists
-            const existing = await schoolService.getSchoolById(id);
-            if (existing) {
-                school = await schoolService.updateSchool(id, { name });
-            }
-            else {
-                school = await schoolService.createSchool({ id, name });
-            }
-        }
-        else {
-            school = await schoolService.createSchool({ name });
-        }
-        res.status(200).json({ success: true, data: {
+        const { school, admin } = await onboardingService.startOnboarding({
+            schoolName: name,
+            adminName,
+            adminEmail,
+            adminPhone,
+            subscriptionTier: tier || 'standard'
+        });
+        res.status(201).json({
+            success: true,
+            data: {
                 id: school.id,
                 schoolId: school.schoolId,
                 name: school.name,
-                subscriptionStatus: school.subscriptionStatus
-            } });
+                subscriptionStatus: school.subscriptionStatus,
+                adminUser: {
+                    email: admin.email,
+                    generatedPassword: admin.generatedPassword
+                }
+            }
+        });
     }
     catch (error) {
-        next(error);
+        res.status(400).json({
+            success: false,
+            message: error instanceof Error ? error.message : 'Failed to create school'
+        });
     }
 });
 // Get school by ID (UUID or SCH-XXXX)
@@ -93,6 +101,88 @@ router.get('/', (0, tenant_middleware_1.authorize)(['super_admin']), async (req,
     try {
         const schools = await schoolService.getAllSchools();
         res.status(200).json({ success: true, data: schools });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Get all grades for a school
+router.get('/me/grades', async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const grades = await schoolService.getGrades(schoolId);
+        res.status(200).json({ success: true, data: grades });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Get all sections for a school
+router.get('/me/sections', async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const sections = await schoolService.getSections(schoolId);
+        res.status(200).json({ success: true, data: sections });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Get all streams for a school
+router.get('/me/streams', async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const streams = await schoolService.getStreams(schoolId);
+        res.status(200).json({ success: true, data: streams });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Complete onboarding: save school profile + settings, mark onboarding done
+router.post('/onboarding', (0, tenant_middleware_1.authorize)(['admin']), async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const { schoolEmail, address, logoUrl, academicYear, attendanceMode, attendanceThreshold, allowLateMark, } = req.body;
+        // Use centralized service to mark as complete
+        await onboardingService.updateOnboardingStatus(schoolId, 'SETUP_COMPLETE');
+        // Update school record email
+        if (schoolEmail !== undefined) {
+            await db_1.default.school.update({
+                where: { id: schoolId },
+                data: { schoolEmail },
+            });
+        }
+        // Update school settings
+        await db_1.default.schoolSettings.upsert({
+            where: { schoolId },
+            create: {
+                schoolId,
+                school_address: address,
+                academic_year: academicYear,
+                attendance_mode: attendanceMode || 'session_based',
+                attendance_threshold: attendanceThreshold ?? 75,
+                allow_late_mark: allowLateMark ?? true,
+                school_logo: logoUrl,
+            },
+            update: {
+                ...(address !== undefined && { school_address: address }),
+                ...(academicYear !== undefined && { academic_year: academicYear }),
+                ...(attendanceMode !== undefined && { attendance_mode: attendanceMode }),
+                ...(attendanceThreshold !== undefined && { attendance_threshold: attendanceThreshold }),
+                ...(allowLateMark !== undefined && { allow_late_mark: allowLateMark }),
+                ...(logoUrl !== undefined && { school_logo: logoUrl }),
+            },
+        });
+        res.status(200).json({ success: true, message: 'Onboarding completed' });
     }
     catch (error) {
         next(error);

@@ -1,11 +1,44 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStudentsByParentPhone = exports.deleteStudent = exports.updateStudent = exports.getStudentById = exports.bulkUpsertStudents = exports.createStudent = exports.getAllStudents = void 0;
+exports.getStudentsByParentPhone = exports.deleteStudent = exports.updateStudent = exports.getStudentById = exports.bulkUpsertStudents = exports.generateStudentId = exports.createStudent = exports.getNextStudentId = exports.getAllStudents = void 0;
 const db_1 = __importDefault(require("../config/db"));
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const parentService = __importStar(require("./parent.service"));
 // Map database relational model to flat frontend model
 const mapStudentToFlat = (student) => {
     if (!student)
@@ -32,14 +65,43 @@ const getAllStudents = async (schoolId) => {
     return students.map(mapStudentToFlat);
 };
 exports.getAllStudents = getAllStudents;
+const getNextStudentId = async (schoolId) => {
+    const idPrefix = 'STU';
+    const latestStudent = await db_1.default.student.findFirst({
+        where: {
+            schoolId,
+            student_id: { startsWith: idPrefix }
+        },
+        orderBy: { student_id: 'desc' },
+        select: { student_id: true }
+    });
+    let nextSequence = 1;
+    if (latestStudent && latestStudent.student_id) {
+        const currentSequence = parseInt(latestStudent.student_id.substring(idPrefix.length), 10);
+        if (!isNaN(currentSequence)) {
+            nextSequence = currentSequence + 1;
+        }
+    }
+    return `${idPrefix}${nextSequence.toString().padStart(4, '0')}`;
+};
+exports.getNextStudentId = getNextStudentId;
 const createStudent = async (data, schoolId) => {
-    if (!schoolId)
-        throw new Error('School ID is required');
+    console.log(`[StudentService] createStudent called for schoolId: "${schoolId}"`);
+    // Verify school exists
+    const school = await db_1.default.school.findUnique({ where: { id: schoolId } });
+    if (!school) {
+        console.error(`[StudentService] School not found for ID: "${schoolId}"`);
+        throw new Error('School context invalid - Please logout and login again (database was likely reset)');
+    }
+    let studentId = data.student_id;
+    if (!studentId) {
+        studentId = await (0, exports.getNextStudentId)(schoolId);
+    }
     // Create or connect relations with schoolId scoping
     const newStudent = await db_1.default.student.create({
         data: {
             fullName: data.name,
-            student_id: data.student_id,
+            student_id: studentId,
             parent_email: data.parent_email || "",
             parent_phone: data.parent_phone || "",
             parent_name: data.parent_name || "",
@@ -72,77 +134,82 @@ const createStudent = async (data, schoolId) => {
         }
     });
     // Handle Parent User Account creation or linking
-    if (data.existingParentId) {
-        await db_1.default.parentStudentLink.upsert({
-            where: {
-                parentId_studentId: {
-                    parentId: data.existingParentId,
-                    studentId: newStudent.id
-                }
-            },
-            update: {
-                relationshipType: data.relationshipType || 'Guardian',
-                schoolId: schoolId
-            },
-            create: {
-                parentId: data.existingParentId,
-                studentId: newStudent.id,
-                schoolId: schoolId,
-                relationshipType: data.relationshipType || 'Guardian'
+    const parent = await parentService.findOrCreateParentByPhone(data.parent_phone, {
+        name: data.parent_name,
+        email: data.parent_email,
+        password: data.parent_password,
+        address: data.parent_address,
+        schoolId: schoolId
+    });
+    await db_1.default.parentStudentLink.upsert({
+        where: {
+            parentId_studentId: {
+                parentId: parent.id,
+                studentId: newStudent.id
             }
-        });
-    }
-    else if (data.parent_phone && data.parent_password) {
-        const cleanPhone = data.parent_phone.replace(/\s+/g, '');
-        const hashedPassword = await bcryptjs_1.default.hash(data.parent_password, 10);
-        // Use clear pattern for email if not provided to maintain uniqueness
-        const parentEmail = data.parent_email || `parent-${cleanPhone}-${schoolId}@zetime.com`;
-        const user = await db_1.default.user.upsert({
-            where: { email: parentEmail },
-            update: {
-                password_hash: hashedPassword,
-                full_name: data.parent_name || 'Parent',
-                phone: cleanPhone,
-                role: 'parent',
-                schoolId: schoolId,
-                address: data.parent_address || null
-            },
-            create: {
-                email: parentEmail,
-                password_hash: hashedPassword,
-                full_name: data.parent_name || 'Parent',
-                phone: cleanPhone,
-                role: 'parent',
-                schoolId: schoolId,
-                address: data.parent_address || null,
-                is_active: true
-            }
-        });
-        await db_1.default.parentStudentLink.create({
-            data: {
-                parentId: user.id,
-                studentId: newStudent.id,
-                schoolId: schoolId,
-                relationshipType: data.relationshipType || 'Guardian'
-            }
-        });
-    }
+        },
+        update: {
+            relationshipType: data.relationshipType || 'Guardian',
+            schoolId: schoolId
+        },
+        create: {
+            parentId: parent.id,
+            studentId: newStudent.id,
+            schoolId: schoolId,
+            relationshipType: data.relationshipType || 'Guardian'
+        }
+    });
     return mapStudentToFlat(newStudent);
 };
 exports.createStudent = createStudent;
+const generateStudentId = async (schoolId) => {
+    return await (0, exports.getNextStudentId)(schoolId);
+};
+exports.generateStudentId = generateStudentId;
 const bulkUpsertStudents = async (students, schoolId) => {
     if (!schoolId)
         throw new Error('School ID is required');
-    const results = {
-        created: 0,
-        updated: 0,
-        errors: []
-    };
+    const results = { created: 0, updated: 0, errors: [] };
+    // Generate a base sequence for auto-generated IDs to avoid collisions during the same bulk operation
+    let autoGenSequenceOffset = 0;
+    const idPrefix = 'STU';
+    // Pre-calculate starting sequence if needed
+    const latestStudent = await db_1.default.student.findFirst({
+        where: {
+            schoolId: schoolId,
+            student_id: { startsWith: idPrefix }
+        },
+        orderBy: { student_id: 'desc' },
+        select: { student_id: true }
+    });
+    let nextBaseSequence = 1;
+    if (latestStudent && latestStudent.student_id) {
+        const currentSequence = parseInt(latestStudent.student_id.substring(idPrefix.length), 10);
+        if (!isNaN(currentSequence)) {
+            nextBaseSequence = currentSequence + 1;
+        }
+    }
     // Process in sequence to ensure stability and proper parent linking across siblings
     for (let i = 0; i < students.length; i++) {
         const data = students[i];
         try {
-            const studentId = String(data.student_id);
+            let studentId = data.student_id ? String(data.student_id).trim() : null;
+            // Auto-generate ID if missing
+            if (!studentId) {
+                studentId = `${idPrefix}${(nextBaseSequence + autoGenSequenceOffset).toString().padStart(4, '0')}`;
+                autoGenSequenceOffset++;
+            }
+            // Stream Validation (Ethiopian Standards)
+            const gradeName = String(data.grade).trim();
+            const gradeNum = parseInt(gradeName);
+            if (!isNaN(gradeNum)) {
+                if (gradeNum >= 11 && !data.stream) {
+                    throw new Error(`Stream selection (Natural/Social Science) is required for Grade ${gradeName}`);
+                }
+                if (gradeNum <= 10 && data.stream) {
+                    data.stream = null; // Enforce no stream for Grades 1-10
+                }
+            }
             // 1. Handle Relations (Grade, Section, Stream)
             const grade = await db_1.default.grade.upsert({
                 where: { schoolId_name: { schoolId, name: data.grade } },
@@ -204,29 +271,12 @@ const bulkUpsertStudents = async (students, schoolId) => {
             }
             // 3. Handle Parent Linking
             if (data.parent_phone) {
-                const cleanPhone = data.parent_phone.replace(/\s+/g, '');
-                const parentEmail = data.parent_email || `parent-${cleanPhone}-${schoolId}@zetime.com`;
-                const tempPassword = data.parent_password || "demo123456";
-                const hashedPassword = await bcryptjs_1.default.hash(tempPassword, 10);
-                const parent = await db_1.default.user.upsert({
-                    where: { email: parentEmail },
-                    update: {
-                        full_name: data.parent_name || 'Parent',
-                        phone: cleanPhone,
-                        role: 'parent',
-                        schoolId: schoolId,
-                        address: data.parent_address || null
-                    },
-                    create: {
-                        email: parentEmail,
-                        password_hash: hashedPassword,
-                        full_name: data.parent_name || 'Parent',
-                        phone: cleanPhone,
-                        role: 'parent',
-                        schoolId: schoolId,
-                        address: data.parent_address || null,
-                        is_active: true
-                    }
+                const parent = await parentService.findOrCreateParentByPhone(data.parent_phone, {
+                    name: data.parent_name,
+                    email: data.parent_email,
+                    password: data.parent_password,
+                    address: data.parent_address,
+                    schoolId: schoolId
                 });
                 await db_1.default.parentStudentLink.upsert({
                     where: { parentId_studentId: { parentId: parent.id, studentId: student.id } },

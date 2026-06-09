@@ -34,6 +34,7 @@ import {
 } from 'recharts'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { getApiUrl } from '@/lib/auth/auth'
 
 export default function SuperAdminDashboard() {
   const [metrics, setMetrics] = useState<{
@@ -61,19 +62,14 @@ export default function SuperAdminDashboard() {
   useEffect(() => {
     ;(async () => {
       try {
-        const res = await fetch('/api/super-admin/subscription-metrics')
+        const res = await fetch(`${getApiUrl()}/api/super-admin/subscription-metrics`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('attendance_token')}`
+          }
+        })
         const json = await parseJsonResponse<{ success: boolean; data: any }>(res)
         if (json.success && json.data) {
-          // Enhancing mock data with requested fields if missing
-          const data = json.data;
-          if (!data.schoolStats) {
-            data.schoolStats = { total: 45, active: 38, trial: 5, suspended: 1, expired: 1 };
-          }
-          if (!data.userStats) {
-            // Excluding students from the core user stats as requested
-            data.userStats = { total: 3250, teachers: 850, students: 9200, parents: 2400 };
-          }
-          setMetrics(data)
+          setMetrics(json.data)
         }
       } catch {
         setMetrics(null)

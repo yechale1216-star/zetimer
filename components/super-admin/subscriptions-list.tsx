@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { CreditCard, Eye, Edit, Trash2, Loader2 } from "lucide-react"
 import { TIER_CONFIG } from "@/lib/utils/pricing-utils"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
+import { getApiUrl } from "@/lib/auth/auth"
 import type { BillingPeriod, SubscriptionStatus, TierPlan } from "@/lib/utils/subscription-types"
 
 const TIERS: TierPlan[] = ["starter", "standard", "premium", "enterprise"]
@@ -179,12 +180,15 @@ export function SubscriptionsList({ searchQuery, statusFilter }: SubscriptionsLi
   const fetchSubscriptions = async () => {
     try {
       setLoading(true)
-      const res = await fetch("/api/subscriptions")
+      const token = localStorage.getItem("attendance_token")
+      const res = await fetch(`${getApiUrl()}/api/subscriptions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       const json = await parseJsonResponse<{ success: boolean; data: EnrichedSubscription[]; error?: string }>(res)
       if (json.success) setSubscriptions(json.data)
       else setError(json.error || "Failed to load subscriptions")
     } catch (err) {
-      console.error("[v0] Error fetching subscriptions:", err)
+      console.error("[SubscriptionsList] Error fetching subscriptions:", err)
       setError("Failed to load subscriptions")
     } finally {
       setLoading(false)
@@ -195,7 +199,11 @@ export function SubscriptionsList({ searchQuery, statusFilter }: SubscriptionsLi
     if (!window.confirm("Delete this subscription?")) return
     try {
       setDeleteLoading(id)
-      const res = await fetch(`/api/subscriptions/${id}`, { method: "DELETE" })
+      const token = localStorage.getItem("attendance_token")
+      const res = await fetch(`${getApiUrl()}/api/subscriptions/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
       const json = await parseJsonResponse<{ success: boolean; error?: string }>(res)
       if (json.success) setSubscriptions((subs) => subs.filter((s) => s.id !== id))
       else alert(json.error || "Failed to delete subscription")

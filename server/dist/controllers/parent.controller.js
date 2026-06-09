@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateProfile = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.deleteNotification = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = exports.listParentSchools = void 0;
+exports.checkParentsBatch = exports.setActiveSchool = exports.getMySchools = exports.updateProfile = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.deleteNotification = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = exports.listParentSchools = void 0;
 const parentService = __importStar(require("../services/parent.service"));
 const listParentSchools = async (req, res, next) => {
     try {
@@ -41,7 +41,8 @@ const listParentSchools = async (req, res, next) => {
         if (!phone || typeof phone !== 'string') {
             return res.status(400).json({ success: false, message: "Phone is required." });
         }
-        const result = await parentService.listParentSchools(phone);
+        const normalizedPhone = parentService.normalizePhoneNumber(phone);
+        const result = await parentService.listParentSchools(normalizedPhone);
         res.status(200).json(result);
     }
     catch (error) {
@@ -55,7 +56,8 @@ const loginParent = async (req, res, next) => {
         if (!phone || !password) {
             return res.status(400).json({ success: false, message: "Phone and password are required." });
         }
-        const result = await parentService.loginParent(phone, password, schoolId);
+        const normalizedPhone = parentService.normalizePhoneNumber(phone);
+        const result = await parentService.loginParent(normalizedPhone, password, schoolId);
         res.status(200).json(result);
     }
     catch (error) {
@@ -85,7 +87,7 @@ const searchParent = async (req, res, next) => {
 exports.searchParent = searchParent;
 const updatePassword = async (req, res, next) => {
     try {
-        const schoolId = req.user?.schoolId;
+        const schoolId = req.headers['x-school-id'] || req.user?.schoolId;
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone, currentPassword, newPassword } = req.body;
@@ -102,7 +104,7 @@ const updatePassword = async (req, res, next) => {
 exports.updatePassword = updatePassword;
 const getNotifications = async (req, res, next) => {
     try {
-        const schoolId = req.user?.schoolId;
+        const schoolId = req.headers['x-school-id'] || req.user?.schoolId;
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
@@ -116,7 +118,7 @@ const getNotifications = async (req, res, next) => {
 exports.getNotifications = getNotifications;
 const markAsRead = async (req, res, next) => {
     try {
-        const schoolId = req.user?.schoolId;
+        const schoolId = req.headers['x-school-id'] || req.user?.schoolId;
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { id } = req.params;
@@ -130,7 +132,7 @@ const markAsRead = async (req, res, next) => {
 exports.markAsRead = markAsRead;
 const deleteNotification = async (req, res, next) => {
     try {
-        const schoolId = req.user?.schoolId;
+        const schoolId = req.headers['x-school-id'] || req.user?.schoolId;
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { id } = req.params;
@@ -144,7 +146,7 @@ const deleteNotification = async (req, res, next) => {
 exports.deleteNotification = deleteNotification;
 const markAllAsRead = async (req, res, next) => {
     try {
-        const schoolId = req.user?.schoolId;
+        const schoolId = req.headers['x-school-id'] || req.user?.schoolId;
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
@@ -158,7 +160,7 @@ const markAllAsRead = async (req, res, next) => {
 exports.markAllAsRead = markAllAsRead;
 const getPreferences = async (req, res, next) => {
     try {
-        const schoolId = req.user?.schoolId;
+        const schoolId = req.headers['x-school-id'] || req.user?.schoolId;
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
@@ -172,7 +174,7 @@ const getPreferences = async (req, res, next) => {
 exports.getPreferences = getPreferences;
 const updatePreferences = async (req, res, next) => {
     try {
-        const schoolId = req.user?.schoolId;
+        const schoolId = req.headers['x-school-id'] || req.user?.schoolId;
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
@@ -199,13 +201,13 @@ const postAnnouncement = async (req, res, next) => {
 exports.postAnnouncement = postAnnouncement;
 const updateProfile = async (req, res, next) => {
     try {
-        const schoolId = req.user?.schoolId;
+        const schoolId = req.headers['x-school-id'] || req.user?.schoolId;
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
         const { name, email, address } = req.body;
-        if (!name || !email) {
-            return res.status(400).json({ success: false, message: "Name and email are required." });
+        if (!name) {
+            return res.status(400).json({ success: false, message: "Name is required." });
         }
         const result = await parentService.updateProfile(phone, schoolId, { name, email, address });
         res.status(200).json(result);
@@ -215,3 +217,58 @@ const updateProfile = async (req, res, next) => {
     }
 };
 exports.updateProfile = updateProfile;
+/**
+ * GET /api/parent/me/schools
+ * Returns all schools this parent has children in — server validated.
+ */
+const getMySchools = async (req, res, next) => {
+    try {
+        if (!req.user?.id)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const schools = await parentService.getParentSchools(req.user.id);
+        res.status(200).json({ success: true, data: schools });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getMySchools = getMySchools;
+/**
+ * POST /api/parent/me/active-school
+ * Validates the parent owns a child in the requested school, then returns school info.
+ */
+const setActiveSchool = async (req, res, next) => {
+    try {
+        if (!req.user?.id)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const { schoolId } = req.body;
+        if (!schoolId)
+            return res.status(400).json({ success: false, message: 'schoolId is required.' });
+        const hasAccess = await parentService.validateSchoolAccess(req.user.id, schoolId);
+        if (!hasAccess) {
+            return res.status(403).json({ success: false, message: 'You do not have a child enrolled in this school.' });
+        }
+        // Return the school details for the frontend to update context
+        const schools = await parentService.getParentSchools(req.user.id);
+        const school = schools.find((s) => s.id === schoolId);
+        res.status(200).json({ success: true, data: school });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.setActiveSchool = setActiveSchool;
+const checkParentsBatch = async (req, res, next) => {
+    try {
+        const { phones } = req.body;
+        if (!Array.isArray(phones)) {
+            return res.status(400).json({ success: false, message: "Phones must be an array." });
+        }
+        const existenceMap = await parentService.checkParentsExist(phones);
+        res.status(200).json({ success: true, data: existenceMap });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.checkParentsBatch = checkParentsBatch;

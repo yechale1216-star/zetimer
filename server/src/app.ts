@@ -14,7 +14,11 @@ import attendanceAnalyticsRoutes from './routes/attendance-analytics.routes';
 import messageRoutes from './routes/message.routes';
 import authRoutes from './routes/auth.routes';
 import promotionRoutes from './routes/promotion.routes';
+import subscriptionRoutes from './routes/subscription.routes';
+import paymentRoutes from './routes/payment.routes';
+import superAdminRoutes from './routes/super-admin.routes';
 import { tenantMiddleware } from './middleware/tenant.middleware';
+import { maintenanceMiddleware } from './middleware/maintenance.middleware';
 import * as parentController from './controllers/parent.controller';
 
 const app = express();
@@ -30,6 +34,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Global Maintenance Guard
+app.use(maintenanceMiddleware);
+
 // Health check and Auth (Public)
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
@@ -43,8 +50,15 @@ publicParentRouter.get('/schools', parentController.listParentSchools);
 publicParentRouter.post('/login', parentController.loginParent);
 app.use('/api/parent', publicParentRouter);
 
-// Apply Tenant Isolation Middleware to all other API routes
+// Apply Tenant Isolation & Auth Middleware to all API routes
 app.use('/api', tenantMiddleware);
+
+// Subscription & Feature Management
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/super-admin', superAdminRoutes);
+
+// Other API routes are already covered by the /api middleware
 
 // Routes
 app.use('/api/students', studentRoutes);

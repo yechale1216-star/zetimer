@@ -8,23 +8,33 @@ import { Progress } from '@/components/ui/progress'
 import { CreditCard, Calendar, Users, AlertCircle, Loader2, ArrowUpCircle } from 'lucide-react'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
 import Link from 'next/link'
-import { TIER_CONFIG } from '@/lib/utils/pricing-utils'
-import type { TierPlan } from '@/lib/utils/subscription-types'
-import { authService } from '@/lib/auth/auth'
+import { authService, getApiUrl } from '@/lib/auth/auth'
 
 interface Subscription {
   id: string
   schoolId: string
-  tier: TierPlan
+  planId: string
+  plan: {
+    id: string
+    name: string
+    slug: string
+    description?: string
+    maxStudents: number
+    maxUsers: number
+  }
   billingPeriod: 'monthly' | 'semester' | 'yearly'
   studentCount: number
-  status: 'active' | 'expiring' | 'expired' | 'cancelled' | 'paused' | 'trial' | 'suspended' | 'pending_payment'
+  status: string
   billingStart: string
   billingEnd: string
   renewalDate: string
   monthlyAmount?: number
   isTrial?: boolean
   trialEndsAt?: string
+  currentUsage: {
+    students: number
+    users: number
+  }
 }
 
 interface Transaction {
@@ -50,22 +60,34 @@ export default function SubscriptionOverviewPage() {
 
   const fetchSubscription = async () => {
     try {
-      const user = authService.getCurrentUser()
-      const schoolId = user?.schoolId || 's1' // fallback for demo/dev
+      const token = localStorage.getItem('attendance_token')
+      const apiUrl = getApiUrl()
 
-      const res = await fetch(`/api/subscriptions/school/${schoolId}`)
+      const res = await fetch(`${apiUrl}/api/subscriptions/me/overview`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       const json = await parseJsonResponse<any>(res)
       if (json.success) {
         const subData = json.data
-        const tier = subData.tier || 'standard'
-        const studentCount = subData.studentCount ?? 0
-        setSubscription({ ...subData, tier, studentCount })
+        // The backend returns expanded plan and usage metrics
+        setSubscription({
+          ...subData,
+          tier: subData.plan.slug,
+          studentCount: subData.studentCount,
+          monthlyAmount: subData.effectiveMonthly,
+        })
         setEffectiveMrr(Number(subData.effectiveMonthly ?? 0))
       } else {
         setError(json.error || 'Failed to load subscription')
       }
 
-      const txRes = await fetch(`/api/transactions/school/${schoolId}`)
+      const txRes = await fetch(`${apiUrl}/api/subscriptions/me/billing`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       const txJson = await parseJsonResponse<any>(txRes)
       if (txJson.success) {
         setTransactions(txJson.data)
@@ -101,14 +123,12 @@ export default function SubscriptionOverviewPage() {
   const nextRenewalDate = isTrial && subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : new Date(subscription.renewalDate)
   const daysUntilRenewal = Math.ceil((nextRenewalDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
   
-  const tierConfig = TIER_CONFIG[subscription.tier]
-  const softLimit = isTrial ? subscription.studentCount : (tierConfig?.maxStudentsSoft || 0)
-  const isEnterprise = subscription.tier === 'enterprise'
+  // Use backend plan data for limits and display
+  const maxStudents = subscription.plan?.maxStudents || 0
+  const activeStudents = subscription.currentUsage?.students || 0
+  const isEnterprise = subscription.plan?.slug === 'enterprise'
   
-  // Need to fetch actual student count from DB or stats to calculate proper usage.
-  // Assuming subscription.studentCount is the limit for trial, and we don't have the active count here.
-  // We'll just show the limit.
-  const usagePercentage = isEnterprise ? 0 : 0 // Needs real active students to calculate accurately
+  const usagePercentage = isEnterprise ? 0 : Math.min(100, (activeStudents / maxStudents) * 100)
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -169,7 +189,7 @@ export default function SubscriptionOverviewPage() {
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Current Plan</p>
             <p className="text-2xl font-black text-foreground capitalize flex items-center gap-2">
-              {isTrial ? 'Free Trial' : (tierConfig?.label || subscription.tier)}
+              {isTrial ? 'Free Trial' : (subscription.plan?.name || subscription.plan?.slug)}
             </p>
             <p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase tracking-widest opacity-70">
               {isTrial ? 'Expires automatically' : `${subscription.billingPeriod} Billing`}
@@ -226,14 +246,15 @@ export default function SubscriptionOverviewPage() {
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">{isTrial ? 'Student Capacity' : 'Active Students'}</p>
             <p className="text-2xl font-black text-foreground">
-              {subscription.studentCount.toLocaleString()}
+              {activeStudents.toLocaleString()}
             </p>
             {!isEnterprise ? (
               <div className="mt-2 space-y-1">
                 <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
-                  <span>{isTrial ? 'Trial Limit' : 'Usage Limit'}</span>
-                  <span>{softLimit.toLocaleString()}</span>
+                   <span>{isTrial ? 'Trial Limit' : 'Usage Limit'}</span>
+                  <span>{maxStudents.toLocaleString()}</span>
                 </div>
+                <Progress value={usagePercentage} className="h-1 bg-slate-100 dark:bg-slate-800" />
               </div>
             ) : (
               <p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase tracking-widest opacity-70">Unlimited usage</p>
@@ -274,11 +295,11 @@ export default function SubscriptionOverviewPage() {
             </div>
             <div className="flex justify-between items-center py-2 border-b border-slate-200/60 dark:border-slate-800/60">
               <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Student Limit</span>
-              <span className="font-bold text-sm">{isEnterprise ? 'Unlimited' : softLimit.toLocaleString()}</span>
+              <span className="font-bold text-sm">{isEnterprise ? 'Unlimited' : maxStudents.toLocaleString()}</span>
             </div>
              <div className="flex justify-between items-center py-2 border-b border-slate-200/60 dark:border-slate-800/60">
               <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Included Features</span>
-              <span className="font-bold text-sm text-right max-w-[200px] truncate">{tierConfig?.description}</span>
+              <span className="font-bold text-sm text-right max-w-[200px] truncate">{subscription.plan?.description || subscription.plan?.name}</span>
             </div>
           </CardContent>
         </Card>

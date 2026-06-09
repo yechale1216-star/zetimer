@@ -20,6 +20,7 @@ model SubscriptionPlan {
   maxUsers                Int                  @default(-1)
   isActive                Boolean              @default(true)
   isCustom                Boolean              @default(false)
+  trialDays               Int                  @default(0)
   sortOrder               Int                  @default(0)
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt

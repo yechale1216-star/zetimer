@@ -14,6 +14,7 @@ export interface CreatePlanInput {
   yearlyTotal: number;
   maxStudents: number;
   maxUsers: number;
+  trialDays?: number;
   isActive?: boolean;
   isCustom?: boolean;
   sortOrder?: number;
@@ -57,6 +58,7 @@ export const createPlan = async (data: CreatePlanInput) => {
       yearlyTotal: data.yearlyTotal ?? 0,
       maxStudents: data.maxStudents,
       maxUsers: data.maxUsers,
+      trialDays: data.trialDays ?? 0,
       isActive: data.isActive ?? true,
       isCustom: data.isCustom ?? false,
       sortOrder: data.sortOrder ?? 0,

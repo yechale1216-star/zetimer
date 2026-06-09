@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Plus, Edit, Trash2, Check, X, Loader2, Layers, Users, DollarSign,
-  ChevronDown, ChevronUp, ToggleLeft, ToggleRight
+  ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Calendar, GraduationCap
 } from "lucide-react"
 import { getApiUrl } from "@/lib/auth/auth"
 
@@ -42,6 +42,7 @@ interface SubscriptionPlan {
   yearlyTotal: number
   maxStudents: number
   maxUsers: number
+  trialDays: number
   isActive: boolean
   isCustom: boolean
   sortOrder: number
@@ -85,6 +86,7 @@ function EditPlanDialog({ plan, onSave, onClose }: EditPlanDialogProps) {
     yearlyTotal: plan?.yearlyTotal ?? 0,
     maxStudents: plan?.maxStudents ?? 250,
     maxUsers: plan?.maxUsers ?? 15,
+    trialDays: plan?.trialDays ?? 14,
     isActive: plan?.isActive ?? true,
     isCustom: plan?.isCustom ?? false,
   })
@@ -145,25 +147,35 @@ function EditPlanDialog({ plan, onSave, onClose }: EditPlanDialogProps) {
             <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief plan description" />
           </div>
 
-          {/* Pricing Totals */}
-          <div>
-            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><DollarSign className="w-4 h-4 text-muted-foreground" /> Package Totals (Flat Rates)</h3>
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { label: "Monthly", key: "monthlyTotal" },
-                { label: "Semester", key: "semesterTotal" },
-                { label: "Yearly", key: "yearlyTotal" },
-              ].map(({ label, key }) => (
-                <div key={key} className="space-y-1.5">
-                  <Label>{label}</Label>
-                  <div className="relative">
-                    <Input type="number" className="pr-8" value={(form as any)[key]} onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })} min={0} />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">ETB</span>
+          {/* Pricing Totals — only for paid plans */}
+          {form.slug !== 'free' ? (
+            <div>
+              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><DollarSign className="w-4 h-4 text-muted-foreground" /> Package Totals (Flat Rates)</h3>
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  { label: "Monthly", key: "monthlyTotal" },
+                  { label: "Semester", key: "semesterTotal" },
+                  { label: "Yearly", key: "yearlyTotal" },
+                ].map(({ label, key }) => (
+                  <div key={key} className="space-y-1.5">
+                    <Label>{label}</Label>
+                    <div className="relative">
+                      <Input type="number" className="pr-8" value={(form as any)[key]} onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })} min={0} />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">ETB</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div>
+              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Calendar className="w-4 h-4 text-muted-foreground" /> Free Trial Settings</h3>
+              <div className="space-y-1.5">
+                <Label>Trial Duration (days)</Label>
+                <Input type="number" value={form.trialDays} onChange={(e) => setForm({ ...form, trialDays: Number(e.target.value) })} min={1} />
+              </div>
+            </div>
+          )}
 
           {/* Limits */}
           <div className="grid grid-cols-2 gap-4">
@@ -217,6 +229,7 @@ interface PlanCardProps {
 
 function PlanCard({ plan, onEdit, onDelete, onToggle }: PlanCardProps) {
   const subscriptions = plan._count?.subscriptions ?? 0
+  const isFree = plan.slug === 'free' || (Number(plan.monthlyTotal) === 0 && Number(plan.semesterTotal) === 0 && Number(plan.yearlyTotal) === 0)
 
   return (
     <Card className={`transition-all ${plan.isActive ? "" : "opacity-60"} relative overflow-hidden`}>
@@ -243,20 +256,37 @@ function PlanCard({ plan, onEdit, onDelete, onToggle }: PlanCardProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Pricing table */}
-        <div className="grid grid-cols-3 gap-2 text-center">
-          {[
-            { label: "Monthly", price: plan.monthlyTotal },
-            { label: "Semester", price: plan.semesterTotal },
-            { label: "Yearly", price: plan.yearlyTotal },
-          ].map(({ label, price }) => (
-            <div key={label} className="bg-primary/5 rounded-lg p-2 border border-primary/10">
-              <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-tight">{label}</p>
-              <p className="text-sm font-bold text-primary mt-0.5">{Number(price).toLocaleString()} ETB</p>
-              <p className="text-[9px] text-primary/60 font-medium">Full Package</p>
+        {/* Pricing table — only for paid plans */}
+        {isFree ? (
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-green-500/5 rounded-lg p-2 border border-green-500/10">
+              <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-tight">Max Students</p>
+              <p className="text-sm font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.maxStudents === -1 ? '♾️' : plan.maxStudents}</p>
             </div>
-          ))}
-        </div>
+            <div className="bg-green-500/5 rounded-lg p-2 border border-green-500/10">
+              <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-tight">Max Users</p>
+              <p className="text-sm font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.maxUsers === -1 ? '♾️' : plan.maxUsers}</p>
+            </div>
+            <div className="bg-green-500/5 rounded-lg p-2 border border-green-500/10">
+              <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-tight">Trial Days</p>
+              <p className="text-sm font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.trialDays ?? 14}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {[
+              { label: "Monthly", price: plan.monthlyTotal },
+              { label: "Semester", price: plan.semesterTotal },
+              { label: "Yearly", price: plan.yearlyTotal },
+            ].map(({ label, price }) => (
+              <div key={label} className="bg-primary/5 rounded-lg p-2 border border-primary/10">
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-tight">{label}</p>
+                <p className="text-sm font-bold text-primary mt-0.5">{Number(price).toLocaleString()} ETB</p>
+                <p className="text-[9px] text-primary/60 font-medium">Full Package</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Stats */}
         <div className="space-y-3 pt-1">

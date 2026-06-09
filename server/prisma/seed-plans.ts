@@ -40,6 +40,18 @@ const DEFAULT_ADDONS = [
 
 const DEFAULT_PLANS = [
   {
+    name: "Free",
+    slug: "free",
+    description: "Free trial for new schools",
+    monthlyTotal: 0,
+    semesterTotal: 0,
+    yearlyTotal: 0,
+    maxStudents: 50,
+    maxUsers: 5,
+    trialDays: 14,
+    sortOrder: 0,
+  },
+  {
     name: "Starter",
     slug: "starter",
     description: "Basic package for small schools",
@@ -48,6 +60,7 @@ const DEFAULT_PLANS = [
     yearlyTotal: 25000,
     maxStudents: 250,
     maxUsers: 15,
+    trialDays: 0,
     sortOrder: 1,
   },
   {
@@ -59,6 +72,7 @@ const DEFAULT_PLANS = [
     yearlyTotal: 55000,
     maxStudents: 600,
     maxUsers: 40,
+    trialDays: 0,
     sortOrder: 2,
   },
   {
@@ -70,6 +84,7 @@ const DEFAULT_PLANS = [
     yearlyTotal: 120000,
     maxStudents: 1500,
     maxUsers: 100,
+    trialDays: 0,
     sortOrder: 3,
   },
   {
@@ -81,6 +96,7 @@ const DEFAULT_PLANS = [
     yearlyTotal: 0,
     maxStudents: -1,
     maxUsers: -1,
+    trialDays: 0,
     sortOrder: 4,
   },
 ];
@@ -117,6 +133,7 @@ async function main() {
         yearlyTotal: planFields.yearlyTotal,
         maxStudents: planFields.maxStudents,
         maxUsers: planFields.maxUsers,
+        trialDays: planFields.trialDays,
         sortOrder: planFields.sortOrder,
       },
     });

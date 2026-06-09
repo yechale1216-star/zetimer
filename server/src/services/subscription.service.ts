@@ -50,15 +50,15 @@ export const createPlan = async (data: CreatePlanInput) => {
       name: data.name,
       slug: data.slug,
       description: data.description,
-      pricePerStudentMonthly: data.pricePerStudentMonthly,
-      pricePerStudentSemester: data.pricePerStudentSemester,
-      pricePerStudentYearly: data.pricePerStudentYearly,
-      monthlyTotal: data.monthlyTotal ?? 0,
-      semesterTotal: data.semesterTotal ?? 0,
-      yearlyTotal: data.yearlyTotal ?? 0,
-      maxStudents: data.maxStudents,
-      maxUsers: data.maxUsers,
-      trialDays: data.trialDays ?? 0,
+      pricePerStudentMonthly: Number(data.pricePerStudentMonthly || 0),
+      pricePerStudentSemester: Number(data.pricePerStudentSemester || 0),
+      pricePerStudentYearly: Number(data.pricePerStudentYearly || 0),
+      monthlyTotal: Number(data.monthlyTotal ?? 0),
+      semesterTotal: Number(data.semesterTotal ?? 0),
+      yearlyTotal: Number(data.yearlyTotal ?? 0),
+      maxStudents: Number(data.maxStudents || 0),
+      maxUsers: Number(data.maxUsers || 0),
+      trialDays: Number(data.trialDays ?? 0),
       isActive: data.isActive ?? true,
       isCustom: data.isCustom ?? false,
       sortOrder: data.sortOrder ?? 0,
@@ -67,7 +67,20 @@ export const createPlan = async (data: CreatePlanInput) => {
 };
 
 export const updatePlan = async (id: string, data: Partial<CreatePlanInput>) => {
-  return prisma.subscriptionPlan.update({ where: { id }, data });
+  // Ensure numeric fields are actually numbers to satisfy Prisma
+  const updateData: any = { ...data };
+  
+  if (data.pricePerStudentMonthly !== undefined) updateData.pricePerStudentMonthly = Number(data.pricePerStudentMonthly);
+  if (data.pricePerStudentSemester !== undefined) updateData.pricePerStudentSemester = Number(data.pricePerStudentSemester);
+  if (data.pricePerStudentYearly !== undefined) updateData.pricePerStudentYearly = Number(data.pricePerStudentYearly);
+  if (data.monthlyTotal !== undefined) updateData.monthlyTotal = Number(data.monthlyTotal);
+  if (data.semesterTotal !== undefined) updateData.semesterTotal = Number(data.semesterTotal);
+  if (data.yearlyTotal !== undefined) updateData.yearlyTotal = Number(data.yearlyTotal);
+  if (data.maxStudents !== undefined) updateData.maxStudents = Number(data.maxStudents);
+  if (data.maxUsers !== undefined) updateData.maxUsers = Number(data.maxUsers);
+  if (data.trialDays !== undefined) updateData.trialDays = Number(data.trialDays);
+
+  return prisma.subscriptionPlan.update({ where: { id }, data: updateData });
 };
 
 export const deletePlan = async (id: string) => {

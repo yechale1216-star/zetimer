@@ -105,12 +105,16 @@ export const getSchoolDetails = async (id: string) => {
   });
   if (!school) return null;
 
-  const [userCount, studentCount] = await Promise.all([
+  const [userCount, studentCount, adminUser] = await Promise.all([
     prisma.user.count({ where: { schoolId: id } }),
     prisma.student.count({ where: { schoolId: id } }),
+    prisma.user.findFirst({ 
+      where: { schoolId: id, role: 'admin' },
+      select: { id: true, full_name: true, email: true, phone: true }
+    }),
   ]);
 
-  return { ...school, userCount, studentCount };
+  return { ...school, userCount, studentCount, adminUser };
 };
 
 /** Suspend or unsuspend a school */

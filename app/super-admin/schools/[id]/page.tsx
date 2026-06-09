@@ -195,13 +195,32 @@ export default function SchoolDetailPage() {
         </TabsList>
 
         <TabsContent value="info" className="mt-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* School Contact */}
             <Card>
               <CardHeader><CardTitle className="text-base">Contact &amp; Identity</CardTitle></CardHeader>
               <CardContent className="space-y-4 text-sm">
-                <InfoRow icon={<Mail className="w-4 h-4 text-muted-foreground" />} label="Email" value={school.schoolEmail || "Not set"} />
+                <InfoRow icon={<Mail className="w-4 h-4 text-muted-foreground" />} label="School Email" value={school.schoolEmail || "Not set"} />
                 <InfoRow icon={<Building2 className="w-4 h-4 text-muted-foreground" />} label="School ID" value={school.schoolId || school.id} mono />
+              </CardContent>
+            </Card>
+
+            {/* Administrator Info */}
+            <Card>
+              <CardHeader><CardTitle className="text-base flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                Primary Administrator
+              </CardTitle></CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                {school.adminUser ? (
+                  <>
+                    <InfoRow icon={<Users className="w-4 h-4 text-muted-foreground" />} label="Full Name" value={school.adminUser.full_name} />
+                    <InfoRow icon={<Mail className="w-4 h-4 text-muted-foreground" />} label="Email Address" value={school.adminUser.email} />
+                    <InfoRow icon={<Building2 className="w-4 h-4 text-muted-foreground" />} label="Phone" value={school.adminUser.phone || "Not set"} />
+                  </>
+                ) : (
+                  <p className="text-muted-foreground italic py-2">No primary administrator found.</p>
+                )}
               </CardContent>
             </Card>
 

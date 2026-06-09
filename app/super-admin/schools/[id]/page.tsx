@@ -93,8 +93,21 @@ export default function SchoolDetailPage() {
       {/* School Hero */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${isSuspended ? 'bg-red-500/10' : 'bg-primary/10'}`}>
-            <Building2 className={`w-8 h-8 ${isSuspended ? 'text-red-500' : 'text-primary'}`} />
+          <div className={`w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden border ${isSuspended ? 'bg-red-500/10 border-red-500/20' : 'bg-primary/10 border-primary/20'}`}>
+            {school.settings?.school_logo ? (
+              <img 
+                src={school.settings.school_logo} 
+                alt={school.name} 
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as any).src = ""; // Clear src to avoid loop
+                  (e.target as any).classList.add("hidden");
+                }}
+              />
+            ) : (
+              <Building2 className={`w-8 h-8 ${isSuspended ? 'text-red-500' : 'text-primary'}`} />
+            )}
+            {!school.settings?.school_logo && <Building2 className={`w-8 h-8 absolute ${isSuspended ? 'text-red-500' : 'text-primary'} -z-10`} />}
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">{school.name}</h1>

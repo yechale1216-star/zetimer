@@ -23,7 +23,7 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
     ;(async () => {
       try {
         const token = localStorage.getItem("attendance_token")
-        const res = await fetch(`${getApiUrl()}/api/schools/${schoolId}/subscription`, {
+        const res = await fetch(`${getApiUrl()}/api/subscriptions/schools/${schoolId}/subscription`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         const json = await res.json()

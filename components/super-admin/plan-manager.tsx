@@ -249,7 +249,7 @@ function PlanCard({ plan, onEdit, onDelete, onToggle }: PlanCardProps) {
               {plan.isActive ? <ToggleRight className="w-4 h-4 text-primary" /> : <ToggleLeft className="w-4 h-4 text-muted-foreground" />}
             </Button>
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onEdit}><Edit className="w-4 h-4" /></Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={onDelete} disabled={subscriptions > 0} title={subscriptions > 0 ? "Has active subscriptions" : "Delete"}>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={onDelete} disabled={subscriptions > 0 || plan.slug === 'free'} title={plan.slug === 'free' ? "System plan cannot be deleted" : subscriptions > 0 ? "Has active subscriptions" : "Delete"}>
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>

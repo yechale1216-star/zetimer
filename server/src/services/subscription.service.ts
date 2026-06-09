@@ -84,6 +84,10 @@ export const updatePlan = async (id: string, data: Partial<CreatePlanInput>) => 
 };
 
 export const deletePlan = async (id: string) => {
+  const plan = await prisma.subscriptionPlan.findUnique({ where: { id } });
+  if (!plan) throw new Error("Plan not found");
+  if (plan.slug === "free") throw new Error("The 'Free' system plan cannot be deleted");
+
   const subCount = await prisma.schoolSubscription.count({ where: { planId: id } });
   if (subCount > 0) throw new Error("Cannot delete a plan that has active subscriptions");
   return prisma.subscriptionPlan.delete({ where: { id } });

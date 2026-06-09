@@ -21,7 +21,7 @@ router.post('/', authorize(['super_admin']), async (req: Request, res: Response,
       adminName,
       adminEmail,
       adminPhone,
-      subscriptionTier: tier || 'standard'
+      subscriptionTier: tier || 'free'
     });
 
     res.status(201).json({ 

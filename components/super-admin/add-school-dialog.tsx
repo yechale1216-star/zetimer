@@ -33,7 +33,7 @@ export function AddSchoolDialog({ open, onOpenChange, onSuccess }: AddSchoolDial
     adminName: '',
     adminEmail: '',
     adminPhone: '',
-    tier: 'standard',
+    tier: 'free',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,7 +74,7 @@ export function AddSchoolDialog({ open, onOpenChange, onSuccess }: AddSchoolDial
         adminName: '',
         adminEmail: '',
         adminPhone: '',
-        tier: 'standard',
+        tier: 'free',
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -160,7 +160,8 @@ export function AddSchoolDialog({ open, onOpenChange, onSuccess }: AddSchoolDial
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="starter">Starter (Free Trial)</SelectItem>
+                  <SelectItem value="free">Free Trial (14 days)</SelectItem>
+                  <SelectItem value="starter">Starter</SelectItem>
                   <SelectItem value="standard">Standard</SelectItem>
                   <SelectItem value="premium">Premium</SelectItem>
                 </SelectContent>

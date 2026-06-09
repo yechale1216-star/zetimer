@@ -25,7 +25,7 @@ export const startOnboarding = async (data: OnboardingData) => {
     adminEmail, 
     adminPhone, 
     adminPassword,
-    subscriptionTier = 'standard'
+    subscriptionTier = 'free'
   } = data;
 
   // 1. Validation: Ensure email is unique
@@ -36,8 +36,8 @@ export const startOnboarding = async (data: OnboardingData) => {
 
   // 2. Atomic Transaction for School and Admin Creation
   return await prisma.$transaction(async (tx) => {
-    // A. Create the School (Using tx directly for atomicity)
-    const customId = await generateSchoolId(); // Generate outside or inside? Inside is safer for sequence
+    // A. Create the School
+    const customId = await generateSchoolId();
     const school = await tx.school.create({
       data: {
         name: schoolName,
@@ -54,28 +54,33 @@ export const startOnboarding = async (data: OnboardingData) => {
     });
 
     // B. Create real School Subscription record
-    // Find the plan based on slug
     const plan = await tx.subscriptionPlan.findUnique({
       where: { slug: subscriptionTier.toLowerCase() }
     });
 
     if (plan) {
+      const trialDays = plan.trialDays || 0;
+      const billingStart = new Date();
+      const trialEndsAt = new Date(billingStart.getTime() + trialDays * 24 * 60 * 60 * 1000);
+      const billingEnd = trialDays > 0 ? trialEndsAt : new Date(billingStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const renewalDate = new Date(billingEnd.getTime() + 24 * 60 * 60 * 1000);
+
       await tx.schoolSubscription.create({
         data: {
           schoolId: school.id,
           planId: plan.id,
           billingPeriod: 'monthly',
-          status: 'trial',
+          status: trialDays > 0 ? 'trial' : 'active',
           studentCount: 0,
-          billingStart: new Date(),
-          billingEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days trial
-          renewalDate: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000),
-          trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          billingStart,
+          billingEnd,
+          renewalDate,
+          trialEndsAt: trialDays > 0 ? trialEndsAt : null
         }
       });
     }
 
-    // Update legacy field for backward compatibility (optional but safer for now)
+    // Update legacy field
     await tx.school.update({
       where: { id: school.id },
       data: {

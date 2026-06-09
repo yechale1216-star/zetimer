@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, User, CheckSquare, BarChart2, BookOpen,
-  Settings, LogOut, CreditCard, MessageSquare, Phone, TrendingUp
+  Settings, LogOut, CreditCard, MessageSquare, Phone, TrendingUp, ShieldBan
 } from 'lucide-react'
 import { authService } from '@/lib/auth/auth'
 import { useRouter } from 'next/navigation'
@@ -17,6 +17,43 @@ import { SocketProvider } from '@/components/providers/socket-provider'
 import { CallProvider } from '@/components/providers/call-provider'
 import { Logo } from '@/components/logo'
 import { TopNav } from '@/components/layout/top-nav'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+
+function SuspendedBanner() {
+  const [isSuspended, setIsSuspended] = React.useState(false)
+
+  React.useEffect(() => {
+    const check = async () => {
+      try {
+        const token = localStorage.getItem('attendance_token')
+        const user = authService.getCurrentUser()
+        if (!user?.schoolId || user?.role === 'super_admin') return
+        const res = await fetch(`${API_URL}/api/schools/${user.schoolId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) return
+        const json = await res.json()
+        if (json.success && json.data?.subscriptionStatus === 'SUSPENDED') {
+          setIsSuspended(true)
+        }
+      } catch {}
+    }
+    check()
+  }, [])
+
+  if (!isSuspended) return null
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-red-600 text-white text-sm font-medium z-50">
+      <ShieldBan className="w-4 h-4 flex-shrink-0" />
+      <span>
+        <strong>Account Suspended.</strong> You can view existing data but cannot create, edit, or delete anything.
+        Please contact support to restore access.
+      </span>
+    </div>
+  )
+}
 
 export default function SchoolAdminLayout({
   children,
@@ -142,6 +179,7 @@ export default function SchoolAdminLayout({
               <TopNav showMenuButton />
               {/* Content */}
               <main className="flex-1 overflow-auto pb-20 md:pb-0">
+                <SuspendedBanner />
                 {children}
               </main>
 

@@ -179,18 +179,35 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     let school;
-    
     if (id.startsWith('SCH-')) {
       school = await schoolService.getSchoolByCustomId(id);
     } else {
       school = await schoolService.getSchoolById(id);
     }
-
     if (!school) return res.status(404).json({ success: false, message: 'School not found' });
     res.status(200).json({ success: true, data: school });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
+});
+
+// Get rich school details (super admin only)
+router.get('/:id/details', authorize(['super_admin']), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const school = await schoolService.getSchoolDetails(req.params.id);
+    if (!school) return res.status(404).json({ success: false, message: 'School not found' });
+    res.status(200).json({ success: true, data: school });
+  } catch (error) { next(error); }
+});
+
+// Suspend / Unsuspend a school (super admin only)
+router.patch('/:id/suspend', authorize(['super_admin']), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { suspend } = req.body;
+    if (typeof suspend !== 'boolean') {
+      return res.status(400).json({ success: false, message: '`suspend` must be a boolean' });
+    }
+    const school = await schoolService.setSchoolSuspended(req.params.id, suspend);
+    res.status(200).json({ success: true, data: school, message: suspend ? 'School suspended' : 'School unsuspended' });
+  } catch (error) { next(error); }
 });
 
 export default router;

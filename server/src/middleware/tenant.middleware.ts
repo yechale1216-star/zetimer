@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import prisma from '../config/db';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-long-enough';
@@ -87,4 +88,41 @@ export const authorize = (roles: string[]) => {
 
     next();
   };
+};
+
+/**
+ * Suspended School Guard
+ * Blocks all write requests (POST/PUT/PATCH/DELETE) for users whose school is SUSPENDED.
+ * Super admins bypass this check. Read-only requests (GET/HEAD/OPTIONS) always pass.
+ */
+export const suspendedGuard = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  // Super admins are never blocked
+  if (!req.user || req.user.role === 'super_admin') return next();
+
+  // Read-only methods are always allowed — historical data stays accessible
+  const readMethods = ['GET', 'HEAD', 'OPTIONS'];
+  if (readMethods.includes(req.method)) return next();
+
+  const schoolId = req.user.schoolId;
+  if (!schoolId) return next();
+
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { subscriptionStatus: true },
+    });
+
+    if (school?.subscriptionStatus === 'SUSPENDED') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your school account is suspended. You can view existing data but cannot make changes. Please contact support.',
+        code: 'SCHOOL_SUSPENDED',
+      });
+    }
+  } catch (err) {
+    // On DB error, fail open to avoid blocking legitimate users
+    console.error('[suspendedGuard] DB error:', err);
+  }
+
+  next();
 };

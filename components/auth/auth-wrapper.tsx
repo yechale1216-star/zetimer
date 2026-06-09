@@ -61,7 +61,7 @@ export function AuthWrapper({ onAuthSuccess }: AuthWrapperProps) {
   return (
     <div className="min-h-[100dvh] w-full flex flex-col md:flex-row bg-background overflow-x-hidden">
       {/* Left Side: Branding & Illustration (Desktop Only) */}
-      <div className="hidden md:flex md:w-1/2 relative bg-primary/5 items-center justify-center p-8 xl:p-12 overflow-hidden border-r border-border/50">
+      <div className="hidden md:flex md:w-1/2 relative bg-primary/5 items-start justify-center p-8 xl:p-12 pt-12 xl:pt-16 overflow-hidden border-r border-border/50">
         {/* Abstract Background Shapes */}
         <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 rounded-full blur-3xl animate-pulse" />

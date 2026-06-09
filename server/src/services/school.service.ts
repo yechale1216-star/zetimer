@@ -93,3 +93,30 @@ export const getStreams = async (schoolId: string) => {
     orderBy: { name: 'asc' }
   });
 };
+
+/** Returns rich school details for the super-admin view */
+export const getSchoolDetails = async (id: string) => {
+  const school = await prisma.school.findUnique({
+    where: { id },
+    include: {
+      settings: true,
+      subscription: { include: { plan: true } },
+    },
+  });
+  if (!school) return null;
+
+  const [userCount, studentCount] = await Promise.all([
+    prisma.user.count({ where: { schoolId: id } }),
+    prisma.student.count({ where: { schoolId: id } }),
+  ]);
+
+  return { ...school, userCount, studentCount };
+};
+
+/** Suspend or unsuspend a school */
+export const setSchoolSuspended = async (id: string, suspend: boolean) => {
+  return await prisma.school.update({
+    where: { id },
+    data: { subscriptionStatus: suspend ? 'SUSPENDED' : 'ACTIVE' },
+  });
+};

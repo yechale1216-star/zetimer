@@ -113,9 +113,9 @@ export function AttendanceTracking() {
       } else {
         setStudents(studentsData)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error loading students for teacher:", error)
-      notifications.error("Error", "Failed to load students")
+      notifications.error("Error", error.message || "Failed to load students")
     } finally {
       setIsLoading(false)
     }
@@ -150,8 +150,8 @@ export function AttendanceTracking() {
       })
 
       setAttendanceState(newAttendanceState)
-    } catch (error) {
-      notifications.error("Error", "Failed to load attendance records")
+    } catch (error: any) {
+      notifications.error("Error", error.message || "Failed to load attendance records")
     }
   }
 
@@ -314,10 +314,9 @@ export function AttendanceTracking() {
 
 
       await loadAttendanceForDate()
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error saving attendance:", error)
-      notifications.error("Error", "Failed to save attendance. Please try again.")
-
+      notifications.error("Error", error.message || "Failed to save attendance. Please try again.")
     } finally {
       setIsSaving(false)
     }
@@ -433,8 +432,8 @@ export function AttendanceTracking() {
         if (result.sms.success > 0) notifications.success("SMS Sent", `Alert sent to ${student.name}'s parent.`)
         else notifications.error("Failed", "Failed to send SMS alert.")
       }
-    } catch (error) {
-      notifications.error("Error", "Failed to send notification")
+    } catch (error: any) {
+      notifications.error("Error", error.message || "Failed to send notification")
     } finally {
       setIsSendingNotifications(false)
     }

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Edit, Trash2, Loader2, Package, Search } from "lucide-react"
 import { getApiUrl } from "@/lib/auth/auth"
+import { notifications } from "@/lib/utils/notifications"
 
 interface Addon {
   id: string
@@ -195,9 +196,15 @@ export function AddonManager() {
     try {
       const res = await fetch(`${apiBase()}/api/subscriptions/addons/${addon.id}`, { method: "DELETE", headers: authHeader() })
       const json = await res.json()
-      if (json.success) setAddons((prev) => prev.filter((a) => a.id !== addon.id))
-      else alert(json.error)
-    } catch { alert("Failed to delete add-on") }
+      if (json.success) {
+        setAddons((prev) => prev.filter((a) => a.id !== addon.id));
+        notifications.success("Success", "Add-on deleted successfully");
+      } else {
+        notifications.error("Delete Failed", json.error || "Failed to delete add-on");
+      }
+    } catch { 
+      notifications.error("Error", "Failed to delete add-on");
+    }
   }
 
   const handleToggle = async (addon: Addon) => {
@@ -206,8 +213,15 @@ export function AddonManager() {
         method: "PUT", headers: authHeader(), body: JSON.stringify({ isActive: !addon.isActive }),
       })
       const json = await res.json()
-      if (json.success) setAddons((prev) => prev.map((a) => a.id === addon.id ? { ...a, isActive: !a.isActive } : a))
-    } catch { alert("Failed to update add-on") }
+      if (json.success) {
+        setAddons((prev) => prev.map((a) => a.id === addon.id ? { ...a, isActive: !a.isActive } : a));
+        notifications.success("Success", `Add-on ${!addon.isActive ? 'activated' : 'deactivated'}`);
+      } else {
+        notifications.error("Update Failed", json.error || "Failed to update add-on");
+      }
+    } catch { 
+      notifications.error("Error", "Failed to update add-on");
+    }
   }
 
   const filtered = addons.filter((a) => 

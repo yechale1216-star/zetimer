@@ -19,7 +19,19 @@ export class NotificationService {
   }
 
   async error(title: string, message: string): Promise<void> {
-    toast.error(`${title}: ${message}`, {
+    let displayMessage = message;
+    
+    // Try to parse if it's a raw JSON string from a fetch error
+    if (message && (message.trim().startsWith('{') || message.trim().startsWith('['))) {
+      try {
+        const parsed = JSON.parse(message);
+        displayMessage = parsed.message || parsed.error || message;
+      } catch (e) {
+        // Fallback to original message
+      }
+    }
+
+    toast.error(`${title}: ${displayMessage}`, {
       duration: 5000,
       style: {
         backgroundColor: "#fee2e2",
@@ -27,7 +39,7 @@ export class NotificationService {
         border: "1px solid #fca5a5",
       },
     })
-    console.error(`[Error] ${title}: ${message}`)
+    console.error(`[Error] ${title}: ${displayMessage}`)
   }
 
   async warning(title: string, message: string): Promise<void> {

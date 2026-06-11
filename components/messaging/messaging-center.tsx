@@ -10,6 +10,7 @@ import { useSocket } from '@/components/providers/socket-provider';
 import { authService } from '@/lib/auth/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/lib/context/language-context';
+import { notifications } from '@/lib/utils/notifications';
 import { formatLocalizedTime } from '@/lib/utils/date-utils';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -318,9 +319,14 @@ export function MessagingCenter() {
         const groupRes = await fetch(`${API_URL}/api/groups/${activeConversationId}`, { headers: getAuthHeaders() });
         const data = await groupRes.json();
         setActiveConversationData(data);
+        notifications.success("Success", "Member role updated");
+      } else {
+        const errorData = await res.json();
+        notifications.error("Error", errorData.message || "Failed to update role");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update role:', err);
+      notifications.error("Error", err.message || "An error occurred");
     }
   };
 
@@ -336,9 +342,14 @@ export function MessagingCenter() {
         const groupRes = await fetch(`${API_URL}/api/groups/${activeConversationId}`, { headers: getAuthHeaders() });
         const data = await groupRes.json();
         setActiveConversationData(data);
+        notifications.success("Success", "Member removed from group");
+      } else {
+        const errorData = await res.json();
+        notifications.error("Error", errorData.message || "Failed to remove member");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to remove member:', err);
+      notifications.error("Error", err.message || "An error occurred");
     }
   };
 

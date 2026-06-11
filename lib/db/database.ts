@@ -114,6 +114,20 @@ class Database {
     return headers
   }
 
+  private async handleError(res: Response): Promise<never> {
+    let message = `HTTP ${res.status}: ${res.statusText}`;
+    try {
+      const data = await res.json();
+      message = data.message || data.error || message;
+    } catch {
+      try {
+        const text = await res.text();
+        if (text && text.length < 200) message = text;
+      } catch {}
+    }
+    throw new Error(message);
+  }
+
   // ─── STUDENTS ─────────────────────────────────────────────────────────────
   async getNextStudentId(): Promise<string> {
     try {
@@ -141,9 +155,7 @@ class Database {
       })
       console.log(`[pg] getStudents response status: ${res.status} (${res.statusText})`)
       if (!res.ok) {
-        const errorText = await res.text()
-        console.error(`[pg] getStudents failed: ${res.status} ${res.statusText} - ${errorText}`)
-        throw new Error(res.statusText)
+        await this.handleError(res);
       }
       const result = await res.json()
       return result.data.map((s: any) => ({
@@ -167,7 +179,7 @@ class Database {
     const res = await fetch(`${API_URL}/api/students`, {
       method: "POST", headers: this.getApiHeaders(), body: JSON.stringify(student),
     })
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) await this.handleError(res);
     const result = await res.json()
     const s = result.data
     return {
@@ -187,7 +199,7 @@ class Database {
     const res = await fetch(`${API_URL}/api/students/bulk`, {
       method: "POST", headers: this.getApiHeaders(), body: JSON.stringify({ students }),
     })
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) await this.handleError(res);
     return await res.json()
   }
 
@@ -195,14 +207,14 @@ class Database {
     const res = await fetch(`${API_URL}/api/students/${id}`, {
       method: "PUT", headers: this.getApiHeaders(), body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) await this.handleError(res);
   }
 
   async deleteStudent(id: string): Promise<void> {
     const res = await fetch(`${API_URL}/api/students/${id}`, {
       method: "DELETE", headers: this.getApiHeaders(),
     })
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) await this.handleError(res);
   }
 
   async checkParentsBatch(phones: string[]): Promise<boolean[]> {
@@ -298,7 +310,7 @@ class Database {
       body: JSON.stringify({ records: formattedRecords }),
     })
 
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) await this.handleError(res);
   }
 
   async saveAttendance(record: Partial<AttendanceRecord>): Promise<AttendanceRecord> {
@@ -316,7 +328,7 @@ class Database {
         date: recDate ? new Date(recDate).toISOString() : new Date().toISOString(),
       }),
     })
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) await this.handleError(res);
     const result = await res.json()
     return this.mapAttendance(result.data, schoolId)
   }
@@ -455,7 +467,7 @@ class Database {
         is_active: true,
       }),
     })
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) await this.handleError(res);
     return (await res.json()).data
   }
 
@@ -465,7 +477,7 @@ class Database {
       headers: this.getApiHeaders(),
       body: JSON.stringify(teacherData),
     })
-    if (!res.ok) throw new Error(await res.text())
+    if (!res.ok) await this.handleError(res);
   }
 
   async deleteTeacher(teacherId: string): Promise<void> {
@@ -525,7 +537,7 @@ class Database {
           subject 
         }),
       })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) await this.handleError(res);
       return (await res.json()).data
     } catch (error) {
       console.error("[pg] assignTeacherToClass error:", error)

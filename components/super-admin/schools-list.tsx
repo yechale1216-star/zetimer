@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import Link from 'next/link'
 import { getApiUrl } from '@/lib/auth/auth'
+import { notifications } from '@/lib/utils/notifications'
 
 interface School {
   id: string
@@ -69,9 +70,13 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
         setSchools(prev => prev.map(s =>
           s.id === school.id ? { ...s, subscriptionStatus: !isSuspended ? 'SUSPENDED' : 'ACTIVE' } : s
         ))
+        notifications.success("Success", `School ${!isSuspended ? 'suspended' : 'unsuspended'} successfully`);
+      } else {
+        notifications.error("Error", result.message || "Failed to update school status");
       }
-    } catch (err) {
-      console.error('Suspend toggle failed:', err)
+    } catch (err: any) {
+      console.error('Suspend toggle failed:', err);
+      notifications.error("Connection Error", "Failed to reach server");
     } finally {
       setSuspendingId(null)
     }

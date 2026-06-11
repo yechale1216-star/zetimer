@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Edit, Trash2, Loader2, Tag, Search } from "lucide-react"
 import { getApiUrl } from "@/lib/auth/auth"
+import { notifications } from "@/lib/utils/notifications"
 
 interface Feature {
   id: string
@@ -153,9 +154,15 @@ export function FeatureCatalog() {
     try {
       const res = await fetch(`${apiBase()}/api/subscriptions/features/${feature.id}`, { method: "DELETE", headers: authHeader() })
       const json = await res.json()
-      if (json.success) setFeatures((prev) => prev.filter((f) => f.id !== feature.id))
-      else alert(json.error)
-    } catch { alert("Failed to delete feature") }
+      if (json.success) {
+        setFeatures((prev) => prev.filter((f) => f.id !== feature.id));
+        notifications.success("Success", "Feature deleted successfully");
+      } else {
+        notifications.error("Delete Failed", json.error || "Failed to delete feature");
+      }
+    } catch { 
+      notifications.error("Error", "Failed to delete feature");
+    }
   }
 
   const handleToggle = async (feature: Feature) => {
@@ -164,8 +171,15 @@ export function FeatureCatalog() {
         method: "PUT", headers: authHeader(), body: JSON.stringify({ isActive: !feature.isActive }),
       })
       const json = await res.json()
-      if (json.success) setFeatures((prev) => prev.map((f) => f.id === feature.id ? { ...f, isActive: !f.isActive } : f))
-    } catch { alert("Failed to update feature") }
+      if (json.success) {
+        setFeatures((prev) => prev.map((f) => f.id === feature.id ? { ...f, isActive: !f.isActive } : f));
+        notifications.success("Success", `Feature ${!feature.isActive ? 'activated' : 'deactivated'}`);
+      } else {
+        notifications.error("Update Failed", json.error || "Failed to update feature");
+      }
+    } catch { 
+      notifications.error("Error", "Failed to update feature");
+    }
   }
 
   const filtered = features.filter((f) => {

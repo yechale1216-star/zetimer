@@ -161,9 +161,9 @@ export function TeacherManagement() {
         qualification: "",
         experience_years: "",
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error saving teacher:", error)
-      notifications.error("Error", "Failed to save teacher")
+      notifications.error("Error", error.message || "Failed to save teacher")
     } finally {
       setIsSaving(false)
     }
@@ -195,9 +195,9 @@ export function TeacherManagement() {
       await db.deleteTeacher(teacherId)
       setTeachers(teachers.filter((t) => t.id !== teacherId))
       notifications.success("Teacher Deleted Successfully", "The teacher has been removed from the system.")
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error deleting teacher:", error)
-      notifications.error("Error", "Failed to delete teacher")
+      notifications.error("Error", error.message || "Failed to delete teacher")
     }
   }
 

@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { getApiUrl } from "@/lib/auth/auth"
 import { cn } from "@/lib/utils/utils"
+import { notifications } from "@/lib/utils/notifications"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -351,9 +352,15 @@ export function PlanManager() {
     try {
       const res = await fetch(`${apiBase()}/api/subscriptions/plans/${plan.id}`, { method: "DELETE", headers: authHeader() })
       const json = await res.json()
-      if (json.success) setPlans((prev) => prev.filter((p) => p.id !== plan.id))
-      else alert(json.error)
-    } catch { alert("Failed to delete plan") }
+      if (json.success) {
+        setPlans((prev) => prev.filter((p) => p.id !== plan.id));
+        notifications.success("Success", "Plan deleted successfully");
+      } else {
+        notifications.error("Delete Failed", json.error || "Failed to delete plan");
+      }
+    } catch (e: any) {
+      notifications.error("Error", e.message || "An unexpected error occurred");
+    }
   }
 
   const handleToggle = async (plan: SubscriptionPlan) => {
@@ -362,8 +369,15 @@ export function PlanManager() {
         method: "PUT", headers: authHeader(), body: JSON.stringify({ isActive: !plan.isActive }),
       })
       const json = await res.json()
-      if (json.success) setPlans((prev) => prev.map((p) => p.id === plan.id ? { ...p, isActive: !p.isActive } : p))
-    } catch { alert("Failed to update plan") }
+      if (json.success) {
+        setPlans((prev) => prev.map((p) => p.id === plan.id ? { ...p, isActive: !p.isActive } : p));
+        notifications.success("Success", `Plan ${!plan.isActive ? 'activated' : 'deactivated'}`);
+      } else {
+        notifications.error("Update Failed", json.error || "Failed to update plan");
+      }
+    } catch {
+      notifications.error("Error", "Failed to update plan status");
+    }
   }
 
   if (loading) return (

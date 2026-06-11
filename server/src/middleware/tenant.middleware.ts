@@ -91,11 +91,11 @@ export const authorize = (roles: string[]) => {
 };
 
 /**
- * Suspended School Guard
- * Blocks all write requests (POST/PUT/PATCH/DELETE) for users whose school is SUSPENDED.
+ * Subscription Guard
+ * Blocks all write requests (POST/PUT/PATCH/DELETE) for users whose school is SUSPENDED or EXPIRED.
  * Super admins bypass this check. Read-only requests (GET/HEAD/OPTIONS) always pass.
  */
-export const suspendedGuard = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const subscriptionGuard = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   // Super admins are never blocked
   if (!req.user || req.user.role === 'super_admin') return next();
 
@@ -109,20 +109,65 @@ export const suspendedGuard = async (req: AuthenticatedRequest, res: Response, n
   try {
     const school = await prisma.school.findUnique({
       where: { id: schoolId },
-      select: { subscriptionStatus: true },
+      include: { 
+        subscription: true 
+      },
     });
 
-    if (school?.subscriptionStatus === 'SUSPENDED') {
+    // Check status from both school (deprecated) and real subscription record
+    const status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
+    
+    console.log(`[subscriptionGuard] Checking school ${school?.schoolId || 'unknown'}. Status: ${status}`);
+
+    if (status === 'SUSPENDED' || status === 'EXPIRED') {
+      console.log(`[subscriptionGuard] BLOCKING request to ${req.method} ${req.originalUrl} - School ${status}`);
+      
+      const message = status === 'SUSPENDED' 
+        ? 'Your school account is suspended. Please contact support.' 
+        : 'Your school subscription or trial has expired. Please upgrade your plan to continue making changes.';
+
       return res.status(403).json({
         success: false,
-        message: 'Your school account is suspended. You can view existing data but cannot make changes. Please contact support.',
-        code: 'SCHOOL_SUSPENDED',
+        message: message,
+        code: `SCHOOL_${status}`,
       });
     }
   } catch (err) {
-    // On DB error, fail open to avoid blocking legitimate users
-    console.error('[suspendedGuard] DB error:', err);
+    console.error('[subscriptionGuard] DB error:', err);
   }
 
   next();
+};
+
+/**
+ * Feature Guard
+ * Checks if the school has a specific feature enabled based on their plan/addons.
+ */
+export const featureGuard = (featureKey: string) => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    // Super admins bypass all feature checks
+    if (!req.user || req.user.role === 'super_admin') return next();
+
+    const schoolId = req.user.schoolId;
+    if (!schoolId) return next();
+
+    try {
+      const { resolveSchoolFeatures } = require('../services/subscription.service');
+      const grantedFeatures = await resolveSchoolFeatures(schoolId);
+
+      if (!grantedFeatures.includes(featureKey)) {
+        console.log(`[featureGuard] BLOCKING request to ${req.method} ${req.originalUrl} - Missing feature: ${featureKey}`);
+        return res.status(403).json({
+          success: false,
+          message: `This feature (${featureKey}) is not included in your current plan. Please upgrade to access it.`,
+          code: 'FEATURE_RESTRICTED',
+          requiredFeature: featureKey
+        });
+      }
+    } catch (err) {
+      console.error('[featureGuard] DB error:', err);
+    }
+
+    next();
+  };
 };

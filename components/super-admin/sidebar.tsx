@@ -83,8 +83,12 @@ const navigationItems = [
   },
 ]
 
-export function Sidebar() {
-  const [isOpen, setIsOpen] = useState(false)
+interface SidebarProps {
+  isOpen: boolean
+  setIsOpen: (open: boolean) => void
+}
+
+export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -95,24 +99,16 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile menu button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 left-4 z-50 lg:hidden bg-primary text-primary-foreground p-2 rounded-lg"
-      >
-        {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-      </button>
-
       {/* Sidebar */}
       <aside
         className={cn(
           'flex flex-col bg-card border-r border-border transition-all duration-300 w-64',
-          'fixed lg:static h-full z-40',
+          'fixed lg:static h-full z-50',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
         {/* Logo Section */}
-        <div className="flex items-center justify-between p-4 border-b border-border mt-12 lg:mt-0">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <Logo size="sm" href="/super-admin" />
           <button
             onClick={() => setIsOpen(false)}
@@ -169,13 +165,6 @@ export function Sidebar() {
         </div>
       </aside>
 
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm lg:hidden z-30"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
     </>
   )
 }

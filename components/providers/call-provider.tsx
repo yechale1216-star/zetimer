@@ -5,6 +5,7 @@ import { useWebRTC } from '@/lib/hooks/use-webrtc';
 import { IncomingCallModal } from '@/components/messaging/calling/IncomingCallModal';
 import { CallOverlay } from '@/components/messaging/calling/CallOverlay';
 import { authService } from '@/lib/auth/auth';
+import { useToast } from '@/hooks/use-toast';
 
 interface CallContextType {
   initiateCall: (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => void;
@@ -19,6 +20,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [incomingCallData, setIncomingCallData] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [callType, setCallType] = useState<'VOICE' | 'VIDEO'>('VOICE');
+  const { toast } = useToast();
 
   useEffect(() => {
     const user = authService.getCurrentUser();
@@ -54,6 +56,17 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     onCallAccepted,
     onCallEnded,
   });
+
+  // Show a toast whenever the WebRTC hook reports a media-access error
+  useEffect(() => {
+    if (webrtc.mediaError) {
+      toast({
+        title: 'Camera / Microphone Error',
+        description: webrtc.mediaError,
+        variant: 'destructive',
+      });
+    }
+  }, [webrtc.mediaError, toast]);
 
   useEffect(() => {
     let timeout: NodeJS.Timeout;

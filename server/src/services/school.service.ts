@@ -105,22 +105,50 @@ export const getSchoolDetails = async (id: string) => {
   });
   if (!school) return null;
 
-  const [userCount, studentCount, adminUser] = await Promise.all([
+  const [userCount, studentCount] = await Promise.all([
     prisma.user.count({ where: { schoolId: id } }),
     prisma.student.count({ where: { schoolId: id } }),
-    prisma.user.findFirst({ 
-      where: { schoolId: id, role: 'admin' },
-      select: { id: true, full_name: true, email: true, phone: true }
-    }),
   ]);
+
+  let adminUser = await prisma.user.findFirst({ 
+    where: { 
+      schoolId: id, 
+      role: { equals: 'admin', mode: 'insensitive' } 
+    },
+    select: { id: true, full_name: true, email: true, phone: true },
+    orderBy: { createdAt: 'asc' }
+  });
+
+  // Fallback: If no 'admin' role found, just take the first user ever created for this school
+  if (!adminUser) {
+    adminUser = await prisma.user.findFirst({
+      where: { schoolId: id },
+      select: { id: true, full_name: true, email: true, phone: true },
+      orderBy: { createdAt: 'asc' }
+    });
+  }
 
   return { ...school, userCount, studentCount, adminUser };
 };
 
 /** Suspend or unsuspend a school */
 export const setSchoolSuspended = async (id: string, suspend: boolean) => {
-  return await prisma.school.update({
-    where: { id },
-    data: { subscriptionStatus: suspend ? 'SUSPENDED' : 'ACTIVE' },
+  return await prisma.$transaction(async (tx) => {
+    // 1. Update School record
+    const school = await tx.school.update({
+      where: { id },
+      data: { subscriptionStatus: suspend ? 'SUSPENDED' : 'ACTIVE' },
+      include: { subscription: true }
+    });
+
+    // 2. Sync Subscription status if it exists
+    if (school.subscription) {
+      await tx.schoolSubscription.update({
+        where: { id: school.subscription.id },
+        data: { status: suspend ? 'suspended' : 'active' }
+      });
+    }
+
+    return school;
   });
 };

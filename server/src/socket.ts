@@ -129,8 +129,28 @@ export const initSocket = (server: HttpServer) => {
       }
     });
 
-    socket.on('typing', (data: { conversationId: string; userId: string; isTyping: boolean }) => {
+    socket.on('typing', (data: { conversationId: string; userId: string; isTyping: boolean; userName: string }) => {
       socket.to(data.conversationId).emit('user_typing', data);
+    });
+
+    socket.on('edit_message', async (data: { messageId: string; conversationId: string; content: string }) => {
+      io.to(data.conversationId).emit('message_edited', data);
+    });
+
+    socket.on('delete_message', async (data: { messageId: string; conversationId: string }) => {
+      io.to(data.conversationId).emit('message_deleted', data);
+    });
+
+    socket.on('pin_message', async (data: { messageId: string; conversationId: string; message: any }) => {
+      io.to(data.conversationId).emit('message_pinned', data);
+    });
+
+    socket.on('unpin_message', async (data: { messageId: string; conversationId: string }) => {
+      io.to(data.conversationId).emit('message_unpinned', data);
+    });
+
+    socket.on('toggle_reaction', async (data: { messageId: string; conversationId: string; emoji: string; userId: string; action: 'added' | 'removed' }) => {
+      io.to(data.conversationId).emit('reaction_updated', data);
     });
 
     socket.on('mark_as_read', async (data: { messageId: string; userId: string; conversationId: string }) => {

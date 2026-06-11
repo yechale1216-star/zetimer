@@ -18,6 +18,41 @@ const ICE_SERVERS = {
   ],
 };
 
+/** Returns a human-readable reason for getUserMedia errors. */
+function describeMediaError(err: unknown): string {
+  if (!(err instanceof Error)) return 'Could not access camera or microphone.';
+  switch (err.name) {
+    case 'NotReadableError':
+    case 'TrackStartError':
+      return 'Camera or microphone is already in use by another app. Close it and try again.';
+    case 'NotAllowedError':
+    case 'PermissionDeniedError':
+      return 'Camera/microphone permission was denied. Please allow access in your browser settings.';
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+      return 'No camera or microphone was found on this device.';
+    case 'OverconstrainedError':
+      return 'The requested media settings are not supported by your device.';
+    default:
+      return err.message || 'Could not access camera or microphone.';
+  }
+}
+
+/**
+ * Acquires a fresh MediaStream with the requested constraints.
+ * Stops any tracks on an existing stream first so the OS releases
+ * the device before we try to re-open it (prevents NotReadableError).
+ */
+async function acquireStream(
+  existing: MediaStream | null,
+  constraints: MediaStreamConstraints,
+): Promise<MediaStream> {
+  if (existing) {
+    existing.getTracks().forEach((t) => t.stop());
+  }
+  return navigator.mediaDevices.getUserMedia(constraints);
+}
+
 export const useWebRTC = (options: WebRTCOptions) => {
   const { socket } = useSocket();
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -25,9 +60,13 @@ export const useWebRTC = (options: WebRTCOptions) => {
   const [callStatus, setCallStatus] = useState<'IDLE' | 'RINGING' | 'CONNECTING' | 'CONNECTED'>('IDLE');
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const callType = useRef<'VOICE' | 'VIDEO'>('VOICE');
+  // Keep a ref to localStream so acquireStream always sees the latest value
+  const localStreamRef = useRef<MediaStream | null>(null);
+  useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
 
   const cleanupUser = useCallback((userId: string) => {
     const pc = peerConnections.current.get(userId);
@@ -82,13 +121,15 @@ export const useWebRTC = (options: WebRTCOptions) => {
 
   const startCall = useCallback(async (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => {
     setCallStatus('CONNECTING');
+    setMediaError(null);
     callType.current = type;
     try {
-      const stream = localStream || await navigator.mediaDevices.getUserMedia({
+      // acquireStream stops stale tracks first — prevents NotReadableError
+      const stream = await acquireStream(localStreamRef.current, {
         audio: true,
         video: type === 'VIDEO',
       });
-      if (!localStream) setLocalStream(stream);
+      setLocalStream(stream);
 
       const pc = createPeerConnection(toId);
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
@@ -107,19 +148,22 @@ export const useWebRTC = (options: WebRTCOptions) => {
       }
     } catch (error) {
       console.error('Error starting call:', error);
+      setMediaError(describeMediaError(error));
       cleanupAll();
     }
-  }, [options.userId, socket, localStream, createPeerConnection, cleanupAll]);
+  }, [options.userId, socket, createPeerConnection, cleanupAll]);
 
   const answerCall = useCallback(async (fromId: string, offer: any, type: 'VOICE' | 'VIDEO') => {
     setCallStatus('CONNECTING');
+    setMediaError(null);
     callType.current = type;
     try {
-      const stream = localStream || await navigator.mediaDevices.getUserMedia({
+      // acquireStream stops stale tracks first — prevents NotReadableError
+      const stream = await acquireStream(localStreamRef.current, {
         audio: true,
         video: type === 'VIDEO',
       });
-      if (!localStream) setLocalStream(stream);
+      setLocalStream(stream);
 
       const pc = createPeerConnection(fromId);
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
@@ -134,9 +178,10 @@ export const useWebRTC = (options: WebRTCOptions) => {
       setCallStatus('CONNECTED');
     } catch (error) {
       console.error('Error answering call:', error);
+      setMediaError(describeMediaError(error));
       cleanupAll();
     }
-  }, [socket, options.userId, localStream, createPeerConnection, cleanupAll]);
+  }, [socket, options.userId, createPeerConnection, cleanupAll]);
 
   const endCall = useCallback(() => {
     peerConnections.current.forEach((_, userId) => {
@@ -237,6 +282,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
     callStatus,
     isMuted,
     isCameraOff,
+    mediaError,
     startCall,
     answerCall,
     endCall,

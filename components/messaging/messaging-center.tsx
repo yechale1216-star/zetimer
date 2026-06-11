@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChatLayout } from '@/components/messaging/chat-layout';
 import { ChatSidebar } from '@/components/messaging/chat-sidebar';
 import { ChatWindow } from '@/components/messaging/chat-window';
+import { CreateGroupModal } from '@/components/messaging/create-group-modal';
+import { GroupInfoPanel } from '@/components/messaging/group-info-panel';
 import { useSocket } from '@/components/providers/socket-provider';
 import { authService } from '@/lib/auth/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +34,8 @@ export function MessagingCenter() {
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, any[]>>({});
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isLoadingSidebar, setIsLoadingSidebar] = useState(true);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
 
   const { socket, isConnected } = useSocket();
   const [user, setUser] = useState<any>(null);
@@ -52,6 +56,12 @@ export function MessagingCenter() {
 
   useEffect(() => {
     setUser(authService.getCurrentUser());
+    
+    // Register global bridge for sidebar to open group modal
+    (window as any).openCreateGroup = () => setIsGroupModalOpen(true);
+    return () => {
+      delete (window as any).openCreateGroup;
+    };
   }, []);
 
   // ── Load sidebar data ────────────────────────────────────────────────────────
@@ -196,12 +206,16 @@ export function MessagingCenter() {
         id: m.id,
         senderId: m.senderId,
         senderName: m.sender?.full_name || 'Unknown',
+        senderAvatar: m.sender?.profile_photo,
         content: m.content,
         timestamp: formatLocalizedTime(m.createdAt, language),
         status: m.readBy && m.readBy.length > 0 ? 'read' : 'sent',
         type: m.type || 'TEXT',
         attachments: m.attachments,
         isMe: m.senderId === userRef.current?.id,
+        reactions: m.reactions || [],
+        isDeleted: m.isDeleted,
+        editedAt: m.editedAt,
       }));
 
       // Store messages keyed by conversationId — never mixed
@@ -266,7 +280,19 @@ export function MessagingCenter() {
       // --- CORE FIX: switch conversations atomically ---
       // 1. Switch active conversation FIRST (clears the window immediately)
       setActiveConversationId(id);
-      setActiveConversationData(chatData);
+      
+      let finalChatData = chatData;
+      if (chatData?.isGroup) {
+        try {
+          const res = await fetch(`${API_URL}/api/groups/${id}`, { headers: getAuthHeaders() });
+          if (res.ok) {
+            finalChatData = await res.json();
+          }
+        } catch (err) {
+          console.error('Failed to fetch full group data:', err);
+        }
+      }
+      setActiveConversationData(finalChatData);
 
       // 2. Join the socket room for this conversation
       if (socket && isConnected) {
@@ -278,6 +304,62 @@ export function MessagingCenter() {
     },
     [user, socket, isConnected, loadMessages, t, toast]
   );
+
+  const handleUpdateRole = async (userId: string, role: string) => {
+    if (!activeConversationId) return;
+    try {
+      const res = await fetch(`${API_URL}/api/groups/${activeConversationId}/members/${userId}/role`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ role })
+      });
+      if (res.ok) {
+        // Refresh group data
+        const groupRes = await fetch(`${API_URL}/api/groups/${activeConversationId}`, { headers: getAuthHeaders() });
+        const data = await groupRes.json();
+        setActiveConversationData(data);
+      }
+    } catch (err) {
+      console.error('Failed to update role:', err);
+    }
+  };
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!activeConversationId) return;
+    try {
+      const res = await fetch(`${API_URL}/api/groups/${activeConversationId}/members/${userId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      if (res.ok) {
+        // Refresh group data
+        const groupRes = await fetch(`${API_URL}/api/groups/${activeConversationId}`, { headers: getAuthHeaders() });
+        const data = await groupRes.json();
+        setActiveConversationData(data);
+      }
+    } catch (err) {
+      console.error('Failed to remove member:', err);
+    }
+  };
+
+  const handleAction = async (action: string, data: any) => {
+    if (!socket || !isConnected) return;
+    
+    switch (action) {
+      case 'edit':
+        socket.emit('edit_message', { ...data, conversationId: activeConversationId });
+        break;
+      case 'delete':
+        socket.emit('delete_message', { ...data, conversationId: activeConversationId });
+        break;
+      case 'pin':
+        socket.emit('pin_message', { ...data, conversationId: activeConversationId });
+        break;
+      case 'react':
+        socket.emit('toggle_reaction', { ...data, conversationId: activeConversationId, userId: user?.id });
+        break;
+    }
+  };
 
   // Sync activeConversationData when conversations list updates (for real-time presence)
   useEffect(() => {
@@ -404,11 +486,54 @@ export function MessagingCenter() {
       ));
     };
 
+    const handleMessageEdited = (data: { messageId: string, content: string, conversationId: string }) => {
+      setMessagesByConversation(prev => {
+        const msgs = prev[data.conversationId];
+        if (!msgs) return prev;
+        return {
+          ...prev,
+          [data.conversationId]: msgs.map(m => m.id === data.messageId ? { ...m, content: data.content, editedAt: new Date() } : m)
+        };
+      });
+    };
+
+    const handleMessageDeleted = (data: { messageId: string, conversationId: string }) => {
+      setMessagesByConversation(prev => {
+        const msgs = prev[data.conversationId];
+        if (!msgs) return prev;
+        return {
+          ...prev,
+          [data.conversationId]: msgs.map(m => m.id === data.messageId ? { ...m, isDeleted: true, content: null } : m)
+        };
+      });
+    };
+
+    const handleReactionUpdated = (data: { messageId: string, emoji: string, userId: string, action: 'added' | 'removed', conversationId: string }) => {
+      setMessagesByConversation(prev => {
+        const msgs = prev[data.conversationId];
+        if (!msgs) return prev;
+        return {
+          ...prev,
+          [data.conversationId]: msgs.map(m => {
+            if (m.id !== data.messageId) return m;
+            const existing = m.reactions || [];
+            const updated = data.action === 'added' 
+              ? [...existing, { emoji: data.emoji, userId: data.userId }]
+              : existing.filter((r: any) => !(r.emoji === data.emoji && r.userId === data.userId));
+            return { ...m, reactions: updated };
+          })
+        };
+      });
+    };
+
     socket.on('new_message', handleNewMessage);
     socket.on('message_read', handleMessageRead);
     socket.on('initial_online_users', handleInitialOnlineUsers);
     socket.on('user_online', handleUserOnline);
     socket.on('user_offline', handleUserOffline);
+    socket.on('message_edited', handleMessageEdited);
+    socket.on('message_deleted', handleMessageDeleted);
+    socket.on('reaction_updated', handleReactionUpdated);
 
     return () => {
       socket.off('new_message', handleNewMessage);
@@ -416,6 +541,9 @@ export function MessagingCenter() {
       socket.off('initial_online_users', handleInitialOnlineUsers);
       socket.off('user_online', handleUserOnline);
       socket.off('user_offline', handleUserOffline);
+      socket.off('message_edited', handleMessageEdited);
+      socket.off('message_deleted', handleMessageDeleted);
+      socket.off('reaction_updated', handleReactionUpdated);
     };
   }, [socket, isConnected, user]);
 
@@ -443,7 +571,7 @@ export function MessagingCenter() {
     : [];
 
   return (
-    <div className="h-full">
+    <div className="h-full relative overflow-hidden">
       <ChatLayout
         sidebar={
           <ChatSidebar
@@ -454,20 +582,44 @@ export function MessagingCenter() {
               handleSelectConversation(id, chat);
             }}
             isLoading={isLoadingSidebar}
+            currentUser={user}
           />
         }
         content={
-          <ChatWindow
-            activeConversation={activeConversationData}
-            messages={currentMessages}
-            onSendMessage={handleSendMessage}
-            isLoading={isLoadingMessages}
-            onBack={() => {
-              setActiveConversationId(null);
-              setActiveConversationData(null);
-            }}
-          />
+          <div className="flex h-full overflow-hidden">
+            <ChatWindow
+              activeConversation={activeConversationData}
+              messages={currentMessages}
+              onSendMessage={handleSendMessage}
+              isLoading={isLoadingMessages}
+              onBack={() => {
+                setActiveConversationId(null);
+                setActiveConversationData(null);
+              }}
+              onToggleInfo={() => setIsInfoPanelOpen(!isInfoPanelOpen)}
+              onAction={handleAction}
+            />
+            {isInfoPanelOpen && activeConversationData?.isGroup && (
+              <GroupInfoPanel 
+                group={activeConversationData}
+                currentUser={user}
+                onClose={() => setIsInfoPanelOpen(false)}
+                onUpdateRole={handleUpdateRole}
+                onRemoveMember={handleRemoveMember}
+              />
+            )}
+          </div>
         }
+      />
+
+      <CreateGroupModal 
+        isOpen={isGroupModalOpen}
+        onClose={() => setIsGroupModalOpen(false)}
+        onCreated={(group) => {
+          setConversations(prev => [group, ...prev]);
+          handleSelectConversation(group.id, group);
+        }}
+        currentUser={user}
       />
     </div>
   );

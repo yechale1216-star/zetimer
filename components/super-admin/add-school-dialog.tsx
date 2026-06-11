@@ -30,6 +30,7 @@ interface AddSchoolDialogProps {
 export function AddSchoolDialog({ open, onOpenChange, onSuccess }: AddSchoolDialogProps) {
   const [formData, setFormData] = useState({
     name: '',
+    address: '',
     adminName: '',
     adminEmail: '',
     adminPhone: '',
@@ -71,6 +72,7 @@ export function AddSchoolDialog({ open, onOpenChange, onSuccess }: AddSchoolDial
       // Optionally reset form but keep success data visible
       setFormData({
         name: '',
+        address: '',
         adminName: '',
         adminEmail: '',
         adminPhone: '',
@@ -144,6 +146,18 @@ export function AddSchoolDialog({ open, onOpenChange, onSuccess }: AddSchoolDial
                 placeholder="e.g., Springfield High School"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">School Address *</Label>
+              <Input
+                id="address"
+                placeholder="e.g., Bole, Addis Ababa"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 required
                 disabled={loading}
               />

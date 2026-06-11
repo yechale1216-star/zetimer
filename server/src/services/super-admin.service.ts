@@ -433,7 +433,7 @@ export const getEnrichedSchools = async (params: { query?: string, page?: number
       schoolId: s.schoolId,
       name: s.name,
       onboardingStatus: s.onboardingStatus,
-      subscriptionStatus: s.subscription?.status ?? "none",
+      subscriptionStatus: s.subscriptionStatus.toLowerCase(),
       plan: s.subscription?.plan?.name ?? "No Plan",
       userCount: s._count.users,
       studentCount: s._count.students,
@@ -445,16 +445,32 @@ export const getEnrichedSchools = async (params: { query?: string, page?: number
 };
 
 export const updateSchoolStatus = async (id: string, action: "suspend" | "activate") => {
-  // Toggle the school's active state via subscription status
-  const school = await prisma.school.findUnique({ where: { id }, include: { subscription: true } });
-  if (!school) throw new Error("School not found");
-
-  if (school.subscription) {
-    await prisma.schoolSubscription.update({
-      where: { id: school.subscription.id },
-      data: { status: action === "suspend" ? "suspended" : "active" }
+  return await prisma.$transaction(async (tx) => {
+    const school = await tx.school.findUnique({ 
+      where: { id }, 
+      include: { subscription: true } 
     });
-  }
+    
+    if (!school) throw new Error("School not found");
 
-  return { id, action };
+    const newStatus = action === "suspend" ? "suspended" : "active";
+    const schoolModelStatus = action === "suspend" ? "SUSPENDED" : "ACTIVE";
+
+    // 1. Update Subscription record if it exists
+    if (school.subscription) {
+      await tx.schoolSubscription.update({
+        where: { id: school.subscription.id },
+        data: { status: newStatus as any }
+      });
+    }
+
+    // 2. Update School record (Source of truth for suspendedGuard)
+    await tx.school.update({
+      where: { id },
+      data: { subscriptionStatus: schoolModelStatus }
+    });
+
+    console.log(`[SuperAdmin] School ${school.schoolId} ${action === "suspend" ? "SUSPENDED" : "ACTIVATED"}`);
+    return { id, action };
+  });
 };

@@ -31,7 +31,6 @@ import Image from "next/image"
 interface OnboardingData {
   // Step 1 – School Profile
   schoolEmail: string
-  address: string
   logoUrl: string
   logoPreview: string
   // Step 2 – Academic Structure
@@ -67,7 +66,6 @@ export default function OnboardingWizard() {
 
   const [data, setData] = useState<OnboardingData>({
     schoolEmail: "",
-    address: "",
     logoUrl: "",
     logoPreview: "",
     academicYear: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`,
@@ -128,7 +126,6 @@ export default function OnboardingWizard() {
     setSaving(true)
     const result = await authService.completeOnboarding({
       schoolEmail: data.schoolEmail || undefined,
-      address: data.address || undefined,
       logoUrl: data.logoUrl || undefined,
       academicYear: data.academicYear || undefined,
       attendanceMode: data.attendanceMode,
@@ -361,23 +358,6 @@ function ProfileStep({
           />
         </div>
         <p className="text-[10px] text-muted-foreground ml-1">Used for school-wide notifications and announcements</p>
-      </div>
-
-      {/* Address */}
-      <div className="space-y-1.5">
-        <Label htmlFor="address">
-          School Address <span className="text-muted-foreground text-xs">(Optional)</span>
-        </Label>
-        <div className="relative">
-          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            id="address"
-            placeholder="e.g. Bole, Addis Ababa"
-            value={data.address}
-            onChange={(e) => update({ address: e.target.value })}
-            className="pl-10 h-11 rounded-xl bg-background/50 border-border/50"
-          />
-        </div>
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 /** Product tier (feature bundle) — not the billing cadence */
-export type TierPlan = "starter" | "standard" | "premium" | "enterprise"
+export type TierPlan = "free" | "starter" | "standard" | "premium" | "enterprise"
 
 /** Billing cadence */
 export type BillingPeriod = "monthly" | "semester" | "yearly"

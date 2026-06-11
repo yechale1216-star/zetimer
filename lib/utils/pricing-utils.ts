@@ -16,6 +16,12 @@ export const TIER_CONFIG: Record<
   TierPlan,
   { label: string; basePerStudentMonth: number; maxStudentsSoft: number; description: string }
 > = {
+  free: {
+    label: "Free Trial",
+    basePerStudentMonth: 0,
+    maxStudentsSoft: 50,
+    description: "Trial for new schools",
+  },
   starter: {
     label: "Starter",
     basePerStudentMonth: 150,
@@ -127,7 +133,7 @@ export function calculateDynamicPrice(
 export function recommendPlanUpgrade(tier: TierPlan, studentCount: number): PlanUpgradeRecommendation {
   const soft = TIER_CONFIG[tier].maxStudentsSoft
   if (studentCount > soft) {
-    const order: TierPlan[] = ["starter", "standard", "premium", "enterprise"]
+    const order: TierPlan[] = ["free", "starter", "standard", "premium", "enterprise"]
     const idx = order.indexOf(tier)
     const next = order[Math.min(idx + 1, order.length - 1)] as TierPlan
     if (next !== tier) {

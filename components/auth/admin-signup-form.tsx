@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { authService, type SignupCredentials } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
-import { ArrowLeft, User, Phone, Mail, Lock, ShieldCheck, Loader2, Eye, EyeOff, CheckCircle2, ExternalLink } from "lucide-react"
+import { ArrowLeft, User, Phone, Mail, Lock, ShieldCheck, Loader2, Eye, EyeOff, CheckCircle2, ExternalLink, MapPin } from "lucide-react"
 import Link from "next/link"
 
 interface AdminSignupFormProps {
@@ -45,6 +45,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
     role: "admin",
     name: "",
     schoolName: "",
+    schoolAddress: "",
   })
 
   const [isLoading, setIsLoading] = useState(false)
@@ -115,6 +116,10 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
 
     if (!credentials.schoolName?.trim()) {
       newErrors.schoolName = "School name is required"
+    }
+
+    if (!credentials.schoolAddress?.trim()) {
+      newErrors.schoolAddress = "School address is required"
     }
 
     if (!credentials.phone.trim()) {
@@ -264,8 +269,34 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                 }`}
               />
             </div>
-            {fieldErrors.schoolName && <p className="text-[10px] text-destructive ml-1">{fieldErrors.schoolName}</p>}
           </div>
+
+          <div className="space-y-4">
+            {/* School Address */}
+            <div className="space-y-1.5">
+              <Label htmlFor="schoolAddress">School Address</Label>
+              <div className="relative group">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <Input
+                  id="schoolAddress"
+                  placeholder="e.g. Bole, Addis Ababa"
+                  value={credentials.schoolAddress}
+                  onChange={(e) => {
+                    setCredentials((prev) => ({ ...prev, schoolAddress: e.target.value }))
+                    setFieldErrors((prev) => ({ ...prev, schoolAddress: "" }))
+                  }}
+                  required
+                  className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
+                    fieldErrors.schoolAddress ? "border-destructive ring-destructive/10" : ""
+                  }`}
+                />
+              </div>
+              {fieldErrors.schoolAddress && <p className="text-[10px] text-destructive ml-1">{fieldErrors.schoolAddress}</p>}
+            </div>
+          </div>
+
 
           {/* Phone */}
           <div className="space-y-1.5">
@@ -418,26 +449,28 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
 
           {/* Terms & Conditions */}
           <div className="space-y-1">
-            <label className="flex gap-3 items-start cursor-pointer group select-none">
+            <label
+              htmlFor="terms"
+              className="flex gap-3 items-start cursor-pointer group select-none"
+            >
+              {/* Visual box — pointer-events-none so all clicks reach the label→input */}
               <div
-                className={`mt-0.5 w-4 h-4 shrink-0 rounded border transition-colors flex items-center justify-center ${
+                className={`mt-0.5 w-5 h-5 shrink-0 rounded border-2 transition-all flex items-center justify-center pointer-events-none ${
                   termsAccepted
                     ? "bg-primary border-primary"
                     : fieldErrors.terms
                     ? "border-destructive bg-destructive/5"
-                    : "border-border/70 bg-background/50 group-hover:border-primary/50"
+                    : "border-border/70 bg-background/50 group-hover:border-primary/60"
                 }`}
-                onClick={() => {
-                  setTermsAccepted((v) => !v)
-                  setFieldErrors((prev) => ({ ...prev, terms: "" }))
-                }}
               >
                 {termsAccepted && (
-                  <svg className="w-2.5 h-2.5 text-primary-foreground" fill="none" viewBox="0 0 12 12">
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 12 12">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
               </div>
+
+              {/* Hidden native input — label's htmlFor points here, so clicking anywhere in the label toggles this */}
               <input
                 type="checkbox"
                 id="terms"
@@ -448,11 +481,13 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                 }}
                 className="sr-only"
               />
+
               <span className="text-xs text-muted-foreground leading-relaxed">
                 I agree to the{" "}
                 <Link
                   href="/terms"
                   target="_blank"
+                  onClick={(e) => e.stopPropagation()}
                   className="text-primary underline underline-offset-2 hover:text-primary/80 inline-flex items-center gap-0.5"
                 >
                   Terms &amp; Conditions

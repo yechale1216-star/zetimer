@@ -114,7 +114,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
 // Signup (Admin creates school and account)
 router.post('/signup', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name, schoolName, phone } = req.body;
+    const { email, password, name, schoolName, schoolAddress, phone } = req.body;
 
     // Server-side validation
     if (!name || name.trim().length < 2) {
@@ -126,11 +126,12 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
 
     const { school, admin } = await onboardingService.startOnboarding({
       schoolName,
+      address: schoolAddress,
       adminName: name,
       adminEmail: email,
       adminPhone: phone,
       adminPassword: password,
-      subscriptionTier: 'starter' // Default for public signup
+      subscriptionTier: 'free' // Default for public signup
     });
 
     const token = generateToken({

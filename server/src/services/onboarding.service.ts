@@ -7,6 +7,7 @@ import { generateSchoolId } from '../utils/school-id';
 
 export interface OnboardingData {
   schoolName: string;
+  address: string;
   adminName: string;
   adminEmail: string;
   adminPhone?: string;
@@ -21,6 +22,7 @@ export interface OnboardingData {
 export const startOnboarding = async (data: OnboardingData) => {
   const { 
     schoolName, 
+    address,
     adminName, 
     adminEmail, 
     adminPhone, 
@@ -46,6 +48,7 @@ export const startOnboarding = async (data: OnboardingData) => {
         settings: {
           create: {
             school_name: schoolName,
+            school_address: address,
             attendance_mode: 'session_based',
             attendance_ui_type: 'card_based'
           }

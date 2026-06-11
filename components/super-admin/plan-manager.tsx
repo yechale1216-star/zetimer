@@ -11,6 +11,7 @@ import {
   ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Calendar, GraduationCap
 } from "lucide-react"
 import { getApiUrl } from "@/lib/auth/auth"
+import { cn } from "@/lib/utils/utils"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -232,8 +233,15 @@ function PlanCard({ plan, onEdit, onDelete, onToggle }: PlanCardProps) {
   const isFree = plan.slug === 'free' || (Number(plan.monthlyTotal) === 0 && Number(plan.semesterTotal) === 0 && Number(plan.yearlyTotal) === 0)
 
   return (
-    <Card className={`transition-all ${plan.isActive ? "" : "opacity-60"} relative overflow-hidden`}>
-      <CardHeader className="pb-3">
+    <Card 
+      className={cn(
+        "transition-all duration-300 relative overflow-hidden cursor-pointer",
+        "border-border/60 hover:border-primary hover:ring-2 hover:ring-primary/20 hover:shadow-lg hover:shadow-primary/20 dark:hover:shadow-primary/10",
+        !plan.isActive && "opacity-60"
+      )}
+      onClick={onEdit}
+    >
+      <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -242,67 +250,67 @@ function PlanCard({ plan, onEdit, onDelete, onToggle }: PlanCardProps) {
               {plan.isCustom && <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-500/5">Custom</Badge>}
               {!plan.isActive && <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>}
             </div>
-            {plan.description && <CardDescription className="mt-1 text-sm">{plan.description}</CardDescription>}
+            {plan.description && <CardDescription className="mt-1 text-xs truncate max-w-[200px]">{plan.description}</CardDescription>}
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onToggle} title={plan.isActive ? "Deactivate" : "Activate"}>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); onToggle(); }} title={plan.isActive ? "Deactivate" : "Activate"}>
               {plan.isActive ? <ToggleRight className="w-4 h-4 text-primary" /> : <ToggleLeft className="w-4 h-4 text-muted-foreground" />}
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onEdit}><Edit className="w-4 h-4" /></Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={onDelete} disabled={subscriptions > 0 || plan.slug === 'free'} title={plan.slug === 'free' ? "System plan cannot be deleted" : subscriptions > 0 ? "Has active subscriptions" : "Delete"}>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); onEdit(); }}><Edit className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(); }} disabled={subscriptions > 0 || plan.slug === 'free'} title={plan.slug === 'free' ? "System plan cannot be deleted" : subscriptions > 0 ? "Has active subscriptions" : "Delete"}>
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-2.5 pb-3">
         {/* Pricing table — only for paid plans */}
         {isFree ? (
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-green-500/5 rounded-lg p-2 border border-green-500/10">
-              <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-tight">Max Students</p>
-              <p className="text-sm font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.maxStudents === -1 ? '♾️' : plan.maxStudents}</p>
+          <div className="grid grid-cols-3 gap-1.5 text-center">
+            <div className="bg-green-500/5 rounded-lg p-1.5 border border-green-500/10">
+              <p className="text-[9px] text-muted-foreground uppercase font-semibold tracking-tight">Max Students</p>
+              <p className="text-xs font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.maxStudents === -1 ? '♾️' : plan.maxStudents}</p>
             </div>
-            <div className="bg-green-500/5 rounded-lg p-2 border border-green-500/10">
-              <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-tight">Max Users</p>
-              <p className="text-sm font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.maxUsers === -1 ? '♾️' : plan.maxUsers}</p>
+            <div className="bg-green-500/5 rounded-lg p-1.5 border border-green-500/10">
+              <p className="text-[9px] text-muted-foreground uppercase font-semibold tracking-tight">Max Users</p>
+              <p className="text-xs font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.maxUsers === -1 ? '♾️' : plan.maxUsers}</p>
             </div>
-            <div className="bg-green-500/5 rounded-lg p-2 border border-green-500/10">
-              <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-tight">Trial Days</p>
-              <p className="text-sm font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.trialDays ?? 14}</p>
+            <div className="bg-green-500/5 rounded-lg p-1.5 border border-green-500/10">
+              <p className="text-[9px] text-muted-foreground uppercase font-semibold tracking-tight">Trial Days</p>
+              <p className="text-xs font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.trialDays ?? 14}</p>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-3 gap-1.5 text-center">
             {[
               { label: "Monthly", price: plan.monthlyTotal },
               { label: "Semester", price: plan.semesterTotal },
               { label: "Yearly", price: plan.yearlyTotal },
             ].map(({ label, price }) => (
-              <div key={label} className="bg-primary/5 rounded-lg p-2 border border-primary/10">
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-tight">{label}</p>
-                <p className="text-sm font-bold text-primary mt-0.5">{Number(price).toLocaleString()} ETB</p>
-                <p className="text-[9px] text-primary/60 font-medium">Full Package</p>
+              <div key={label} className="bg-primary/5 rounded-lg p-1.5 border border-primary/10">
+                <p className="text-[9px] text-muted-foreground uppercase font-semibold tracking-tight">{label}</p>
+                <p className="text-xs font-bold text-primary mt-0.5">{Number(price).toLocaleString()} ETB</p>
+                <p className="text-[8px] text-primary/60 font-medium tracking-tight">Package</p>
               </div>
             ))}
           </div>
         )}
 
         {/* Stats */}
-        <div className="space-y-3 pt-1">
-          <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-sm text-foreground/80">
-            <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
-              <Users className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-semibold">Up to {plan.maxStudents === -1 ? "♾️" : plan.maxStudents.toLocaleString()}</span> Students
+        <div className="space-y-2 pt-0.5">
+          <div className="flex flex-wrap items-center gap-y-1.5 gap-x-3 text-xs text-foreground/80">
+            <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-md">
+              <Users className="w-3 h-3 text-muted-foreground" />
+              <span className="font-semibold">{plan.maxStudents === -1 ? "♾️" : plan.maxStudents.toLocaleString()}</span> Students
             </div>
-            <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
-              <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-semibold">Up to {plan.maxUsers === -1 ? "♾️" : plan.maxUsers.toLocaleString()}</span> Teachers
+            <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-md">
+              <Plus className="w-3 h-3 text-muted-foreground" />
+              <span className="font-semibold">{plan.maxUsers === -1 ? "♾️" : plan.maxUsers.toLocaleString()}</span> Teachers
             </div>
           </div>
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground border-t border-border/50 pt-2">
-            <span className="flex items-center gap-1.5"><Check className="w-3 h-3 text-green-500" /> All Core Features</span>
-            <Badge variant="secondary" className="text-[9px] font-normal">{subscriptions} schools</Badge>
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground border-t border-border/50 pt-1.5">
+            <span className="flex items-center gap-1"><Check className="w-2.5 h-2.5 text-green-500" /> Core Features</span>
+            <Badge variant="secondary" className="text-[8px] font-normal px-1 h-3.5 leading-none">{subscriptions} schools</Badge>
           </div>
         </div>
       </CardContent>

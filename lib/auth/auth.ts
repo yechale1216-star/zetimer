@@ -47,6 +47,7 @@ export interface SignupCredentials {
   phone: string
   schoolId?: string
   schoolName?: string
+  schoolAddress?: string
 }
 
 class AuthService {
@@ -272,6 +273,7 @@ class AuthService {
           password: credentials.password,
           name: credentials.name,
           schoolName: credentials.schoolName,
+          schoolAddress: credentials.schoolAddress,
           role: credentials.role,
           phone: credentials.phone
         }),
@@ -445,8 +447,13 @@ class AuthService {
         // Update local user
         const user = this.getCurrentUser()
         if (user && this.isClient()) {
-          const updated = { ...user, onboardingCompleted: true }
+          const updated = { 
+            ...user, 
+            onboardingCompleted: true,
+            schoolLogo: payload.logoUrl || user.schoolLogo
+          }
           localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(updated))
+          window.dispatchEvent(new Event("userSessionChanged"))
         }
         return { success: true, message: data.message }
       }

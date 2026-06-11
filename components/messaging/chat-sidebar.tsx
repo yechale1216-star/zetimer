@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Pin, BellOff, MoreVertical, Plus, Users, User as UserIcon } from 'lucide-react';
+import { Search, Pin, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils/utils';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatListSkeleton } from './skeletons';
 import { useLanguage } from '@/lib/context/language-context';
@@ -23,6 +23,7 @@ interface Conversation {
   isPinned?: boolean;
   isMuted?: boolean;
   isNewContact?: boolean;
+  isGroup?: boolean;
 }
 
 interface ChatSidebarProps {
@@ -30,13 +31,15 @@ interface ChatSidebarProps {
   activeConversationId?: string;
   onSelectConversation: (id: string) => void;
   isLoading?: boolean;
+  currentUser?: { name?: string; profile_photo?: string } | null;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   conversations,
   activeConversationId,
   onSelectConversation,
-  isLoading
+  isLoading,
+  currentUser
 }) => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +53,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     if (activeTab === 'Teacher') return matchesSearch && (c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin');
     if (activeTab === 'Parents') return matchesSearch && c.role?.toLowerCase() === 'parent';
     if (activeTab === 'Unread') return matchesSearch && (c.unreadCount ?? 0) > 0;
+    if (activeTab === 'Groups') return matchesSearch && c.isGroup;
     
     return matchesSearch;
   });
@@ -59,22 +63,32 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       {/* Sidebar Header & Search */}
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
+          <h2 className="typography-section-title">{t("communication")}</h2>
           <div className="flex items-center gap-2">
-            <h2 className="typography-section-title">{t("school_directory")}</h2>
-            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full bg-primary/10 text-primary hover:bg-primary/20">
-              <Plus className="h-4 w-4" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => (window as any).openCreateGroup?.()}
+              className="h-8 w-8 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-90"
+            >
+              <Plus className="h-5 w-5" />
             </Button>
+            {currentUser && (
+              <Avatar className="h-8 w-8 cursor-pointer border border-border">
+                <AvatarImage src={currentUser.profile_photo || ''} />
+                <AvatarFallback className="typography-label bg-primary/10 text-primary">
+                  {currentUser.name ? currentUser.name.slice(0, 2).toUpperCase() : 'U'}
+                </AvatarFallback>
+              </Avatar>
+            )}
           </div>
-          <Avatar className="h-8 w-8 cursor-pointer border border-border">
-            <AvatarImage src="" />
-            <AvatarFallback className="typography-label bg-primary/10 text-primary">U</AvatarFallback>
-          </Avatar>
         </div>
         
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
           <FilterTab label={t("all")} active={activeTab === 'All'} onClick={() => setActiveTab('All')} count={conversations.length} />
-          <FilterTab label={t("staff")} active={activeTab === 'Teacher'} onClick={() => setActiveTab('Teacher')} count={conversations.filter(c => c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin').length} />
-          <FilterTab label={t("parents")} active={activeTab === 'Parents'} onClick={() => setActiveTab('Parents')} count={conversations.filter(c => c.role?.toLowerCase() === 'parent').length} />
+          <FilterTab label="Groups" active={activeTab === 'Groups'} onClick={() => setActiveTab('Groups')} count={conversations.filter(c => c.isGroup).length} />
+          <FilterTab label={t("staff")} active={activeTab === 'Teacher'} onClick={() => setActiveTab('Teacher')} count={conversations.filter(c => !c.isGroup && (c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin')).length} />
+          <FilterTab label={t("parents")} active={activeTab === 'Parents'} onClick={() => setActiveTab('Parents')} count={conversations.filter(c => !c.isGroup && c.role?.toLowerCase() === 'parent').length} />
           <FilterTab label={t("unread")} active={activeTab === 'Unread'} onClick={() => setActiveTab('Unread')} count={conversations.filter(c => (c.unreadCount ?? 0) > 0).length} />
         </div>
 
@@ -130,7 +144,9 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                    <div className="flex items-center justify-between mb-0.5">
                      <div className="flex flex-col">
                        <span className="typography-label truncate text-[15px]">{chat.name}</span>
-                       <span className="typography-label text-[10px] opacity-70 uppercase">{t(chat.role?.toLowerCase() as any)}</span>
+                       <span className="typography-label text-[10px] opacity-70 uppercase">
+                         {chat.isGroup ? 'GROUP' : t(chat.role?.toLowerCase() as any)}
+                       </span>
                      </div>
                      <span className={cn(
                        "text-[10px] whitespace-nowrap ml-2",
@@ -162,10 +178,9 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
               </button>
             ))}
 
-            {filteredConversations.filter(c => c.isNewContact).length > 0 && (
-              <div className="typography-label px-3 pt-6 pb-1 text-[11px] text-muted-foreground/50 uppercase">
-                {t("school_directory")}
-              </div>
+            {filteredConversations.filter(c => !c.isNewContact).length > 0 &&
+             filteredConversations.filter(c => c.isNewContact).length > 0 && (
+              <div className="mx-3 my-2 border-t border-border/30" />
             )}
             {filteredConversations.filter(c => c.isNewContact).map((chat) => (
                <button

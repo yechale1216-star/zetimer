@@ -5,7 +5,8 @@ import {
   Send, Paperclip, Smile, MoreVertical, Phone, Video, ChevronLeft, 
   Check, CheckCheck, Reply, Forward, Trash2, Heart, Search, X, 
   Pin, Copy, FileText, FileJson, FileType, Music, Play, ExternalLink, 
-  Download, Globe, FileArchive, Mic, MicOff, StopCircle, ImageIcon, File as FileIcon
+  Download, Globe, FileArchive, Mic, MicOff, StopCircle, ImageIcon, File as FileIcon,
+  Info, Bell
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,6 +18,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   ContextMenu,
@@ -48,6 +50,8 @@ interface Message {
     type: string;
     size: number;
   }[];
+  isDeleted?: boolean;
+  editedAt?: Date | string | null;
 }
 
 interface ChatWindowProps {
@@ -55,6 +59,8 @@ interface ChatWindowProps {
   messages: Message[];
   onSendMessage: (content: string, options?: { type: string; attachment?: any }) => void;
   onBack?: () => void;
+  onToggleInfo?: () => void;
+  onAction?: (action: string, data: any) => void;
   isLoading?: boolean;
 }
 
@@ -63,6 +69,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   messages,
   onSendMessage,
   onBack,
+  onToggleInfo,
+  onAction,
   isLoading,
 }) => {
   const { t } = useLanguage();
@@ -320,10 +328,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       />
 
       {/* Chat Header */}
-      <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-4 z-40 sticky top-0 font-sans">
-        <div className="flex items-center gap-3">
+      <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-4 z-40 sticky top-0 font-sans shadow-sm">
+        <div 
+          className={cn(
+            "flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity",
+            activeConversation.isGroup ? "cursor-pointer" : "cursor-default"
+          )}
+          onClick={() => activeConversation.isGroup && onToggleInfo?.()}
+        >
           {onBack && (
-            <Button variant="ghost" size="icon" onClick={onBack} className="md:hidden">
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onBack(); }} className="md:hidden">
               <ChevronLeft className="h-5 w-5" />
             </Button>
           )}
@@ -338,9 +352,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-background rounded-full" />
             )}
           </div>
-          <div className="flex flex-col">
-            <span className="typography-label text-[15px]">{activeConversation.name}</span>
-            {activeConversation.isOnline ? (
+          <div className="flex flex-col min-w-0">
+            <span className="typography-label text-[15px] truncate">{activeConversation.name}</span>
+            {activeConversation.isGroup ? (
+              <span className="text-[11px] text-muted-foreground/80 truncate">
+                {activeConversation.members?.length} members • {activeConversation.groupType || 'Group'}
+              </span>
+            ) : activeConversation.isOnline ? (
               <span className="typography-label text-[11px] text-green-500 font-medium">{t("online")}</span>
             ) : (
               <span className="text-[11px] text-muted-foreground/80">
@@ -381,11 +399,26 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem>{t("view_profile")}</DropdownMenuItem>
-              <DropdownMenuItem>{t("mute_notifications")}</DropdownMenuItem>
-              <DropdownMenuItem>{t("clear_chat")}</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">{t("delete_chat")}</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl border-none shadow-xl p-2">
+              <DropdownMenuItem className="rounded-xl flex gap-3 h-11" onClick={() => activeConversation.isGroup && onToggleInfo?.()}>
+                <Info className="h-4 w-4" />
+                {activeConversation.isGroup ? 'Group Info' : t("view_profile")}
+              </DropdownMenuItem>
+              {activeConversation.isGroup && (
+                <DropdownMenuItem className="rounded-xl flex gap-3 h-11">
+                  <Heart className="h-4 w-4" />
+                  View Shared Media
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem className="rounded-xl flex gap-3 h-11">
+                <Bell className="h-4 w-4" />
+                {t("mute_notifications")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-1 bg-border/50" />
+              <DropdownMenuItem className="rounded-xl flex gap-3 h-11 text-destructive focus:text-destructive">
+                <Trash2 className="h-4 w-4" />
+                {activeConversation.isGroup ? 'Leave Group' : t("delete_chat")}
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -410,6 +443,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   onToggleSelect={() => toggleSelect(message.id)}
                   onEnterSelectionMode={() => setIsSelectionMode(true)}
                   t={t}
+                  isGroup={activeConversation.isGroup}
+                  onAction={onAction}
+                  currentUser={currentUser}
                 />
               );
             })}
@@ -749,6 +785,7 @@ const CustomAudioPlayer = ({ url, isMe }: { url: string, isMe: boolean }) => {
       <audio 
         ref={audioRef} 
         src={url} 
+        preload="metadata"
         onTimeUpdate={handleTimeUpdate} 
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={() => setIsPlaying(false)}
@@ -784,8 +821,8 @@ const CustomAudioPlayer = ({ url, isMe }: { url: string, isMe: boolean }) => {
 const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe }: { file: any, onImageClick: (url: string) => void, isCompact?: boolean, isMe: boolean }) => {
   const file = rawFile.create ? rawFile.create : rawFile;
   const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.url);
-  const isVideo = file.type?.startsWith('video/') || /\.(mp4|webm|ogg)$/i.test(file.url);
-  const isAudio = file.type?.startsWith('audio/') || /\.(mp3|wav|ogg)$/i.test(file.url);
+  const isAudio = file.type?.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(file.url) || file.url.includes('voice-');
+  const isVideo = (file.type?.startsWith('video/') || /\.(mp4|webm)$/i.test(file.url)) && !file.url.includes('voice-');
 
   const getFileIcon = (url: string) => {
     if (url.endsWith('.pdf')) return <FileText className="h-6 w-6 text-red-500" />;
@@ -818,35 +855,50 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe }: { 
     );
   }
 
+  if (isAudio) {
+    return <CustomAudioPlayer url={file.url} isMe={isMe} />;
+  }
+
   if (isVideo || rawFile.type === 'VIDEO_MESSAGE') {
     const isCircular = rawFile.type === 'VIDEO_MESSAGE';
+    const [isMuted, setIsMuted] = useState(isCircular);
+
     return (
-      <div className={cn(
-        "overflow-hidden relative bg-black",
-        isCircular 
-          ? "rounded-full w-48 h-48 border-4 border-white/20 shadow-xl mx-auto my-2" 
-          : (isCompact ? "rounded-lg" : "rounded-xl border border-border/10")
-      )}>
+      <div 
+        className={cn(
+          "overflow-hidden relative bg-black cursor-pointer",
+          isCircular 
+            ? "rounded-full w-48 h-48 border-4 border-white/20 shadow-xl mx-auto my-2" 
+            : (isCompact ? "rounded-lg" : "rounded-xl border border-border/10")
+        )}
+        onClick={() => setIsMuted(!isMuted)}
+      >
         <video 
           src={file.url} 
           controls={!isCircular} 
           autoPlay={isCircular} 
           loop={isCircular} 
-          muted={isCircular}
+          muted={isMuted}
+          playsInline
           className={cn(
             "w-full h-full",
             isCircular ? "object-cover" : "max-h-[400px]"
           )} 
         />
         {isCircular && (
-           <div className="absolute inset-0 border-[6px] border-black/10 rounded-full pointer-events-none" />
+           <>
+             <div className="absolute inset-0 border-[6px] border-black/10 rounded-full pointer-events-none" />
+             {isMuted && (
+               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                 <div className="bg-black/50 p-2 rounded-full">
+                   <MicOff className="h-6 w-6 text-white" />
+                 </div>
+               </div>
+             )}
+           </>
         )}
       </div>
     );
-  }
-
-  if (isAudio) {
-    return <CustomAudioPlayer url={file.url} isMe={isMe} />;
   }
 
   return (
@@ -941,7 +993,10 @@ const MessageBubble = ({
   isSelected, 
   onToggleSelect, 
   onEnterSelectionMode,
-  t
+  t,
+  isGroup,
+  onAction,
+  currentUser
 }: { 
   message: Message, 
   isLastInGroup: boolean,
@@ -949,16 +1004,27 @@ const MessageBubble = ({
   isSelected: boolean,
   onToggleSelect: () => void,
   onEnterSelectionMode: () => void,
-  t: any
+  t: any,
+  isGroup: boolean,
+  onAction?: (action: string, data: any) => void,
+  currentUser: any
 }) => {
   const isMe = message.isMe;
   const hasAttachments = message.attachments && message.attachments.length > 0;
   const isMediaOnly = (hasAttachments && 
-    (!message.content || message.content === 'Image' || message.content === 'File')) || message.type === 'VIDEO_MESSAGE';
+    (!message.content || message.content === 'Image' || message.content === 'Video' || message.content === 'File')) || 
+    message.type === 'VIDEO_MESSAGE' || message.type === 'VIDEO' || message.type === 'IMAGE';
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
   };
+
+  const handleAction = (action: string, data?: any) => {
+    onAction?.(action, { messageId: message.id, ...data });
+  };
+
+  const reactions = (message as any).reactions || [];
+  const uniqReactions = Array.from(new Set(reactions.map((r: any) => r.emoji)));
 
   return (
     <motion.div
@@ -971,18 +1037,34 @@ const MessageBubble = ({
         isLastInGroup && "mb-2",
         isSelectionMode && "cursor-pointer"
       )}
-      onClick={() => isSelectionMode && onToggleSelect()}
     >
+      {!isMe && isGroup && isLastInGroup && (
+        <div className="flex items-center gap-2 mb-1 px-1">
+           <Avatar className="h-5 w-5 border border-border/50">
+              <AvatarImage src={(message as any).senderAvatar} />
+              <AvatarFallback className="bg-primary/20 text-[8px] font-bold text-primary">
+                 {(message as any).senderName?.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+           </Avatar>
+           <span className="text-[10px] font-bold text-primary/80 uppercase">{(message as any).senderName}</span>
+        </div>
+      )}
       <div className={cn(
-        "relative transition-all shadow-sm overflow-hidden",
-        isMediaOnly || message.type === 'VIDEO_MESSAGE' 
-          ? "p-1 rounded-xl bg-white dark:bg-slate-900 border border-border/40" 
-          : cn(
-              "pl-3 pr-12 py-2 rounded-2xl text-[15px]",
-              isMe 
-                ? "bg-primary text-primary-foreground rounded-br-none" 
-                : "bg-white dark:bg-slate-900 border border-border/50 text-foreground rounded-bl-none"
-            ),
+        "relative transition-all shadow-sm",
+        message.isDeleted ? "opacity-50 grayscale italic" : ""
+      )}>
+        <div className={cn(
+          "relative transition-all shadow-sm overflow-hidden",
+        message.type === 'VIDEO_MESSAGE' 
+          ? "p-0 bg-transparent border-none shadow-none" 
+          : (isMediaOnly 
+              ? "p-1 rounded-xl bg-white dark:bg-slate-900 border border-border/40" 
+              : cn(
+                  "pl-3 pr-12 py-2 rounded-2xl text-[15px]",
+                  isMe 
+                    ? "bg-primary text-primary-foreground rounded-br-none" 
+                    : "bg-white dark:bg-slate-900 border border-border/50 text-foreground rounded-bl-none"
+                )),
         !isLastInGroup && !isMediaOnly && (isMe ? "rounded-br-sm" : "rounded-bl-sm")
       )}>
         <ContextMenu>
@@ -1062,11 +1144,34 @@ const MessageBubble = ({
               )}
             </div>
           </ContextMenuTrigger>
-          <ContextMenuContent className="w-56">
-             <ContextMenuItem onClick={handleCopy}>{t("copy_text")}</ContextMenuItem>
-             <ContextMenuItem>{t("reply")}</ContextMenuItem>
-             <ContextMenuItem>{t("forward")}</ContextMenuItem>
-             <ContextMenuItem className="text-destructive">{t("delete")}</ContextMenuItem>
+          <ContextMenuContent className="w-56 rounded-xl border-none shadow-xl p-2">
+             <ContextMenuItem onClick={handleCopy} className="rounded-lg h-10 gap-3">
+               <Copy className="h-4 w-4" />
+               {t("copy_text")}
+             </ContextMenuItem>
+             <ContextMenuItem className="rounded-lg h-10 gap-3">
+               <Reply className="h-4 w-4" />
+               {t("reply")}
+             </ContextMenuItem>
+             {isMe && !message.isDeleted && (
+               <ContextMenuItem onClick={() => handleAction('edit_start')} className="rounded-lg h-10 gap-3">
+                 <MoreVertical className="h-4 w-4" />
+                 Edit Message
+               </ContextMenuItem>
+             )}
+             <ContextMenuItem onClick={() => handleAction('pin')} className="rounded-lg h-10 gap-3">
+               <Pin className="h-4 w-4" />
+               Pin Message
+             </ContextMenuItem>
+             <ContextMenuItem className="rounded-lg h-10 gap-3">
+                <Forward className="h-4 w-4" />
+                {t("forward")}
+             </ContextMenuItem>
+             <ContextMenuSeparator className="my-1 bg-border/50" />
+             <ContextMenuItem onClick={() => handleAction('delete')} className="rounded-lg h-10 gap-3 text-destructive focus:text-destructive">
+               <Trash2 className="h-4 w-4" />
+               {t("delete")}
+             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
 
@@ -1076,6 +1181,7 @@ const MessageBubble = ({
             ? "bg-black/30 backdrop-blur-md text-white px-2 py-0.5 rounded-full" 
             : (isMe ? "text-primary-foreground/70" : "text-muted-foreground")
         )}>
+          {message.editedAt && <span className="italic mr-1">edited</span>}
           <span>{message.timestamp}</span>
           {isMe && (
             <span>
@@ -1088,8 +1194,32 @@ const MessageBubble = ({
           )}
         </div>
 
+        {/* Reactions Display */}
+        {uniqReactions.length > 0 && (
+          <div className={cn(
+            "absolute -bottom-4 flex gap-1",
+            isMe ? "right-0" : "left-0"
+          )}>
+            {uniqReactions.map((emoji: any) => (
+              <button
+                key={emoji}
+                onClick={() => handleAction('react', { emoji })}
+                className={cn(
+                  "bg-white dark:bg-slate-800 border border-border/50 rounded-full px-1.5 py-0.5 text-[10px] shadow-sm hover:scale-110 transition-transform flex items-center gap-1",
+                  reactions.some((r: any) => r.userId === currentUser?.id && r.emoji === emoji) ? "border-primary bg-primary/5" : ""
+                )}
+              >
+                <span>{emoji}</span>
+                <span className="font-bold opacity-70">
+                  {reactions.filter((r: any) => r.emoji === emoji).length}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Telegram-style Corner Tail */}
-        {isLastInGroup && (
+        {isLastInGroup && message.type !== 'VIDEO_MESSAGE' && (
           <div className={cn(
             "absolute bottom-0 w-3 h-3 overflow-hidden",
             message.isMe ? "-right-2" : "-left-2"
@@ -1101,8 +1231,9 @@ const MessageBubble = ({
           </div>
         )}
       </div>
-    </motion.div>
-  );
+    </div>
+  </motion.div>
+);
 };
 
 const DateSeparator = ({ date }: { date: string }) => (

@@ -10,14 +10,15 @@ const router = Router();
 // Create a school (Super Admin Only)
 router.post('/', authorize(['super_admin']), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, adminName, adminEmail, adminPhone, tier } = req.body;
+    const { name, address, adminName, adminEmail, adminPhone, tier } = req.body;
 
-    if (!name || !adminName || !adminEmail) {
-      return res.status(400).json({ success: false, message: 'School name, admin name, and admin email are required' });
+    if (!name || !adminName || !adminEmail || !address) {
+      return res.status(400).json({ success: false, message: 'School name, address, admin name, and admin email are required' });
     }
 
     const { school, admin } = await onboardingService.startOnboarding({
       schoolName: name,
+      address,
       adminName,
       adminEmail,
       adminPhone,

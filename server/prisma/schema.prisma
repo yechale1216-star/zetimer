@@ -478,16 +478,21 @@ model ParentPreferences {
 }
 
 model Conversation {
-  id        String               @id @default(uuid())
-  name      String?
-  isGroup   Boolean              @default(false)
-  avatar    String?
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-  schoolId  String?
-  school    School?              @relation(fields: [schoolId], references: [id])
-  members   ConversationMember[]
-  messages  Message[]
+  id              String               @id @default(uuid())
+  name            String?
+  isGroup         Boolean              @default(false)
+  avatar          String?
+  description     String?
+  groupType       String?              // GRADE | PARENT | TEACHER | STAFF | ANNOUNCEMENT | CUSTOM
+  isAnnouncement  Boolean              @default(false)
+  createdBy       String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  schoolId        String?
+  school          School?              @relation(fields: [schoolId], references: [id])
+  members         ConversationMember[]
+  messages        Message[]
+  pinnedMessages  PinnedMessage[]
 
   @@index([schoolId])
 }
@@ -496,7 +501,11 @@ model ConversationMember {
   id             String       @id @default(uuid())
   conversationId String
   userId         String
-  role           String       @default("MEMBER")
+  role           String       @default("MEMBER") // OWNER | ADMIN | MEMBER
+  isMuted        Boolean      @default(false)
+  mutedUntil     DateTime?
+  lastSeenAt     DateTime?
+  nickname       String?
   joinedAt       DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -507,28 +516,45 @@ model ConversationMember {
 }
 
 model Message {
-  id             String            @id @default(uuid())
-  schoolId       String?
-  conversationId String
-  senderId       String
-  content        String?
-  type           String            @default("TEXT")
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  replyToId      String?
-  attachments    Json?
-  metadata       Json?
-  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  replyTo        Message?          @relation("Replies", fields: [replyToId], references: [id])
-  replies        Message[]         @relation("Replies")
-  school         School?           @relation(fields: [schoolId], references: [id])
-  sender         User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  reactions      MessageReaction[]
-  readBy         MessageRead[]
+  id               String            @id @default(uuid())
+  schoolId         String?
+  conversationId   String
+  senderId         String
+  content          String?
+  type             String            @default("TEXT")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  editedAt         DateTime?
+  isDeleted        Boolean           @default(false)
+  replyToId        String?
+  forwardedFromId  String?
+  attachments      Json?
+  metadata         Json?
+  conversation     Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo          Message?          @relation("Replies", fields: [replyToId], references: [id])
+  replies          Message[]         @relation("Replies")
+  school           School?           @relation(fields: [schoolId], references: [id])
+  sender           User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  reactions        MessageReaction[]
+  readBy           MessageRead[]
+  pinnedIn         PinnedMessage[]
 
   @@index([conversationId])
   @@index([senderId])
   @@index([schoolId])
+}
+
+model PinnedMessage {
+  id             String       @id @default(uuid())
+  conversationId String
+  messageId      String
+  pinnedBy       String
+  pinnedAt       DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message        Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, messageId])
+  @@index([conversationId])
 }
 
 model MessageRead {

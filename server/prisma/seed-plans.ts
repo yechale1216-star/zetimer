@@ -140,6 +140,53 @@ async function main() {
     console.log(`  ✅ Plan '${planFields.name}' limits updated`);
   }
 
+  console.log("🌱 Mapping Features to Plans...");
+  // Map messaging and analytics to all non-free plans, and everything to Premium/Enterprise
+  const allFeatureRecords = await prisma.feature.findMany();
+  const messagingFeature = allFeatureRecords.find(f => f.key === 'messaging');
+  const emailFeature = allFeatureRecords.find(f => f.key === 'email_notifications');
+  const smsFeature = allFeatureRecords.find(f => f.key === 'sms_notifications');
+  
+  const plans = await prisma.subscriptionPlan.findMany();
+  
+  for (const plan of plans) {
+    if (plan.slug === 'free') continue; // Free plan only gets Core (automatic)
+
+    // Starter gets Messaging
+    if (messagingFeature) {
+      await prisma.planFeature.upsert({
+        where: { planId_featureId: { planId: plan.id, featureId: messagingFeature.id } },
+        create: { planId: plan.id, featureId: messagingFeature.id },
+        update: {}
+      });
+    }
+
+    // Standard gets Messaging + Email
+    if (plan.slug === 'standard' || plan.slug === 'premium' || plan.slug === 'enterprise') {
+      if (emailFeature) {
+        await prisma.planFeature.upsert({
+          where: { planId_featureId: { planId: plan.id, featureId: emailFeature.id } },
+          create: { planId: plan.id, featureId: emailFeature.id },
+          update: {}
+        });
+      }
+    }
+
+    // Premium & Enterprise get EVERYTHING
+    if (plan.slug === 'premium' || plan.slug === 'enterprise') {
+      for (const feature of allFeatureRecords) {
+        if (!feature.isCore) {
+          await prisma.planFeature.upsert({
+            where: { planId_featureId: { planId: plan.id, featureId: feature.id } },
+            create: { planId: plan.id, featureId: feature.id },
+            update: {}
+          });
+        }
+      }
+    }
+  }
+  console.log("✅ Feature mappings updated");
+
   console.log("🌱 Seeding SaaS Modular Add-ons...");
   for (const addon of DEFAULT_ADDONS) {
     const addonId = addon.name.toLowerCase().replace(/\s+/g, "_");

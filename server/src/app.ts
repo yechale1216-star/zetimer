@@ -17,7 +17,8 @@ import promotionRoutes from './routes/promotion.routes';
 import subscriptionRoutes from './routes/subscription.routes';
 import paymentRoutes from './routes/payment.routes';
 import superAdminRoutes from './routes/super-admin.routes';
-import { tenantMiddleware, suspendedGuard } from './middleware/tenant.middleware';
+import groupRoutes from './routes/group.routes';
+import { tenantMiddleware, subscriptionGuard } from './middleware/tenant.middleware';
 import { maintenanceMiddleware } from './middleware/maintenance.middleware';
 import * as parentController from './controllers/parent.controller';
 
@@ -52,8 +53,8 @@ app.use('/api/parent', publicParentRouter);
 
 // Apply Tenant Isolation & Auth Middleware to all API routes
 app.use('/api', tenantMiddleware);
-// Block write operations for suspended schools (super_admin is exempt)
-app.use('/api', suspendedGuard);
+// Block write operations for suspended or expired schools (super_admin is exempt)
+app.use('/api', subscriptionGuard);
 
 // Subscription & Feature Management
 app.use('/api/subscriptions', subscriptionRoutes);
@@ -72,6 +73,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/parent', parentRoutes); // Re-use for other parent routes
 app.use('/api/attendance-analytics', attendanceAnalyticsRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/groups', groupRoutes);
 app.use('/api/promotions', promotionRoutes);
 
 

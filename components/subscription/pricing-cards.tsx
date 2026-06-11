@@ -41,6 +41,7 @@ const PERIOD_MONTHS: Record<BillingPeriod, number> = {
 
 // Per-plan static feature bullets that supplement the DB data
 const PLAN_FEATURES: Record<string, string[]> = {
+  free:         ["14-day full trial", "Up to 50 students", "Basic attendance", "Mobile app access"],
   starter:      ["Student attendance tracking", "Parent portal", "Basic reports", "2 admin users"],
   standard:     ["Everything in Starter", "Session-based attendance", "Grade analytics", "Teacher portal", "CSV exports"],
   premium:      ["Everything in Standard", "Advanced analytics", "Priority support", "API access"],
@@ -117,12 +118,14 @@ export function PricingCards({ currentTier, studentCount, billingPeriod, onSelec
           <Card
             key={plan.id}
             className={cn(
-              "relative flex flex-col transition-all duration-300 border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl active:scale-[0.98] hover:scale-[1.02]",
+              "relative flex flex-col transition-all duration-300 shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl active:scale-[0.98] hover:scale-[1.02] cursor-pointer",
+              "border border-transparent hover:border-primary hover:ring-2 hover:ring-primary/20 hover:shadow-lg hover:shadow-primary/20 dark:hover:shadow-primary/10",
               isCurrent
                 ? "ring-2 ring-primary border-primary/50 shadow-md bg-white/60 dark:bg-slate-900/60"
-                : "border border-slate-200/60 dark:border-slate-800 hover:shadow-lg",
+                : "border-slate-200/60 dark:border-slate-800",
               exceedsLimit && "opacity-60"
             )}
+            onClick={() => !isCurrent && !isLoading && onSelectTier(plan.slug as TierPlan)}
           >
             {isCurrent && (
               <div className="absolute -top-3 left-0 right-0 flex justify-center z-10">
@@ -132,14 +135,14 @@ export function PricingCards({ currentTier, studentCount, billingPeriod, onSelec
               </div>
             )}
 
-            <CardHeader className={cn("pb-8 pt-8 border-b border-slate-200/60 dark:border-slate-800/60", isCurrent && "pt-10")}>
+            <CardHeader className={cn("pb-4 pt-4 border-b border-slate-200/60 dark:border-slate-800/60", isCurrent && "pt-6")}>
               <CardTitle className="typography-section-title">{plan.name}</CardTitle>
               <CardDescription className="typography-label min-h-[40px] uppercase opacity-70 mt-2">
                 {plan.description || `Up to ${isEnterprise ? 'unlimited' : plan.maxStudents.toLocaleString()} students`}
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="flex-1 pb-6 pt-6 space-y-4">
+            <CardContent className="flex-1 pb-3 pt-4 space-y-3">
               {/* Price */}
               <div className="flex items-baseline gap-1 mb-2">
                 {isEnterprise ? (
@@ -155,7 +158,7 @@ export function PricingCards({ currentTier, studentCount, billingPeriod, onSelec
 
               {/* Billing total */}
               {!isEnterprise && billingPeriod !== 'monthly' && (
-                <div className="typography-label text-[10px] uppercase text-muted-foreground bg-slate-100/50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
+                <div className="typography-label text-[10px] uppercase text-muted-foreground bg-slate-100/50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
                   Billed{' '}
                   <span className="text-foreground font-bold">
                     {total.toLocaleString('en-ET', { maximumFractionDigits: 0 })} ETB
@@ -172,7 +175,7 @@ export function PricingCards({ currentTier, studentCount, billingPeriod, onSelec
               )}
 
               {/* Features */}
-              <ul className="typography-body space-y-2.5">
+              <ul className="typography-body space-y-1.5 text-sm">
                 <li className="flex items-start">
                   <Check className="h-4 w-4 text-primary shrink-0 mr-3 mt-0.5" />
                   <span>
@@ -194,14 +197,24 @@ export function PricingCards({ currentTier, studentCount, billingPeriod, onSelec
               </ul>
             </CardContent>
 
-            <CardFooter className="pt-2">
+            <CardFooter className="pt-2 pb-4">
               <Button
-                className="typography-label w-full rounded-xl uppercase h-12 transition-all shadow-md active:scale-95"
+                className="typography-label w-full rounded-xl uppercase h-10 transition-all shadow-md active:scale-95"
                 variant={isCurrent ? 'outline' : 'default'}
                 disabled={isCurrent || isLoading}
                 onClick={() => onSelectTier(plan.slug as TierPlan)}
               >
-                {isCurrent ? 'Current Plan' : isEnterprise ? 'Contact Sales' : 'Upgrade Plan'}
+                {(() => {
+                  if (isCurrent) return 'Current Plan'
+                  if (isEnterprise) return 'Contact Sales'
+                  
+                  const tierOrder: TierPlan[] = ['free', 'starter', 'standard', 'premium', 'enterprise']
+                  const currentIdx = tierOrder.indexOf(currentTier)
+                  const planIdx = tierOrder.indexOf(plan.slug as TierPlan)
+                  
+                  if (planIdx < currentIdx) return 'Downgrade Plan'
+                  return 'Upgrade Plan'
+                })()}
               </Button>
             </CardFooter>
           </Card>

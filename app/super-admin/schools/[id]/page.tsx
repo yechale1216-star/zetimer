@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import {
   ChevronLeft, Building2, MapPin, Mail, Sliders, Package,
-  Users, GraduationCap, CalendarDays, ShieldBan, ShieldCheck, Loader2, AlertTriangle
+  Users, GraduationCap, CalendarDays, ShieldBan, ShieldCheck, Loader2, AlertTriangle, Phone
 } from "lucide-react"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -216,7 +216,7 @@ export default function SchoolDetailPage() {
                   <>
                     <InfoRow icon={<Users className="w-4 h-4 text-muted-foreground" />} label="Full Name" value={school.adminUser.full_name} />
                     <InfoRow icon={<Mail className="w-4 h-4 text-muted-foreground" />} label="Email Address" value={school.adminUser.email} />
-                    <InfoRow icon={<Building2 className="w-4 h-4 text-muted-foreground" />} label="Phone" value={school.adminUser.phone || "Not set"} />
+                    <InfoRow icon={<Phone className="w-4 h-4 text-muted-foreground" />} label="Phone" value={school.adminUser.phone || "Not set"} />
                   </>
                 ) : (
                   <p className="text-muted-foreground italic py-2">No primary administrator found.</p>

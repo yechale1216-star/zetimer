@@ -14,7 +14,7 @@ import { recommendPlanUpgrade } from '@/lib/utils/pricing-utils'
 import { authService, getApiUrl } from '@/lib/auth/auth'
 
 export default function UpgradePlanPage() {
-  const [currentTier, setCurrentTier] = useState<TierPlan>('starter')
+  const [currentTier, setCurrentTier] = useState<TierPlan>('free')
   const [studentCount, setStudentCount] = useState(0)
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly')
   const [loading, setLoading] = useState(true)
@@ -39,7 +39,7 @@ export default function UpgradePlanPage() {
       const json = await parseJsonResponse<any>(res)
       if (json.success) {
         const subData = json.data
-        setCurrentTier(subData.plan?.slug || 'starter')
+        setCurrentTier(subData.plan?.slug || 'free')
         setStudentCount(subData.currentUsage?.students || 0)
         setBillingPeriod(subData.billingPeriod || 'monthly')
       } else {

@@ -42,11 +42,15 @@ const getStatusLabel = (status: string) =>
 interface EnrichedSubscription {
   id: string
   schoolId: string
-  tier: TierPlan
+  tier?: TierPlan
+  plan: {
+    id: string
+    name: string
+    slug: string
+  }
   billingPeriod: BillingPeriod
   studentCount: number
   userCount?: number
-  plan?: BillingPeriod
   status: SubscriptionStatus
   billingStart: string
   billingEnd: string
@@ -54,7 +58,7 @@ interface EnrichedSubscription {
   addons?: { id: string; quantity?: number }[]
   discountPercent?: number
   trialEndsAt?: string
-  school?: { name: string }
+  school?: { name: string; schoolId?: string }
   currentPeriodTotal?: number
   effectiveMonthly?: number
 }
@@ -81,12 +85,15 @@ function ViewDetailsModal({ subscription, onClose }: ViewDetailsModalProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="typography-label text-muted-foreground uppercase">School</p>
-              <p className="typography-label text-foreground">{subscription.school?.name || "Unknown"}</p>
+              <div className="flex flex-col">
+                <p className="typography-label text-foreground">{subscription.school?.name || "Unknown"}</p>
+                <p className="text-[10px] text-muted-foreground font-mono">{subscription.school?.schoolId}</p>
+              </div>
             </div>
             <div>
               <p className="typography-label text-muted-foreground uppercase">Tier</p>
               <Badge variant="outline" className="typography-label mt-1">
-                {TIER_CONFIG[subscription.tier]?.label ?? subscription.tier}
+                {TIER_CONFIG[subscription.plan.slug as TierPlan]?.label ?? subscription.plan.name}
               </Badge>
             </div>
           </div>
@@ -94,7 +101,7 @@ function ViewDetailsModal({ subscription, onClose }: ViewDetailsModalProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="typography-label text-muted-foreground uppercase">Billing Period</p>
-              <p className="typography-label capitalize text-foreground">{subscription.billingPeriod ?? subscription.plan}</p>
+              <p className="typography-label capitalize text-foreground">{subscription.billingPeriod ?? "monthly"}</p>
             </div>
             <div>
               <p className="typography-label text-muted-foreground uppercase">Active Students</p>
@@ -218,8 +225,9 @@ export function SubscriptionsList({ searchQuery, statusFilter }: SubscriptionsLi
     const schoolName = sub.school?.name || ""
     const matchesSearch =
       schoolName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.tier.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (sub.billingPeriod || sub.plan || "").toLowerCase().includes(searchQuery.toLowerCase())
+      (sub.school?.schoolId || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (sub.plan?.slug || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (sub.billingPeriod || "").toLowerCase().includes(searchQuery.toLowerCase())
     const matchesStatus = statusFilter === "all" || sub.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -279,10 +287,17 @@ export function SubscriptionsList({ searchQuery, statusFilter }: SubscriptionsLi
                   const seats = sub.studentCount ?? sub.userCount ?? 0
                   return (
                     <tr key={sub.id} className="border-b border-border hover:bg-secondary/50 transition-colors">
-                      <td className="typography-label py-3 px-4 text-foreground">{sub.school?.name || "Unknown"}</td>
-                      <td className="typography-body py-3 px-4 text-muted-foreground">{TIER_CONFIG[sub.tier]?.label}</td>
+                      <td className="typography-label py-3 px-4">
+                        <div className="flex flex-col">
+                          <span className="text-foreground">{sub.school?.name || "Unknown"}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">{sub.school?.schoolId}</span>
+                        </div>
+                      </td>
+                      <td className="typography-body py-3 px-4 text-muted-foreground">
+                        {TIER_CONFIG[sub.plan.slug as TierPlan]?.label ?? sub.plan.name}
+                      </td>
                       <td className="typography-body py-3 px-4 text-muted-foreground capitalize">
-                        {sub.billingPeriod ?? sub.plan}
+                        {sub.billingPeriod || "Monthly"}
                       </td>
                       <td className="typography-label py-3 px-4">{seats}</td>
                       <td className="typography-label py-3 px-4">ETB {(sub.currentPeriodTotal ?? 0).toLocaleString()}</td>

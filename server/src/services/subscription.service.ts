@@ -245,7 +245,7 @@ export const getAllSubscriptions = async () => {
   return prisma.schoolSubscription.findMany({
     include: {
       plan: true,
-      school: { select: { name: true } },
+      school: { select: { name: true, schoolId: true } },
     },
     orderBy: { renewalDate: "asc" },
   });
@@ -288,55 +288,143 @@ export const getSchoolFeatureOverrides = async (schoolId: string) => {
  * 3. Apply manual Super Admin overrides (force grant/revoke)
  */
 export const resolveSchoolFeatures = async (schoolId: string): Promise<string[]> => {
-  // 1. Get Core Features
-  const coreFeatures = await prisma.feature.findMany({
-    where: { isCore: true, isActive: true },
-    select: { key: true }
-  });
+  try {
+    // 0. Fetch school and its subscription/plan
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+      include: {
+        subscription: {
+          include: {
+            plan: { include: { features: { include: { feature: true } } } }
+          }
+        }
+      }
+    });
 
-  const featureKeys = new Set<string>(coreFeatures.map(f => f.key));
+    if (!school) return [];
 
-  // 2. Get Active Add-ons for the school
-  const activeAddons = await prisma.schoolAddon.findMany({
-    where: { schoolId, isActive: true },
-    include: { addon: true }
-  });
+    const sub = school.subscription;
+    const rawStatus = (sub?.status || '').toLowerCase();
 
-  for (const sa of activeAddons) {
-    if (sa.addon.featureKey && sa.addon.isActive) {
-      featureKeys.add(sa.addon.featureKey);
+    // 1. Detect if school is in an active TRIAL period
+    // A school is in trial if:
+    //   - status is explicitly 'trial', OR
+    //   - trialEndsAt exists and is still in the future (even if status shows 'active')
+    const now = new Date();
+    const trialEndsAt = sub?.trialEndsAt ? new Date(sub.trialEndsAt) : null;
+    const isInActiveTrial = rawStatus === 'trial' ||
+      (trialEndsAt !== null && trialEndsAt > now);
+
+    if (isInActiveTrial) {
+      // Full access to ALL features during trial
+      const allFeatures = await prisma.feature.findMany({
+        where: { isActive: true },
+        select: { key: true }
+      });
+      return allFeatures.map(f => f.key);
+    }
+
+    // 2. IF EXPIRED or SUSPENDED: Only Core Features
+    if (rawStatus === 'expired' || rawStatus === 'suspended') {
+      const coreFeatures = await prisma.feature.findMany({
+        where: { isCore: true, isActive: true },
+        select: { key: true }
+      });
+      return coreFeatures.map(f => f.key);
+    }
+
+    // 3. ACTIVE paid subscription: Core + Plan Features + Add-ons + Overrides
+    const featureKeys = new Set<string>();
+
+    // A. Core Features (always available)
+    const coreFeatures = await prisma.feature.findMany({
+      where: { isCore: true, isActive: true },
+      select: { key: true }
+    });
+    coreFeatures.forEach(f => featureKeys.add(f.key));
+
+    // B. Plan Features
+    if (sub?.plan?.features) {
+      for (const pf of sub.plan.features) {
+        if (pf.feature.isActive) featureKeys.add(pf.feature.key);
+      }
+    }
+
+    // C. Emergency Fallback: Grant messaging to any non-free active school if plan mapping is missing
+    const planSlug = (sub?.plan?.slug || '').toLowerCase();
+    if (planSlug && planSlug !== 'free') {
+      featureKeys.add('messaging');
+    }
+
+    // D. Get Active Add-ons
+    const activeAddons = await prisma.schoolAddon.findMany({
+      where: { schoolId, isActive: true },
+      include: { addon: true }
+    });
+    for (const sa of activeAddons) {
+      if (sa.addon.featureKey && sa.addon.isActive) {
+        featureKeys.add(sa.addon.featureKey);
+      }
+    }
+
+    // E. Apply manual Super Admin Overrides
+    const overrides = await prisma.schoolFeatureOverride.findMany({
+      where: { schoolId },
+      include: { feature: true },
+    });
+    for (const override of overrides) {
+      if (override.granted) {
+        featureKeys.add(override.feature.key);
+      } else {
+        featureKeys.delete(override.feature.key);
+      }
+    }
+
+    return Array.from(featureKeys);
+  } catch (error) {
+    console.error(`[resolveSchoolFeatures] Error for school ${schoolId}:`, error);
+    // On error, grant core + messaging to avoid total blackout
+    try {
+      const core = await prisma.feature.findMany({ where: { isCore: true }, select: { key: true } });
+      return [...core.map(f => f.key), 'messaging'];
+    } catch {
+      return ['messaging', 'attendance_tracking', 'student_management'];
     }
   }
-
-  // 3. Apply manual Overrides
-  const overrides = await prisma.schoolFeatureOverride.findMany({
-    where: { schoolId },
-    include: { feature: true },
-  });
-
-  for (const override of overrides) {
-    if (override.granted) {
-      featureKeys.add(override.feature.key);
-    } else {
-      featureKeys.delete(override.feature.key);
-    }
-  }
-
-  return Array.from(featureKeys);
 };
+
 
 /**
  * Get the current limits (students/users) for a school based on their subscription plan.
  */
 export const getSchoolLimits = async (schoolId: string) => {
-  const subscription = await prisma.schoolSubscription.findUnique({
-    where: { schoolId },
-    include: { plan: true }
-  });
+  const [subscription, config] = await Promise.all([
+    prisma.schoolSubscription.findUnique({
+      where: { schoolId },
+      include: { plan: true }
+    }),
+    prisma.platformConfig.findUnique({
+      where: { id: "singleton" }
+    })
+  ]);
 
   // Default limits if no subscription (very restrictive)
   if (!subscription || !subscription.plan) {
     return { maxStudents: 50, maxUsers: 5 };
+  }
+
+  // If in trial, we use the stricter of (Plan Limits) and (Super Admin Trial Capacity)
+  if (subscription.status === 'trial') {
+    const trialCap = config?.trialCapacity ?? 100;
+    
+    return {
+      maxStudents: subscription.plan.maxStudents === -1 
+        ? trialCap 
+        : Math.min(subscription.plan.maxStudents, trialCap),
+      maxUsers: subscription.plan.maxUsers === -1 
+        ? 10 
+        : Math.min(subscription.plan.maxUsers, 10)
+    };
   }
 
   return {

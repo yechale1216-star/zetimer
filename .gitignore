@@ -13,6 +13,7 @@ __zetime_jsx-dev-runtime.ts
 node_modules
 .next/
 .next_dev/
+.next_dev_v2/
 .DS_Store
 .env
 .env.*

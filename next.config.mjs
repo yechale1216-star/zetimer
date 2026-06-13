@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  distDir: '.next_dev',
+  distDir: '.next_dev_v2',
   typescript: {
     ignoreBuildErrors: false,
   },

@@ -41,20 +41,22 @@ const tenant_middleware_1 = require("../middleware/tenant.middleware");
 const db_1 = __importDefault(require("../config/db"));
 const schoolService = __importStar(require("../services/school.service"));
 const onboardingService = __importStar(require("../services/onboarding.service"));
+const SuperAdminService = __importStar(require("../services/super-admin.service"));
 const router = (0, express_1.Router)();
-// Create a school (Super Admin / Onboarding Start)
-router.post('/', async (req, res, next) => {
+// Create a school (Super Admin Only)
+router.post('/', (0, tenant_middleware_1.authorize)(['super_admin']), async (req, res, next) => {
     try {
-        const { name, adminName, adminEmail, adminPhone, tier } = req.body;
-        if (!name || !adminName || !adminEmail) {
-            return res.status(400).json({ success: false, message: 'School name, admin name, and admin email are required' });
+        const { name, address, adminName, adminEmail, adminPhone, tier } = req.body;
+        if (!name || !adminName || !adminEmail || !address) {
+            return res.status(400).json({ success: false, message: 'School name, address, admin name, and admin email are required' });
         }
         const { school, admin } = await onboardingService.startOnboarding({
             schoolName: name,
+            address,
             adminName,
             adminEmail,
             adminPhone,
-            subscriptionTier: tier || 'standard'
+            subscriptionTier: tier || 'free'
         });
         res.status(201).json({
             success: true,
@@ -75,25 +77,6 @@ router.post('/', async (req, res, next) => {
             success: false,
             message: error instanceof Error ? error.message : 'Failed to create school'
         });
-    }
-});
-// Get school by ID (UUID or SCH-XXXX)
-router.get('/:id', async (req, res, next) => {
-    try {
-        const { id } = req.params;
-        let school;
-        if (id.startsWith('SCH-')) {
-            school = await schoolService.getSchoolByCustomId(id);
-        }
-        else {
-            school = await schoolService.getSchoolById(id);
-        }
-        if (!school)
-            return res.status(404).json({ success: false, message: 'School not found' });
-        res.status(200).json({ success: true, data: school });
-    }
-    catch (error) {
-        next(error);
     }
 });
 // Get all schools (Super Admin only)
@@ -183,6 +166,86 @@ router.post('/onboarding', (0, tenant_middleware_1.authorize)(['admin']), async 
             },
         });
         res.status(200).json({ success: true, message: 'Onboarding completed' });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// ─── Help Desk (Support Tickets) ──────────────────────────────────────────────
+router.get('/support', (0, tenant_middleware_1.authorize)(['admin']), async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const data = await SuperAdminService.getSupportTickets({
+            schoolId,
+            status: req.query.status,
+            page: req.query.page ? parseInt(req.query.page) : 1,
+            limit: req.query.limit ? parseInt(req.query.limit) : 20,
+        });
+        res.json({ success: true, data });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post('/support', (0, tenant_middleware_1.authorize)(['admin']), async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        const authorId = req.user?.id;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const ticket = await SuperAdminService.createTicket({
+            ...req.body,
+            schoolId,
+            authorId,
+        });
+        res.status(201).json({ success: true, data: ticket });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Get school by ID (UUID or SCH-XXXX)
+router.get('/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        let school;
+        if (id.startsWith('SCH-')) {
+            school = await schoolService.getSchoolByCustomId(id);
+        }
+        else {
+            school = await schoolService.getSchoolById(id);
+        }
+        if (!school)
+            return res.status(404).json({ success: false, message: 'School not found' });
+        res.status(200).json({ success: true, data: school });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Get rich school details (super admin only)
+router.get('/:id/details', (0, tenant_middleware_1.authorize)(['super_admin']), async (req, res, next) => {
+    try {
+        const school = await schoolService.getSchoolDetails(req.params.id);
+        if (!school)
+            return res.status(404).json({ success: false, message: 'School not found' });
+        res.status(200).json({ success: true, data: school });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Suspend / Unsuspend a school (super admin only)
+router.patch('/:id/suspend', (0, tenant_middleware_1.authorize)(['super_admin']), async (req, res, next) => {
+    try {
+        const { suspend } = req.body;
+        if (typeof suspend !== 'boolean') {
+            return res.status(400).json({ success: false, message: '`suspend` must be a boolean' });
+        }
+        const school = await schoolService.setSchoolSuspended(req.params.id, suspend);
+        res.status(200).json({ success: true, data: school, message: suspend ? 'School suspended' : 'School unsuspended' });
     }
     catch (error) {
         next(error);

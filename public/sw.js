@@ -3,7 +3,15 @@ const STATIC_CACHE = "static-v2"
 const DYNAMIC_CACHE = "dynamic-v2"
 const IMAGE_CACHE = "images-v2"
 
-const STATIC_ASSETS = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png", "/offline.html"]
+const STATIC_ASSETS = [
+  "/",
+  "/manifest.json",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/offline.html",
+  "/zetime-logo.png",
+  "/zetime_branding_professional.png"
+]
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

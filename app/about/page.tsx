@@ -68,11 +68,13 @@ export default function AboutPage() {
                   Our mission is to eliminate the manual burden of attendance tracking, allowing educators 
                   to focus on what truly matters: their students' growth and success.
                 </p>
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FeatureItem text="Automated real-time reporting" />
                   <FeatureItem text="Seamless multi-role management" />
                   <FeatureItem text="Instant parent notifications" />
-                  <FeatureItem text="Cloud-synced offline capabilities" />
+                  <FeatureItem text="PWA & Full Offline Support" />
+                  <FeatureItem text="Real-time Messaging Center" />
+                  <FeatureItem text="Advanced School Analytics" />
                 </div>
               </div>
               <div className="relative">
@@ -88,7 +90,7 @@ export default function AboutPage() {
                     </div>
                   </div>
                   <blockquote className="text-lg italic text-foreground/90">
-                    "Zetime has transformed how we handle daily records. It's not just a tool; it's a vital part of our school's ecosystem."
+                    "Zetime has transformed how we handle daily records. The new messaging features and offline support have made it indispensable for our staff."
                   </blockquote>
                   <div className="mt-6 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-muted" />
@@ -108,13 +110,13 @@ export default function AboutPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold">Why Choose Zetime?</h2>
-              <p className="text-muted-foreground mt-2">Built on three core pillars of excellence</p>
+              <p className="text-muted-foreground mt-2">Built on core pillars of excellence</p>
             </div>
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               <ValueCard 
                 icon={<Shield className="w-8 h-8 text-blue-500" />}
                 title="Security First"
-                description="Your data is encrypted and stored securely, ensuring privacy for students and staff at all times."
+                description="Your data is encrypted and stored securely, ensuring privacy for students and staff with industry-standard protocols."
               />
               <ValueCard 
                 icon={<Users className="w-8 h-8 text-green-500" />}
@@ -126,6 +128,16 @@ export default function AboutPage() {
                 title="Scale Ready"
                 description="Whether you're a small primary school or a large university campus, Zetime scales with your needs."
               />
+              <ValueCard 
+                icon={<Clock className="w-8 h-8 text-orange-500" />}
+                title="Offline Ready"
+                description="Our PWA technology ensures you can mark attendance and access records even without an active internet connection."
+              />
+              <ValueCard 
+                icon={<Users className="w-8 h-8 text-indigo-500" />}
+                title="Communication Centric"
+                description="Integrated messaging center with document sharing keeps parents, teachers, and admins perfectly in sync."
+              />
             </div>
           </div>
         </section>
@@ -134,10 +146,10 @@ export default function AboutPage() {
         <section className="py-20 bg-primary text-primary-foreground">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-              <StatItem value="500+" label="Schools" />
-              <StatItem value="50k+" label="Students" />
-              <StatItem value="1M+" label="Records Taken" />
-              <StatItem value="99.9%" label="Uptime" />
+              <StatItem value="750+" label="Schools" />
+              <StatItem value="100k+" label="Students" />
+              <StatItem value="5M+" label="Records Taken" />
+              <StatItem value="99.99%" label="Uptime" />
             </div>
           </div>
         </section>

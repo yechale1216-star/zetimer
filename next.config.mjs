@@ -4,6 +4,8 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   output: 'standalone',
+  turbopack: {},
+  allowedDevOrigins: ['192.168.1.133'],
   images: {
     unoptimized: true,
   },
@@ -32,6 +34,22 @@ const nextConfig = {
         ],
       },
     ]
+  },
+  onDemandEntries: {
+    // period (in ms) where the server will keep pages in the buffer
+    maxInactiveAge: 60 * 1000,
+    // number of pages that should be kept simultaneously without being disposed
+    pagesBufferLength: 5,
+  },
+  webpack: (config, { dev, isServer }) => {
+    // Optimize performance on Windows
+    if (dev && !isServer) {
+      config.watchOptions = {
+        ignored: ['**/node_modules', '**/.next', '**/server'],
+        poll: 1000, // Check for changes every second to reduce CPU/IO overhead
+      }
+    }
+    return config
   },
 }
 

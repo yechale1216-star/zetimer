@@ -147,8 +147,8 @@ export default function StudentPromotionPage() {
     }
   }, [])
 
-  const loadData = async () => {
-    setIsLoading(true)
+  const loadData = async (isBackground = false) => {
+    if (!isBackground) setIsLoading(true)
     try {
       const [prevRes, histRes, streamRes, settingsRes, gradesRes] = await Promise.all([
         fetch(`${API_URL}/api/promotions/preview`, { headers: headers as any }),
@@ -217,6 +217,13 @@ export default function StudentPromotionPage() {
 
   useEffect(() => {
     loadData()
+
+    // Background polling for "instant" updates (every 10 seconds)
+    const pollInterval = setInterval(() => {
+      loadData(true)
+    }, 10000)
+
+    return () => clearInterval(pollInterval)
   }, [])
 
   // Fetch students for a specific cohort
@@ -512,7 +519,7 @@ export default function StudentPromotionPage() {
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input 
                             placeholder="Filter cohorts..." 
-                            className="pl-9 bg-slate-50/50 dark:bg-slate-950/50 border-none"
+                            className="pl-9 bg-background/50 dark:bg-slate-950/50 border-none"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                           />
@@ -604,7 +611,7 @@ export default function StudentPromotionPage() {
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                               <Input 
                                 placeholder="Search students..." 
-                                className="pl-9 bg-slate-50/50 dark:bg-slate-950/50 border-none h-9 text-sm"
+                                className="pl-9 bg-background/50 dark:bg-slate-950/50 border-none h-9 text-sm"
                                 value={studentSearchTerm}
                                 onChange={(e) => setStudentSearchTerm(e.target.value)}
                               />
@@ -634,7 +641,7 @@ export default function StudentPromotionPage() {
                           <ScrollArea className="h-[450px]">
                             <div className="rounded-2xl border border-border/50 overflow-hidden shadow-sm bg-white dark:bg-slate-950">
                               <Table>
-                                <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50 sticky top-0 font-black tracking-tight uppercase text-[10px]">
+                                <TableHeader className="bg-background/50 dark:bg-slate-900/50 sticky top-0 font-black tracking-tight uppercase text-[10px]">
                                   <TableRow className="border-border/50">
                                     <TableHead className="w-12">
                                       <Checkbox
@@ -755,7 +762,7 @@ export default function StudentPromotionPage() {
                                   [cohort.id]: { ...prev[cohort.id], gradeId: val as any } 
                                 }))}
                               >
-                                <SelectTrigger className="w-full bg-slate-50/50 dark:bg-slate-950/50 border-none h-10 font-bold focus:ring-1 focus:ring-primary">
+                                <SelectTrigger className="w-full bg-background/50 dark:bg-slate-950/50 border-none h-10 font-bold focus:ring-1 focus:ring-primary">
                                   <SelectValue placeholder="Target Grade" />
                                 </SelectTrigger>
                                 <SelectContent>

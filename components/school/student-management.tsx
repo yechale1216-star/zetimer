@@ -42,6 +42,8 @@ export function StudentManagement() {
   const [teacherAssignedClasses, setTeacherAssignedClasses] = useState<
     Array<{ grade: string; section: string; stream?: string }>
   >([])
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -85,6 +87,13 @@ export function StudentManagement() {
     const user = authService.getCurrentUser()
     setIsTeacher(user?.role === "teacher")
     loadStudents()
+
+    // Background polling for "instant" updates (every 10 seconds)
+    const pollInterval = setInterval(() => {
+      loadStudents(true)
+    }, 10000)
+
+    return () => clearInterval(pollInterval)
   }, [])
 
   const filteredStudents = useMemo(() => {
@@ -103,15 +112,15 @@ export function StudentManagement() {
     }
 
     if (!isTeacher && gradeFilter !== "All Grades") {
-      filtered = filtered.filter((student) => student.grade === gradeFilter)
+      filtered = filtered.filter((student) => student.grade?.toLowerCase() === gradeFilter.toLowerCase())
     }
 
     if (!isTeacher && streamFilter !== "All Streams") {
-      filtered = filtered.filter((student) => student.stream === streamFilter)
+      filtered = filtered.filter((student) => student.stream?.toLowerCase() === streamFilter.toLowerCase())
     }
 
     if (!isTeacher && sectionFilter !== "All Sections") {
-      filtered = filtered.filter((student) => student.section === sectionFilter)
+      filtered = filtered.filter((student) => student.section?.toLowerCase() === sectionFilter.toLowerCase())
     }
 
     return [...filtered].sort((a, b) => {
@@ -121,8 +130,8 @@ export function StudentManagement() {
     })
   }, [students, searchTerm, gradeFilter, streamFilter, sectionFilter, isTeacher])
 
-  const loadStudents = async () => {
-    setIsLoading(true)
+  const loadStudents = async (isBackground = false) => {
+    if (!isBackground) setIsLoading(true)
     try {
       const user = authService.getCurrentUser()
       const studentsData = await db.getStudents()
@@ -344,15 +353,30 @@ export function StudentManagement() {
     }
   }
 
-  const handleDelete = async (student: Student) => {
-    if (window.confirm(`Are you sure you want to delete ${student.name}? This action cannot be undone.`)) {
-      try {
-        await db.deleteStudent(student.id)
-        notifications.success("Success", "Student deleted successfully")
-        await loadStudents()
-      } catch (error) {
-        notifications.error("Error", "Failed to delete student")
-      }
+  const handleDelete = async (e: React.MouseEvent, student: Student) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!student.id) {
+      notifications.error("Error", "Student record is missing a valid identifier.")
+      return
+    }
+
+    setConfirmingDeleteId(student.id)
+  }
+
+  const executeDelete = async (id: string) => {
+    setDeletingId(id)
+    setConfirmingDeleteId(null)
+    try {
+      await db.deleteStudent(id)
+      notifications.success("Success", "Student deleted successfully")
+      await loadStudents()
+    } catch (error: any) {
+      console.error("[StudentManagement] Delete error:", error);
+      notifications.error("Deletion Failed", error.message || "Failed to delete student. Please try again.");
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -1245,10 +1269,15 @@ export function StudentManagement() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => handleDelete(student)}
+                          onClick={(e) => handleDelete(e, student)}
+                          disabled={deletingId === student.id}
                           className="h-9 w-9 rounded-xl hover:bg-red-500/10 hover:text-red-600 transition-all text-muted-foreground"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          {deletingId === student.id ? (
+                            <div className="h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
                         </Button>
                       </div>
                     </TableCell>
@@ -1377,6 +1406,32 @@ export function StudentManagement() {
           </div>
         </div>
       )}
+      {/* Delete Confirmation Modal */}
+      <Dialog open={!!confirmingDeleteId} onOpenChange={(open) => !open && setConfirmingDeleteId(null)}>
+        <DialogContent className="sm:max-w-[425px] rounded-3xl">
+          <DialogHeader>
+            <div className="mx-auto w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
+              <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+            </div>
+            <DialogTitle className="text-center typography-page-title">Delete Student?</DialogTitle>
+            <DialogDescription className="text-center typography-label text-slate-500">
+              Are you sure you want to remove this student? This action will permanently delete all attendance records and parent links associated with them.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 pt-6">
+            <Button variant="outline" className="flex-1 rounded-xl h-12" onClick={() => setConfirmingDeleteId(null)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="flex-1 rounded-xl h-12 bg-red-600 hover:bg-red-700"
+              onClick={() => confirmingDeleteId && executeDelete(confirmingDeleteId)}
+            >
+              Confirm Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -18,10 +18,7 @@ import { TeacherAssignmentManagement } from "@/components/school/teacher-assignm
 import { UserProfile } from "@/components/school/user-profile"
 import { ErrorBoundary } from "@/components/system/error-boundary"
 
-// Lazy load PWA Install component
-const PWAInstall = dynamic(() => import("@/components/system/pwa-install").then(mod => ({ default: mod.PWAInstall })), {
-  ssr: false,
-})
+
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -31,19 +28,8 @@ export default function Home() {
   useEffect(() => {
     const registerServiceWorker = async () => {
       if ("serviceWorker" in navigator) {
-        const host = window.location.hostname
-        const isV0Preview = host.includes("vusercontent")
-        const isLocalDev =
-          host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host.endsWith(".localhost")
-
-        if (isV0Preview || isLocalDev) {
-          console.log(
-            "[v0] Skipping service worker on this host (local dev or v0 preview). Deploy to production to use the PWA.",
-          )
-          return
-        }
-
         try {
+          const host = window.location.hostname
           console.log("[v0] Registering service worker:", host)
 
           const registration = await navigator.serviceWorker.register("/sw.js", {

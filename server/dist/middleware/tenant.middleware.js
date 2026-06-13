@@ -3,7 +3,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authorize = exports.tenantMiddleware = void 0;
+exports.featureGuard = exports.subscriptionGuard = exports.authorize = exports.tenantMiddleware = void 0;
+const db_1 = __importDefault(require("../config/db"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-long-enough';
 /**
@@ -18,6 +19,8 @@ const tenantMiddleware = (req, res, next) => {
         '/api/parent/schools',
         '/api/parent/login',
         '/api/auth',
+        '/api/subscriptions/plans',
+        '/api/subscriptions/addons',
         '/health'
     ];
     const url = req.originalUrl.split('?')[0]; // strip query string for comparison
@@ -71,3 +74,79 @@ const authorize = (roles) => {
     };
 };
 exports.authorize = authorize;
+/**
+ * Subscription Guard
+ * Blocks all write requests (POST/PUT/PATCH/DELETE) for users whose school is SUSPENDED or EXPIRED.
+ * Super admins bypass this check. Read-only requests (GET/HEAD/OPTIONS) always pass.
+ */
+const subscriptionGuard = async (req, res, next) => {
+    // Super admins are never blocked
+    if (!req.user || req.user.role === 'super_admin')
+        return next();
+    // Read-only methods are always allowed — historical data stays accessible
+    const readMethods = ['GET', 'HEAD', 'OPTIONS'];
+    if (readMethods.includes(req.method))
+        return next();
+    const schoolId = req.user.schoolId;
+    if (!schoolId)
+        return next();
+    try {
+        const school = await db_1.default.school.findUnique({
+            where: { id: schoolId },
+            include: {
+                subscription: true
+            },
+        });
+        // Check status from both school (deprecated) and real subscription record
+        const status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
+        console.log(`[subscriptionGuard] Checking school ${school?.schoolId || 'unknown'}. Status: ${status}`);
+        if (status === 'SUSPENDED' || status === 'EXPIRED') {
+            console.log(`[subscriptionGuard] BLOCKING request to ${req.method} ${req.originalUrl} - School ${status}`);
+            const message = status === 'SUSPENDED'
+                ? 'Your school account is suspended. Please contact support.'
+                : 'Your school subscription or trial has expired. Please upgrade your plan to continue making changes.';
+            return res.status(403).json({
+                success: false,
+                message: message,
+                code: `SCHOOL_${status}`,
+            });
+        }
+    }
+    catch (err) {
+        console.error('[subscriptionGuard] DB error:', err);
+    }
+    next();
+};
+exports.subscriptionGuard = subscriptionGuard;
+/**
+ * Feature Guard
+ * Checks if the school has a specific feature enabled based on their plan/addons.
+ */
+const featureGuard = (featureKey) => {
+    return async (req, res, next) => {
+        // Super admins bypass all feature checks
+        if (!req.user || req.user.role === 'super_admin')
+            return next();
+        const schoolId = req.user.schoolId;
+        if (!schoolId)
+            return next();
+        try {
+            const { resolveSchoolFeatures } = require('../services/subscription.service');
+            const grantedFeatures = await resolveSchoolFeatures(schoolId);
+            if (!grantedFeatures.includes(featureKey)) {
+                console.log(`[featureGuard] BLOCKING request to ${req.method} ${req.originalUrl} - Missing feature: ${featureKey}`);
+                return res.status(403).json({
+                    success: false,
+                    message: `This feature (${featureKey}) is not included in your current plan. Please upgrade to access it.`,
+                    code: 'FEATURE_RESTRICTED',
+                    requiredFeature: featureKey
+                });
+            }
+        }
+        catch (err) {
+            console.error('[featureGuard] DB error:', err);
+        }
+        next();
+    };
+};
+exports.featureGuard = featureGuard;

@@ -18,6 +18,7 @@ import subscriptionRoutes from './routes/subscription.routes';
 import paymentRoutes from './routes/payment.routes';
 import superAdminRoutes from './routes/super-admin.routes';
 import groupRoutes from './routes/group.routes';
+import announcementRoutes from './routes/announcement.routes';
 import { tenantMiddleware, subscriptionGuard } from './middleware/tenant.middleware';
 import { maintenanceMiddleware } from './middleware/maintenance.middleware';
 import * as parentController from './controllers/parent.controller';
@@ -75,6 +76,7 @@ app.use('/api/attendance-analytics', attendanceAnalyticsRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/promotions', promotionRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 
 // Error handling middleware

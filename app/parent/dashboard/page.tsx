@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { parentDb, type ParentNotification } from "@/lib/db/parent-db"
 import { useLanguage } from "@/lib/context/language-context"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { db } from "@/lib/db/database"
 import {
   Calendar,
   Clock,
@@ -28,6 +29,8 @@ import {
   X
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { ChevronRight } from "lucide-react"
 import { formatLocalizedDate } from "@/lib/utils/date-utils"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
@@ -60,6 +63,18 @@ export default function ParentDashboard() {
       const user = JSON.parse(userStr)
       setCurrentUser(user)
 
+      // Fetch school settings to get default attendance mode
+      let currentMode = 'daily'
+      try {
+        const settings = await db.getSettings()
+        if (settings?.attendanceMode) {
+          currentMode = settings.attendanceMode === 'session_based' ? 'session' : 'daily'
+          setStatsMode(currentMode as any)
+        }
+      } catch (err) {
+        console.error("[Dashboard] Error fetching school settings:", err)
+      }
+
       if (user.name) {
         const nameParts = user.name.trim().split(/\s+/)
         const titles = ['dr', 'dr.', 'mr', 'mr.', 'mrs', 'mrs.', 'ms', 'ms.', 'prof', 'prof.']
@@ -78,7 +93,7 @@ export default function ParentDashboard() {
 
         if (student) {
           setSelectedStudent(student)
-          await fetchStudentAttendance(student.id)
+          await fetchStudentAttendance(student.id, currentMode)
           await fetchNotifications(user.phone)
         }
       } else if (studentsStr) {
@@ -86,7 +101,7 @@ export default function ParentDashboard() {
         if (students[0]) {
           setSelectedStudent(students[0])
           localStorage.setItem("parent_selected_student_id", students[0].id)
-          await fetchStudentAttendance(students[0].id)
+          await fetchStudentAttendance(students[0].id, currentMode)
           await fetchNotifications(user.phone)
         }
       }
@@ -98,7 +113,7 @@ export default function ParentDashboard() {
   }
 
   // 2. Fetch student's attendance list
-  const fetchStudentAttendance = async (studentId: string) => {
+  const fetchStudentAttendance = async (studentId: string, mode?: string) => {
     try {
       const token = localStorage.getItem("attendance_token") || "";
       const schoolId = localStorage.getItem("x-school-id") || "";
@@ -108,7 +123,12 @@ export default function ParentDashboard() {
         ...(schoolId ? { "x-school-id": schoolId } : {})
       };
 
-      const res = await fetch(`${API_URL}/api/attendance?studentId=${studentId}`, { headers })
+      let url = `${API_URL}/api/attendance?studentId=${studentId}`
+      if (mode === 'daily') {
+        url += "&session=none"
+      }
+      
+      const res = await fetch(url, { headers })
       const data = await res.json()
       if (data.success && data.data) {
         setAttendance(data.data)
@@ -135,14 +155,38 @@ export default function ParentDashboard() {
   useEffect(() => {
     loadStudentData()
 
+    // Background polling for "instant" updates (every 10 seconds)
+    const pollInterval = setInterval(() => {
+      const userStr = localStorage.getItem("attendance_current_user")
+      const studentId = localStorage.getItem("parent_selected_student_id")
+      
+      if (userStr && studentId) {
+        try {
+          const user = JSON.parse(userStr)
+          fetchNotifications(user.phone)
+          fetchStudentAttendance(studentId, statsMode)
+        } catch (e) {}
+      }
+    }, 10000)
+
     const handleStudentChange = () => {
       setIsLoading(true)
       loadStudentData()
     }
 
     window.addEventListener("studentChanged", handleStudentChange)
-    return () => window.removeEventListener("studentChanged", handleStudentChange)
-  }, [])
+    return () => {
+      window.removeEventListener("studentChanged", handleStudentChange)
+      clearInterval(pollInterval)
+    }
+  }, [statsMode]) // Re-run poll if statsMode changes to ensure correct fetch
+
+  // 1.5 Re-fetch on mode switch
+  useEffect(() => {
+     if (selectedStudent?.id) {
+        fetchStudentAttendance(selectedStudent.id, statsMode)
+     }
+  }, [statsMode])
 
   const handleDismissAlert = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -256,8 +300,8 @@ export default function ParentDashboard() {
   const todayStatus = getTodayAttendance()
 
   // School announcements (general school alert notifications)
-  const announcements = notificationsList.filter(n => n.type === "announcement" || n.type === "emergency")
-  const emergencyNotice = announcements.find(a => a.type === "emergency")
+  const announcements = notificationsList.filter(n => n.type === "announcement" || n.type === "emergency" || n.type === "info")
+  const emergencyNotices = announcements.filter(a => a.type === "emergency")
 
   // Child specific alerts (absent & late notifications)
   const recentAlerts = notificationsList.filter(n => !n.isRead && (n.type === "absent" || n.type === "late" || n.type === "warning") && n.studentId === selectedStudent?.id)
@@ -277,13 +321,13 @@ export default function ParentDashboard() {
     const s = status.toLowerCase()
     switch (s) {
       case "present":
-        return <Badge className="typography-label bg-emerald-500 hover:bg-emerald-600 border-none rounded-lg px-3">{t("presents")}</Badge>
+        return <Badge className="typography-label bg-emerald-50/50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30 rounded-full h-8 px-4 font-bold shadow-none">{t("presents")}</Badge>
       case "absent":
-        return <Badge className="typography-label bg-rose-500 hover:bg-rose-600 border-none rounded-lg px-3">{t("absents")}</Badge>
+        return <Badge className="typography-label bg-rose-50/50 text-rose-600 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30 rounded-full h-8 px-4 font-bold shadow-none">{t("absents")}</Badge>
       case "late":
-        return <Badge className="typography-label bg-amber-500 hover:bg-amber-600 border-none rounded-lg px-3">{t("late_arrivals")}</Badge>
+        return <Badge className="typography-label bg-amber-50/50 text-amber-600 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30 rounded-full h-8 px-4 font-bold shadow-none">{t("late_arrivals")}</Badge>
       case "excused":
-        return <Badge className="typography-label bg-blue-500 hover:bg-blue-600 border-none rounded-lg px-3">{t("excused")}</Badge>
+        return <Badge className="typography-label bg-sky-50/50 text-sky-600 border-sky-100 dark:bg-sky-950/20 dark:text-sky-400 dark:border-sky-900/30 rounded-full h-8 px-4 font-bold shadow-none">{t("excused")}</Badge>
       default:
         return <Badge variant="outline" className="typography-label rounded-lg px-3 py-1">{t("unmarked")}</Badge>
     }
@@ -351,17 +395,21 @@ export default function ParentDashboard() {
       </div>
 
       {/* ─── EMERGENCY ALERTS BANNER ──────────────────────────────────────── */}
-      {emergencyNotice && (
-        <Alert variant="destructive" className="border-rose-500/40 bg-rose-500/5 text-rose-800 dark:text-rose-200 rounded-2xl shadow-lg shadow-rose-500/5">
-          <AlertOctagon className="h-5 w-5 text-rose-600 dark:text-rose-400" />
-          <AlertTitle className="typography-card-title uppercase flex items-center gap-2">
-            {t("emergency_notice")}
-          </AlertTitle>
-          <AlertDescription className="typography-label mt-2">
-            <span className="text-rose-900 dark:text-rose-100">{emergencyNotice.title}:</span> {emergencyNotice.message}
-            <span className="typography-label block opacity-90 mt-2 uppercase">Posted: {formatNotificationTime(emergencyNotice.createdAt)}</span>
-          </AlertDescription>
-        </Alert>
+      {emergencyNotices.length > 0 && (
+        <div className="space-y-4">
+          {emergencyNotices.map((notice) => (
+            <Alert key={notice.id} variant="destructive" className="border-rose-500/40 bg-rose-500/5 text-rose-800 dark:text-rose-200 rounded-2xl shadow-lg shadow-rose-500/5 animate-in slide-in-from-top-4 duration-500">
+              <AlertOctagon className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+              <AlertTitle className="typography-card-title uppercase flex items-center gap-2">
+                {t("emergency_notice")}
+              </AlertTitle>
+              <AlertDescription className="typography-label mt-2">
+                <span className="text-rose-900 dark:text-rose-100 font-bold">{notice.title}:</span> {notice.message}
+                <span className="typography-label block opacity-90 mt-2 uppercase text-[10px]">Posted: {formatNotificationTime(notice.createdAt)}</span>
+              </AlertDescription>
+            </Alert>
+          ))}
+        </div>
       )}
 
       {/* ─── TODAY'S ATTENDANCE SUMMARY CARD ──────────────────────────────── */}
@@ -602,29 +650,59 @@ export default function ParentDashboard() {
         {/* Right: School Announcements Board */}
         <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md">
           <CardHeader className="flex flex-row items-center justify-between border-b border-border/20 pb-4">
-            <div>
+            <div className="flex flex-col">
               <CardTitle className="typography-card-title uppercase text-foreground/80 flex items-center gap-2">
                 <Megaphone className="w-5 h-5 text-emerald-500" />
                 <span>{t("school_announcements")}</span>
               </CardTitle>
               <CardDescription className="typography-label mt-1 italic text-muted-foreground/80">{t("notifications_desc")}</CardDescription>
             </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => router.push("/parent/announcements")}
+              className="typography-label text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl gap-2 font-bold uppercase transition-all"
+            >
+              <span>{t("view_all")}</span>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
           </CardHeader>
-          <CardContent className="p-6 space-y-4 max-h-[300px] overflow-y-auto">
+          <CardContent className="p-6 space-y-4 max-h-[350px] overflow-y-auto custom-scrollbar">
             {announcements.filter(a => a.type !== "emergency").length === 0 ? (
               <div className="py-12 flex flex-col items-center justify-center text-muted-foreground bg-muted/10 rounded-3xl border-2 border-dashed border-border/20">
                 <BookOpen className="w-12 h-12 text-emerald-500/50 mb-3" />
-                <p className="typography-label uppercase">{t("no_announcements")}</p>
-                <span className="typography-label text-muted-foreground/80 mt-2">{t("check_back_later_newsletters")}</span>
+                <p className="typography-label uppercase font-bold">{t("no_announcements")}</p>
+                <span className="typography-label text-muted-foreground/80 mt-2 italic px-8 text-center">{t("check_back_later_newsletters")}</span>
               </div>
             ) : (
-              announcements.filter(a => a.type !== "emergency").slice(0, 5).map((announcement) => (
-                <div key={announcement.id} className="p-4 bg-muted/40 border-2 border-border/10 rounded-2xl space-y-3 shadow-sm group hover:border-emerald-500/20 transition-all">
-                  <div className="flex items-center justify-between">
-                    <span className="typography-label text-foreground uppercase group-hover:text-emerald-600 transition-colors">{announcement.title}</span>
-                    <span className="typography-label text-muted-foreground opacity-70">{formatNotificationTime(announcement.createdAt)}</span>
+              announcements.slice(0, 5).map((announcement) => (
+                <div 
+                  key={announcement.id} 
+                  className={`p-5 border-2 hover:border-emerald-500/20 rounded-3xl space-y-3 shadow-none group transition-all duration-300 cursor-pointer ${
+                    announcement.type === "emergency" 
+                      ? "bg-rose-500/5 border-rose-500/10 hover:bg-rose-500/10" 
+                      : announcement.type === "info"
+                      ? "bg-blue-500/5 border-blue-500/10 hover:bg-blue-500/10"
+                      : "bg-muted/30 border-border/5 hover:bg-white dark:hover:bg-slate-800/50"
+                  }`}
+                  onClick={() => router.push("/parent/announcements")}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      {announcement.type === "emergency" && <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />}
+                      <span className={`typography-label font-bold uppercase transition-colors truncate ${
+                        announcement.type === "emergency" ? "text-rose-700" : "text-foreground group-hover:text-emerald-600"
+                      }`}>
+                        {announcement.title}
+                      </span>
+                    </div>
+                    <span className="typography-label text-[10px] text-muted-foreground/60 whitespace-nowrap bg-muted/50 px-2 py-0.5 rounded-full font-bold">
+                       {formatNotificationTime(announcement.createdAt)}
+                    </span>
                   </div>
-                  <p className="typography-label text-foreground/80 dark:text-foreground/70">{announcement.message}</p>
+                  <p className="typography-body text-sm text-foreground/70 dark:text-foreground/60 line-clamp-2 leading-relaxed italic">
+                    "{announcement.message}"
+                  </p>
                 </div>
               ))
             )}

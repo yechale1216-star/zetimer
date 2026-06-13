@@ -101,7 +101,8 @@ export function Reports() {
         generateReport()
       }
     }
-  }, [startDate, endDate, reportType, sessionFilter])
+  }, [startDate, endDate, reportType, sessionFilter, isSessionBased])
+
 
   useEffect(() => {
     filterReports()
@@ -151,11 +152,30 @@ export function Reports() {
 
     setIsLoading(true)
     try {
-      const filteredAttendance = await db.getAttendanceByDateRange(startDate, endDate)
+      const allAttendance = await db.getAttendanceByDateRange(startDate, endDate)
       
-      let processedAttendance = filteredAttendance
-      if (isSessionBased && sessionFilter !== "total") {
-        processedAttendance = processedAttendance.filter(record => record.session?.toLowerCase() === sessionFilter.toLowerCase())
+      // ── Strict mode isolation ──────────────────────────────────────────────
+      // daily mode    → only records with null/undefined/empty session
+      // session mode  → only records that have a real session value
+      //   + optionally narrowed by sessionFilter (morning / afternoon / total)
+      let processedAttendance: typeof allAttendance
+
+      if (!isSessionBased) {
+        // Daily mode: reject every record that carries a session tag
+        processedAttendance = allAttendance.filter(
+          record => !record.session
+        )
+      } else {
+        // Session-based mode: reject records with no session
+        const sessionRecords = allAttendance.filter(
+          record => !!record.session
+        )
+        // Then narrow by selected session filter if not "total"
+        processedAttendance = sessionFilter !== "total"
+          ? sessionRecords.filter(
+              record => record.session?.toLowerCase() === sessionFilter.toLowerCase()
+            )
+          : sessionRecords
       }
 
       // Pre-group attendance by student ID for O(N) lookup

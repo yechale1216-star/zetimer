@@ -368,9 +368,31 @@ export const updateStudent = async (id: string, data: any, schoolId: string) => 
 };
 
 export const deleteStudent = async (id: string, schoolId: string) => {
-  return await prisma.student.delete({ 
+  console.log(`[StudentService] Attempting to delete student with identifier: ${id} for school: ${schoolId}`);
+  
+  // Try deleting by the primary UUID first
+  let result = await prisma.student.deleteMany({ 
     where: { id, schoolId } 
   });
+  
+  // If no record was deleted, try deleting by the custom 'student_id' field (like STU0001)
+  if (result.count === 0) {
+    console.log(`[StudentService] UUID match failed, trying custom student_id field...`);
+    result = await prisma.student.deleteMany({
+      where: { 
+        student_id: id,
+        schoolId: schoolId 
+      }
+    });
+  }
+  
+  console.log(`[StudentService] Final delete result:`, result);
+  
+  if (result.count === 0) {
+    throw new Error('Student not found. Ensure the ID is correct and you have permission to delete this record.');
+  }
+  
+  return result;
 };
 
 export const getStudentsByParentPhone = async (parentPhone: string, schoolId: string) => {

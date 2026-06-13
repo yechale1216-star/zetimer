@@ -38,15 +38,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateOnboardingStatus = exports.startOnboarding = void 0;
 const db_1 = __importDefault(require("../config/db"));
-const schoolService = __importStar(require("./school.service"));
 const userService = __importStar(require("./user.service"));
 const crypto_1 = __importDefault(require("crypto"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const school_id_1 = require("../utils/school-id");
 /**
  * Centralized service to handle the full school onboarding process.
  * This is used by both public signup and Super Admin school creation.
  */
 const startOnboarding = async (data) => {
-    const { schoolName, adminName, adminEmail, adminPhone, adminPassword, subscriptionTier = 'standard' } = data;
+    const { schoolName, address, adminName, adminEmail, adminPhone, adminPassword, subscriptionTier = 'free' } = data;
     // 1. Validation: Ensure email is unique
     const existingUser = await userService.getUserByEmail(adminEmail);
     if (existingUser) {
@@ -55,30 +56,47 @@ const startOnboarding = async (data) => {
     // 2. Atomic Transaction for School and Admin Creation
     return await db_1.default.$transaction(async (tx) => {
         // A. Create the School
-        const school = await schoolService.createSchool({
-            name: schoolName
+        const customId = await (0, school_id_1.generateSchoolId)();
+        const school = await tx.school.create({
+            data: {
+                name: schoolName,
+                schoolId: customId,
+                subscriptionStatus: 'ACTIVE',
+                settings: {
+                    create: {
+                        school_name: schoolName,
+                        school_address: address,
+                        attendance_mode: 'session_based',
+                        attendance_ui_type: 'card_based'
+                    }
+                }
+            }
         });
         // B. Create real School Subscription record
-        // Find the plan based on slug
         const plan = await tx.subscriptionPlan.findUnique({
             where: { slug: subscriptionTier.toLowerCase() }
         });
         if (plan) {
+            const trialDays = plan.trialDays || 0;
+            const billingStart = new Date();
+            const trialEndsAt = new Date(billingStart.getTime() + trialDays * 24 * 60 * 60 * 1000);
+            const billingEnd = trialDays > 0 ? trialEndsAt : new Date(billingStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+            const renewalDate = new Date(billingEnd.getTime() + 24 * 60 * 60 * 1000);
             await tx.schoolSubscription.create({
                 data: {
                     schoolId: school.id,
                     planId: plan.id,
                     billingPeriod: 'monthly',
-                    status: 'trial',
+                    status: trialDays > 0 ? 'trial' : 'active',
                     studentCount: 0,
-                    billingStart: new Date(),
-                    billingEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days trial
-                    renewalDate: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000),
-                    trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                    billingStart,
+                    billingEnd,
+                    renewalDate,
+                    trialEndsAt: trialDays > 0 ? trialEndsAt : null
                 }
             });
         }
-        // Update legacy field for backward compatibility (optional but safer for now)
+        // Update legacy field
         await tx.school.update({
             where: { id: school.id },
             data: {
@@ -86,17 +104,20 @@ const startOnboarding = async (data) => {
                 onboardingStatus: 'PENDING'
             }
         });
-        // B. Create the Admin User
+        // B. Create the Admin User (Inside transaction with tx)
         // If no password provided (Super Admin flow), generate a random one
-        const password = adminPassword || crypto_1.default.randomBytes(8).toString('hex');
-        const user = await userService.createUser({
-            email: adminEmail.toLowerCase().trim(),
-            password_hash: password,
-            full_name: adminName,
-            role: 'admin', // Default role for school creator
-            phone: adminPhone,
-            schoolId: school.id,
-            is_active: true
+        const rawPassword = adminPassword || crypto_1.default.randomBytes(8).toString('hex');
+        const hashedPassword = bcryptjs_1.default.hashSync(rawPassword, 10);
+        const user = await tx.user.create({
+            data: {
+                email: adminEmail.toLowerCase().trim(),
+                password_hash: hashedPassword,
+                full_name: adminName,
+                role: 'admin',
+                phone: adminPhone,
+                schoolId: school.id,
+                is_active: true
+            }
         });
         return {
             school,
@@ -105,7 +126,7 @@ const startOnboarding = async (data) => {
                 email: user.email,
                 name: user.full_name,
                 role: user.role,
-                generatedPassword: adminPassword ? undefined : password
+                generatedPassword: adminPassword ? undefined : rawPassword
             }
         };
     });

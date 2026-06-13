@@ -131,6 +131,25 @@ router.delete("/features/:id", async (req, res) => {
         fail(res, e.message, 500);
     }
 });
+// ─── Global Subscriptions ─────────────────────────────────────────────────────
+router.get("/", async (_req, res) => {
+    try {
+        const subs = await SubscriptionService.getAllSubscriptions();
+        ok(res, subs);
+    }
+    catch (e) {
+        fail(res, e.message, 500);
+    }
+});
+router.delete("/:id", async (req, res) => {
+    try {
+        await SubscriptionService.deleteSchoolSubscription(req.params.id);
+        ok(res, { deleted: true });
+    }
+    catch (e) {
+        fail(res, e.message, 500);
+    }
+});
 // ─── School Subscriptions ─────────────────────────────────────────────────────
 router.get("/schools/:id/subscription", async (req, res) => {
     try {
@@ -264,6 +283,47 @@ router.get("/subscription-metrics", async (_req, res) => {
     try {
         const metrics = await SubscriptionService.getSubscriptionMetrics();
         ok(res, metrics);
+    }
+    catch (e) {
+        fail(res, e.message, 500);
+    }
+});
+// ─── Tenant-Aware Routes (My Subscription) ───────────────────────────────────
+router.get("/me/overview", async (req, res) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return fail(res, "Unauthorized", 401);
+        const data = await SubscriptionService.getSchoolSubscriptionDetailed(schoolId);
+        if (!data)
+            return fail(res, "Subscription not found", 404);
+        ok(res, data);
+    }
+    catch (e) {
+        fail(res, e.message, 500);
+    }
+});
+router.get("/me/billing", async (req, res) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return fail(res, "Unauthorized", 401);
+        // Reuse the mapping logic from SuperAdminService but filter for this school
+        // Actually, we'll just return the current subscription formatted as history for now
+        const sub = await SubscriptionService.getSchoolSubscriptionDetailed(schoolId);
+        if (!sub)
+            return ok(res, []);
+        // Return as a list of "transactions"
+        const record = {
+            id: sub.id,
+            amount: sub.effectiveMonthly,
+            currency: "ETB",
+            status: "completed",
+            description: `${sub.plan.name} – ${sub.billingPeriod}`,
+            createdAt: sub.billingStart,
+            paymentMethod: "Card / Telebirr"
+        };
+        ok(res, [record]);
     }
     catch (e) {
         fail(res, e.message, 500);

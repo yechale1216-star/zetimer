@@ -155,6 +155,31 @@ export const postAnnouncement = async (req: AuthenticatedRequest, res: Response,
   }
 };
 
+export const getAnnouncements = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const announcements = await parentService.getSchoolAnnouncements(schoolId);
+    res.status(200).json({ success: true, data: announcements });
+  } catch (error: any) {
+    next(error);
+  }
+};
+
+export const updateAnnouncement = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const announcement = await parentService.updateAnnouncement(id, schoolId, req.body);
+    res.status(200).json({ success: true, data: announcement, message: "Announcement updated." });
+  } catch (error: any) {
+    next(error);
+  }
+};
+
 export const updateProfile = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = (req.headers['x-school-id'] as string) || req.user?.schoolId;

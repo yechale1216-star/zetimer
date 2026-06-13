@@ -53,6 +53,13 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
       interval = setInterval(() => {
         setCallTime((prev) => prev + 1);
       }, 1000);
+    } else if (status === 'RINGING') {
+      // Periodic vibration while ringing
+      interval = setInterval(() => {
+        if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+          navigator.vibrate([400, 200, 400]);
+        }
+      }, 2000);
     }
     return () => clearInterval(interval);
   }, [status]);
@@ -181,7 +188,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
             <span className="typography-label text-white/60 text-[10px] uppercase tracking-[0.3em] mb-1">Encrypted Call</span>
           )}
           <span className="typography-section-title text-white font-mono">
-            {status === 'CONNECTED' ? formatTime(callTime) : status.toLowerCase() + '...'}
+            {status === 'CONNECTED' ? formatTime(callTime) : ''}
           </span>
         </div>
         <Button
@@ -246,23 +253,55 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
           /* Voice Call UI (Profile Centered) */
           <div className="flex flex-col items-center gap-8">
              <div className="relative">
+                {/* Ambient Glow Background */}
                 <motion.div
                   animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
                   transition={{ repeat: Infinity, duration: 4 }}
                   className="absolute inset-0 bg-primary/20 rounded-full blur-3xl"
                 />
-                <Avatar className="h-48 w-48 border-4 border-white/10 shadow-2xl relative z-10">
-                  <AvatarImage src={caller.avatar || undefined} />
-                  <AvatarFallback className="typography-label text-5xl bg-primary/20 text-white">
-                    {caller.name.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                
+                {/* Vibrating Avatar */}
+                <motion.div
+                  animate={status === 'CONNECTED' ? {
+                    x: [0, -1, 1, -1, 1, 0],
+                    y: [0, 1, -1, 1, -1, 0],
+                  } : {}}
+                  transition={{
+                    repeat: Infinity,
+                    duration: 0.2,
+                    ease: "linear",
+                    repeatDelay: 2
+                  }}
+                  className="relative z-10"
+                >
+                  <Avatar className="h-48 w-48 border-4 border-white/10 shadow-2xl">
+                    <AvatarImage src={caller.avatar || undefined} />
+                    <AvatarFallback className="text-7xl font-black bg-gradient-to-br from-primary/40 to-primary/10 text-white shadow-inner flex items-center justify-center w-full h-full">
+                      {caller.name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </motion.div>
              </div>
              <div className="text-center">
                 <h2 className="typography-page-title text-white mb-2">{caller.name}</h2>
                 <div className="flex items-center justify-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <p className="typography-label text-white/40 uppercase">Ongoing voice session</p>
+                  <div className="flex gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <motion.div
+                        key={i}
+                        animate={{ scale: [1, 1.5, 1], opacity: [0.4, 1, 0.4] }}
+                        transition={{
+                          repeat: Infinity,
+                          duration: 1,
+                          delay: i * 0.2,
+                        }}
+                        className="h-1.5 w-1.5 rounded-full bg-green-500"
+                      />
+                    ))}
+                  </div>
+                  <p className="typography-label text-white/40 uppercase">
+                    {status === 'CONNECTED' ? 'Ongoing voice session' : 'Connecting...'}
+                  </p>
                 </div>
              </div>
           </div>

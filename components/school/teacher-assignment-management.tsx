@@ -30,9 +30,9 @@ interface TeacherAssignment {
   teacher_id: string
   class_id: string
   subject?: string
-  grade?: string
-  section?: string
-  stream?: string
+  grade?: { id: string; name: string }
+  section?: { id: string; name: string }
+  stream?: { id: string; name: string }
   gradeId?: string
   sectionId?: string
   streamId?: string
@@ -57,6 +57,9 @@ export function TeacherAssignmentManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [schoolId, setSchoolId] = useState<string>("")
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const [availableGrades, setAvailableGrades] = useState<any[]>([])
   const [availableSections, setAvailableSections] = useState<any[]>([])
@@ -130,6 +133,8 @@ export function TeacherAssignmentManagement() {
     setSelectedGrade("")
     setSelectedSection("")
     setSelectedStream("")
+    setIsEditing(false)
+    setEditingAssignmentId(null)
     setShowSuccess(false)
   }
 
@@ -161,8 +166,19 @@ export function TeacherAssignmentManagement() {
 
     try {
       setIsAssigning(true)
-      const classId = `class-${selectedGrade}-${selectedSection}-${selectedStream || "none"}`
-      await db.assignTeacherToClass(selectedTeacher, classId, undefined, selectedGrade, selectedSection, selectedStream || undefined)
+      const data = {
+        teacher_id: selectedTeacher,
+        gradeId: selectedGrade,
+        sectionId: selectedSection,
+        streamId: selectedStream || undefined
+      }
+
+      if (isEditing && editingAssignmentId) {
+        await db.updateTeacherAssignment(editingAssignmentId, data)
+      } else {
+        const classId = `class-${selectedGrade}-${selectedSection}-${selectedStream || "none"}`
+        await db.assignTeacherToClass(selectedTeacher, classId, undefined, selectedGrade, selectedSection, selectedStream || undefined)
+      }
 
       setShowSuccess(true)
       await loadAllData(schoolId)
@@ -178,14 +194,42 @@ export function TeacherAssignmentManagement() {
     }
   }
 
-  const handleRemoveAssignment = async (assignmentId: string) => {
-    if (!confirm("Remove this assignment?")) return
+  const handleEditAssignment = (assignment: TeacherAssignment) => {
+    setEditingAssignmentId(assignment.id)
+    setSelectedTeacher(assignment.teacher_id)
+    setSelectedGrade(assignment.gradeId || assignment.grade?.id || "")
+    setSelectedSection(assignment.sectionId || assignment.section?.id || "")
+    setSelectedStream(assignment.streamId || assignment.stream?.id || "")
+    setIsEditing(true)
+    setIsDialogOpen(true)
+  }
+
+  const handleRemoveAssignment = async (e: React.MouseEvent | null, assignmentId: string) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
+    console.log("[v0] Delete clicked for assignment:", assignmentId)
+    
+    const isConfirmed = window.confirm("Are you sure you want to remove this teacher assignment?")
+    if (!isConfirmed) {
+      console.log("[v0] Delete cancelled by user")
+      return
+    }
+    
     try {
+      console.log("[v0] Proceeding with deletion...")
+      setDeletingId(assignmentId)
       await db.removeTeacherAssignment(assignmentId)
+      console.log("[v0] Deletion successful")
       notifications.success("Assignment Removed", "Teacher assignment has been removed.")
       await loadAllData(schoolId)
     } catch (error: any) {
-      notifications.error("Error", error.message)
+      console.error("[v0] Deletion failed:", error)
+      notifications.error("Delete Failed", error.message || "Failed to remove assignment")
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -247,8 +291,12 @@ export function TeacherAssignmentManagement() {
                     <Plus className="w-4 h-4" />
                   </div>
                   <div>
-                    <DialogTitle className="typography-section-title">New Class Assignment</DialogTitle>
-                    <p className="typography-helper text-slate-500 dark:text-slate-400 mt-0.5">Select a teacher and assign them to a grade section.</p>
+                    <DialogTitle className="typography-section-title">
+                      {isEditing ? "Edit Class Assignment" : "New Class Assignment"}
+                    </DialogTitle>
+                    <p className="typography-helper text-slate-500 dark:text-slate-400 mt-0.5">
+                      {isEditing ? "Modify assignment details for this teacher." : "Select a teacher and assign them to a grade section."}
+                    </p>
                   </div>
                 </div>
               </DialogHeader>
@@ -350,7 +398,7 @@ export function TeacherAssignmentManagement() {
                     {isAssigning ? (
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
-                      <><Plus className="w-4 h-4 mr-2" />Assign Teacher</>
+                      <><Plus className="w-4 h-4 mr-2" />{isEditing ? "Update Assignment" : "Assign Teacher"}</>
                     )}
                   </Button>
                 </div>
@@ -401,15 +449,34 @@ export function TeacherAssignmentManagement() {
                           {getInitials(teacherName)}
                         </div>
                       )}
-                      <Button
-                        onClick={() => handleRemoveAssignment(assignment.id)}
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-full"
-                        title="Remove Assignment"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            onClick={() => handleEditAssignment(assignment)}
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-full"
+                            title="Edit Assignment"
+                          >
+                            <Plus className="w-3.5 h-3.5 rotate-45" /> 
+                          </Button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              window.alert("DELETE CLICKED - ID: " + assignment.id);
+                              handleRemoveAssignment(null, assignment.id);
+                            }}
+                            disabled={deletingId === assignment.id}
+                            className="h-8 w-8 flex items-center justify-center text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-full border border-transparent transition-all"
+                            title="Remove Assignment"
+                          >
+                            {deletingId === assignment.id ? (
+                               <div className="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                               <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                     </div>
 
                     {/* Name */}
@@ -423,12 +490,12 @@ export function TeacherAssignmentManagement() {
                     <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800/50 space-y-1.5">
                       <div className="typography-helper flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
                         <Users className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        <span>Grade {assignment.grade} - Section {assignment.section}</span>
+                        <span>Grade {assignment.grade?.name || "N/A"} - Section {assignment.section?.name || "N/A"}</span>
                       </div>
-                      {assignment.stream && (
+                      {assignment.stream?.name && (
                         <div className="typography-helper flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                           <GraduationCap className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                          <span>{assignment.stream} Stream</span>
+                          <span>{assignment.stream.name} Stream</span>
                         </div>
                       )}
                     </div>

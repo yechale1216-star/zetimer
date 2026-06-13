@@ -77,6 +77,13 @@ export function AttendanceTracking() {
     const user = authService.getCurrentUser()
     setIsTeacher(user?.role === "teacher")
     loadStudents()
+
+    // Background polling for "instant" updates (every 10 seconds)
+    const pollInterval = setInterval(() => {
+      loadAttendanceForDate(true)
+    }, 10000)
+
+    return () => clearInterval(pollInterval)
   }, [])
 
   useEffect(() => {
@@ -99,9 +106,24 @@ export function AttendanceTracking() {
 
         const allFilteredStudents = studentsData.filter((student: Student) => {
           return classes.some((cls: any) => {
-            const gradeMatch = (student.grade || "").replace("Grade ", "") === String(cls.grade || "")
-            const sectionMatch = student.section === cls.section
-            const streamMatch = !cls.stream || student.stream === cls.stream
+            const studentGrade = (student.grade || "").toLowerCase().replace("grade ", "").trim()
+            const clsGradeId = String(cls.gradeId || "").toLowerCase().trim()
+            const clsGradeName = String(cls.grade?.name || "").toLowerCase().replace("grade ", "").trim()
+            
+            const gradeMatch = studentGrade === clsGradeId || studentGrade === clsGradeName
+            
+            const studentSection = (student.section || "").toLowerCase().trim()
+            const clsSectionId = String(cls.sectionId || "").toLowerCase().trim()
+            const clsSectionName = String(cls.section?.name || "").toLowerCase().trim()
+            
+            const sectionMatch = studentSection === clsSectionId || studentSection === clsSectionName
+
+            const studentStream = (student.stream || "").toLowerCase().trim()
+            const clsStreamId = String(cls.streamId || "").toLowerCase().trim()
+            const clsStreamName = String(cls.stream?.name || "").toLowerCase().trim()
+            
+            const streamMatch = !cls.streamId || studentStream === clsStreamId || studentStream === clsStreamName
+            
             return gradeMatch && sectionMatch && streamMatch
           })
         })
@@ -121,15 +143,28 @@ export function AttendanceTracking() {
     }
   }
 
-  const loadAttendanceForDate = async () => {
+  const loadAttendanceForDate = async (isBackground = false) => {
     if (students.length === 0) return
 
     try {
-      const attendanceRecords = await db.getAttendanceByDate(selectedDate)
       const isSessionBased = settings?.attendanceMode === "session_based"
+
+      // Fetch records with mode context so the API can filter server-side
+      const attendanceRecords = await db.getAttendanceByDateAndMode(
+        selectedDate,
+        isSessionBased ? selectedSession : null
+      )
+
+      // Client-side guard: strictly isolate records by mode
+      // - session_based mode: only records whose session matches selectedSession
+      // - daily mode: only records whose session is null / undefined
       const filteredRecords = isSessionBased
-        ? attendanceRecords.filter((r: any) => r.session?.toLowerCase() === selectedSession.toLowerCase())
-        : attendanceRecords
+        ? attendanceRecords.filter(
+            (r: any) => r.session?.toLowerCase() === selectedSession.toLowerCase()
+          )
+        : attendanceRecords.filter(
+            (r: any) => r.session === null || r.session === undefined || r.session === ""
+          )
 
       const newAttendanceState: AttendanceState = {}
 
@@ -442,15 +477,15 @@ export function AttendanceTracking() {
   const getStatusColor = (status: string | null) => {
     switch (status) {
       case "present":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "bg-emerald-50/50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30 font-medium"
       case "late":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+        return "bg-amber-50/50 text-amber-600 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30 font-medium"
       case "absent":
-        return "bg-red-100 text-red-800 border-red-200"
+        return "bg-rose-50/50 text-rose-600 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30 font-medium"
       case "excused":
-        return "bg-blue-100 text-blue-800 border-blue-200"
+        return "bg-sky-50/50 text-sky-600 border-sky-100 dark:bg-sky-950/20 dark:text-sky-400 dark:border-sky-900/30 font-medium"
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return "bg-slate-50/50 text-slate-600 border-slate-100 dark:bg-slate-900/20 dark:text-slate-400 dark:border-slate-800 font-medium"
     }
   }
 
@@ -648,42 +683,42 @@ export function AttendanceTracking() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-green-100 dark:bg-green-950/40 rounded-lg flex items-center justify-center text-green-600 dark:text-green-400">
+                <div className="w-8 h-8 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50">
                   <UserCheck className="h-4 w-4" />
                 </div>
                 <p className="typography-label text-[10px] text-muted-foreground uppercase">Present</p>
               </div>
-              <p className="typography-page-title text-green-600 dark:text-green-500">{stats.present}</p>
+              <p className="typography-page-title text-emerald-600 dark:text-emerald-500">{stats.present}</p>
             </div>
 
             <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-950/40 rounded-lg flex items-center justify-center text-yellow-600 dark:text-yellow-400">
+                <div className="w-8 h-8 bg-amber-50 dark:bg-amber-950/40 rounded-lg flex items-center justify-center text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50">
                   <Clock className="h-4 w-4" />
                 </div>
                 <p className="typography-label text-[10px] text-muted-foreground uppercase">Late</p>
               </div>
-              <p className="typography-page-title text-yellow-600 dark:text-yellow-500">{stats.late}</p>
+              <p className="typography-page-title text-amber-600 dark:text-amber-500">{stats.late}</p>
             </div>
 
             <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-red-100 dark:bg-red-950/40 rounded-lg flex items-center justify-center text-red-600 dark:text-red-400">
+                <div className="w-8 h-8 bg-rose-50 dark:bg-rose-950/40 rounded-lg flex items-center justify-center text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/50">
                   <UserX className="h-4 w-4" />
                 </div>
                 <p className="typography-label text-[10px] text-muted-foreground uppercase">Absent</p>
               </div>
-              <p className="typography-page-title text-red-600 dark:text-red-500">{stats.absent}</p>
+              <p className="typography-page-title text-rose-600 dark:text-rose-500">{stats.absent}</p>
             </div>
 
             <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-950/40 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400">
+                <div className="w-8 h-8 bg-sky-50 dark:bg-sky-950/40 rounded-lg flex items-center justify-center text-sky-600 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50">
                   <AlertTriangle className="h-4 w-4" />
                 </div>
                 <p className="typography-label text-[10px] text-muted-foreground uppercase">Excused</p>
               </div>
-              <p className="typography-page-title text-blue-600 dark:text-blue-500">{stats.excused}</p>
+              <p className="typography-page-title text-sky-600 dark:text-sky-500">{stats.excused}</p>
             </div>
           </div>
         </CardContent>

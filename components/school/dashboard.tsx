@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, UserCheck, UserX, Clock, AlertTriangle, TrendingUp, Calendar } from "lucide-react"
+import { Users, UserCheck, UserX, Clock, AlertTriangle, TrendingUp, Calendar, RefreshCw } from "lucide-react"
 import { db, type Student } from "@/lib/db/database"
 import { notifications } from "@/lib/utils/notifications"
 import { QuickActions } from "@/components/school/quick-actions"
@@ -17,6 +17,7 @@ import {
   PieChart, Pie, Cell, Legend, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip
 } from "recharts"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { cn } from "../../lib/utils/utils"
 
 interface DashboardStats {
   totalStudents: number
@@ -73,10 +74,28 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   useEffect(() => {
     loadDashboardData()
-  }, [])
 
-  const loadDashboardData = async () => {
-    setIsLoading(true)
+    // Add polling for "instant" updates from other users/tabs (every 10 seconds)
+    const pollInterval = setInterval(() => {
+      // Pass a flag to loadDashboardData to avoid showing full-page loader during background refreshes
+      loadDashboardData(true)
+    }, 10000)
+
+    return () => clearInterval(pollInterval)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-compute chart/stats when attendance mode setting changes
+  // (settings is already loaded, rawData just needs to be re-processed)
+  useEffect(() => {
+    if (rawData) {
+      // Re-run the rawData effect by triggering a dummy state update
+      setRawData(prev => prev ? { ...prev } : null)
+    }
+  }, [isSessionBased]) // eslint-disable-line react-hooks/exhaustive-deps
+
+
+  const loadDashboardData = async (isBackground = false) => {
+    if (!isBackground) setIsLoading(true)
     try {
       const user = authService.getCurrentUser()
       let students: Student[] = []
@@ -91,11 +110,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
         students = allStudents.filter((student: Student) => {
           return classes.some((cls: any) => {
-            const studentGrade = (student.grade || "").replace("Grade ", "").trim()
-            const classGrade = String(cls.grade || cls.class?.grade || "").trim()
-            const gradeMatch = studentGrade === classGrade
-            const sectionMatch = (cls.section || cls.class?.section) === student.section
-            const streamMatch = !(cls.stream || cls.class?.stream) || (cls.stream || cls.class?.stream) === student.stream
+            const studentGrade = (student.grade || "").toLowerCase().replace("grade ", "").trim()
+            const clsGradeId = String(cls.gradeId || "").toLowerCase().trim()
+            const clsGradeName = String(cls.grade?.name || cls.class?.grade || "").toLowerCase().replace("grade ", "").trim()
+            
+            const gradeMatch = studentGrade === clsGradeId || studentGrade === clsGradeName
+            
+            const studentSection = (student.section || "").toLowerCase().trim()
+            const clsSectionId = String(cls.sectionId || "").toLowerCase().trim()
+            const clsSectionName = String(cls.section?.name || cls.class?.section || "").toLowerCase().trim()
+            
+            const sectionMatch = studentSection === clsSectionId || studentSection === clsSectionName
+
+            const studentStream = (student.stream || "").toLowerCase().trim()
+            const clsStreamId = String(cls.streamId || "").toLowerCase().trim()
+            const clsStreamName = String(cls.stream?.name || cls.class?.stream || "").toLowerCase().trim()
+            
+            const streamMatch = !cls.streamId || studentStream === clsStreamId || studentStream === clsStreamName
+            
             return gradeMatch && sectionMatch && streamMatch
           })
         })
@@ -154,10 +186,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
     const { today: rawToday, all: rawAll, students } = rawData
 
-    // If session-based, only consider records that have a session field
-    // to prevent old daily-mode records from polluting the dashboard.
-    const today = isSessionBased ? rawToday.filter(r => r.session) : rawToday
-    const all = isSessionBased ? rawAll.filter(r => r.session) : rawAll
+    // Strict mode isolation — same logic as attendance-tracking.tsx:
+    // - daily mode    → only records with null/undefined/empty session
+    // - session mode  → only records that have a session value
+    const today = isSessionBased
+      ? rawToday.filter(r => r.session && r.session !== "")
+      : rawToday.filter(r => r.session === null || r.session === undefined || r.session === "")
+
+    const all = isSessionBased
+      ? rawAll.filter(r => r.session && r.session !== "")
+      : rawAll.filter(r => r.session === null || r.session === undefined || r.session === "")
 
     const sessionFilteredToday = sessionFilter === "total" 
       ? today 
@@ -404,13 +442,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "present":
-        return "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+        return "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800"
       case "late":
-        return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20"
+        return "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
       case "absent":
-        return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+        return "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800"
       case "excused":
-        return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+        return "bg-sky-50 text-sky-700 border-sky-100 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-800"
       default:
         return "bg-muted text-muted-foreground border-border"
     }
@@ -453,7 +491,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </p>
         </div>
         <div className="flex flex-col items-start md:items-end gap-3 w-full md:w-auto">
-          <div className="typography-label text-[10px] uppercase bg-primary/10 text-primary px-4 py-1.5 rounded-full border border-primary/20 shadow-sm">
+          <div className="typography-label text-[10px] uppercase bg-primary/10 text-primary px-4 py-1.5 rounded-full border border-primary/20 shadow-sm flex items-center gap-3">
             {new Date().toLocaleDateString("en-ET", {
               timeZone: "Africa/Addis_Ababa",
               weekday: "long",
@@ -461,6 +499,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               month: "long",
               day: "numeric",
             })}
+            <button 
+              onClick={() => loadDashboardData()}
+              className="ml-2 hover:text-primary-focus transition-colors"
+              title="Refresh Data"
+            >
+              <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
           {isSessionBased && (
             <div className="flex gap-1.5 p-1 bg-white/50 dark:bg-slate-800/50 rounded-full border border-slate-200 dark:border-slate-700">
@@ -493,77 +538,52 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </div>
 
-      <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
-        <CardHeader className="pb-0 border-none">
-          <CardTitle className="typography-card-title flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            School Overview
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="flex flex-row items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md cursor-pointer group">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-950/50 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50">
-                  <Users className="h-5 w-5" />
-                </div>
-                <p className="typography-label text-foreground uppercase text-[10px]">Total Students</p>
+      {/* School Overview Stats - Reimagined as a single row card */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+        {[
+          { label: "Total Students", value: stats.totalStudents, icon: Users, color: "slate", trend: null },
+          { label: "Present", value: stats.presentToday, icon: UserCheck, color: "green", trend: null },
+          { label: "Late", value: stats.lateToday, icon: Clock, color: "yellow", trend: null },
+          { label: "Absent", value: stats.absentToday, icon: UserX, color: "red", trend: null },
+          { label: "Excused", value: stats.excusedToday, icon: AlertTriangle, color: "blue", trend: null },
+          { label: "Attendance Rate", value: `${stats.attendanceRate}%`, icon: TrendingUp, color: "violet", isRate: true },
+        ].map((item, idx) => (
+          <Card 
+            key={idx} 
+            className={cn(
+              "relative overflow-hidden border-none shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 active:scale-[0.98] group",
+              item.isRate 
+                ? "bg-gradient-to-br from-violet-600 to-indigo-700 text-white" 
+                : "bg-white/90 dark:bg-slate-900/90 backdrop-blur-md"
+            )}
+          >
+            <CardContent className="p-4 flex flex-col items-center text-center">
+              <div className={cn(
+                "w-10 h-10 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110",
+                item.isRate 
+                  ? "bg-white/20 border border-white/20" 
+                  : `bg-${item.color}-100 dark:bg-${item.color}-900/30 text-${item.color}-600 dark:text-${item.color}-400 border border-${item.color}-200/50 dark:border-${item.color}-800/50`
+              )}>
+                <item.icon className="h-5 w-5" />
               </div>
-              <p className="typography-page-title text-foreground text-2xl">{stats.totalStudents}</p>
-            </div>
-
-            <div className="flex flex-row items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md cursor-pointer group">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-100 dark:bg-green-950/50 rounded-lg flex items-center justify-center text-green-600 dark:text-green-400 border border-green-200/50 dark:border-green-800/50">
-                  <UserCheck className="h-5 w-5" />
-                </div>
-                <p className="typography-label text-green-600 dark:text-green-400 uppercase text-[10px]">Present</p>
+              <div className="space-y-0.5">
+                <p className={cn(
+                  "text-[22px] font-bold tracking-tight",
+                  item.isRate ? "text-white" : `text-${item.color}-600 dark:text-${item.color}-400`
+                )}>
+                  {item.value}
+                </p>
+                <p className={cn(
+                  "text-[12px] uppercase font-bold tracking-widest leading-none",
+                  item.isRate ? "text-white/90" : "text-slate-500/80 dark:text-slate-400/80"
+                )}>
+                  {item.label}
+                </p>
               </div>
-              <p className="typography-page-title text-green-600 dark:text-green-500 text-2xl">{stats.presentToday}</p>
-            </div>
-
-            <div className="flex flex-row items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md cursor-pointer group">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-950/50 rounded-lg flex items-center justify-center text-yellow-600 dark:text-yellow-400 border border-yellow-200/50 dark:border-yellow-800/50">
-                  <Clock className="h-5 w-5" />
-                </div>
-                <p className="typography-label text-yellow-600 dark:text-yellow-400 uppercase text-[10px]">Late</p>
-              </div>
-              <p className="typography-page-title text-yellow-600 dark:text-yellow-500 text-2xl">{stats.lateToday}</p>
-            </div>
-
-            <div className="flex flex-row items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md cursor-pointer group">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-100 dark:bg-red-950/50 rounded-lg flex items-center justify-center text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-800/50">
-                  <UserX className="h-5 w-5" />
-                </div>
-                <p className="typography-label text-red-600 dark:text-red-400 uppercase text-[10px]">Absent</p>
-              </div>
-              <p className="typography-page-title text-red-600 dark:text-red-500 text-2xl">{stats.absentToday}</p>
-            </div>
-
-            <div className="flex flex-row items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md cursor-pointer group">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-950/50 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50">
-                  <AlertTriangle className="h-5 w-5" />
-                </div>
-                <p className="typography-label text-blue-600 dark:text-blue-400 uppercase text-[10px]">Excused</p>
-              </div>
-              <p className="typography-page-title text-blue-600 dark:text-blue-500 text-2xl">{stats.excusedToday}</p>
-            </div>
-
-            <div className="flex flex-row items-center justify-between p-4 bg-gradient-to-br from-purple-500 to-indigo-600 dark:from-purple-600 dark:to-indigo-800 rounded-xl shadow-lg border-none transition-all hover:shadow-xl active:scale-[0.98] cursor-pointer">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center text-white border border-white/20">
-                  <TrendingUp className="h-5 w-5" />
-                </div>
-                <p className="typography-label text-white uppercase text-[10px]">Rate</p>
-              </div>
-              <p className="typography-page-title text-white text-2xl">{stats.attendanceRate}%</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       <QuickActions onNavigate={onNavigate || (() => {})} />
 

@@ -43,7 +43,7 @@ export default function PrivacyPage() {
             <Shield className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight">Privacy Policy</h1>
-          <p className="text-muted-foreground">Last updated: May 15, 2026</p>
+          <p className="text-muted-foreground">Last updated: June 13, 2026</p>
         </div>
 
         <div className="prose prose-slate dark:prose-invert max-w-none">
@@ -53,48 +53,59 @@ export default function PrivacyPage() {
               We collect information to provide better services to our users. This includes:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li><strong>Account Information:</strong> Name, email address, and school details when you register.</li>
-              <li><strong>Student Data:</strong> Names, grades, and attendance records provided by school administrators.</li>
-              <li><strong>Usage Data:</strong> Information about how you interact with our platform to improve performance.</li>
+              <li><strong>Account Information:</strong> Name, email address, phone number, and school details during registration and onboarding.</li>
+              <li><strong>Student Data:</strong> Names, grades, and attendance records managed by school administrators.</li>
+              <li><strong>Communication Data:</strong> Message history, attachments, and documents shared within the Messaging Center.</li>
+              <li><strong>Usage & Offline Data:</strong> Local storage of records for offline functionality and technical logs to improve platform stability.</li>
             </ul>
           </section>
 
           <section className="mb-10">
             <h2 className="text-2xl font-bold mb-4">2. How We Use Information</h2>
             <p className="text-muted-foreground mb-4 leading-relaxed">
-              The data we collect is used solely for the purpose of maintaining the attendance system, including:
+              The data we collect is used solely for maintainting the educational ecosystem, including:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-              <li>Processing and displaying attendance reports.</li>
-              <li>Sending notifications to parents and staff.</li>
-              <li>Ensuring the security and integrity of the school database.</li>
+              <li>Processing real-time attendance and academic reporting.</li>
+              <li>Facilitating secure communication between staff, parents, and admins.</li>
+              <li>Delivering automated SMS and email notifications.</li>
+              <li>Ensuring synchronization of data across devices, including offline-to-online transitions.</li>
             </ul>
           </section>
 
           <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 mb-10">
             <div className="flex items-center gap-3 mb-3">
               <Lock className="w-5 h-5 text-primary" />
-              <h3 className="font-bold text-primary">Data Security Commitment</h3>
+              <h3 className="font-bold text-primary">Advanced Security Standards</h3>
             </div>
             <p className="text-sm text-primary/80 leading-relaxed">
-              We implement industry-standard encryption and security protocols to protect sensitive student and institutional data. 
-              We never sell or share your data with third-party advertisers.
+              We employ AES-256 encryption for data at rest and TLS 1.3 for data in transit. 
+              Our multi-tenant architecture ensures strict data isolation between institutions. 
+              We never sell your data to third parties.
             </p>
           </div>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">3. Data Retention</h2>
+            <h2 className="text-2xl font-bold mb-4">3. Data Retention & Privacy</h2>
             <p className="text-muted-foreground leading-relaxed">
-              We retain account information and student records for as long as your school maintains an active subscription. 
-              Upon request, or after subscription termination, we will securely delete all associated data in accordance with our data management policies.
+              We retain data for the duration of an active subscription. Schools can request bulk data deletion or exports at any time. 
+              Upon subscription termination, data is securely purged after a 30-day grace period, unless otherwise required by law.
             </p>
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">4. Your Rights</h2>
+            <h2 className="text-2xl font-bold mb-4">4. PWA & Local Storage</h2>
+            <p className="text-muted-foreground mb-4 leading-relaxed">
+              To provide offline capabilities, certain data is cached locally in your browser using Service Workers and IndexedDB/LocalStorage. 
+              This data remains on your device and is only transmitted to our servers during synchronization.
+            </p>
+          </section>
+
+          <section className="mb-10">
+            <h2 className="text-2xl font-bold mb-4">5. Your Rights</h2>
             <p className="text-muted-foreground leading-relaxed">
               Users have the right to access, correct, or request deletion of their personal data. 
-              Administrators have full control over the student data they manage within the platform.
+              Administrators have full transparency and control over the student data they manage within the platform.
             </p>
           </section>
         </div>

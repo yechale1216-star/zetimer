@@ -18,6 +18,7 @@ const initSocket = (server) => {
     });
     const userSockets = new Map(); // userId -> socketId
     const socketData = new Map(); // socketId -> data
+    const onlineUsers = new Set(); // Set of online userIds
     io.on('connection', (socket) => {
         console.log('A user connected:', socket.id);
         socket.on('authenticate', async ({ token }) => {
@@ -29,8 +30,11 @@ const initSocket = (server) => {
                 }
                 userSockets.set(userId, socket.id);
                 socketData.set(socket.id, { userId, schoolId });
+                onlineUsers.add(userId);
                 console.log(`User ${userId} from school ${schoolId} authenticated with socket ${socket.id}`);
-                // Notify friends/contacts that user is online
+                // 1. Send the current list of online users to the newly authenticated user
+                socket.emit('initial_online_users', Array.from(onlineUsers));
+                // 2. Notify friends/contacts that user is online
                 socket.broadcast.emit('user_online', userId);
             }
             catch (error) {
@@ -49,6 +53,22 @@ const initSocket = (server) => {
                 return;
             }
             try {
+                // Verify school subscription status
+                const school = await prisma.school.findUnique({
+                    where: { id: tenant.schoolId },
+                    include: { subscription: true }
+                });
+                const status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
+                if (status === 'SUSPENDED' || status === 'EXPIRED') {
+                    const errorMsg = status === 'SUSPENDED'
+                        ? 'Your school account is suspended.'
+                        : 'Your school subscription has expired. Please upgrade to continue messaging.';
+                    socket.emit('message_error', {
+                        message: errorMsg,
+                        code: `SCHOOL_${status}`
+                    });
+                    return;
+                }
                 // Verify conversation belongs to this school
                 const conversation = await prisma.conversation.findFirst({
                     where: { id: data.conversationId, schoolId: tenant.schoolId }
@@ -102,6 +122,21 @@ const initSocket = (server) => {
         });
         socket.on('typing', (data) => {
             socket.to(data.conversationId).emit('user_typing', data);
+        });
+        socket.on('edit_message', async (data) => {
+            io.to(data.conversationId).emit('message_edited', data);
+        });
+        socket.on('delete_message', async (data) => {
+            io.to(data.conversationId).emit('message_deleted', data);
+        });
+        socket.on('pin_message', async (data) => {
+            io.to(data.conversationId).emit('message_pinned', data);
+        });
+        socket.on('unpin_message', async (data) => {
+            io.to(data.conversationId).emit('message_unpinned', data);
+        });
+        socket.on('toggle_reaction', async (data) => {
+            io.to(data.conversationId).emit('reaction_updated', data);
         });
         socket.on('mark_as_read', async (data) => {
             const tenant = socketData.get(socket.id);
@@ -245,12 +280,24 @@ const initSocket = (server) => {
                 });
             }
         });
-        socket.on('disconnect', () => {
-            console.log('User disconnected:', socket.id);
+        socket.on('disconnect', async () => {
+            console.log('A user disconnected:', socket.id);
             const data = socketData.get(socket.id);
             if (data) {
-                userSockets.delete(data.userId);
-                socket.broadcast.emit('user_offline', data.userId);
+                const { userId, schoolId } = data;
+                // Update lastActive in DB
+                try {
+                    await prisma.user.update({
+                        where: { id: userId },
+                        data: { lastActive: new Date() }
+                    });
+                }
+                catch (err) {
+                    console.error('Failed to update lastActive on disconnect:', err);
+                }
+                userSockets.delete(userId);
+                onlineUsers.delete(userId);
+                socket.broadcast.emit('user_offline', userId);
             }
             socketData.delete(socket.id);
         });

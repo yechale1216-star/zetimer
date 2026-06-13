@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, User, CheckSquare, BarChart2, BookOpen,
-  Settings, LogOut, CreditCard, MessageSquare, Phone, TrendingUp, ShieldBan
+  Settings, LogOut, CreditCard, MessageSquare, Phone, TrendingUp, ShieldBan,
+  X, ChevronRight, Megaphone
 } from 'lucide-react'
 import { authService } from '@/lib/auth/auth'
 import { useRouter } from 'next/navigation'
@@ -66,6 +67,7 @@ export default function SchoolAdminLayout({
   const [user, setUser] = React.useState<any>(null)
   const [isAdmin, setIsAdmin] = React.useState(false)
   const [isMounted, setIsMounted] = React.useState(false)
+  const [sidebarOpen, setSidebarOpen] = React.useState(false)
 
   React.useEffect(() => {
     setIsMounted(true)
@@ -80,8 +82,6 @@ export default function SchoolAdminLayout({
       pathname
     })
 
-    // Redirect new admins to onboarding wizard if they haven't completed setup.
-    // Use explicit === false check so existing users without the field don't get redirected.
     if (currentUser?.role === 'admin' && currentUser?.onboardingCompleted === false) {
       if (pathname !== "/onboarding") {
         console.log("[RedirectDebug] Redirecting to /onboarding")
@@ -90,8 +90,12 @@ export default function SchoolAdminLayout({
     }
   }, [router, pathname])
 
-  const isPublicPage = pathname === "/school/admin/signup"
+  // Close sidebar on route change
+  React.useEffect(() => {
+    setSidebarOpen(false)
+  }, [pathname])
 
+  const isPublicPage = pathname === "/school/admin/signup"
   const isActive = (path: string) => pathname === path
 
   const handleLogout = async () => {
@@ -115,41 +119,133 @@ export default function SchoolAdminLayout({
     )
   }
 
+  const allNavItems = [
+    { href: '/school/admin', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Dashboard', show: true },
+    { href: '/school/admin/announcements', icon: <Megaphone className="w-5 h-5" />, label: 'Announcements', show: true },
+    { href: '/school/admin/communication', icon: <MessageSquare className="w-5 h-5" />, label: 'Communication', show: true },
+    { href: '/school/admin/calls', icon: <Phone className="w-5 h-5" />, label: 'Calls', show: true },
+    { href: '/school/admin/students', icon: <Users className="w-5 h-5" />, label: 'Students', show: true },
+    { href: '/school/admin/teachers', icon: <User className="w-5 h-5" />, label: 'Teachers', show: isAdmin },
+    { href: '/school/admin/teacher-assignments', icon: <BookOpen className="w-5 h-5" />, label: 'Assignments', show: isAdmin },
+    { href: '/school/admin/attendance', icon: <CheckSquare className="w-5 h-5" />, label: 'Attendance', show: true },
+    { href: '/school/admin/attendance-by-grade', icon: <BarChart2 className="w-5 h-5" />, label: 'Grade Analytics', show: true },
+    { href: '/school/admin/reports', icon: <BookOpen className="w-5 h-5" />, label: 'Reports', show: true },
+    { href: '/school/admin/promotion', icon: <TrendingUp className="w-5 h-5" />, label: 'Promotion', show: isAdmin },
+    { href: '/school/admin/subscription', icon: <CreditCard className="w-5 h-5" />, label: 'Subscription & Pricing', show: true },
+    { href: '/school/admin/settings', icon: <Settings className="w-5 h-5" />, label: 'Settings', show: isAdmin },
+    { href: '/school/admin/profile', icon: <User className="w-5 h-5" />, label: 'Profile', show: true },
+    { href: '/school/admin/support', icon: <MessageSquare className="w-5 h-5" />, label: 'Help & Support', show: true },
+  ]
+
   return (
     <SubscriptionProvider>
       <SocketProvider>
         <CallProvider>
-          <div className="flex h-screen bg-slate-50/50 dark:bg-slate-950 flex-col md:flex-row relative overflow-hidden">
+          <div className="flex h-screen bg-background dark:bg-slate-950 flex-col md:flex-row relative overflow-hidden">
             {/* Premium Background Pattern & Gradients */}
             <div className="absolute inset-0 pointer-events-none z-0">
-              <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-none [background-size:20px_20px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
-              <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-200/30 dark:bg-blue-900/10 rounded-full blur-[120px] animate-pulse" />
-              <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-200/30 dark:bg-indigo-900/10 rounded-full blur-[120px] animate-pulse" />
+              <div className="absolute inset-0 bg-none dark:bg-none [background-size:20px_20px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
+              <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-100/20 dark:bg-blue-900/10 rounded-full blur-[120px] animate-pulse" />
+              <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-100/20 dark:bg-indigo-900/10 rounded-full blur-[120px] animate-pulse" />
             </div>
-            {/* Desktop Sidebar */}
-            <aside className="hidden md:flex w-64 border-r border-border bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl flex-col relative z-20">
+
+            {/* ── Mobile / Tablet Sidebar Drawer ── */}
+            {/* Backdrop */}
+            {sidebarOpen && (
+              <div
+                className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+                onClick={() => setSidebarOpen(false)}
+              />
+            )}
+
+            {/* Slide-in drawer */}
+            <aside
+              className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 bg-card dark:bg-slate-900 border-r border-border flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
+                sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+              }`}
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card/80 backdrop-blur-xl">
+                <Logo size="sm" href="/school/admin" />
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-2 rounded-lg hover:bg-secondary transition text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Drawer Nav */}
+              <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+                {allNavItems
+                  .filter(item => item.show)
+                  .map(item => {
+                    const active = item.href === '/school/admin/subscription'
+                      ? pathname.startsWith('/school/admin/subscription')
+                      : isActive(item.href)
+                    return (
+                      <Link key={item.href} href={item.href}>
+                        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-semibold group ${
+                          active
+                            ? 'bg-primary/15 text-primary shadow-sm'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}>
+                          <span className={active ? 'text-primary' : 'text-slate-500 dark:text-slate-400 group-hover:text-foreground'}>
+                            {item.icon}
+                          </span>
+                          <span className="flex-1">{item.label}</span>
+                          {active && <ChevronRight className="w-4 h-4 text-primary/60" />}
+                        </div>
+                      </Link>
+                    )
+                  })}
+              </nav>
+
+              {/* Drawer Footer */}
+              <div className="p-4 border-t border-border">
+                <div className="flex items-center gap-3 px-4 py-2 mb-3">
+                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0">
+                    {user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-sm font-semibold text-foreground truncate">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground truncate capitalize">
+                      {user?.role} {user?.customSchoolId && `• ${user.customSchoolId}`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-600 transition text-sm font-semibold"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </div>
+            </aside>
+
+            {/* ── Desktop Sidebar ── */}
+            <aside className="hidden md:flex w-64 border-r border-border bg-card/70 dark:bg-slate-950/70 backdrop-blur-xl flex-col relative z-20">
               <div className="p-6 border-b border-border flex items-center">
                 <Logo size="md" href="/school/admin" />
               </div>
               <nav className="flex-1 p-4 pt-4 space-y-2 overflow-y-auto scrollbar-hide">
-                <NavLink href="/school/admin" icon={<LayoutDashboard className="w-4 h-4" />} label="Dashboard" active={isActive('/school/admin')} />
-                <NavLink href="/school/admin/communication" icon={<MessageSquare className="w-4 h-4" />} label="Communication" active={isActive('/school/admin/communication')} />
-                <NavLink href="/school/admin/calls" icon={<Phone className="w-4 h-4" />} label="Calls" active={isActive('/school/admin/calls')} />
-                <NavLink href="/school/admin/students" icon={<Users className="w-4 h-4" />} label="Students" active={isActive('/school/admin/students')} />
-                {isAdmin && (
-                  <>
-                    <NavLink href="/school/admin/teachers" icon={<User className="w-4 h-4" />} label="Teachers" active={isActive('/school/admin/teachers')} />
-                    <NavLink href="/school/admin/teacher-assignments" icon={<BookOpen className="w-4 h-4" />} label="Assignments" active={isActive('/school/admin/teacher-assignments')} />
-                  </>
-                )}
-                <NavLink href="/school/admin/attendance" icon={<CheckSquare className="w-4 h-4" />} label="Attendance" active={isActive('/school/admin/attendance')} />
-                <NavLink href="/school/admin/attendance-by-grade" icon={<BarChart2 className="w-4 h-4" />} label="Grade Analytics" active={isActive('/school/admin/attendance-by-grade')} />
-                <NavLink href="/school/admin/reports" icon={<BookOpen className="w-4 h-4" />} label="Reports" active={isActive('/school/admin/reports')} />
-                {isAdmin && <NavLink href="/school/admin/promotion" icon={<TrendingUp className="w-4 h-4" />} label="Promotion" active={isActive('/school/admin/promotion')} />}
-                <NavLink href="/school/admin/subscription" icon={<CreditCard className="w-4 h-4" />} label="Subscription & Pricing" active={pathname.startsWith('/school/admin/subscription')} />
-                {isAdmin && <NavLink href="/school/admin/settings" icon={<Settings className="w-4 h-4" />} label="Settings" active={isActive('/school/admin/settings')} />}
-                <NavLink href="/school/admin/profile" icon={<User className="w-4 h-4" />} label="Profile" active={isActive('/school/admin/profile')} />
-                <NavLink href="/school/admin/support" icon={<MessageSquare className="w-4 h-4" />} label="Help & Support" active={isActive('/school/admin/support')} />
+                {allNavItems
+                  .filter(item => item.show)
+                  .map(item => {
+                    const active = item.href === '/school/admin/subscription'
+                      ? pathname.startsWith('/school/admin/subscription')
+                      : isActive(item.href)
+                    return (
+                      <NavLink
+                        key={item.href}
+                        href={item.href}
+                        icon={item.icon}
+                        label={item.label}
+                        active={active}
+                      />
+                    )
+                  })}
               </nav>
 
               <div className="p-4 border-t border-border">
@@ -174,53 +270,47 @@ export default function SchoolAdminLayout({
               </div>
             </aside>
 
-            {/* Main Content */}
+            {/* ── Main Content ── */}
             <div className="flex-1 flex flex-col overflow-hidden relative z-10">
-              <TopNav showMenuButton />
-              {/* Content */}
+              <TopNav showMenuButton onMenuClick={() => setSidebarOpen(true)} />
+
               <main className="flex-1 overflow-auto pb-20 md:pb-0">
                 <SuspendedBanner />
                 {children}
               </main>
 
-              {/* Mobile Bottom Navigation Tabs */}
-              <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur-sm">
-                <div className="flex items-center justify-around">
+              {/* ── Mobile Bottom Navigation (5 tabs) ── */}
+              <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md shadow-[0_-2px_20px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_20px_rgba(0,0,0,0.3)]">
+                <div className="flex items-stretch justify-around">
                   <MobileTabLink
                     href="/school/admin"
                     icon={<LayoutDashboard className="w-5 h-5" />}
-                    label="Dashboard"
-                    active={isActive('/school/admin') && !isActive('/school/admin/subscription') && !isActive('/school/admin/settings') && !isActive('/school/admin/communication') && !isActive('/school/admin/calls')}
+                    label="Home"
+                    active={isActive('/school/admin')}
                   />
                   <MobileTabLink
-                    href="/school/admin/communication"
-                    icon={<MessageSquare className="w-5 h-5" />}
-                    label="Talk"
-                    active={isActive('/school/admin/communication')}
+                    href="/school/admin/announcements"
+                    icon={<Megaphone className="w-5 h-5" />}
+                    label="Alerts"
+                    active={isActive('/school/admin/announcements')}
                   />
                   <MobileTabLink
-                    href="/school/admin/calls"
-                    icon={<Phone className="w-5 h-5" />}
-                    label="Calls"
-                    active={isActive('/school/admin/calls')}
+                    href="/school/admin/attendance-by-grade"
+                    icon={<BarChart2 className="w-5 h-5" />}
+                    label="Analytics"
+                    active={isActive('/school/admin/attendance-by-grade')}
                   />
                   <MobileTabLink
-                    href="/school/admin/subscription"
-                    icon={<CreditCard className="w-5 h-5" />}
-                    label="Pricing"
-                    active={isActive('/school/admin/subscription')}
+                    href="/school/admin/attendance"
+                    icon={<CheckSquare className="w-5 h-5" />}
+                    label="Attendance"
+                    active={isActive('/school/admin/attendance')}
                   />
                   <MobileTabLink
                     href="/school/admin/settings"
                     icon={<Settings className="w-5 h-5" />}
                     label="Settings"
                     active={isActive('/school/admin/settings')}
-                  />
-                  <MobileTabLink
-                    href="/school/admin/profile"
-                    icon={<User className="w-5 h-5" />}
-                    label="Profile"
-                    active={isActive('/school/admin/profile')}
                   />
                 </div>
               </nav>
@@ -270,13 +360,22 @@ function MobileTabLink({
   active: boolean
 }) {
   return (
-    <Link href={href}>
-      <div className={`flex flex-col items-center gap-1 px-4 py-3 transition ${active
-          ? 'text-primary'
-          : 'text-muted-foreground'
-        }`}>
-        {icon}
-        <span className="text-xs">{label}</span>
+    <Link href={href} className="flex-1 min-w-0">
+      <div className={`relative flex flex-col items-center justify-center gap-[5px] py-3 px-1 min-h-[60px] transition-all duration-200 ${
+        active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+      }`}>
+        {/* Active indicator pill at top */}
+        {active && (
+          <span className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[3px] rounded-full bg-primary" />
+        )}
+        {/* Icon */}
+        <span className={`flex items-center justify-center transition-transform duration-200 ${active ? 'scale-110' : 'scale-100'}`}>
+          {icon}
+        </span>
+        {/* Label — always visible */}
+        <span className="text-[11px] font-semibold leading-tight tracking-wide text-center whitespace-nowrap">
+          {label}
+        </span>
       </div>
     </Link>
   )

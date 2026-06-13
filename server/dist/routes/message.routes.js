@@ -35,8 +35,16 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const messageController = __importStar(require("../controllers/message.controller"));
+const groupController = __importStar(require("../controllers/group.controller")); // Use group controller for shared message actions
+const tenant_middleware_1 = require("../middleware/tenant.middleware");
 const router = (0, express_1.Router)();
-router.get('/conversations/:userId', messageController.getConversations);
-router.get('/:conversationId', messageController.getMessages);
-router.post('/conversations', messageController.createConversation);
+router.get('/conversations/:userId', (0, tenant_middleware_1.featureGuard)('messaging'), messageController.getConversations);
+router.get('/:conversationId', (0, tenant_middleware_1.featureGuard)('messaging'), messageController.getMessages);
+router.post('/conversations', (0, tenant_middleware_1.featureGuard)('messaging'), messageController.createConversation);
+// Message Actions (Shared between 1:1 and Groups)
+router.put('/:messageId', (0, tenant_middleware_1.featureGuard)('messaging'), groupController.editMessage);
+router.delete('/:messageId', (0, tenant_middleware_1.featureGuard)('messaging'), groupController.deleteMessage);
+router.post('/:messageId/pin', (0, tenant_middleware_1.featureGuard)('messaging'), groupController.pinMessage);
+router.delete('/:messageId/pin', (0, tenant_middleware_1.featureGuard)('messaging'), groupController.unpinMessage);
+router.post('/:messageId/react', (0, tenant_middleware_1.featureGuard)('messaging'), groupController.toggleReaction);
 exports.default = router;

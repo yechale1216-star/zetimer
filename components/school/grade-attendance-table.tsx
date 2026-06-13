@@ -47,15 +47,15 @@ export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
   }
 
   const getRateColor = (rate: number) => {
-    if (rate >= 90) return "text-green-600 dark:text-green-400"
-    if (rate >= 75) return "text-yellow-600 dark:text-yellow-400"
-    return "text-red-600 dark:text-red-400"
+    if (rate >= 90) return "text-emerald-600 dark:text-emerald-400"
+    if (rate >= 75) return "text-amber-600 dark:text-amber-400"
+    return "text-rose-600 dark:text-rose-400"
   }
 
   const getRateBg = (rate: number) => {
-    if (rate >= 90) return "bg-green-500"
-    if (rate >= 75) return "bg-yellow-500"
-    return "bg-red-500"
+    if (rate >= 90) return "bg-emerald-500"
+    if (rate >= 75) return "bg-amber-500"
+    return "bg-rose-500"
   }
 
   return (
@@ -69,10 +69,10 @@ export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
             <TableHead onClick={() => requestSort('section')} className="typography-label cursor-pointer text-[10px] uppercase text-center">Section</TableHead>
             <TableHead className="typography-label text-[10px] uppercase text-center">Stream</TableHead>
             <TableHead onClick={() => requestSort('totalStudents')} className="typography-label cursor-pointer text-[10px] uppercase text-center w-20">Total</TableHead>
-            <TableHead className="typography-label text-[10px] uppercase text-center text-green-600 w-24">Present</TableHead>
-            <TableHead className="typography-label text-[10px] uppercase text-center text-red-600 w-24">Absent</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-emerald-600 w-24">Present</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-rose-600 w-24">Absent</TableHead>
             <TableHead className="typography-label text-[10px] uppercase text-center text-amber-500 w-24">Late</TableHead>
-            <TableHead className="typography-label text-[10px] uppercase text-center text-indigo-500 w-24">Excused</TableHead>
+            <TableHead className="typography-label text-[10px] uppercase text-center text-sky-500 w-24">Excused</TableHead>
             <TableHead onClick={() => requestSort('attendanceRate')} className="typography-label cursor-pointer text-[10px] uppercase w-[160px]">
               <div className="flex items-center gap-1">Rate % {sortConfig?.key === 'attendanceRate' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>)}</div>
             </TableHead>
@@ -87,10 +87,10 @@ export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
               </TableCell>
               <TableCell className="typography-helper text-center text-muted-foreground uppercase">{row.stream || "-"}</TableCell>
               <TableCell className="typography-label text-center">{row.totalStudents}</TableCell>
-              <TableCell className="typography-label text-center text-green-600">{row.present}</TableCell>
-              <TableCell className="typography-label text-center text-red-600">{row.absent}</TableCell>
+              <TableCell className="typography-label text-center text-emerald-600">{row.present}</TableCell>
+              <TableCell className="typography-label text-center text-rose-600">{row.absent}</TableCell>
               <TableCell className="typography-label text-center text-amber-500">{row.late}</TableCell>
-              <TableCell className="typography-label text-center text-indigo-500">{row.excused}</TableCell>
+              <TableCell className="typography-label text-center text-sky-500">{row.excused}</TableCell>
               <TableCell>
                 <div className="space-y-1.5">
                   <div className="typography-label flex justify-between text-[10px]">

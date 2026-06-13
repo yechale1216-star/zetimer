@@ -12,7 +12,7 @@ const isE = (s) => s?.toLowerCase() === 'excused';
 const isA = (s) => s?.toLowerCase() === 'absent';
 const isAttendance = (s) => isP(s) || isL(s);
 const getAttendanceSummary = async (schoolId, filters) => {
-    const { startDate, endDate, academicYear, session } = filters;
+    const { startDate, endDate, academicYear, session, grade, section, stream } = filters;
     const isFullDay = !session || session === 'total';
     const where = { schoolId };
     if (startDate || endDate) {
@@ -25,10 +25,21 @@ const getAttendanceSummary = async (schoolId, filters) => {
     if (!isFullDay) {
         where.session = session;
     }
-    const totalStudents = await db_1.default.student.count({ where: { schoolId } });
+    // Filter attendance by student attributes if provided
+    const studentWhere = { schoolId };
+    if (grade && grade !== 'all')
+        studentWhere.grade = { name: grade };
+    if (section && section !== 'all')
+        studentWhere.section = { name: section };
+    if (stream && stream !== 'all')
+        studentWhere.stream = { name: stream };
+    if (grade || section || stream) {
+        where.student = studentWhere;
+    }
+    const totalStudents = await db_1.default.student.count({ where: studentWhere });
     if (isFullDay) {
         const allRecords = await db_1.default.attendance.findMany({
-            where: { ...where, schoolId },
+            where,
             select: { studentId: true, date: true, session: true, status: true }
         });
         const hasAnySessionRecords = allRecords.some(r => r.session);
@@ -65,11 +76,9 @@ const getAttendanceSummary = async (schoolId, filters) => {
                         excused++;
                     else if (isA(m) && isA(a))
                         absent++;
-                    // Partial days are ignored per user request "remove partial Day it is not neccessary"
                 }
             }
             else if (d !== undefined) {
-                // Fallback for daily mode
                 if (isP(d))
                     present++;
                 else if (isL(d))
@@ -95,11 +104,6 @@ const getAttendanceSummary = async (schoolId, filters) => {
     }
     else {
         // Single session view
-        const attendanceCounts = await db_1.default.attendance.groupBy({
-            by: ['status'],
-            where: { ...where, schoolId },
-            _count: { _all: true }
-        });
         const stats = {
             totalStudents,
             present: 0,
@@ -108,6 +112,11 @@ const getAttendanceSummary = async (schoolId, filters) => {
             excused: 0,
             attendanceRate: 0
         };
+        const attendanceCounts = await db_1.default.attendance.groupBy({
+            by: ['status'],
+            where,
+            _count: { _all: true }
+        });
         attendanceCounts.forEach((group) => {
             const s = group.status.toLowerCase();
             if (s === 'present')
@@ -128,7 +137,7 @@ const getAttendanceSummary = async (schoolId, filters) => {
 };
 exports.getAttendanceSummary = getAttendanceSummary;
 const getGradeStats = async (schoolId, filters) => {
-    const { startDate, endDate, session } = filters;
+    const { startDate, endDate, session, grade, section, stream } = filters;
     const isFullDay = !session || session === 'total';
     const where = { schoolId };
     if (startDate || endDate) {
@@ -141,12 +150,23 @@ const getGradeStats = async (schoolId, filters) => {
     if (!isFullDay) {
         where.session = session;
     }
+    // Filter by student attributes if provided
+    const studentWhere = { schoolId };
+    if (grade && grade !== 'all')
+        studentWhere.grade = { name: grade };
+    if (section && section !== 'all')
+        studentWhere.section = { name: section };
+    if (stream && stream !== 'all')
+        studentWhere.stream = { name: stream };
+    if (grade || section || stream) {
+        where.student = studentWhere;
+    }
     const students = await db_1.default.student.findMany({
-        where: { schoolId },
+        where: studentWhere,
         include: { grade: true, section: true, stream: true }
     });
     const attendance = await db_1.default.attendance.findMany({
-        where: { ...where, schoolId },
+        where,
         select: { studentId: true, status: true, date: true, session: true }
     });
     const hasAnySessionRecords = attendance.some(r => r.session);
@@ -258,6 +278,17 @@ const getAttendanceTrends = async (schoolId, filters) => {
         if (endDate)
             where.date.lte = new Date(endDate);
     }
+    // Filter records by student attributes if provided
+    const studentWhere = { schoolId };
+    if (grade && grade !== 'all')
+        studentWhere.grade = { name: grade };
+    if (section && section !== 'all')
+        studentWhere.section = { name: section };
+    if (stream && stream !== 'all')
+        studentWhere.stream = { name: stream };
+    if (grade || section || stream) {
+        where.student = studentWhere;
+    }
     const allRecords = await db_1.default.attendance.findMany({
         where: { ...where, ...(isFullDay ? {} : { session }) },
         select: { studentId: true, date: true, session: true, status: true },
@@ -312,18 +343,27 @@ const getAttendanceTrends = async (schoolId, filters) => {
 exports.getAttendanceTrends = getAttendanceTrends;
 const getDrillDownStats = async (schoolId, gradeId, filters) => {
     const { startDate, endDate, sectionId, streamId } = filters;
+    const where = {
+        schoolId,
+        gradeId,
+        ...(sectionId && sectionId !== 'all' ? { sectionId } : {}),
+        ...(streamId && streamId !== 'all' ? { streamId } : {})
+    };
     const students = await db_1.default.student.findMany({
-        where: {
-            schoolId,
-            gradeId,
-            ...(sectionId ? { sectionId } : {}),
-            ...(streamId ? { streamId } : {})
-        },
+        where,
         include: {
             section: true,
             stream: true,
             attendance: {
-                where: { schoolId, ...(startDate || endDate ? { date: { ...(startDate ? { gte: new Date(startDate) } : {}), ...(endDate ? { lte: new Date(endDate) } : {}) } } : {}) },
+                where: {
+                    schoolId,
+                    ...(startDate || endDate ? {
+                        date: {
+                            ...(startDate ? { gte: new Date(startDate) } : {}),
+                            ...(endDate ? { lte: new Date(endDate) } : {})
+                        }
+                    } : {})
+                },
                 orderBy: { date: 'desc' }
             }
         }

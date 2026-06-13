@@ -43,7 +43,15 @@ const onboardingService = __importStar(require("../services/onboarding.service")
 const jwt_1 = require("../utils/jwt");
 const email_1 = require("../utils/email");
 const db_1 = __importDefault(require("../config/db"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 const router = (0, express_1.Router)();
+// Startup Debug
+console.log('Auth Routes Loaded');
+try {
+    fs_1.default.appendFileSync(path_1.default.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Auth Routes Loaded\n`);
+}
+catch (err) { }
 // Check email availability
 router.get('/check-email', async (req, res, next) => {
     try {
@@ -135,7 +143,7 @@ router.post('/login', async (req, res, next) => {
 // Signup (Admin creates school and account)
 router.post('/signup', async (req, res, next) => {
     try {
-        const { email, password, name, schoolName, phone } = req.body;
+        const { email, password, name, schoolName, schoolAddress, phone } = req.body;
         // Server-side validation
         if (!name || name.trim().length < 2) {
             return res.status(400).json({ success: false, message: 'Admin name must be at least 2 characters' });
@@ -145,11 +153,12 @@ router.post('/signup', async (req, res, next) => {
         }
         const { school, admin } = await onboardingService.startOnboarding({
             schoolName,
+            address: schoolAddress,
             adminName: name,
             adminEmail: email,
             adminPhone: phone,
             adminPassword: password,
-            subscriptionTier: 'starter' // Default for public signup
+            subscriptionTier: 'free' // Default for public signup
         });
         const token = (0, jwt_1.generateToken)({
             id: admin.id,
@@ -186,6 +195,11 @@ router.post('/signup', async (req, res, next) => {
 });
 // Forgot Password
 router.post('/forgot-password', async (req, res, next) => {
+    console.log('Forgot password request received:', req.body.email);
+    try {
+        fs_1.default.appendFileSync(path_1.default.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Forgot password request for: ${req.body.email}\n`);
+    }
+    catch (err) { }
     try {
         const { email } = req.body;
         if (!email) {

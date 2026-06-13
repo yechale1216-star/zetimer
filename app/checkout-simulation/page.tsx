@@ -102,7 +102,7 @@ function CheckoutSimulationContent() {
         </div>
 
         <Card className="border-none shadow-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-3xl overflow-hidden border border-slate-200/60 dark:border-slate-800">
-            <CardHeader className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 py-6">
+            <CardHeader className="bg-background/50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 py-6">
                 <CardTitle className="text-center text-sm font-black uppercase tracking-widest text-muted-foreground opacity-80">Order Summary</CardTitle>
                 <div className="text-center mt-4">
                     <p className="text-4xl font-black">{parseFloat(amount || '0').toLocaleString('en-ET')} <span className="text-lg font-bold opacity-60">ETB</span></p>

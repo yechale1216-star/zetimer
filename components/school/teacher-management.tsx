@@ -69,8 +69,8 @@ export function TeacherManagement() {
   const [assignments, setAssignments] = useState<any[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false)
 
-  const loadData = async () => {
-    setIsLoading(true)
+  const loadData = async (isBackground = false) => {
+    if (!isBackground) setIsLoading(true)
     try {
       const teachersData = await db.getTeachers()
       setTeachers(teachersData)
@@ -85,6 +85,13 @@ export function TeacherManagement() {
 
   useEffect(() => {
     loadData()
+
+    // Background polling for "instant" updates (every 30 seconds)
+    const pollInterval = setInterval(() => {
+      loadData(true)
+    }, 30000)
+
+    return () => clearInterval(pollInterval)
   }, [])
 
   // Load teacher assignments when modal opens
@@ -285,7 +292,7 @@ export function TeacherManagement() {
         </div>
         <div className="flex gap-3">
           <Button 
-            onClick={loadData} 
+            onClick={() => loadData()} 
             variant="outline" 
             size="sm" 
             className="rounded-xl border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80"

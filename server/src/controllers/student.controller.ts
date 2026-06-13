@@ -73,6 +73,8 @@ export const updateStudent = async (req: AuthenticatedRequest, res: Response, ne
 export const deleteStudent = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.user?.schoolId;
+    console.log(`[StudentController] Delete requested. StudentID: ${req.params.id}, SchoolID: ${schoolId}, UserRole: ${req.user?.role}`);
+    
     if (!schoolId) {
       return res.status(401).json({ success: false, message: 'School ID context missing' });
     }

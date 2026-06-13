@@ -57,6 +57,7 @@ import { LanguageProvider } from "@/lib/context/language-context"
 import { SchoolProvider } from "@/lib/context/school-context"
 
 import { Toaster as SonnerToaster } from "sonner"
+import { PWAClientWrapper } from "@/components/system/pwa-client-wrapper"
 
 export default function RootLayout({
   children,
@@ -80,6 +81,7 @@ export default function RootLayout({
               {children}
               <Toaster />
               <SonnerToaster position="top-right" richColors />
+              <PWAClientWrapper />
             </SchoolProvider>
           </LanguageProvider>
         </ThemeProvider>

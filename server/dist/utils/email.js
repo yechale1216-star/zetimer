@@ -5,6 +5,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendResetPasswordEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const debugLog = (msg) => {
+    const logMsg = `[${new Date().toISOString()}] ${msg}\n`;
+    try {
+        fs_1.default.appendFileSync(path_1.default.join(process.cwd(), 'email_debug.log'), logMsg);
+    }
+    catch (err) { }
+};
 const transporter = nodemailer_1.default.createTransport({
     host: process.env.EMAIL_HOST,
     port: parseInt(process.env.EMAIL_PORT || '465'),
@@ -13,6 +22,15 @@ const transporter = nodemailer_1.default.createTransport({
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
+});
+// Verify connection configuration
+transporter.verify((error, success) => {
+    if (error) {
+        console.error('SMTP Transporter error:', error);
+    }
+    else {
+        console.log('SMTP Server is ready to take our messages');
+    }
 });
 const sendResetPasswordEmail = async (email, token) => {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
@@ -34,11 +52,16 @@ const sendResetPasswordEmail = async (email, token) => {
     `,
     };
     try {
-        await transporter.sendMail(mailOptions);
+        debugLog(`Attempting to send reset email to: ${email}`);
+        console.log(`Attempting to send reset email to: ${email}`);
+        const info = await transporter.sendMail(mailOptions);
+        debugLog(`Email sent successfully: ${info.messageId}`);
+        console.log('Email sent successfully:', info.messageId);
         return true;
     }
     catch (error) {
-        console.error('Email send error:', error);
+        debugLog(`Email send error: ${error instanceof Error ? error.message : String(error)}`);
+        console.error('Detailed Email send error:', error);
         return false;
     }
 };

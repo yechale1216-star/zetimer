@@ -33,7 +33,7 @@ export function PWAInstall() {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
-      setShowInstallPrompt(true)
+      // We no longer show the prompt automatically to follow user request
     }
 
     // Listen for app installed event
@@ -93,19 +93,20 @@ export function PWAInstall() {
       })
     }
 
-    // Show install prompt after a delay if not already shown
-    const timer = setTimeout(() => {
-      if (!isInstalled && !showInstallPrompt) {
-        setShowInstallPrompt(true)
+    // Show a one-time reminder notification on mount if not installed
+    if (!isInstalled && !window.location.hostname.includes("localhost")) {
+      const hasReminded = localStorage.getItem("pwa_reminded")
+      if (!hasReminded) {
+        notifications.info("Tip", "You can install Zetime as an app for a better experience!")
+        localStorage.setItem("pwa_reminded", "true")
       }
-    }, 10000) // Show after 10 seconds
+    }
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
       window.removeEventListener("appinstalled", handleAppInstalled)
-      clearTimeout(timer)
     }
-  }, [isInstalled, showInstallPrompt])
+  }, [isInstalled])
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {

@@ -83,7 +83,13 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="container flex h-20 items-center px-4 md:px-8">
         {showMenuButton && (
-          <Button variant="ghost" size="icon" className="mr-2 md:hidden" onClick={onMenuClick}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="mr-2 md:hidden hover:bg-primary/10 transition-colors"
+            onClick={onMenuClick}
+            aria-label="Open navigation menu"
+          >
             <Menu className="h-5 w-5" />
           </Button>
         )}

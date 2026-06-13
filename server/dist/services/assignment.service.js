@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteAssignment = exports.createAssignment = exports.getAssignments = void 0;
+exports.updateAssignment = exports.deleteAssignment = exports.createAssignment = exports.getAssignments = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const getAssignments = async (schoolId, teacherId) => {
     if (!schoolId)
@@ -21,7 +21,12 @@ const getAssignments = async (schoolId, teacherId) => {
     }
     return await db_1.default.teacherAssignment.findMany({
         where,
-        include: { teacher: true },
+        include: {
+            teacher: true,
+            grade: true,
+            section: true,
+            stream: true
+        },
     });
 };
 exports.getAssignments = getAssignments;
@@ -89,3 +94,17 @@ const deleteAssignment = async (id, schoolId) => {
     });
 };
 exports.deleteAssignment = deleteAssignment;
+const updateAssignment = async (id, data, schoolId) => {
+    return await db_1.default.teacherAssignment.update({
+        where: { id, schoolId },
+        data: {
+            teacher_id: data.teacher_id,
+            gradeId: data.gradeId,
+            sectionId: data.sectionId,
+            streamId: data.streamId || null,
+            subject: data.subject || null,
+        },
+        include: { teacher: true, grade: true, section: true, stream: true },
+    });
+};
+exports.updateAssignment = updateAssignment;

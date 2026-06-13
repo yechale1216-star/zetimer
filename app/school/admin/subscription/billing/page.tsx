@@ -97,7 +97,7 @@ export default function BillingHistoryPage() {
               <p className="text-xs mt-1 font-medium">Your past transactions will appear here.</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden bg-slate-50/50 dark:bg-slate-800/20">
+            <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden bg-background/50 dark:bg-slate-800/20">
               <Table>
                 <TableHeader className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-md">
                   <TableRow className="border-b border-slate-200/60 dark:border-slate-800/60 hover:bg-transparent">

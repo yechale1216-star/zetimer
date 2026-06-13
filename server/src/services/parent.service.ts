@@ -295,6 +295,28 @@ export const postAnnouncement = async (schoolId: string, data: any) => {
   });
 };
 
+export const updateAnnouncement = async (id: string, schoolId: string, data: any) => {
+  return await prisma.parentNotification.update({
+    where: { id, schoolId },
+    data: {
+      title: data.title,
+      message: data.message,
+      type: data.type || "announcement",
+    }
+  });
+};
+
+export const getSchoolAnnouncements = async (schoolId: string) => {
+  return await prisma.parentNotification.findMany({
+    where: { 
+      schoolId,
+      type: { in: ["announcement", "emergency"] },
+      studentId: null // General announcements
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+};
+
 export const updatePassword = async (phone: string, currentPassword: string, newPassword: string, schoolId: string) => {
   // Use global phone lookup — parents are global entities, not school-scoped in the User table
   const cleanPhone = normalizePhoneNumber(phone);
@@ -476,9 +498,12 @@ export const searchParentByPhone = async (phone: string, schoolId: string) => {
     return { success: true, data: user };
   }
 
-  // Fallback: Search Student table for legacy parent info
+  // Fallback: Search Student table for legacy parent info within THIS school
   const legacyStudent = await prisma.student.findFirst({
-    where: { parent_phone: { in: phoneVariations } },
+    where: { 
+      parent_phone: { in: phoneVariations },
+      schoolId: schoolId 
+    },
     select: { parent_name: true, parent_email: true, parent_phone: true, address: true }
   });
 

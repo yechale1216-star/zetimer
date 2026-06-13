@@ -57,7 +57,7 @@ interface Message {
 interface ChatWindowProps {
   activeConversation: any;
   messages: Message[];
-  onSendMessage: (content: string, options?: { type: string; attachment?: any }) => void;
+  onSendMessage: (content: string, options?: { type: string; attachment?: any; replyToId?: string }) => void;
   onBack?: () => void;
   onToggleInfo?: () => void;
   onAction?: (action: string, data: any) => void;
@@ -82,6 +82,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [uploading, setUploading] = useState(false);
   const [attachedFile, setAttachedFile] = useState<{ file: File; type: 'IMAGE' | 'VIDEO' | 'FILE'; preview: string } | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [replyTarget, setReplyTarget] = useState<Message | null>(null);
+  const [editTarget, setEditTarget] = useState<Message | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   // Recording
   const [recordMode, setRecordMode] = useState<'audio' | 'video'>('audio');
@@ -161,6 +164,20 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     setAttachedFile({ file, type, preview });
     setShowAttachMenu(false);
     e.target.value = '';
+  };
+
+  const emojis = [
+    { cat: "Smileys", items: ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕"] },
+    { cat: "Gestures", items: ["👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "✍️", "💅", "🤳", "💪", "🦾", "🦵", "🦿", "🦶", "👂", "🦻", "👃", "🧠", "🦷", "🦴", "👀", "👁️", "👅", "👄", "💋", "🩸"] },
+    { cat: "Hearts", items: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❤️‍🔥", "❤️‍🩹", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟"] },
+    { cat: "Nature", items: ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐻‍❄️", "🐨", "🐯", "🦁", "🐮", "🐷", "🐽", "🐸", "🐵", "🙈", "🙉", "🙊", "🐒", "🐔", "🐧", "🐦", "🐤", "🐣", "🐥", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🪱", "🐛", "🦋", "🐌", "🐞", "🐜", "🦟", "🪳", "🦂", "🕸️", "🕷️", "🐢", "🐍", "🦎", "🦖", "🦕", "🐙", "🦑", "🦐", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🐘", "🦛", "🦏", "🐪", "🐫", "🦒", "🦘", "🦬", "🐃", "🐄", "🐎", "🐖", "🐏", "🐑", "🦙", "🐐", "🦌", "🐕", "🐩", "🦮", "🐕‍🦺", "🐈", "🐈‍⬛", "🐓", "🦃", "🦚", "🦜", "🦢", "🦩", "🕊️", "🐇", "🦝", "🦨", "🦡", "🦫", " Otter", "🦥", "🐁", "🐀", "🐿️", "🦔"] },
+    { cat: "Food", items: ["🍏", "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍈", "🍒", "🍑", "🥭", "🍍", "🥥", "🥝", "🍅", "🍆", "🥑", "🥦", "🥬", "🥒", "🌶️", "🫑", "🌽", "🥕", "🫒", "🧄", "🧅", "🥔", "🍠", "🥐", "🥯", "🍞", "🥖", "🥨", "🧀", "🥚", "🍳", "🧈", "🥞", "🧇", "🥓", "🥩", "🍗", "🍖", "🦴", "🌭", "🍔", "🍟", "🍕", "🫓", "🥪", "🥙", "🧆", "🌮", "🌯", "🫔", "🥗", "🥘", "🫕", "🥣", "🍝", "🍜", "🍲", "🍛", "🍣", "🍱", "🥟", "🦪", "🍤", "🍙", "🍚", "🍘", "🍥", "🥠", "🥮", "🍢", "🍡", "🍧", "🍨", "🍦", "🥧", "🧁", "🍰", "🎂", "🍮", "🍭", "🍬", "🍫", "🍿", "🍩", "🍪", "🌰", "🥜", "🍯", "🥛", "☕", "🫖", "🍵", "🍶", "🍾", "🍷", "🍸", "🍹", "🍺", "🍻", "🥂", "🥃", "🥤", "🧋", "🧃", "🧉", "🧊", "🥢", "🍽️", "🍴", "🥄", "🔪", "🏺"] },
+    { cat: "Activities", items: ["⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🎱", "🥏", "🏓", "🏸", "🏒", "🏑", "🥍", "🏏", "🪃", "🥅", "⛳", "🪁", "🏹", "🎣", "🤿", "🥊", "🥋", "🎽", "🛹", "🛼", "🛷", "⛸️", " curling", "🎿", "⛷️", "🏂", "🪂", "🏋️", "🤼", "🤸", "⛹️", "🤺", "🤾", "🏌️", "🏇", "🧘", "🏄", "🏊", "🤽", "🚣", "🧗", "🚵", "🚴", "🏆", "🥇", "🥈", "🥉", "🏅", "🎖️", "🏵️", "🎫", "🎟️", "🎭", "🎨", "🎬", "🎤", "🎧", "🎼", "🎹", "🥁", "🪘", "🎷", "🎺", "🪗", "🎸", "🪕", "🎻", "🎲", "♟️", "🎯", "🎳", "🎮", "🎰", "🧩"] }
+  ];
+
+  const addEmoji = (emoji: string) => {
+    setInputValue(prev => prev + emoji);
+    // Keep visible if user wants to add multiple, but provide feedback/close logic if needed
   };
 
   // ── Recording ─────────────────────────────────────────
@@ -260,6 +277,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleSend = async () => {
     if (!inputValue.trim() && !attachedFile) return;
 
+    if (editTarget) {
+      onAction?.('edit', { messageId: editTarget.id, content: inputValue });
+      setEditTarget(null);
+      setInputValue('');
+      return;
+    }
+
     setUploading(true);
     try {
       let attachmentUrl = '';
@@ -274,16 +298,39 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           name: attachedFile.file.name,
           type: attachedFile.file.type,
           size: attachedFile.file.size
-        } : undefined
+        } : undefined,
+        replyToId: replyTarget?.id
       });
       
       setInputValue('');
       setAttachedFile(null);
+      setReplyTarget(null);
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send file');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleBubbleAction = (action: string, data: any) => {
+    const message = data.message;
+    switch (action) {
+      case 'reply':
+        setReplyTarget(message);
+        setEditTarget(null);
+        break;
+      case 'edit_start':
+        setEditTarget(message);
+        setReplyTarget(null);
+        setInputValue(message.content);
+        break;
+      case 'copy':
+        navigator.clipboard.writeText(message.content);
+        toast.success("Copied to clipboard");
+        break;
+      default:
+        onAction?.(action, data);
     }
   };
 
@@ -444,7 +491,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   onEnterSelectionMode={() => setIsSelectionMode(true)}
                   t={t}
                   isGroup={activeConversation.isGroup}
-                  onAction={onAction}
+                  onAction={handleBubbleAction}
                   currentUser={currentUser}
                 />
               );
@@ -485,6 +532,45 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Message Input */}
       <div className="p-4 bg-background/80 backdrop-blur-md border-t border-border z-40 sticky bottom-0">
         <div className="max-w-4xl mx-auto space-y-2">
+
+          {/* Reply/Edit Preview */}
+          <AnimatePresence>
+            {(replyTarget || editTarget) && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-secondary/30 border-l-4 border-primary rounded-r-xl px-4 py-3 flex items-center justify-between group overflow-hidden"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    {replyTarget ? (
+                      <>
+                        <Reply className="h-3 w-3 text-primary" />
+                        <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{t("replying_to", { name: replyTarget.senderName })}</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileType className="h-3 w-3 text-primary" />
+                        <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Editing Message</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate italic">
+                    {(replyTarget || editTarget)?.content || "File"}
+                  </p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => { setReplyTarget(null); setEditTarget(null); if (editTarget) setInputValue(''); }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Recording UI */}
           <AnimatePresence>
@@ -609,10 +695,56 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             </div>
 
             {/* Text input */}
-            <div className="bg-secondary/50 rounded-2xl flex-1 flex items-end p-1.5 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
-              <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 text-muted-foreground hover:text-primary shrink-0">
-                <Smile className="h-5 w-5" />
-              </Button>
+            <div className="bg-secondary/50 rounded-2xl flex-1 flex items-end p-1.5 focus-within:ring-1 focus-within:ring-primary/20 transition-all relative">
+              <div className="relative">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className={cn("rounded-full h-9 w-9 text-muted-foreground hover:text-primary shrink-0", showEmojiPicker && "text-primary bg-primary/10")}
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                >
+                  <Smile className="h-5 w-5" />
+                </Button>
+                
+                <AnimatePresence>
+                  {showEmojiPicker && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute bottom-12 left-0 w-[280px] md:w-[350px] max-h-[400px] bg-background border border-border shadow-2xl rounded-2xl p-4 overflow-hidden z-50 flex flex-col"
+                      >
+                        <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+                          <span className="typography-label text-xs font-bold uppercase tracking-widest text-primary">Emoji Picker</span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={() => setShowEmojiPicker(false)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="overflow-y-auto pr-2 custom-scrollbar space-y-4">
+                          {emojis.map((group) => (
+                            <div key={group.cat}>
+                              <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">{group.cat}</h4>
+                              <div className="grid grid-cols-7 md:grid-cols-8 gap-1">
+                                {group.items.map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    onClick={() => addEmoji(emoji)}
+                                    className="h-8 w-8 flex items-center justify-center text-xl hover:bg-primary/10 rounded-lg transition-all active:scale-90"
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
               <textarea
                 placeholder={isRecording ? 'Recording…' : t('write_message')}
                 value={inputValue}
@@ -906,7 +1038,13 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe }: { 
         "bg-background/40 dark:bg-slate-800/40 border border-border/10 flex items-center gap-4 hover:bg-background/60 transition-all cursor-pointer group backdrop-blur-sm shadow-sm",
         isCompact ? "rounded-lg p-3" : "rounded-xl p-3"
       )}
-         onClick={() => window.open(file.url, '_blank')}>
+         onClick={(e) => {
+           e.stopPropagation();
+           const viewerUrl = file.url.endsWith('.pdf') 
+             ? file.url 
+             : `https://docs.google.com/viewer?url=${encodeURIComponent(file.url)}`;
+           window.open(viewerUrl, '_blank');
+         }}>
       <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
         {getFileIcon(file.url)}
       </div>
@@ -922,7 +1060,30 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe }: { 
           </p>
         </div>
       </div>
-      <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8 rounded-full">
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="shrink-0 h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+        onClick={async (e) => {
+          e.stopPropagation();
+          try {
+            const response = await fetch(file.url);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = file.name || 'document';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error('Download failed:', error);
+            // Fallback to simple open if fetch fails
+            window.open(file.url, '_blank');
+          }
+        }}
+      >
         <Download className="h-4 w-4" />
       </Button>
     </div>
@@ -1011,9 +1172,14 @@ const MessageBubble = ({
 }) => {
   const isMe = message.isMe;
   const hasAttachments = message.attachments && message.attachments.length > 0;
-  const isMediaOnly = (hasAttachments && 
+  
+  // Telegram-style large emojis: check if content is only emojis
+  const emojiOnlyRegex = /^(\s*(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}|\p{Emoji_Modifier})\s*)+$/u;
+  const isEmojiOnly = Boolean(!hasAttachments && message.content && emojiOnlyRegex.test(message.content));
+
+  const isMediaOnly = Boolean((hasAttachments && 
     (!message.content || message.content === 'Image' || message.content === 'Video' || message.content === 'File')) || 
-    message.type === 'VIDEO_MESSAGE' || message.type === 'VIDEO' || message.type === 'IMAGE';
+    message.type === 'VIDEO_MESSAGE' || message.type === 'VIDEO' || message.type === 'IMAGE' || isEmojiOnly);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -1055,7 +1221,7 @@ const MessageBubble = ({
       )}>
         <div className={cn(
           "relative transition-all shadow-sm overflow-hidden",
-        message.type === 'VIDEO_MESSAGE' 
+        (message.type === 'VIDEO_MESSAGE' || isEmojiOnly)
           ? "p-0 bg-transparent border-none shadow-none" 
           : (isMediaOnly 
               ? "p-1 rounded-xl bg-white dark:bg-slate-900 border border-border/40" 
@@ -1089,10 +1255,11 @@ const MessageBubble = ({
                   ))}
                 </div>
               )}
-              {message.content && !isMediaOnly && message.content !== 'File' && (
+              {message.content && (!isMediaOnly || isEmojiOnly) && message.content !== 'File' && (
                 <div className={cn(
                   "pb-4",
-                  hasAttachments ? "mt-2" : ""
+                  hasAttachments ? "mt-2" : "",
+                  isEmojiOnly ? "text-5xl pb-1" : ""
                 )}>
                   {(() => {
                     const urlRegex = /((https?:\/\/[^\s]+)|(www\.[^\s]+))/g;
@@ -1176,8 +1343,11 @@ const MessageBubble = ({
         </ContextMenu>
 
         <div className={cn(
-          "absolute bottom-1 right-2 flex items-center gap-1 text-[10px]",
-          isMediaOnly 
+          "flex items-center gap-1 text-[10px]",
+          isEmojiOnly 
+            ? "relative mt-1 self-end text-muted-foreground opacity-60" 
+            : "absolute bottom-1 right-2",
+          (isMediaOnly && !isEmojiOnly) 
             ? "bg-black/30 backdrop-blur-md text-white px-2 py-0.5 rounded-full" 
             : (isMe ? "text-primary-foreground/70" : "text-muted-foreground")
         )}>
@@ -1219,7 +1389,7 @@ const MessageBubble = ({
         )}
 
         {/* Telegram-style Corner Tail */}
-        {isLastInGroup && message.type !== 'VIDEO_MESSAGE' && (
+        {isLastInGroup && message.type !== 'VIDEO_MESSAGE' && !isEmojiOnly && (
           <div className={cn(
             "absolute bottom-0 w-3 h-3 overflow-hidden",
             message.isMe ? "-right-2" : "-left-2"

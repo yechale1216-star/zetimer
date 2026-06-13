@@ -4,14 +4,19 @@ import { type NextRequest, NextResponse } from "next/server"
 const PUBLIC_ROOT_FILES = new Set([
   "/sw.js",
   "/manifest.json",
+  "/icon-192.png",
+  "/icon-512.png",
   "/offline.html",
   "/browserconfig.xml",
   "/icon.svg",
   "/placeholder.svg",
   "/placeholder-logo.svg",
-  "/school_login_illustration_1778883405545.png",
   "/zetime-logo.png",
-  "/branding/app-icon.png",
+  "/zetime_branding_professional.png",
+  "/ethiopian_admin_attendance.png",
+  "/ethiopian_admin_attendance_v2.png",
+  "/ethiopian_admin_attendance_v3.png",
+  "/zetime_branding_professional.png",
 ])
 
 export function proxy(request: NextRequest) {
@@ -60,6 +65,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json|offline.html|browserconfig.xml|icon.svg|placeholder.svg|placeholder-logo.svg).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json|icon-192.png|icon-512.png|offline.html|browserconfig.xml|icon.svg|placeholder.svg|placeholder-logo.svg).*)",
   ],
 }

@@ -71,6 +71,25 @@ export const initSocket = (server: HttpServer) => {
       }
 
       try {
+        // Verify school subscription status
+        const school = await prisma.school.findUnique({
+          where: { id: tenant.schoolId },
+          include: { subscription: true }
+        });
+
+        const status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
+        if (status === 'SUSPENDED' || status === 'EXPIRED') {
+          const errorMsg = status === 'SUSPENDED' 
+            ? 'Your school account is suspended.' 
+            : 'Your school subscription has expired. Please upgrade to continue messaging.';
+          
+          socket.emit('message_error', { 
+            message: errorMsg,
+            code: `SCHOOL_${status}`
+          });
+          return;
+        }
+
         // Verify conversation belongs to this school
         const conversation = await prisma.conversation.findFirst({
           where: { id: data.conversationId, schoolId: tenant.schoolId }

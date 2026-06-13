@@ -16,9 +16,6 @@ router.patch('/notifications/:id/read', parentController.markAsRead);
 router.delete('/notifications/:id', parentController.deleteNotification);
 router.patch('/notifications/read-all/:phone', parentController.markAllAsRead);
 
-// Announcements Publisher (Admins/Teachers or test suite)
-router.post('/announcements', parentController.postAnnouncement);
-
 // Preferences
 router.get('/preferences/:phone', parentController.getPreferences);
 router.put('/preferences/:phone', parentController.updatePreferences);

@@ -111,6 +111,7 @@ exports.updateStudent = updateStudent;
 const deleteStudent = async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;
+        console.log(`[StudentController] Delete requested. StudentID: ${req.params.id}, SchoolID: ${schoolId}, UserRole: ${req.user?.role}`);
         if (!schoolId) {
             return res.status(401).json({ success: false, message: 'School ID context missing' });
         }

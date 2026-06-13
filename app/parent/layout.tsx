@@ -16,7 +16,8 @@ import {
   GraduationCap,
   Settings,
   ChevronRight,
-  MessageSquare
+  MessageSquare,
+  Megaphone
 } from "lucide-react"
 import { parentDb } from "@/lib/db/parent-db"
 import { authService } from "@/lib/auth/auth"
@@ -167,6 +168,7 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
   const navLinks = [
     { href: "/parent/dashboard", label: t("dashboard"), icon: LayoutDashboard },
     { href: "/parent/communication", label: t("communication"), icon: MessageSquare },
+    { href: "/parent/announcements", label: t("announcements"), icon: Megaphone },
     { href: "/parent/attendance", label: t("attendance"), icon: Calendar },
     { href: "/parent/profile", label: t("profile"), icon: User },
     {

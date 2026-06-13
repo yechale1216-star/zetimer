@@ -43,7 +43,7 @@ export default function TermsPage() {
             <Scale className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight">Terms of Service</h1>
-          <p className="text-muted-foreground">Last updated: May 15, 2026</p>
+          <p className="text-muted-foreground">Last updated: June 13, 2026</p>
         </div>
 
         <div className="prose prose-slate dark:prose-invert max-w-none">
@@ -55,45 +55,58 @@ export default function TermsPage() {
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">2. Account Responsibility</h2>
+            <h2 className="text-2xl font-bold mb-4">2. Account & Onboarding</h2>
             <p className="text-muted-foreground mb-4 leading-relaxed">
-              You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. 
-              Schools are responsible for ensuring they have the necessary rights to upload student information.
+              Schools must complete the official onboarding process to verify institutional status. 
+              You are responsible for maintaining the confidentiality of your account credentials. 
+              Admins are responsible for the accuracy of student data and teacher assignments.
             </p>
           </section>
 
           <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-6 mb-10">
             <div className="flex items-center gap-3 mb-3">
               <AlertCircle className="w-5 h-5 text-amber-600" />
-              <h3 className="font-bold text-amber-700">Important Usage Policy</h3>
+              <h3 className="font-bold text-amber-700">Messaging & Document Policy</h3>
             </div>
             <p className="text-sm text-amber-800/80 leading-relaxed">
-              Zetime is intended for legitimate educational and administrative use only. 
-              Misuse of student data or unauthorized access to other school databases will result in immediate termination of service.
+              The Zetime Messaging Center is for professional educational communication only. 
+              Users are prohibited from sharing sensitive personal data of students in chat text, 
+              and must only upload documents relevant to official school business.
             </p>
           </div>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">3. Subscription & Payments</h2>
+            <h2 className="text-2xl font-bold mb-4">3. Subscriptions & PWA Usage</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Service is provided on a subscription basis. Fees are non-refundable unless otherwise specified. 
-              Failure to pay subscription fees may result in temporary suspension of account access.
+              Service is provided based on the selected subscription tier. Full functionality, including 
+              offline mode via our PWA, is subject to maintaining an active subscription. 
+              Offline data synchronization occurs automatically when a connection is restored.
             </p>
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">4. Limitation of Liability</h2>
+            <h2 className="text-2xl font-bold mb-4">4. System Integrity</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Zetime provides the platform "as is" and shall not be liable for any indirect, incidental, 
-              or consequential damages arising from the use of our service or loss of data.
+              Unauthorized attempts to bypass security measures, access other school databases, 
+              or manipulate audit logs will result in immediate termination of service and 
+              potential legal action.
             </p>
           </section>
 
           <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">5. Changes to Terms</h2>
+            <h2 className="text-2xl font-bold mb-4">5. Limitation of Liability</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Zetime provides the platform "as is". While we strive for 100% uptime, 
+              we are not liable for data loss due to device hardware failure or service 
+              interruptions beyond our control.
+            </p>
+          </section>
+
+          <section className="mb-10">
+            <h2 className="text-2xl font-bold mb-4">6. Changes to Terms</h2>
             <p className="text-muted-foreground leading-relaxed">
               We reserve the right to modify these terms at any time. Significant changes will be notified to 
-              account administrators via email or platform announcements.
+              account administrators via email or platform announcements to ensure full awareness of policy updates.
             </p>
           </section>
         </div>

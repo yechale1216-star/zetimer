@@ -25,6 +25,24 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
   onAccept,
   onReject,
 }) => {
+  React.useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isOpen) {
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate([1000, 500, 1000, 500, 1000]);
+        interval = setInterval(() => {
+          navigator.vibrate([1000, 500, 1000]);
+        }, 4000);
+      }
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(0);
+      }
+    };
+  }, [isOpen]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -56,12 +74,25 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
             </div>
 
             <div className="relative z-10 flex flex-col items-center">
-              <Avatar className="h-28 w-28 border-4 border-background shadow-xl mb-6">
-                <AvatarImage src={caller.avatar || undefined} />
-                <AvatarFallback className="typography-page-title bg-primary/10 text-primary">
-                  {caller.name.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <motion.div
+                animate={{
+                  x: [0, -2, 2, -2, 2, 0],
+                  y: [0, 1, -1, 1, -1, 0],
+                }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 0.2,
+                  ease: "linear",
+                }}
+                className="mb-6"
+              >
+                <Avatar className="h-28 w-28 border-4 border-background shadow-xl">
+                  <AvatarImage src={caller.avatar || undefined} />
+                  <AvatarFallback className="typography-page-title bg-primary/10 text-primary">
+                    {caller.name.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </motion.div>
 
               <h3 className="typography-page-title mb-1">{caller.name}</h3>
               <p className="typography-label text-primary flex items-center gap-2 mb-12">

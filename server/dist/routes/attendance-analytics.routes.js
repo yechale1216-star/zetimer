@@ -35,10 +35,11 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const analyticsController = __importStar(require("../controllers/attendance-analytics.controller"));
+const tenant_middleware_1 = require("../middleware/tenant.middleware");
 const router = (0, express_1.Router)();
 router.get('/summary', analyticsController.getAttendanceSummary);
 router.get('/grade-stats', analyticsController.getGradeStats);
-router.get('/trends', analyticsController.getAttendanceTrends);
-router.get('/drill-down/:gradeId', analyticsController.getDrillDownStats);
+router.get('/trends', (0, tenant_middleware_1.featureGuard)('advanced_analytics'), analyticsController.getAttendanceTrends);
+router.get('/drill-down/:gradeId', (0, tenant_middleware_1.featureGuard)('advanced_analytics'), analyticsController.getDrillDownStats);
 router.get('/export', analyticsController.exportAttendance);
 exports.default = router;

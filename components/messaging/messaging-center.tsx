@@ -245,7 +245,29 @@ export function MessagingCenter() {
             }),
           });
 
-          if (!res.ok) throw new Error('Failed to create conversation');
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            if (errorData.code === 'SCHOOL_EXPIRED' || errorData.code === 'SCHOOL_SUSPENDED') {
+              toast({
+                title: t("error"),
+                description: t("plan_expired_error"),
+                variant: 'destructive'
+              });
+            } else if (errorData.code === 'FEATURE_RESTRICTED') {
+              toast({
+                title: t("error"),
+                description: t("feature_restricted_error"),
+                variant: 'destructive'
+              });
+            } else {
+              toast({ 
+                title: t("error"), 
+                description: errorData.message || t("start_conv_error"), 
+                variant: 'destructive' 
+              });
+            }
+            return;
+          }
 
           const newConv = await res.json();
           const realId = newConv.id;
@@ -537,6 +559,14 @@ export function MessagingCenter() {
       });
     };
 
+    const handleMessageError = (data: { message: string, code?: string }) => {
+      toast({
+        title: t("error"),
+        description: data.code === 'SCHOOL_EXPIRED' ? t("plan_expired_error") : data.message,
+        variant: 'destructive',
+      });
+    };
+
     socket.on('new_message', handleNewMessage);
     socket.on('message_read', handleMessageRead);
     socket.on('initial_online_users', handleInitialOnlineUsers);
@@ -545,6 +575,7 @@ export function MessagingCenter() {
     socket.on('message_edited', handleMessageEdited);
     socket.on('message_deleted', handleMessageDeleted);
     socket.on('reaction_updated', handleReactionUpdated);
+    socket.on('message_error', handleMessageError);
 
     return () => {
       socket.off('new_message', handleNewMessage);
@@ -555,12 +586,13 @@ export function MessagingCenter() {
       socket.off('message_edited', handleMessageEdited);
       socket.off('message_deleted', handleMessageDeleted);
       socket.off('reaction_updated', handleReactionUpdated);
+      socket.off('message_error', handleMessageError);
     };
   }, [socket, isConnected, user]);
 
   // ── Send message ─────────────────────────────────────────────────────────────
   const handleSendMessage = useCallback(
-    (content: string, options?: { type: string; attachment?: any }) => {
+    (content: string, options?: { type: string; attachment?: any; replyToId?: string }) => {
       if (!socket || !isConnected || !activeConversationId || !user) return;
 
       const messageData = {
@@ -569,6 +601,7 @@ export function MessagingCenter() {
         content,
         type: options?.type || 'TEXT',
         attachment: options?.attachment,
+        replyToId: options?.replyToId,
       };
 
       socket.emit('send_message', messageData);

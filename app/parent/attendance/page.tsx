@@ -58,9 +58,15 @@ export default function AttendanceHistory() {
       if (student) {
         setSelectedStudent(student)
         
-        // Fetch academic year from settings
+        // Fetch academic year and attendance mode from settings
         try {
           const settings = await db.getSettings()
+          let currentMode = 'daily'
+          if (settings?.attendanceMode) {
+            currentMode = settings.attendanceMode === 'session_based' ? 'session' : 'daily'
+            setAttendanceMode(currentMode as any)
+          }
+
           if (settings?.academicYear) {
             const yearMatch = settings.academicYear.match(/\d{4}/)
             if (yearMatch) {
@@ -86,14 +92,14 @@ export default function AttendanceHistory() {
           console.error("Failed to load school settings:", err)
         }
 
-        await fetchStudentAttendance(student.id)
+        await fetchStudentAttendance(student.id, currentMode)
       }
     }
     setIsLoading(false)
   }
 
   // 2. Fetch student's attendance list
-  const fetchStudentAttendance = async (studentId: string) => {
+  const fetchStudentAttendance = async (studentId: string, mode?: string) => {
     setFetchError(null)
     try {
       const token = localStorage.getItem("attendance_token") || "";
@@ -104,8 +110,17 @@ export default function AttendanceHistory() {
         ...(schoolId ? { "x-school-id": schoolId } : {})
       };
 
-      // Use the dedicated per-student endpoint (ordered desc, no extra joins)
-      const res = await fetch(`${API_URL}/api/attendance/student/${studentId}`, { headers })
+      // Narrow fetch based on attendance mode if requested
+      let url = `${API_URL}/api/attendance/student/${studentId}`
+      if (mode === 'daily') {
+        url += "?session=none"
+      } else if (mode === 'session_based' || mode === 'session') {
+        // If searching specifically for sessions, we could filter here, 
+        // but often we want all records for session aggregation logic.
+        // For now, let's keep session mode fetching everything to allow aggregation.
+      }
+
+      const res = await fetch(url, { headers })
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}))
         throw new Error(errBody.message || `HTTP ${res.status}`)
@@ -137,6 +152,13 @@ export default function AttendanceHistory() {
     window.addEventListener("studentChanged", handleStudentChange)
     return () => window.removeEventListener("studentChanged", handleStudentChange)
   }, [])
+
+  // 1.8 Re-fetch on mode change
+  useEffect(() => {
+    if (selectedStudent?.id) {
+       fetchStudentAttendance(selectedStudent.id, attendanceMode)
+    }
+  }, [attendanceMode])
 
   // 1.5 Handle language change to sync calendar selection
   const lastLang = useRef(language)
@@ -398,7 +420,7 @@ export default function AttendanceHistory() {
         <h3 className="typography-section-title text-foreground">{t("error_loading")}</h3>
         <p className="typography-label text-muted-foreground max-w-xs text-center">{fetchError}</p>
         <button
-          onClick={() => selectedStudent && fetchStudentAttendance(selectedStudent.id)}
+          onClick={() => selectedStudent && fetchStudentAttendance(selectedStudent.id, attendanceMode)}
           className="typography-label px-6 py-2.5 rounded-xl bg-primary text-white hover:bg-primary/90 transition-all"
         >
           {t("retry")}

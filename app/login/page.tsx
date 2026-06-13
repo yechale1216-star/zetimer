@@ -7,7 +7,7 @@ import { ResetPasswordForm } from '@/components/auth/reset-password-form'
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { authService } from '@/lib/auth/auth'
-import { CheckCircle2, Clock, ShieldCheck, Users } from 'lucide-react'
+import { BarChart3, BookOpen, CheckCircle2, Clock, LayoutDashboard, ShieldCheck, Users, WifiOff } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { Suspense } from 'react'
 
@@ -41,12 +41,12 @@ function LoginContent() {
   return (
     <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background">
       {/* Left Side: Branding & Illustration (Desktop Only) */}
-      <div className="hidden md:flex md:w-1/2 relative bg-primary/5 items-center justify-center p-8 xl:p-12 overflow-hidden border-r border-border/50">
+      <div className="hidden md:flex md:w-1/2 relative bg-primary/5 items-start justify-center p-8 pt-8 xl:p-12 xl:pt-12 overflow-hidden border-r border-border/50">
         {/* Abstract Background Shapes */}
         <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 rounded-full blur-3xl animate-pulse" />
 
-        <div className="relative z-10 max-w-lg">
+        <div className="relative z-10 max-w-xl">
           <div className="mb-12">
             <div className="flex items-center gap-3 mb-6 animate-in slide-in-from-left duration-700">
               <Logo size="md" href="/" />
@@ -54,7 +54,7 @@ function LoginContent() {
 
             <h2 className="text-4xl xl:text-5xl font-black text-foreground leading-[1.1] mb-6 animate-in slide-in-from-left duration-700 delay-100">
               Modern Attendance <br />
-              <span className="text-primary">Management.</span>
+              <span className="text-primary">Management System.</span>
             </h2>
             <p className="text-lg xl:text-xl text-muted-foreground mb-10 animate-in slide-in-from-left duration-700 delay-200">
               The professional choice for schools to track attendance, manage students, and generate real-time reports with ease.
@@ -85,14 +85,38 @@ function LoginContent() {
                 </div>
                 <span className="font-medium text-sm">Secure Data</span>
               </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/5 shadow-sm border border-border flex items-center justify-center">
+                  <BarChart3 className="w-5 h-5 text-primary" />
+                </div>
+                <span className="font-medium text-sm">Detailed Reports</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/5 shadow-sm border border-border flex items-center justify-center">
+                  <BookOpen className="w-5 h-5 text-primary" />
+                </div>
+                <span className="font-medium text-sm">Teacher Portal</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/5 shadow-sm border border-border flex items-center justify-center">
+                  <WifiOff className="w-5 h-5 text-primary" />
+                </div>
+                <span className="font-medium text-sm">Offline Capability</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/5 shadow-sm border border-border flex items-center justify-center">
+                  <LayoutDashboard className="w-5 h-5 text-primary" />
+                </div>
+                <span className="font-medium text-sm">Parent Access</span>
+              </div>
             </div>
           </div>
 
           {/* Illustration Container */}
           <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-primary/20 border border-border/50 animate-in zoom-in duration-1000 delay-500">
             <img
-              src="/school_login_illustration_1778883405545.png"
-              alt="School Attendance Illustration"
+              src="/zetime_branding_professional.png"
+              alt="Ethiopian School Attendance Analysis"
               className="w-full aspect-video object-cover"
             />
           </div>

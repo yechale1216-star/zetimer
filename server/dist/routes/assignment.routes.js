@@ -63,6 +63,19 @@ router.post('/', async (req, res, next) => {
         next(error);
     }
 });
+// Update assignment
+router.put('/:id', async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const assignment = await assignmentService.updateAssignment(req.params.id, req.body, schoolId);
+        res.status(200).json({ success: true, data: assignment });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 // Delete assignment
 router.delete('/:id', async (req, res, next) => {
     try {

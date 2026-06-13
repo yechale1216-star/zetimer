@@ -11,6 +11,8 @@ export const translations = {
     switch_student: "Switch Student",
     parent_portal: "Parent Portal",
     logged_in_as: "Logged in as parent",
+    view_all: "View All",
+    announcements: "Announcements",
 
     // Dashboard
     today_attendance: "Today's Attendance Breakdown",
@@ -154,6 +156,9 @@ export const translations = {
     error: "Error",
     load_conv_error: "Could not load conversations",
     start_conv_error: "Could not start conversation",
+    plan_expired_error: "Your school subscription has expired. Please renew to continue using communication features.",
+    feature_restricted_error: "This feature is not included in your current plan. Please upgrade to access it.",
+    replying_to: "Replying to {name}",
 
     // Login Form
     welcome_back: "Welcome Back",
@@ -272,6 +277,8 @@ export const translations = {
     switch_student: "ተማሪ ይቀይሩ",
     parent_portal: "የወላጆች ፖርታል",
     logged_in_as: "እንደ ወላጅ ገብተዋል",
+    view_all: "ሁሉንም ይመልከቱ",
+    announcements: "ማስታወቂያዎች",
 
     // Dashboard
     today_attendance: "የዛሬ የመገኘት ሁኔታ መግለጫ",
@@ -419,6 +426,9 @@ export const translations = {
     error: "ስህተት",
     load_conv_error: "ውይይቶችን መጫን አልተቻለም",
     start_conv_error: "ውይይት መጀመር አልተቻለም",
+    plan_expired_error: "የትምህርት ቤትዎ የደንበኝነት ምዝገባ ጊዜ አልፎበታል። ግንኙነት ለመቀጠል እባክዎ ምዝገባዎን ያድሱ።",
+    feature_restricted_error: "ይህ አገልግሎት በአሁኑ እቅድዎ ውስጥ አይካተትም። እባክዎ ለመጠቀም እቅድዎን ያሳድጉ።",
+    replying_to: "ለ{name} መልስ በመስጠት ላይ",
 
     // Login Form
     welcome_back: "እንኳን ደህና መጡ",

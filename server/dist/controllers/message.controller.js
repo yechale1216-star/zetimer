@@ -80,6 +80,7 @@ const getMessages = async (req, res) => {
                         id: true,
                         full_name: true,
                         profile_photo: true,
+                        lastActive: true,
                     },
                 },
                 readBy: {

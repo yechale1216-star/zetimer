@@ -52,7 +52,11 @@ const message_routes_1 = __importDefault(require("./routes/message.routes"));
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const promotion_routes_1 = __importDefault(require("./routes/promotion.routes"));
 const subscription_routes_1 = __importDefault(require("./routes/subscription.routes"));
+const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
+const super_admin_routes_1 = __importDefault(require("./routes/super-admin.routes"));
+const group_routes_1 = __importDefault(require("./routes/group.routes"));
 const tenant_middleware_1 = require("./middleware/tenant.middleware");
+const maintenance_middleware_1 = require("./middleware/maintenance.middleware");
 const parentController = __importStar(require("./controllers/parent.controller"));
 const app = (0, express_1.default)();
 // Middleware
@@ -64,6 +68,8 @@ app.use((req, res, next) => {
     console.log(`[DEBUG] ${req.method} ${req.url}`);
     next();
 });
+// Global Maintenance Guard
+app.use(maintenance_middleware_1.maintenanceMiddleware);
 // Health check and Auth (Public)
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', message: 'Server is running' });
@@ -75,10 +81,15 @@ const publicParentRouter = express_1.default.Router();
 publicParentRouter.get('/schools', parentController.listParentSchools);
 publicParentRouter.post('/login', parentController.loginParent);
 app.use('/api/parent', publicParentRouter);
-// Subscription & Feature Management (No school tenant required — Super Admin manages plans globally)
-app.use('/api', subscription_routes_1.default);
-// Apply Tenant Isolation Middleware to all other API routes
+// Apply Tenant Isolation & Auth Middleware to all API routes
 app.use('/api', tenant_middleware_1.tenantMiddleware);
+// Block write operations for suspended or expired schools (super_admin is exempt)
+app.use('/api', tenant_middleware_1.subscriptionGuard);
+// Subscription & Feature Management
+app.use('/api/subscriptions', subscription_routes_1.default);
+app.use('/api/payments', payment_routes_1.default);
+app.use('/api/super-admin', super_admin_routes_1.default);
+// Other API routes are already covered by the /api middleware
 // Routes
 app.use('/api/students', student_routes_1.default);
 app.use('/api/attendance', attendance_routes_1.default);
@@ -89,6 +100,7 @@ app.use('/api/settings', settings_routes_1.default);
 app.use('/api/parent', parent_routes_1.default); // Re-use for other parent routes
 app.use('/api/attendance-analytics', attendance_analytics_routes_1.default);
 app.use('/api/messages', message_routes_1.default);
+app.use('/api/groups', group_routes_1.default);
 app.use('/api/promotions', promotion_routes_1.default);
 // Error handling middleware
 app.use((err, req, res, next) => {

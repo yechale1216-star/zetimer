@@ -15,7 +15,12 @@ export const getAssignments = async (schoolId: string, teacherId?: string) => {
   }
   return await prisma.teacherAssignment.findMany({
     where,
-    include: { teacher: true },
+    include: { 
+      teacher: true,
+      grade: true,
+      section: true,
+      stream: true
+    },
   });
 };
 
@@ -83,5 +88,19 @@ export const createAssignment = async (data: any, schoolId: string) => {
 export const deleteAssignment = async (id: string, schoolId: string) => {
   return await prisma.teacherAssignment.delete({ 
     where: { id, schoolId } 
+  });
+};
+
+export const updateAssignment = async (id: string, data: any, schoolId: string) => {
+  return await prisma.teacherAssignment.update({
+    where: { id, schoolId },
+    data: {
+      teacher_id: data.teacher_id,
+      gradeId: data.gradeId,
+      sectionId: data.sectionId,
+      streamId: data.streamId || null,
+      subject: data.subject || null,
+    },
+    include: { teacher: true, grade: true, section: true, stream: true },
   });
 };

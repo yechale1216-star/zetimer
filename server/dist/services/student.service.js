@@ -93,6 +93,13 @@ const createStudent = async (data, schoolId) => {
         console.error(`[StudentService] School not found for ID: "${schoolId}"`);
         throw new Error('School context invalid - Please logout and login again (database was likely reset)');
     }
+    // Enforce SaaS student limits
+    const { getSchoolLimits } = require('./subscription.service');
+    const limits = await getSchoolLimits(schoolId);
+    const currentCount = await db_1.default.student.count({ where: { schoolId } });
+    if (limits.maxStudents !== -1 && currentCount >= limits.maxStudents) {
+        throw new Error(`Student limit reached (${limits.maxStudents}). Please upgrade your Zetime plan to add more students.`);
+    }
     let studentId = data.student_id;
     if (!studentId) {
         studentId = await (0, exports.getNextStudentId)(schoolId);
@@ -189,6 +196,11 @@ const bulkUpsertStudents = async (students, schoolId) => {
             nextBaseSequence = currentSequence + 1;
         }
     }
+    // Enforce SaaS student limits for bulk upload
+    const { getSchoolLimits } = require('./subscription.service');
+    const limits = await getSchoolLimits(schoolId);
+    const initialCount = await db_1.default.student.count({ where: { schoolId } });
+    let createdCountInThisBatch = 0;
     // Process in sequence to ensure stability and proper parent linking across siblings
     for (let i = 0; i < students.length; i++) {
         const data = students[i];
@@ -233,6 +245,12 @@ const bulkUpsertStudents = async (students, schoolId) => {
             const existingStudent = await db_1.default.student.findUnique({
                 where: { student_id_schoolId: { student_id: studentId, schoolId } }
             });
+            // Limit check before creation
+            if (!existingStudent && limits.maxStudents !== -1) {
+                if ((initialCount + createdCountInThisBatch) >= limits.maxStudents) {
+                    throw new Error(`Student limit reached (${limits.maxStudents}). Batch stopped at this row.`);
+                }
+            }
             // 2. Upsert Student
             const student = await db_1.default.student.upsert({
                 where: { student_id_schoolId: { student_id: studentId, schoolId } },
@@ -268,6 +286,7 @@ const bulkUpsertStudents = async (students, schoolId) => {
             }
             else {
                 results.created++;
+                createdCountInThisBatch++;
             }
             // 3. Handle Parent Linking
             if (data.parent_phone) {
@@ -366,9 +385,26 @@ const updateStudent = async (id, data, schoolId) => {
 };
 exports.updateStudent = updateStudent;
 const deleteStudent = async (id, schoolId) => {
-    return await db_1.default.student.delete({
+    console.log(`[StudentService] Attempting to delete student with identifier: ${id} for school: ${schoolId}`);
+    // Try deleting by the primary UUID first
+    let result = await db_1.default.student.deleteMany({
         where: { id, schoolId }
     });
+    // If no record was deleted, try deleting by the custom 'student_id' field (like STU0001)
+    if (result.count === 0) {
+        console.log(`[StudentService] UUID match failed, trying custom student_id field...`);
+        result = await db_1.default.student.deleteMany({
+            where: {
+                student_id: id,
+                schoolId: schoolId
+            }
+        });
+    }
+    console.log(`[StudentService] Final delete result:`, result);
+    if (result.count === 0) {
+        throw new Error('Student not found. Ensure the ID is correct and you have permission to delete this record.');
+    }
+    return result;
 };
 exports.deleteStudent = deleteStudent;
 const getStudentsByParentPhone = async (parentPhone, schoolId) => {

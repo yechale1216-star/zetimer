@@ -15,7 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
-import { getApiUrl } from "@/lib/auth/auth"
+import { getApiUrl } from "@/lib/api-config"
 import { SchoolSubscriptionTab } from "@/components/super-admin/school-subscription-tab"
 import { SchoolAddonsTab } from "@/components/super-admin/school-addons-tab"
 

@@ -9,7 +9,7 @@ import { TIER_CONFIG } from "@/lib/utils/pricing-utils"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
 import { CreditCard, Calendar, Users, ArrowUpRight } from "lucide-react"
 import Link from "next/link"
-import { getApiUrl } from "@/lib/auth/auth"
+import { getApiUrl } from "@/lib/api-config"
 
 interface Props {
   schoolId: string

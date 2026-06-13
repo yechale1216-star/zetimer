@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Search, Loader2, Users, BookOpen, ShieldCheck, ShieldOff, Eye } from 'lucide-react'
 import Link from 'next/link'
-import { getApiUrl } from '@/lib/auth/auth'
+import { getApiUrl } from '@/lib/api-config'
 import { AddSchoolDialog } from '@/components/super-admin/add-school-dialog'
 
 export default function SchoolsPage() {

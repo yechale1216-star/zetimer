@@ -1,14 +1,6 @@
 "use client"
 
-export const getApiUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-  if (typeof window !== "undefined") {
-    return `${window.location.protocol}//${window.location.hostname}:5000`;
-  }
-  return "http://localhost:5000";
-};
-
-const API_URL = getApiUrl();
+import { API_URL, getApiUrl } from "@/lib/api-config";
 
 export interface LoginCredentials {
   email: string
@@ -104,8 +96,7 @@ class AuthService {
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user))
         localStorage.setItem("attendance_token", token) // Store the JWT token
         if (user.schoolId) {
-          const { db } = await import("@/lib/db/database")
-          db.initializeSchoolData(user.schoolId)
+          localStorage.setItem("x-school-id", user.schoolId);
         }
       }
 
@@ -188,11 +179,6 @@ class AuthService {
           localStorage.setItem("has_multiple_schools", "true");
         } else {
           localStorage.removeItem("has_multiple_schools");
-        }
-
-        if (user.schoolId) {
-          const { db } = await import("@/lib/db/database");
-          db.initializeSchoolData(user.schoolId);
         }
       }
 
@@ -310,8 +296,7 @@ class AuthService {
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user))
         localStorage.setItem("attendance_token", token)
         if (user.schoolId) {
-          const { db } = await import("@/lib/db/database")
-          db.initializeSchoolData(user.schoolId)
+          localStorage.setItem("x-school-id", user.schoolId);
         }
       }
 

@@ -16,7 +16,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ sidebar, content }) => {
   return (
     <div className="flex h-[calc(100vh-64px)] md:h-full bg-background overflow-hidden relative">
       {/* Desktop Sidebar */}
-      <div className="hidden md:block w-80 lg:w-96 border-r border-border shrink-0">
+      <div className="hidden md:flex md:flex-col w-80 lg:w-96 border-r border-border shrink-0 h-full overflow-hidden">
         {sidebar}
       </div>
 

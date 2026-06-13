@@ -65,6 +65,7 @@ export function AttendanceTracking() {
 
   const [isTeacher, setIsTeacher] = useState(false)
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set())
+  const [showUnmarkedOnly, setShowUnmarkedOnly] = useState(false)
   const [uiType, setUiType] = useState<"card_based" | "tabular">("card_based")
 
   useEffect(() => {
@@ -92,7 +93,7 @@ export function AttendanceTracking() {
 
   useEffect(() => {
     filterStudents()
-  }, [students, searchTerm, gradeFilter, streamFilter, sectionFilter])
+  }, [students, searchTerm, gradeFilter, streamFilter, sectionFilter, showUnmarkedOnly, attendanceState])
 
   const loadStudents = async () => {
     setIsLoading(true)
@@ -214,6 +215,10 @@ export function AttendanceTracking() {
 
     if (sectionFilter !== "All Sections") {
       filtered = filtered.filter((student) => student.section === sectionFilter)
+    }
+
+    if (showUnmarkedOnly) {
+      filtered = filtered.filter((student) => !attendanceState[student.id]?.status)
     }
 
     setFilteredStudents(filtered)
@@ -874,6 +879,17 @@ export function AttendanceTracking() {
               className="typography-label text-muted-foreground hover:text-foreground h-9 rounded-xl uppercase"
             >
               Reset
+            </Button>
+            <Button
+              onClick={() => setShowUnmarkedOnly(!showUnmarkedOnly)}
+              variant={showUnmarkedOnly ? "default" : "outline"}
+              className={`typography-label h-9 rounded-xl uppercase ${
+                showUnmarkedOnly 
+                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm border-blue-600" 
+                  : "bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Unmarked ({stats.unmarked})
             </Button>
           </div>
         </CardContent>

@@ -8,7 +8,8 @@ import { Progress } from '@/components/ui/progress'
 import { CreditCard, Calendar, Users, AlertCircle, Loader2, ArrowUpCircle } from 'lucide-react'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
 import Link from 'next/link'
-import { authService, getApiUrl } from '@/lib/auth/auth'
+import { authService } from '@/lib/auth/auth'
+import { getApiUrl } from '@/lib/api-config'
 
 interface Subscription {
   id: string

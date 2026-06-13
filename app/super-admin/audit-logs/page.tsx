@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Search, Filter, Clock, User, Shield, Info } from 'lucide-react'
-import { getApiUrl } from '@/lib/auth/auth'
+import { getApiUrl } from '@/lib/api-config'
 
 // Mock Audit Logs
 const mockLogs = [

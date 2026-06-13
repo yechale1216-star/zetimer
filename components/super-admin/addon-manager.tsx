@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Plus, Edit, Trash2, Loader2, Package, Search } from "lucide-react"
-import { getApiUrl } from "@/lib/auth/auth"
+import { getApiUrl } from "@/lib/api-config"
 import { notifications } from "@/lib/utils/notifications"
 
 interface Addon {

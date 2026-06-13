@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button'
 import { Loader2, CheckCircle2, XCircle, ShieldCheck, CreditCard } from 'lucide-react'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
-import { getApiUrl } from '@/lib/auth/auth'
+import { getApiUrl } from '@/lib/api-config'
 
 function CheckoutSimulationContent() {
   const searchParams = useSearchParams()

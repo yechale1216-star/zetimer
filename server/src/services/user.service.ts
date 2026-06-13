@@ -26,19 +26,16 @@ export const getUsers = async (schoolId: string) => {
 export const getContacts = async (schoolId: string, currentUser?: any) => {
   if (!schoolId) throw new Error('School ID is required');
 
-  let allowedRoles = ['admin', 'school_admin', 'teacher', 'parent'];
-  
-  // Parents should only see admins and teachers
-  if (currentUser?.role === 'parent') {
-    allowedRoles = ['admin', 'school_admin', 'teacher'];
-  }
+  console.log(`[UserService] getContacts called for schoolId: ${schoolId}, role: ${currentUser?.role}`);
 
-  const users = await prisma.user.findMany({
+  const allowedRoles = ['admin', 'school_admin', 'teacher', 'parent', 'staff'];
+  const baseRoles = ['admin', 'school_admin', 'teacher', 'staff'];
+  
+  // 1. Fetch Users directly belonging to this school (Admins/Teachers)
+  const staffAndAdmins = await prisma.user.findMany({
     where: {
       schoolId: schoolId,
-      role: { in: allowedRoles },
-      is_active: true,
-      ...(currentUser?.id ? { id: { not: currentUser.id } } : {})
+      role: { in: baseRoles }
     },
     select: {
       id: true,
@@ -47,11 +44,48 @@ export const getContacts = async (schoolId: string, currentUser?: any) => {
       role: true,
       phone: true,
       email: true,
-    },
-    orderBy: { full_name: 'asc' }
+      is_active: true
+    }
   });
 
-  return users;
+  // 2. Fetch Parents linked to this school via ParentStudentLink
+  // This ensures a parent is found in every school where they have children
+  const linkedParents = await prisma.user.findMany({
+    where: {
+      role: 'parent',
+      parentStudents: {
+        some: {
+          schoolId: schoolId
+        }
+      }
+    },
+    select: {
+      id: true,
+      full_name: true,
+      profile_photo: true,
+      role: true,
+      phone: true,
+      email: true,
+      is_active: true
+    }
+  });
+
+  // 3. Combine and Filter (Remove self)
+  let allContacts = [...staffAndAdmins, ...linkedParents];
+  
+  // Remove duplicates (in case a parent also has a schoolId set)
+  const uniqueContacts = Array.from(new Map(allContacts.map(item => [item.id, item])).values());
+  
+  // Filter out the current user
+  const finalContacts = uniqueContacts.filter(u => u.id !== currentUser?.id);
+
+  // If the requesting user is a parent, they should only see staff/admins
+  if (currentUser?.role === 'parent') {
+    return finalContacts.filter(u => ['admin', 'school_admin', 'teacher', 'staff'].includes(u.role));
+  }
+
+  console.log(`[UserService] Found ${finalContacts.length} potential contacts`);
+  return finalContacts.sort((a, b) => a.full_name.localeCompare(b.full_name));
 };
 
 export const createUser = async (data: any) => {

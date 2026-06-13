@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Loader2, AlertTriangle, TrendingUp, Settings2, Save, CheckCircle2 } from "lucide-react"
-import { getApiUrl } from "@/lib/auth/auth"
+import { getApiUrl } from "@/lib/api-config"
 import type { AddonSelection, BillingPeriod } from "@/lib/utils/subscription-types"
 
 const PERIODS: { value: BillingPeriod; label: string; discount: string }[] = [

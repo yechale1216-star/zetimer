@@ -12,6 +12,7 @@ __zetime_jsx-dev-runtime.ts
 # Common ignores
 node_modules
 .next/
+.next_dev/
 .DS_Store
 .env
 .env.*

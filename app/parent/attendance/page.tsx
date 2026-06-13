@@ -59,9 +59,9 @@ export default function AttendanceHistory() {
         setSelectedStudent(student)
         
         // Fetch academic year and attendance mode from settings
+        let currentMode = 'daily';
         try {
           const settings = await db.getSettings()
-          let currentMode = 'daily'
           if (settings?.attendanceMode) {
             currentMode = settings.attendanceMode === 'session_based' ? 'session' : 'daily'
             setAttendanceMode(currentMode as any)

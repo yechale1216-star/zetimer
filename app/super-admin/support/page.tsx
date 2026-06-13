@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Search, MessageSquare, AlertCircle, CheckCircle2, Clock, Loader2, MoreHorizontal } from 'lucide-react'
-import { getApiUrl } from '@/lib/auth/auth'
+import { getApiUrl } from '@/lib/api-config'
 
 export default function SupportTicketsPage() {
   const [tickets, setTickets] = useState<any[]>([])

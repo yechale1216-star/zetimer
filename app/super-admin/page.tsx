@@ -34,7 +34,7 @@ import {
 } from 'recharts'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { getApiUrl } from '@/lib/auth/auth'
+import { getApiUrl } from '@/lib/api-config'
 
 export default function SuperAdminDashboard() {
   const [metrics, setMetrics] = useState<{

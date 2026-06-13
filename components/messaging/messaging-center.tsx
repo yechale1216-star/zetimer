@@ -459,33 +459,51 @@ export function MessagingCenter() {
         type: message.type || 'TEXT',
         attachments: message.attachments,
         isMe: message.senderId === currentUser?.id,
+        tempId: message.tempId, // Capture tempId if present
       };
 
       // Append ONLY to the correct conversation bucket
       setMessagesByConversation(prev => {
         const existing = prev[convId] || [];
+        
+        // If we find a message with the same tempId, it means this is the confirmation of our optimistic message
+        if (formatted.tempId) {
+          const index = existing.findIndex(m => m.id === formatted.tempId);
+          if (index !== -1) {
+            const updated = [...existing];
+            updated[index] = { ...formatted };
+            return { ...prev, [convId]: updated };
+          }
+        }
+
         // Deduplicate by id
         if (existing.some(m => m.id === formatted.id)) return prev;
         return { ...prev, [convId]: [...existing, formatted] };
       });
 
-      // Update sidebar last-message preview
-      setConversations(prev =>
-        prev.map(c =>
+      // Update sidebar last-message preview and re-sort (most recent at top, like Telegram)
+      setConversations(prev => {
+        const nowTs = Date.now();
+        const updated = prev.map(c =>
           c.id === convId
             ? {
                 ...c,
                 lastMessage: message.content,
                 timestamp: t("just_now"),
-                updatedAt: Date.now(),
+                updatedAt: nowTs,
                 unreadCount:
                   convId !== activeConversationIdRef.current
                     ? (c.unreadCount || 0) + 1
                     : 0,
               }
             : c
-        )
-      );
+        );
+
+        // Separate and re-sort: active chats by recency, directory contacts stay at bottom
+        const activeChats = updated.filter(c => !c.isNewContact).sort((a, b) => b.updatedAt - a.updatedAt);
+        const directory = updated.filter(c => c.isNewContact);
+        return [...activeChats, ...directory];
+      });
     };
 
     const handleMessageRead = (data: { messageId: string; userId: string; conversationId: string }) => {
@@ -592,21 +610,96 @@ export function MessagingCenter() {
 
   // ── Send message ─────────────────────────────────────────────────────────────
   const handleSendMessage = useCallback(
-    (content: string, options?: { type: string; attachment?: any; replyToId?: string }) => {
-      if (!socket || !isConnected || !activeConversationId || !user) return;
+    (content: string, options?: {
+      type?: string;
+      attachment?: any;
+      replyToId?: string;
+      isOptimistic?: boolean;
+      tempId?: string;
+      replaceTempId?: string;
+    }) => {
+      if (!activeConversationId || !user) return;
 
-      const messageData = {
+      // Case A: Upload finished — swap local-preview bubble with real attachment
+      if (options?.replaceTempId) {
+        const realTempId = options.replaceTempId;
+        const updatedMessage = {
+          id: realTempId,
+          senderId: user.id,
+          senderName: user.full_name || 'Me',
+          content,
+          timestamp: formatLocalizedTime(new Date(), language),
+          status: 'sending' as const,
+          type: options?.type || 'FILE',
+          attachments: options?.attachment ? [options.attachment] : undefined,
+          isMe: true,
+        };
+        setMessagesByConversation(prev => ({
+          ...prev,
+          [activeConversationId]: (prev[activeConversationId] || []).map(m =>
+            m.id === realTempId ? updatedMessage : m
+          ),
+        }));
+        if (!socket || !isConnected) return;
+        socket.emit('send_message', {
+          conversationId: activeConversationId,
+          senderId: user.id,
+          content,
+          type: options?.type || 'FILE',
+          attachment: options?.attachment,
+          replyToId: options?.replyToId,
+          tempId: realTempId,
+        });
+        return;
+      }
+
+      // Case B: Add new optimistic message
+      const tempId = options?.tempId || `temp-${Date.now()}`;
+      const optimisticMessage = {
+        id: tempId,
+        senderId: user.id,
+        senderName: user.full_name || 'Me',
+        content,
+        timestamp: formatLocalizedTime(new Date(), language),
+        status: 'sending' as const,
+        type: options?.type || 'TEXT',
+        attachments: options?.attachment ? [options.attachment] : undefined,
+        isMe: true,
+      };
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [activeConversationId]: [...(prev[activeConversationId] || []), optimisticMessage],
+      }));
+
+      // Update sidebar preview and bubble to top (even before server confirms)
+      setConversations(prev => {
+        const nowTs = Date.now();
+        const updated = prev.map(c =>
+          c.id === activeConversationId
+            ? { ...c, lastMessage: content, timestamp: formatLocalizedTime(new Date(), language), updatedAt: nowTs }
+            : c
+        );
+        const activeChats = updated.filter(c => !c.isNewContact).sort((a, b) => b.updatedAt - a.updatedAt);
+        const directory = updated.filter(c => c.isNewContact);
+        return [...activeChats, ...directory];
+      });
+
+      // isOptimistic = local preview only, don't emit to socket yet
+      if (options?.isOptimistic) return;
+
+      // Case C: Text message — emit immediately
+      if (!socket || !isConnected) return;
+      socket.emit('send_message', {
         conversationId: activeConversationId,
         senderId: user.id,
         content,
         type: options?.type || 'TEXT',
         attachment: options?.attachment,
         replyToId: options?.replyToId,
-      };
-
-      socket.emit('send_message', messageData);
+        tempId,
+      });
     },
-    [socket, isConnected, activeConversationId, user]
+    [socket, isConnected, activeConversationId, user, language]
   );
 
   // ── Derive the messages to display for the active conversation ───────────────

@@ -1,12 +1,17 @@
 'use client';
 
-import { Suspense } from 'react';
-import { MessagingCenter } from '@/components/messaging/messaging-center';
+import dynamic from 'next/dynamic';
+
+const MessagingCenter = dynamic(
+  () => import('@/components/messaging/messaging-center').then(mod => mod.MessagingCenter),
+  { 
+    ssr: false,
+    loading: () => <div className="p-8">Loading messaging center...</div>
+  }
+);
 
 export default function AdminMessagesPage() {
   return (
-    <Suspense fallback={<div>Loading messaging center...</div>}>
-      <MessagingCenter />
-    </Suspense>
+    <MessagingCenter />
   );
 }

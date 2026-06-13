@@ -5,6 +5,9 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev --turbo",
+    "dev:stable": "next dev",
+    "fix": "powershell ./scripts/fix-turbo.ps1",
+    "clean-dev": "powershell ./scripts/fix-turbo.ps1 && npm run dev",
     "lint": "next lint",
     "start": "next start"
   },

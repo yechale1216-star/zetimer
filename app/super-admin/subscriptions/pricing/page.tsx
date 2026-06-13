@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DynamicPriceCalculator } from "@/components/super-admin/dynamic-price-calculator"
-import { getApiUrl } from "@/lib/auth/auth"
+import { getApiUrl } from "@/lib/api-config"
 import { ChevronLeft, ExternalLink, Loader2 } from "lucide-react"
 
 interface DBAddon {

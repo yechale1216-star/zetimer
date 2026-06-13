@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Check, Sparkles, Loader2 } from 'lucide-react'
-import { getApiUrl } from '@/lib/auth/auth'
+import { getApiUrl } from '@/lib/api-config'
 import type { TierPlan, BillingPeriod } from '@/lib/utils/subscription-types'
 import { cn } from '@/lib/utils/utils'
 

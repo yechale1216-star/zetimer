@@ -10,7 +10,7 @@ import {
   Plus, Edit, Trash2, Check, X, Loader2, Layers, Users, DollarSign,
   ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Calendar, GraduationCap
 } from "lucide-react"
-import { getApiUrl } from "@/lib/auth/auth"
+import { getApiUrl } from "@/lib/api-config"
 import { cn } from "@/lib/utils/utils"
 import { notifications } from "@/lib/utils/notifications"
 

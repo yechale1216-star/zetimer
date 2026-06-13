@@ -14,17 +14,23 @@ const STATIC_ASSETS = [
 ]
 
 self.addEventListener("install", (event) => {
+  console.log("[SW] Install event started");
   event.waitUntil(
-    caches
-      .open(STATIC_CACHE)
-      .then((cache) => {
-        return cache.addAll(STATIC_ASSETS)
-      })
-      .then(() => {
-        return self.skipWaiting()
-      }),
-  )
-})
+    caches.open(STATIC_CACHE).then((cache) => {
+      console.log("[SW] Caching static assets");
+      return Promise.allSettled(
+        STATIC_ASSETS.map((asset) => {
+          return cache.add(asset).catch((err) => {
+            console.error(`[SW] Failed to cache asset: ${asset}`, err);
+          });
+        }),
+      );
+    }).then(() => {
+      console.log("[SW] Install event completed");
+      return self.skipWaiting();
+    }),
+  );
+});
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, ShieldCheck, ShieldX, Trash2, Sliders } from "lucide-react"
-import { getApiUrl } from "@/lib/auth/auth"
+import { getApiUrl } from "@/lib/api-config"
 
 interface Feature { id: string; key: string; name: string; category: string; isActive: boolean; isCore: boolean }
 interface Override { id: string; featureId: string; granted: boolean; reason?: string; feature: Feature }

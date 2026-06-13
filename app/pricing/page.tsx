@@ -10,7 +10,7 @@ import {
   Check, Zap, Users, School, ArrowRight, Loader2,
   ChevronDown, ChevronUp, Star, Shield, Clock
 } from "lucide-react"
-import { getApiUrl } from "@/lib/auth/auth"
+import { getApiUrl } from "@/lib/api-config"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface DBPlan {

@@ -1,7 +1,6 @@
 "use client"
 
-import { getApiUrl } from "@/lib/auth/auth"
-const API_URL = getApiUrl()
+import { API_URL, getApiUrl } from "@/lib/api-config"
 
 export interface Student {
   id: string
@@ -73,14 +72,9 @@ class Database {
   }
 
   private getSchoolId(): string {
-    if (!this.currentSchoolId) {
-      const user = this.getCurrentUser()
-      if (user?.schoolId) {
-        this.currentSchoolId = String(user.schoolId)
-      } else {
-        console.warn("[pg] No schoolId found in user session")
-        return ""
-      }
+    const user = this.getCurrentUser()
+    if (user?.schoolId) {
+      this.currentSchoolId = String(user.schoolId)
     }
     return this.currentSchoolId || ""
   }
@@ -802,6 +796,53 @@ class Database {
     } catch (error) {
       console.error("[pg] exportAttendanceReport error:", error)
       return null
+    }
+  }
+
+  // ─── CALLS & CONTACTS ─────────────────────────────────────────────────────
+  async getContacts(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_URL}/api/users/contacts`, { 
+        headers: this.getApiHeaders(),
+        cache: 'no-store'
+      })
+      if (!res.ok) return []
+      const result = await res.json()
+      return result.data
+    } catch (error) {
+      console.error("[pg] getContacts error:", error)
+      return []
+    }
+  }
+
+  async logCall(data: { recipientId: string, type: 'VOICE' | 'VIDEO', status: string, duration?: number }): Promise<any> {
+    try {
+      const res = await fetch(`${API_URL}/api/calls/log`, {
+        method: "POST",
+        headers: this.getApiHeaders(),
+        body: JSON.stringify(data),
+      })
+      if (!res.ok) return null
+      const result = await res.json()
+      return result.data
+    } catch (error) {
+      console.error("[pg] logCall error:", error)
+      return null
+    }
+  }
+
+  async getCallHistoryApi(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_URL}/api/calls/history`, { 
+        headers: this.getApiHeaders(),
+        cache: 'no-store'
+      })
+      if (!res.ok) return []
+      const result = await res.json()
+      return result.data
+    } catch (error) {
+      console.error("[pg] getCallHistory error:", error)
+      return []
     }
   }
 }

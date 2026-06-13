@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { Download, Loader2, ArrowUpRight, History } from 'lucide-react'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
-import { getApiUrl } from '@/lib/auth/auth'
+import { getApiUrl } from '@/lib/api-config'
 
 interface BillingRecord {
   id: string

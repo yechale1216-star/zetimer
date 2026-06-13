@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { CreditCard, Eye, Edit, Trash2, Loader2 } from "lucide-react"
 import { TIER_CONFIG } from "@/lib/utils/pricing-utils"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
-import { getApiUrl } from "@/lib/auth/auth"
+import { getApiUrl } from "@/lib/api-config"
 import type { BillingPeriod, SubscriptionStatus, TierPlan } from "@/lib/utils/subscription-types"
 
 const TIERS: TierPlan[] = ["starter", "standard", "premium", "enterprise"]

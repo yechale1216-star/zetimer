@@ -11,7 +11,8 @@ import { parseJsonResponse } from '@/lib/utils/parse-json-response'
 import { PricingCards } from '@/components/subscription/pricing-cards'
 import type { TierPlan, BillingPeriod } from '@/lib/utils/subscription-types'
 import { recommendPlanUpgrade } from '@/lib/utils/pricing-utils'
-import { authService, getApiUrl } from '@/lib/auth/auth'
+import { authService } from '@/lib/auth/auth'
+import { getApiUrl } from '@/lib/api-config'
 
 export default function UpgradePlanPage() {
   const [currentTier, setCurrentTier] = useState<TierPlan>('free')

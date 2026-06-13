@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils/utils';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatListSkeleton } from './skeletons';
 import { useLanguage } from '@/lib/context/language-context';
 
@@ -59,7 +58,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   });
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* Sidebar Header & Search */}
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
@@ -104,7 +103,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       </div>
 
       {/* Conversations List */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
         {isLoading ? (
           <ChatListSkeleton />
         ) : (
@@ -223,7 +222,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             )}
           </div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 };

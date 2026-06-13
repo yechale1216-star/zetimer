@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  distDir: '.next_dev',
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -36,19 +37,18 @@ const nextConfig = {
     ]
   },
   onDemandEntries: {
-    // period (in ms) where the server will keep pages in the buffer
-    maxInactiveAge: 60 * 1000,
-    // number of pages that should be kept simultaneously without being disposed
-    pagesBufferLength: 5,
+    // Keep pages in memory for 1 hour
+    maxInactiveAge: 3600 * 1000,
+    // Buffer more pages
+    pagesBufferLength: 100,
   },
+  devIndicators: {
+    appIsrStatus: false,
+    buildActivity: true,
+    buildActivityPosition: 'bottom-right',
+  },
+  reactStrictMode: false, // Disable strict mode in dev to reduce double-loading of chunks
   webpack: (config, { dev, isServer }) => {
-    // Optimize performance on Windows
-    if (dev && !isServer) {
-      config.watchOptions = {
-        ignored: ['**/node_modules', '**/.next', '**/server'],
-        poll: 1000, // Check for changes every second to reduce CPU/IO overhead
-      }
-    }
     return config
   },
 }

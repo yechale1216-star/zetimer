@@ -19,7 +19,7 @@ import {
   ChevronRight,
   Send
 } from 'lucide-react'
-import { getApiUrl } from '@/lib/auth/auth'
+import { getApiUrl } from '@/lib/api-config'
 import { notifications } from '@/lib/utils/notifications'
 
 export default function SupportPage() {

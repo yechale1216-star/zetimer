@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Paperclip, Smile, MoreVertical, Phone, Video, ChevronLeft, 
-  Check, CheckCheck, Reply, Forward, Trash2, Heart, Search, X, 
+  Check, CheckCheck, Reply, Forward, Trash2, Heart, Search, X, Clock,
   Pin, Copy, FileText, FileJson, FileType, Music, Play, ExternalLink, 
   Download, Globe, FileArchive, Mic, MicOff, StopCircle, ImageIcon, File as FileIcon,
   Info, Bell
@@ -57,7 +57,14 @@ interface Message {
 interface ChatWindowProps {
   activeConversation: any;
   messages: Message[];
-  onSendMessage: (content: string, options?: { type: string; attachment?: any; replyToId?: string }) => void;
+  onSendMessage: (content: string, options?: {
+    type?: string;
+    attachment?: any;
+    replyToId?: string;
+    isOptimistic?: boolean;
+    tempId?: string;
+    replaceTempId?: string;
+  }) => void;
   onBack?: () => void;
   onToggleInfo?: () => void;
   onAction?: (action: string, data: any) => void;
@@ -145,12 +152,39 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const isStudent = currentUser?.role === 'student';
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const isNearBottomRef = useRef(true);
 
+  // Track whether the user is near the bottom of the scroll container
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distFromBottom < 120;
+    setShowScrollBtn(distFromBottom > 200);
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
+  };
+
+  // When messages change: scroll smoothly only if already near bottom
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (isNearBottomRef.current) {
+      scrollToBottom('smooth');
     }
   }, [messages]);
+
+  // When the conversation changes: instant jump to bottom
+  const activeConvId = activeConversation?.id;
+  useEffect(() => {
+    isNearBottomRef.current = true;
+    setShowScrollBtn(false);
+    // Slight delay lets the DOM paint the new messages first
+    const t = setTimeout(() => scrollToBottom('instant'), 50);
+    return () => clearTimeout(t);
+  }, [activeConvId]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, forcedType?: 'IMAGE' | 'VIDEO' | 'FILE') => {
     const file = e.target.files?.[0];
@@ -219,25 +253,39 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     const mr = mediaRecorderRef.current;
     
+    const mimeType = recordMode === 'video' ? 'video/webm' : 'audio/webm';
+    const ext = 'webm';
+    const prefix = recordMode === 'video' ? 'video' : 'voice';
+
     mr.onstop = async () => {
-      const mimeType = recordMode === 'video' ? 'video/webm' : 'audio/webm';
       const blob = new Blob(audioChunksRef.current, { type: mimeType });
       mr.stream.getTracks().forEach(t => t.stop());
       setCameraStream(null);
 
       if (send && blob.size > 0) {
-        setUploading(true);
+        const file = new File([blob], `${prefix}-${Date.now()}.${ext}`, { type: mimeType });
+        const localUrl = URL.createObjectURL(blob);
+        const fileTempId = `temp-${Date.now()}`;
+
+        // 1. Show optimistic message with local preview
+        onSendMessage(recordMode === 'video' ? '📹 Video message' : '🎤 Voice message', {
+          type: recordMode === 'video' ? 'VIDEO_MESSAGE' : 'FILE',
+          attachment: { url: localUrl, name: file.name, type: file.type, size: file.size, isLocal: true },
+          isOptimistic: true,
+          tempId: fileTempId,
+        });
+
+        // 2. Upload and replace with real message
         try {
-          const ext = recordMode === 'video' ? 'webm' : 'webm';
-          const prefix = recordMode === 'video' ? 'video' : 'voice';
-          const file = new File([blob], `${prefix}-${Date.now()}.${ext}`, { type: mimeType });
           const url = await uploadFile(file);
           onSendMessage(recordMode === 'video' ? '📹 Video message' : '🎤 Voice message', {
             type: recordMode === 'video' ? 'VIDEO_MESSAGE' : 'FILE',
-            attachment: { url, name: file.name, type: file.type, size: file.size }
+            attachment: { url, name: file.name, type: file.type, size: file.size },
+            replaceTempId: fileTempId,
           });
-        } catch { toast.error(`Failed to send ${recordMode} message`); }
-        finally { setUploading(false); }
+        } catch { 
+          toast.error(`Failed to send ${recordMode} message`); 
+        }
       }
     };
     mr.stop();
@@ -284,32 +332,55 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       return;
     }
 
-    setUploading(true);
-    try {
-      let attachmentUrl = '';
-      if (attachedFile) {
-        attachmentUrl = await uploadFile(attachedFile.file);
-      }
+    const currentInput = inputValue;
+    const currentFile = attachedFile;
 
-      onSendMessage(inputValue || (attachedFile?.type === 'IMAGE' ? 'Image' : attachedFile?.type === 'VIDEO' ? 'Video' : 'File'), {
-        type: attachedFile?.type || 'TEXT',
-        attachment: attachedFile ? {
+    // Clear UI instantly
+    setInputValue('');
+    setAttachedFile(null);
+    setReplyTarget(null);
+
+    // Case 1: Just text
+    if (!currentFile) {
+      onSendMessage(currentInput);
+      return;
+    }
+
+    // Case 2: Has attachment
+    const fileTempId = `temp-${Date.now()}`;
+
+    // 1. Show optimistic message with local preview immediately
+    onSendMessage(currentInput || (currentFile.type === 'IMAGE' ? 'Image' : currentFile.type === 'VIDEO' ? 'Video' : 'File'), {
+      type: currentFile.type,
+      attachment: {
+        url: currentFile.preview,
+        name: currentFile.file.name,
+        type: currentFile.file.type,
+        size: currentFile.file.size,
+        isLocal: true
+      },
+      replyToId: replyTarget?.id,
+      isOptimistic: true,
+      tempId: fileTempId, // ← pin this optimistic message with a known id
+    });
+
+    // 2. Upload in background then replace the optimistic message
+    try {
+      const attachmentUrl = await uploadFile(currentFile.file);
+      onSendMessage(currentInput || (currentFile.type === 'IMAGE' ? 'Image' : currentFile.type === 'VIDEO' ? 'Video' : 'File'), {
+        type: currentFile.type,
+        attachment: {
           url: attachmentUrl,
-          name: attachedFile.file.name,
-          type: attachedFile.file.type,
-          size: attachedFile.file.size
-        } : undefined,
-        replyToId: replyTarget?.id
+          name: currentFile.file.name,
+          type: currentFile.file.type,
+          size: currentFile.file.size
+        },
+        replyToId: replyTarget?.id,
+        replaceTempId: fileTempId, // ← replace the local preview, not add a new message
       });
-      
-      setInputValue('');
-      setAttachedFile(null);
-      setReplyTarget(null);
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send file');
-    } finally {
-      setUploading(false);
+      toast.error('Failed to upload file. Please try again.');
     }
   };
 
@@ -472,7 +543,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       </header>
 
       {/* Messages Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 scrollbar-hide">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 scrollbar-hide"
+      >
         {isLoading ? (
           <MessageWindowSkeleton />
         ) : (
@@ -496,9 +571,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 />
               );
             })}
+            {/* Invisible anchor element always at the very bottom */}
+            <div ref={messagesEndRef} className="h-0 w-full" />
           </>
         )}
       </div>
+
+      {/* Scroll-to-bottom FAB — visible only when scrolled up */}
+      <AnimatePresence>
+        {showScrollBtn && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.7 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => scrollToBottom('smooth')}
+            className="absolute bottom-28 right-4 z-50 h-10 w-10 rounded-full bg-background border border-border shadow-lg flex items-center justify-center hover:bg-secondary transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5 -rotate-90 text-muted-foreground" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Floating Selection Bar */}
       <AnimatePresence>
@@ -765,10 +858,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             {(inputValue.trim() || attachedFile) ? (
               <Button
                 onClick={handleSend}
-                disabled={uploading}
                 className="rounded-full h-11 w-11 shrink-0 shadow-lg bg-primary hover:bg-primary/90 transition-all active:scale-95"
               >
-                {uploading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="h-5 w-5 text-white" />}
+                <Send className="h-5 w-5 text-white" />
               </Button>
             ) : isRecording ? (
               <Button
@@ -950,7 +1042,7 @@ const CustomAudioPlayer = ({ url, isMe }: { url: string, isMe: boolean }) => {
   );
 };
 
-const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe }: { file: any, onImageClick: (url: string) => void, isCompact?: boolean, isMe: boolean }) => {
+const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, status }: { file: any, onImageClick: (url: string) => void, isCompact?: boolean, isMe: boolean, status?: string }) => {
   const file = rawFile.create ? rawFile.create : rawFile;
   const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.url);
   const isAudio = file.type?.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(file.url) || file.url.includes('voice-');
@@ -977,12 +1069,17 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe }: { 
         <img 
           src={file.url} 
           alt={file.name || "Image"} 
-          className="w-full h-auto max-h-[400px] object-cover"
+          className={cn("w-full h-auto max-h-[400px] object-cover", status === 'sending' && "opacity-50")}
           loading="lazy"
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
           <Search className="text-white h-8 w-8" />
         </div>
+        {status === 'sending' && (
+          <div className="absolute inset-0 flex items-center justify-center">
+             <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin shadow-lg" />
+          </div>
+        )}
       </div>
     );
   }
@@ -1045,8 +1142,12 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe }: { 
              : `https://docs.google.com/viewer?url=${encodeURIComponent(file.url)}`;
            window.open(viewerUrl, '_blank');
          }}>
-      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-        {getFileIcon(file.url)}
+      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform relative">
+        {status === 'sending' ? (
+          <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        ) : (
+          getFileIcon(file.url)
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <p className="typography-label truncate group-hover:text-primary transition-colors">{file.name || "Document"}</p>
@@ -1251,6 +1352,7 @@ const MessageBubble = ({
                       onImageClick={(url) => (window as any).showImagePreview?.(url)} 
                       isCompact={isMediaOnly}
                       isMe={isMe}
+                      status={message.status}
                     />
                   ))}
                 </div>
@@ -1354,9 +1456,11 @@ const MessageBubble = ({
           {message.editedAt && <span className="italic mr-1">edited</span>}
           <span>{message.timestamp}</span>
           {isMe && (
-            <span>
-              {message.status === 'read' ? (
-                <CheckCheck className="h-3 w-3" />
+            <span className="shrink-0">
+              {message.status === 'sending' ? (
+                <Clock className="h-3 w-3 animate-pulse" />
+              ) : message.status === 'read' ? (
+                <CheckCheck className="h-3 w-3 text-sky-400" />
               ) : (
                 <Check className="h-3 w-3" />
               )}

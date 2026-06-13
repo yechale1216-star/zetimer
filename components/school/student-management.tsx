@@ -87,6 +87,7 @@ export function StudentManagement() {
     const user = authService.getCurrentUser()
     setIsTeacher(user?.role === "teacher")
     loadStudents()
+    fetchNextStudentId()
 
     // Background polling for "instant" updates (every 10 seconds)
     const pollInterval = setInterval(() => {

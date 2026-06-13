@@ -1,202 +1,47 @@
 "use client"
 
-import { API_URL, getApiUrl } from "@/lib/api-config"
+import { BaseDatabase } from "./base"
+import * as students from "./methods/students"
+import * as attendance from "./methods/attendance"
+import * as analytics from "./methods/analytics"
+import * as teachers from "./methods/teachers"
+import * as calls from "./methods/calls"
+import * as settings from "./methods/settings"
+import type { Student, AttendanceRecord, TeacherAssignment } from "./types"
+import { API_URL } from "@/lib/api-config"
 
-export interface Student {
-  id: string
-  name?: string
-  student_id?: string
-  grade?: string
-  stream?: string
-  section?: string
-  parent_email?: string
-  parent_phone?: string
-  parent_name?: string
-  existingParentId?: string
-  gender?: string
-  date_of_birth?: string
-  first_name?: string
-  last_name?: string
-  roll_number?: string
-  schoolId?: string
-  class_id?: string
-  address?: string
-  status?: string
-  relationshipType?: string
-  parent_address?: string
-  parent_password?: string
-}
+export type { Student, AttendanceRecord, TeacherAssignment }
 
-export interface AttendanceRecord {
-  id: string
-  student_id: string
-  attendance_date: string
-  status: "present" | "late" | "absent" | "excused" | "Present" | "Late" | "Absent" | "Excused"
-  remarks?: string
-  note?: string
-  created_at: string
-  updated_at?: string
-  schoolId?: string
-  date?: string
-  class_id?: string
-  session?: "morning" | "afternoon" | null
-}
-
-export interface TeacherAssignment {
-  id: string
-  teacher_id: string
-  class_id?: string
-  grade?: string
-  section?: string
-  stream?: string
-  subject?: string
-  schoolId?: string
-  teacher?: {
-    id: string
-    full_name: string
-    email: string
-  }
-  class?: {
-    id: string
-    name: string
-    grade: string
-    section: string
-  }
-}
-
-class Database {
-  private currentSchoolId: string | null = null
-
-  private setSchoolId(schoolId: string | number) {
-    this.currentSchoolId = String(schoolId)
-  }
-
-  private getSchoolId(): string {
-    const user = this.getCurrentUser()
-    if (user?.schoolId) {
-      this.currentSchoolId = String(user.schoolId)
-    }
-    return this.currentSchoolId || ""
-  }
-
-  private getCurrentUser(): any {
-    if (typeof window === "undefined") return null
-    try {
-      const data = localStorage.getItem("attendance_current_user")
-      return data ? JSON.parse(data) : null
-    } catch {
-      return null
-    }
-  }
-
-  private getApiHeaders(): Record<string, string> {
-    const token = typeof window !== "undefined" ? localStorage.getItem("attendance_token") : null
-    const schoolId = this.getSchoolId()
-    
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    }
-    
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`
-    }
-
-    if (schoolId) {
-      headers["x-school-id"] = schoolId
-    }
-    
-    return headers
-  }
-
-  private async handleError(res: Response): Promise<never> {
-    let message = `HTTP ${res.status}: ${res.statusText}`;
-    try {
-      const data = await res.json();
-      message = data.message || data.error || message;
-    } catch {
-      try {
-        const text = await res.text();
-        if (text && text.length < 200) message = text;
-      } catch {}
-    }
-    throw new Error(message);
-  }
-
+class Database extends BaseDatabase {
   // ─── STUDENTS ─────────────────────────────────────────────────────────────
   async getNextStudentId(): Promise<string> {
-    try {
-      const res = await fetch(`${API_URL}/api/students/auto/next-id`, {
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      })
-      if (!res.ok) throw new Error(res.statusText)
-      const result = await res.json()
-      return result.data
-    } catch (error) {
-      console.error("[pg] getNextStudentId error:", error)
-      return ""
-    }
+    return students.getNextStudentId(this.getApiHeaders())
   }
 
   async getStudents(): Promise<Student[]> {
-    try {
-      const schoolId = this.getSchoolId()
-      if (!schoolId) return []
-      const res = await fetch(`${API_URL}/api/students?_t=${Date.now()}`, { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      })
-      if (!res.ok) {
-        await this.handleError(res);
-      }
-      const result = await res.json()
-      // The API already returns normalized flat data
-      return result.data.map((s: any) => ({
-        ...s,
-        schoolId: schoolId,
-      }))
-    } catch (error) {
-      console.error("[pg] getStudents error:", error)
-      return []
-    }
+    return students.getStudents(this.getApiHeaders(), this.getSchoolId())
   }
 
   async addStudent(student: Partial<Student>): Promise<Student> {
-    const schoolId = this.getSchoolId()
-    if (!schoolId) throw new Error("School ID not found")
-    const res = await fetch(`${API_URL}/api/students`, {
-      method: "POST", headers: this.getApiHeaders(), body: JSON.stringify(student),
-    })
-    if (!res.ok) await this.handleError(res);
-    const result = await res.json()
-    return {
-      ...result.data,
-      schoolId: schoolId,
-    }
+    return students.addStudent(this.getApiHeaders(), this.getSchoolId(), student)
   }
 
-  async bulkAddStudents(students: Partial<Student>[]): Promise<any> {
+  async bulkAddStudents(studentsData: Partial<Student>[]): Promise<any> {
     const schoolId = this.getSchoolId()
     if (!schoolId) throw new Error("School ID not found")
     const res = await fetch(`${API_URL}/api/students/bulk`, {
-      method: "POST", headers: this.getApiHeaders(), body: JSON.stringify({ students }),
+      method: "POST", headers: this.getApiHeaders(), body: JSON.stringify({ students: studentsData }),
     })
     if (!res.ok) await this.handleError(res);
     return await res.json()
   }
 
   async updateStudent(id: string, data: Partial<Student>): Promise<void> {
-    const res = await fetch(`${API_URL}/api/students/${id}`, {
-      method: "PUT", headers: this.getApiHeaders(), body: JSON.stringify(data),
-    })
-    if (!res.ok) await this.handleError(res);
+    return students.updateStudent(this.getApiHeaders(), id, data)
   }
 
   async deleteStudent(id: string): Promise<void> {
-    const res = await fetch(`${API_URL}/api/students/${id}`, {
-      method: "DELETE", headers: this.getApiHeaders(),
-    })
-    if (!res.ok) await this.handleError(res);
+    return students.deleteStudent(this.getApiHeaders(), id)
   }
 
   async checkParentsBatch(phones: string[]): Promise<boolean[]> {
@@ -217,20 +62,7 @@ class Database {
 
   // ─── ATTENDANCE ───────────────────────────────────────────────────────────
   async getAttendance(): Promise<AttendanceRecord[]> {
-    try {
-      const schoolId = this.getSchoolId()
-      if (!schoolId) return []
-      const res = await fetch(`${API_URL}/api/attendance?_t=${Date.now()}`, { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      })
-      if (!res.ok) throw new Error(res.statusText)
-      const result = await res.json()
-      return result.data.map((r: any) => this.mapAttendance(r, schoolId))
-    } catch (error) {
-      console.error("[pg] getAttendance error:", error)
-      return []
-    }
+    return attendance.getAttendance(this.getApiHeaders(), this.getSchoolId())
   }
 
   async getAttendanceByDate(date: string): Promise<AttendanceRecord[]> {
@@ -243,40 +75,28 @@ class Database {
       })
       if (!res.ok) throw new Error(res.statusText)
       const result = await res.json()
-      return result.data.map((r: any) => this.mapAttendance(r, schoolId))
+      return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
     } catch (error) {
       console.error("[pg] getAttendanceByDate error:", error)
       return []
     }
   }
 
-  /**
-   * Fetches attendance for a date, filtered by attendance mode:
-   * - session_based: pass the session ("morning"/"afternoon") to fetch only that session
-   * - daily (null): fetches only records with no session (session IS NULL)
-   */
   async getAttendanceByDateAndMode(date: string, session: "morning" | "afternoon" | null): Promise<AttendanceRecord[]> {
     try {
       const schoolId = this.getSchoolId()
       if (!schoolId) return []
-
-      // Build query params — "none" signals to backend: WHERE session IS NULL
       const sessionParam = session ? `&session=${session}` : `&session=none`
       const url = `${API_URL}/api/attendance?date=${date}${sessionParam}&_t=${Date.now()}`
-
-      const res = await fetch(url, {
-        headers: this.getApiHeaders(),
-        cache: 'no-store',
-      })
+      const res = await fetch(url, { headers: this.getApiHeaders(), cache: 'no-store' })
       if (!res.ok) throw new Error(res.statusText)
       const result = await res.json()
-      return result.data.map((r: any) => this.mapAttendance(r, schoolId))
+      return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
     } catch (error) {
       console.error("[pg] getAttendanceByDateAndMode error:", error)
       return []
     }
   }
-
 
   async getAttendanceByDateRange(startDate: string, endDate: string): Promise<AttendanceRecord[]> {
     try {
@@ -288,7 +108,7 @@ class Database {
       })
       if (!res.ok) throw new Error(res.statusText)
       const result = await res.json()
-      return result.data.map((r: any) => this.mapAttendance(r, schoolId))
+      return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
     } catch (error) {
       console.error("[pg] getAttendanceByDateRange error:", error)
       return []
@@ -300,27 +120,7 @@ class Database {
   }
 
   async markAttendance(records: Partial<AttendanceRecord>[]): Promise<void> {
-    const schoolId = this.getSchoolId()
-    if (!schoolId) throw new Error("School ID not found")
-    
-    const formattedRecords = records.map(record => {
-      const recDate = record.attendance_date || record.date
-      return {
-        studentId: record.student_id,
-        status: record.status,
-        session: record.session || null,
-        remarks: record.remarks || record.note || "",
-        date: recDate ? new Date(recDate).toISOString() : new Date().toISOString(),
-      }
-    })
-
-    const res = await fetch(`${API_URL}/api/attendance/bulk`, {
-      method: "POST",
-      headers: this.getApiHeaders(),
-      body: JSON.stringify({ records: formattedRecords }),
-    })
-
-    if (!res.ok) await this.handleError(res);
+    return attendance.markAttendance(this.getApiHeaders(), this.getSchoolId(), records)
   }
 
   async saveAttendance(record: Partial<AttendanceRecord>): Promise<AttendanceRecord> {
@@ -340,7 +140,7 @@ class Database {
     })
     if (!res.ok) await this.handleError(res);
     const result = await res.json()
-    return this.mapAttendance(result.data, schoolId)
+    return attendance.mapAttendance(result.data, schoolId)
   }
 
   async getAttendanceByStudent(studentId: string, schoolId: string): Promise<AttendanceRecord[]> {
@@ -351,74 +151,37 @@ class Database {
       })
       if (!res.ok) return []
       const result = await res.json()
-      return result.data.map((r: any) => this.mapAttendance(r, schoolId))
+      return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
     } catch (error) {
       console.error("[pg] getAttendanceByStudent error:", error)
       return []
     }
   }
 
-  private mapAttendance(r: any, schoolId: string): AttendanceRecord {
-    return {
-      ...r,
-      attendance_date: (r.date || r.attendance_date || "").split("T")[0],
-      student_id: r.studentId || r.student_id,
-      schoolId: schoolId,
-      created_at: r.createdAt || r.created_at || new Date().toISOString(),
-    }
-  }
-
   // ─── SETTINGS ─────────────────────────────────────────────────────────────
   async getSettings(): Promise<any> {
-    try {
-      const schoolId = this.getSchoolId()
-      if (!schoolId) return this.defaultSettings()
-      const res = await fetch(`${API_URL}/api/settings?_t=${Date.now()}`, { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      })
-      if (!res.ok) return this.defaultSettings()
-      const result = await res.json()
-      const s = result.data
-      return {
-        schoolName: s.school_name || "Zetime School",
-        schoolPhone: s.school_phone || "",
-        schoolAddress: s.school_address || "",
-        academicYear: s.academic_year || new Date().getFullYear().toString(),
-        attendanceMode: s.attendance_mode || "session_based",
-        attendanceUiType: s.attendance_ui_type || "card_based",
-        attendanceThreshold: s.attendance_threshold ?? 75,
-        allowLateMark: s.allow_late_mark ?? true,
-        emailNotifications: s.email_notifications ?? true,
-        smsNotifications: s.sms_notifications ?? false,
-        notificationTime: s.notification_time || "16:00",
-        schoolLogo: s.school_logo || "",
-      }
-    } catch (error) {
-      console.error("[pg] getSettings error:", error)
-      return this.defaultSettings()
-    }
+    return settings.getSettings(this.getApiHeaders(), this.getSchoolId())
   }
 
-  async updateSettings(settings: any): Promise<void> {
+  async updateSettings(settingsData: any): Promise<void> {
     const schoolId = this.getSchoolId()
     if (!schoolId) return
     await fetch(`${API_URL}/api/settings`, {
       method: "PUT",
       headers: this.getApiHeaders(),
       body: JSON.stringify({
-        school_name: settings.schoolName,
-        school_phone: settings.schoolPhone,
-        school_address: settings.schoolAddress,
-        academic_year: settings.academicYear,
-        attendance_mode: settings.attendanceMode,
-        attendance_ui_type: settings.attendanceUiType,
-        attendance_threshold: settings.attendanceThreshold,
-        allow_late_mark: settings.allowLateMark,
-        email_notifications: settings.emailNotifications,
-        sms_notifications: settings.smsNotifications,
-        notification_time: settings.notificationTime,
-        school_logo: settings.schoolLogo,
+        school_name: settingsData.schoolName,
+        school_phone: settingsData.schoolPhone,
+        school_address: settingsData.schoolAddress,
+        academic_year: settingsData.academicYear,
+        attendance_mode: settingsData.attendanceMode,
+        attendance_ui_type: settingsData.attendanceUiType,
+        attendance_threshold: settingsData.attendanceThreshold,
+        allow_late_mark: settingsData.allowLateMark,
+        email_notifications: settingsData.emailNotifications,
+        sms_notifications: settingsData.smsNotifications,
+        notification_time: settingsData.notificationTime,
+        school_logo: settingsData.schoolLogo,
       }),
     })
   }
@@ -429,42 +192,13 @@ class Database {
     await fetch(`${API_URL}/api/settings`, {
       method: "PUT",
       headers: this.getApiHeaders(),
-      body: JSON.stringify(this.defaultSettings()),
+      body: JSON.stringify(settings.defaultSettings()),
     })
-  }
-
-  private defaultSettings() {
-    return {
-      schoolName: "Setup Required",
-      schoolPhone: "",
-      schoolAddress: "",
-      academicYear: new Date().getFullYear().toString(),
-      attendanceMode: "session_based",
-      attendanceUiType: "card_based",
-      attendanceThreshold: 75,
-      allowLateMark: true,
-      emailNotifications: true,
-      smsNotifications: false,
-      notificationTime: "16:00",
-    }
   }
 
   // ─── TEACHERS ─────────────────────────────────────────────────────────────
   async getTeachers(): Promise<any[]> {
-    try {
-      const schoolId = this.getSchoolId()
-      if (!schoolId) return []
-      const res = await fetch(`${API_URL}/api/users?_t=${Date.now()}`, { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      })
-      if (!res.ok) return []
-      const result = await res.json()
-      return result.data.filter((u: any) => u.role === "teacher")
-    } catch (error) {
-      console.error("[pg] getTeachers error:", error)
-      return []
-    }
+    return teachers.getTeachers(this.getApiHeaders())
   }
 
   async createTeacher(teacherData: any): Promise<any> {
@@ -502,37 +236,7 @@ class Database {
 
   // ─── TEACHER ASSIGNMENTS ──────────────────────────────────────────────────
   async getTeacherAssignments(schoolId?: string, teacherId?: string): Promise<TeacherAssignment[]> {
-    try {
-      const sid = schoolId || this.getSchoolId()
-      if (!sid) return []
-      const params = teacherId ? `?teacherId=${teacherId}` : ""
-      const separator = params ? '&' : '?'
-      const res = await fetch(`${API_URL}/api/assignments${params}${separator}_t=${Date.now()}`, {
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      })
-      if (!res.ok) return []
-      const result = await res.json()
-      return result.data.map((a: any) => ({
-        id: a.id,
-        teacher_id: a.teacher_id,
-        schoolId: a.schoolId,
-        grade: a.grade,
-        section: a.section,
-        subject: a.subject,
-        stream: a.stream,
-        class_id: a.id,
-        teacher: a.teacher ? {
-          id: a.teacher.id,
-          full_name: a.teacher.full_name || a.teacher.name,
-          email: a.teacher.email,
-          profile_photo: a.teacher.profile_photo,
-        } : undefined,
-      }))
-    } catch (error) {
-      console.error("[pg] getTeacherAssignments error:", error)
-      return []
-    }
+    return teachers.getTeacherAssignments(this.getApiHeaders(), schoolId || this.getSchoolId(), teacherId)
   }
 
   async assignTeacherToClass(
@@ -560,7 +264,6 @@ class Database {
       throw error
     }
   }
-
 
   async removeTeacherAssignment(assignmentId: string): Promise<void> {
     const res = await fetch(`${API_URL}/api/assignments/${assignmentId}`, {
@@ -618,8 +321,6 @@ class Database {
     } catch { return [] }
   }
 
-
-  // ─── USERS / AUTH HELPERS ─────────────────────────────────────────────────
   async getUserByEmail(email: string): Promise<any> {
     try {
       const res = await fetch(`${API_URL}/api/users/by-email?email=${encodeURIComponent(email)}`)
@@ -656,26 +357,6 @@ class Database {
     } catch { return false }
   }
 
-  async storePasswordResetToken(_userId: string, _tokenHash: string, _expiresAt: Date): Promise<boolean> {
-    return true // TODO: implement in PostgreSQL
-  }
-
-  async verifyResetToken(_email: string, _token: string): Promise<{ valid: boolean; userId?: string }> {
-    return { valid: true } // TODO: implement in PostgreSQL
-  }
-
-  async getEmailSettings(): Promise<any> {
-    return this.getSettings()
-  }
-
-  async updateEmailSettings(settings: any): Promise<any> {
-    return this.updateSettings(settings)
-  }
-
-  async clearAllData(): Promise<void> {
-    console.warn("[pg] clearAllData not supported in PostgreSQL mode")
-  }
-
   async initializeSchoolData(schoolId: string | number): Promise<void> {
     this.setSchoolId(schoolId)
     console.log("[pg] School session initialized:", this.currentSchoolId)
@@ -695,53 +376,21 @@ class Database {
 
   // ─── ANALYTICS ────────────────────────────────────────────────────────────
   async getAttendanceSummaryStats(filters: any = {}): Promise<any> {
-    try {
-      const settings = await this.getSettings()
-      const query = new URLSearchParams({ 
-        ...filters, 
-        mode: settings.attendanceMode,
-        _t: Date.now().toString() 
-      }).toString()
-      const res = await fetch(`${API_URL}/api/attendance-analytics/summary?${query}`, { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      })
-      if (!res.ok) return null
-      const result = await res.json()
-      return result.data
-    } catch (error) {
-      console.error("[pg] getAttendanceSummaryStats error:", error)
-      return null
-    }
+    const settingsData = await this.getSettings()
+    return analytics.getAttendanceSummaryStats(this.getApiHeaders(), { ...filters, mode: settingsData.attendanceMode })
   }
 
   async getAttendanceGradeStats(filters: any = {}): Promise<any[]> {
-    try {
-      const settings = await this.getSettings()
-      const query = new URLSearchParams({ 
-        ...filters, 
-        mode: settings.attendanceMode,
-        _t: Date.now().toString() 
-      }).toString()
-      const res = await fetch(`${API_URL}/api/attendance-analytics/grade-stats?${query}`, { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      })
-      if (!res.ok) return []
-      const result = await res.json()
-      return result.data
-    } catch (error) {
-      console.error("[pg] getAttendanceGradeStats error:", error)
-      return []
-    }
+    const settingsData = await this.getSettings()
+    return analytics.getAttendanceGradeStats(this.getApiHeaders(), { ...filters, mode: settingsData.attendanceMode })
   }
 
   async getAttendanceTrendStats(filters: any = {}): Promise<any[]> {
     try {
-      const settings = await this.getSettings()
+      const settingsData = await this.getSettings()
       const query = new URLSearchParams({ 
         ...filters, 
-        mode: settings.attendanceMode,
+        mode: settingsData.attendanceMode,
         _t: Date.now().toString() 
       }).toString()
       const res = await fetch(`${API_URL}/api/attendance-analytics/trends?${query}`, { 
@@ -759,10 +408,10 @@ class Database {
 
   async getAttendanceDrillDownStats(gradeId: string, filters: any = {}): Promise<any[]> {
     try {
-      const settings = await this.getSettings()
+      const settingsData = await this.getSettings()
       const query = new URLSearchParams({ 
         ...filters, 
-        mode: settings.attendanceMode,
+        mode: settingsData.attendanceMode,
         _t: Date.now().toString() 
       }).toString()
       const res = await fetch(`${API_URL}/api/attendance-analytics/drill-down/${gradeId}?${query}`, { 
@@ -780,10 +429,10 @@ class Database {
 
   async exportAttendanceReport(filters: any = {}): Promise<Blob | null> {
     try {
-      const settings = await this.getSettings()
+      const settingsData = await this.getSettings()
       const query = new URLSearchParams({ 
         ...filters, 
-        mode: settings.attendanceMode,
+        mode: settingsData.attendanceMode,
         format: 'csv', 
         _t: Date.now().toString() 
       }).toString()
@@ -801,49 +450,15 @@ class Database {
 
   // ─── CALLS & CONTACTS ─────────────────────────────────────────────────────
   async getContacts(): Promise<any[]> {
-    try {
-      const res = await fetch(`${API_URL}/api/users/contacts`, { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      })
-      if (!res.ok) return []
-      const result = await res.json()
-      return result.data
-    } catch (error) {
-      console.error("[pg] getContacts error:", error)
-      return []
-    }
+    return calls.getContacts(this.getApiHeaders())
   }
 
   async logCall(data: { recipientId: string, type: 'VOICE' | 'VIDEO', status: string, duration?: number }): Promise<any> {
-    try {
-      const res = await fetch(`${API_URL}/api/calls/log`, {
-        method: "POST",
-        headers: this.getApiHeaders(),
-        body: JSON.stringify(data),
-      })
-      if (!res.ok) return null
-      const result = await res.json()
-      return result.data
-    } catch (error) {
-      console.error("[pg] logCall error:", error)
-      return null
-    }
+    return calls.logCall(this.getApiHeaders(), data)
   }
 
   async getCallHistoryApi(): Promise<any[]> {
-    try {
-      const res = await fetch(`${API_URL}/api/calls/history`, { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      })
-      if (!res.ok) return []
-      const result = await res.json()
-      return result.data
-    } catch (error) {
-      console.error("[pg] getCallHistory error:", error)
-      return []
-    }
+    return calls.getCallHistoryApi(this.getApiHeaders())
   }
 }
 

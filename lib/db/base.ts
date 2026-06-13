@@ -17,7 +17,7 @@ export class BaseDatabase {
     return this.currentSchoolId || ""
   }
 
-  protected getCurrentUser(): any {
+  public getCurrentUser(): any {
     if (typeof window === "undefined") return null
     try {
       const data = localStorage.getItem("attendance_current_user")

@@ -19,10 +19,10 @@ export function EmailSettings() {
 
   useEffect(() => {
     const loadSettings = async () => {
-      const settings = await db.getEmailSettings()
+      const settings = await db.getSettings()
       if (settings) {
-        setApiKey(settings.api_key || "")
-        setFromDomain(settings.from_domain || "smartattenadacetracker.app")
+        setApiKey(settings.email_api_key || "")
+        setFromDomain(settings.email_from_domain || "smartattenadacetracker.app")
       }
     }
     loadSettings()
@@ -80,9 +80,9 @@ export function EmailSettings() {
     }
 
     try {
-      await db.updateEmailSettings({
-        api_key: apiKey.trim(),
-        from_domain: fromDomain.trim(),
+      await db.updateSettings({
+        email_api_key: apiKey.trim(),
+        email_from_domain: fromDomain.trim(),
       })
 
       toast({

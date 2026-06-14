@@ -5,8 +5,7 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   output: 'standalone',
-  turbopack: {},
-  allowedDevOrigins: ['192.168.1.133'],
+  allowedDevOrigins: ['192.168.1.133', '192.168.1.3'],
   images: {
     unoptimized: true,
   },
@@ -48,9 +47,6 @@ const nextConfig = {
     buildActivityPosition: 'bottom-right',
   },
   reactStrictMode: false, // Disable strict mode in dev to reduce double-loading of chunks
-  webpack: (config, { dev, isServer }) => {
-    return config
-  },
 }
 
 export default nextConfig

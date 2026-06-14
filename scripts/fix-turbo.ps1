@@ -32,6 +32,7 @@ function Force-Delete-Directory($path) {
 
 Force-Delete-Directory ".next"
 Force-Delete-Directory ".next_dev"
+Force-Delete-Directory ".next_dev_v2"
 Force-Delete-Directory "node_modules/.cache/turbo"
 
 Write-Host "--- ALL CACHES CLEARED ---" -ForegroundColor Green

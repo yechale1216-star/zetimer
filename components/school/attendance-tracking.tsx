@@ -482,15 +482,15 @@ export function AttendanceTracking() {
   const getStatusColor = (status: string | null) => {
     switch (status) {
       case "present":
-        return "bg-emerald-50/50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30 font-medium"
+        return "bg-emerald-600 text-white border-emerald-700 dark:bg-emerald-500 shadow-sm font-semibold scale-[1.02]"
       case "late":
-        return "bg-amber-50/50 text-amber-600 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30 font-medium"
+        return "bg-amber-500 text-white border-amber-600 dark:bg-amber-500 shadow-sm font-semibold scale-[1.02]"
       case "absent":
-        return "bg-rose-50/50 text-rose-600 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30 font-medium"
+        return "bg-rose-600 text-white border-rose-700 dark:bg-rose-500 shadow-sm font-semibold scale-[1.02]"
       case "excused":
-        return "bg-sky-50/50 text-sky-600 border-sky-100 dark:bg-sky-950/20 dark:text-sky-400 dark:border-sky-900/30 font-medium"
+        return "bg-sky-600 text-white border-sky-700 dark:bg-sky-500 shadow-sm font-semibold scale-[1.02]"
       default:
-        return "bg-slate-50/50 text-slate-600 border-slate-100 dark:bg-slate-900/20 dark:text-slate-400 dark:border-slate-800 font-medium"
+        return "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 font-medium"
     }
   }
 
@@ -931,7 +931,10 @@ export function AttendanceTracking() {
                         className={`typography-label capitalize h-10 rounded-xl text-[11px] uppercase ${ attendance.status === status ? getStatusColor(status) : "bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700" } transition-all active:scale-95`}
                         onClick={() => updateAttendance(student.id, status)}
                       >
-                        {status}
+                        <div className="flex items-center gap-1">
+                          {attendance.status === status && <Check className="w-3 h-3" />}
+                          {status}
+                        </div>
                       </Button>
                     ))}
                   </div>
@@ -1038,7 +1041,10 @@ export function AttendanceTracking() {
                               className={`typography-helper capitalize h-8 px-3 ${ attendance.status === status ? getStatusColor(status) : "" } hover:scale-105 transition-transform`}
                               onClick={() => updateAttendance(student.id, status)}
                             >
-                              {status}
+                              <div className="flex items-center gap-1">
+                                {attendance.status === status && <Check className="w-3 h-3" />}
+                                {status}
+                              </div>
                             </Button>
                           ))}
                         </div>

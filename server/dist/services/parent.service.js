@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateProfile = exports.searchParentByPhone = exports.checkParentsExist = exports.findOrCreateParentByPhone = exports.normalizePhoneNumber = exports.updatePassword = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllNotificationsAsRead = exports.deleteNotification = exports.markNotificationAsRead = exports.getNotifications = exports.loginParent = exports.validateSchoolAccess = exports.getParentSchools = exports.listParentSchools = void 0;
+exports.updateProfile = exports.searchParentByPhone = exports.checkParentsExist = exports.findOrCreateParentByPhone = exports.normalizePhoneNumber = exports.updatePassword = exports.getSchoolAnnouncements = exports.updateAnnouncement = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllNotificationsAsRead = exports.deleteNotification = exports.markNotificationAsRead = exports.getNotifications = exports.loginParent = exports.validateSchoolAccess = exports.getParentSchools = exports.listParentSchools = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jwt_1 = require("../utils/jwt");
@@ -307,6 +307,28 @@ const postAnnouncement = async (schoolId, data) => {
     });
 };
 exports.postAnnouncement = postAnnouncement;
+const updateAnnouncement = async (id, schoolId, data) => {
+    return await db_1.default.parentNotification.update({
+        where: { id, schoolId },
+        data: {
+            title: data.title,
+            message: data.message,
+            type: data.type || "announcement",
+        }
+    });
+};
+exports.updateAnnouncement = updateAnnouncement;
+const getSchoolAnnouncements = async (schoolId) => {
+    return await db_1.default.parentNotification.findMany({
+        where: {
+            schoolId,
+            type: { in: ["announcement", "emergency"] },
+            studentId: null // General announcements
+        },
+        orderBy: { createdAt: 'desc' }
+    });
+};
+exports.getSchoolAnnouncements = getSchoolAnnouncements;
 const updatePassword = async (phone, currentPassword, newPassword, schoolId) => {
     // Use global phone lookup — parents are global entities, not school-scoped in the User table
     const cleanPhone = (0, exports.normalizePhoneNumber)(phone);
@@ -472,9 +494,12 @@ const searchParentByPhone = async (phone, schoolId) => {
     if (user) {
         return { success: true, data: user };
     }
-    // Fallback: Search Student table for legacy parent info
+    // Fallback: Search Student table for legacy parent info within THIS school
     const legacyStudent = await db_1.default.student.findFirst({
-        where: { parent_phone: { in: phoneVariations } },
+        where: {
+            parent_phone: { in: phoneVariations },
+            schoolId: schoolId
+        },
         select: { parent_name: true, parent_email: true, parent_phone: true, address: true }
     });
     if (legacyStudent) {

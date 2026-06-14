@@ -36,23 +36,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const parentController = __importStar(require("../controllers/parent.controller"));
 const router = (0, express_1.Router)();
-// Authentication / Verification
-router.get('/schools', parentController.listParentSchools);
-router.post('/login', parentController.loginParent);
-router.post('/update-password', parentController.updatePassword);
-router.get('/search', parentController.searchParent);
-router.post('/check-batch', parentController.checkParentsBatch);
-// Notifications & Announcements
-router.get('/notifications/:phone', parentController.getNotifications);
-router.patch('/notifications/:id/read', parentController.markAsRead);
-router.delete('/notifications/:id', parentController.deleteNotification);
-router.patch('/notifications/read-all/:phone', parentController.markAllAsRead);
-// Preferences
-router.get('/preferences/:phone', parentController.getPreferences);
-router.put('/preferences/:phone', parentController.updatePreferences);
-// Profile
-router.put('/profile/:phone', parentController.updateProfile);
-// Multi-school context — authenticated, server-validated
-router.get('/me/schools', parentController.getMySchools);
-router.post('/me/active-school', parentController.setActiveSchool);
+// These routes are authenticated via tenantMiddleware
+router.get('/', parentController.getAnnouncements);
+router.post('/', parentController.postAnnouncement);
+router.put('/:id', parentController.updateAnnouncement);
 exports.default = router;

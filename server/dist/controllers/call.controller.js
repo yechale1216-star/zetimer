@@ -33,26 +33,38 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = require("express");
-const parentController = __importStar(require("../controllers/parent.controller"));
-const router = (0, express_1.Router)();
-// Authentication / Verification
-router.get('/schools', parentController.listParentSchools);
-router.post('/login', parentController.loginParent);
-router.post('/update-password', parentController.updatePassword);
-router.get('/search', parentController.searchParent);
-router.post('/check-batch', parentController.checkParentsBatch);
-// Notifications & Announcements
-router.get('/notifications/:phone', parentController.getNotifications);
-router.patch('/notifications/:id/read', parentController.markAsRead);
-router.delete('/notifications/:id', parentController.deleteNotification);
-router.patch('/notifications/read-all/:phone', parentController.markAllAsRead);
-// Preferences
-router.get('/preferences/:phone', parentController.getPreferences);
-router.put('/preferences/:phone', parentController.updatePreferences);
-// Profile
-router.put('/profile/:phone', parentController.updateProfile);
-// Multi-school context — authenticated, server-validated
-router.get('/me/schools', parentController.getMySchools);
-router.post('/me/active-school', parentController.setActiveSchool);
-exports.default = router;
+exports.getCallHistory = exports.logCall = void 0;
+const callService = __importStar(require("../services/call.service"));
+const logCall = async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        const userId = req.user?.id;
+        if (!schoolId || !userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+        const call = await callService.logCall({
+            ...req.body,
+            schoolId,
+            userId
+        });
+        res.status(201).json({ success: true, data: call });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.logCall = logCall;
+const getCallHistory = async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId) {
+            return res.status(401).json({ success: false, message: 'School ID required' });
+        }
+        const history = await callService.getCallHistory(schoolId, req.query.userId);
+        res.status(200).json({ success: true, data: history });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getCallHistory = getCallHistory;

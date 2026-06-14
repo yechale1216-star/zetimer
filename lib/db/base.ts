@@ -13,6 +13,11 @@ export class BaseDatabase {
     const user = this.getCurrentUser()
     if (user?.schoolId) {
       this.currentSchoolId = String(user.schoolId)
+    } else if (typeof window !== "undefined") {
+      const storedId = localStorage.getItem("x-school-id")
+      if (storedId) {
+        this.currentSchoolId = storedId
+      }
     }
     return this.currentSchoolId || ""
   }

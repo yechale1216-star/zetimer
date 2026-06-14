@@ -12,8 +12,9 @@ const isE = (s) => s?.toLowerCase() === 'excused';
 const isA = (s) => s?.toLowerCase() === 'absent';
 const isAttendance = (s) => isP(s) || isL(s);
 const getAttendanceSummary = async (schoolId, filters) => {
-    const { startDate, endDate, academicYear, session, grade, section, stream } = filters;
+    const { startDate, endDate, academicYear, session, grade, section, stream, mode } = filters;
     const isFullDay = !session || session === 'total';
+    const isSessionMode = mode === 'session_based';
     const where = { schoolId };
     if (startDate || endDate) {
         where.date = {};
@@ -42,10 +43,13 @@ const getAttendanceSummary = async (schoolId, filters) => {
             where,
             select: { studentId: true, date: true, session: true, status: true }
         });
-        const hasAnySessionRecords = allRecords.some(r => r.session);
         const byStudentDate = {};
         allRecords.forEach(rec => {
-            if (hasAnySessionRecords && !rec.session)
+            const recHasSession = !!rec.session;
+            // Strict mode isolation
+            if (isSessionMode && !recHasSession)
+                return;
+            if (!isSessionMode && recHasSession)
                 return;
             const dateStr = rec.date.toISOString().split('T')[0];
             const key = `${rec.studentId}||${dateStr}`;
@@ -137,8 +141,9 @@ const getAttendanceSummary = async (schoolId, filters) => {
 };
 exports.getAttendanceSummary = getAttendanceSummary;
 const getGradeStats = async (schoolId, filters) => {
-    const { startDate, endDate, session, grade, section, stream } = filters;
+    const { startDate, endDate, session, grade, section, stream, mode } = filters;
     const isFullDay = !session || session === 'total';
+    const isSessionMode = mode === 'session_based';
     const where = { schoolId };
     if (startDate || endDate) {
         where.date = {};
@@ -169,10 +174,12 @@ const getGradeStats = async (schoolId, filters) => {
         where,
         select: { studentId: true, status: true, date: true, session: true }
     });
-    const hasAnySessionRecords = attendance.some(r => r.session);
     const attendanceMap = {};
     attendance.forEach(rec => {
-        if (hasAnySessionRecords && !rec.session)
+        const recHasSession = !!rec.session;
+        if (isSessionMode && !recHasSession)
+            return;
+        if (!isSessionMode && recHasSession)
             return;
         if (!attendanceMap[rec.studentId])
             attendanceMap[rec.studentId] = [];
@@ -268,8 +275,9 @@ const getGradeStats = async (schoolId, filters) => {
 };
 exports.getGradeStats = getGradeStats;
 const getAttendanceTrends = async (schoolId, filters) => {
-    const { startDate, endDate, grade, section, stream, session } = filters;
+    const { startDate, endDate, grade, section, stream, session, mode } = filters;
     const isFullDay = !session || session === 'total';
+    const isSessionMode = mode === 'session_based';
     const where = { schoolId };
     if (startDate || endDate) {
         where.date = {};
@@ -294,10 +302,12 @@ const getAttendanceTrends = async (schoolId, filters) => {
         select: { studentId: true, date: true, session: true, status: true },
         orderBy: { date: 'asc' }
     });
-    const hasAnySessionRecords = allRecords.some(r => r.session);
     const byDateStudent = {};
     allRecords.forEach(rec => {
-        if (isFullDay && hasAnySessionRecords && !rec.session)
+        const recHasSession = !!rec.session;
+        if (isSessionMode && !recHasSession)
+            return;
+        if (!isSessionMode && recHasSession)
             return;
         const dateStr = rec.date.toISOString().split('T')[0];
         if (!byDateStudent[dateStr])
@@ -342,7 +352,8 @@ const getAttendanceTrends = async (schoolId, filters) => {
 };
 exports.getAttendanceTrends = getAttendanceTrends;
 const getDrillDownStats = async (schoolId, gradeId, filters) => {
-    const { startDate, endDate, sectionId, streamId } = filters;
+    const { startDate, endDate, sectionId, streamId, mode } = filters;
+    const isSessionMode = mode === 'session_based';
     const where = {
         schoolId,
         gradeId,
@@ -375,10 +386,12 @@ const getDrillDownStats = async (schoolId, gradeId, filters) => {
             excused: 0,
             absent: 0,
         };
-        const hasAnySessionRecords = student.attendance.some(r => r.session);
         const byDate = {};
         student.attendance.forEach(rec => {
-            if (hasAnySessionRecords && !rec.session)
+            const recHasSession = !!rec.session;
+            if (isSessionMode && !recHasSession)
+                return;
+            if (!isSessionMode && recHasSession)
                 return;
             const dStr = rec.date.toISOString().split('T')[0];
             if (!byDate[dStr])

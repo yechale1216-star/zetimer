@@ -37,8 +37,8 @@ export function EmailStatus() {
 
   const checkEmailStatus = async () => {
     try {
-      const settings = await db.getEmailSettings()
-      const configured = !!settings?.api_key
+      const settings = await db.getSettings()
+      const configured = !!settings?.email_api_key
       
       setEmailStatus({
         configured,
@@ -61,8 +61,8 @@ export function EmailStatus() {
     setTestResult(null)
 
     try {
-      const settings = await db.getEmailSettings()
-      const isConfigured = !!settings?.api_key
+      const settings = await db.getSettings()
+      const isConfigured = !!settings?.email_api_key
 
       // Mock behavior
       setTimeout(() => {

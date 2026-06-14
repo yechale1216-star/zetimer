@@ -53,10 +53,11 @@ const startOnboarding = async (data) => {
     if (existingUser) {
         throw new Error('An account with this email already exists.');
     }
-    // 2. Atomic Transaction for School and Admin Creation
+    // 2. Generate a unique School ID (outside transaction to avoid connection deadlock)
+    const customId = await (0, school_id_1.generateSchoolId)();
+    // 3. Atomic Transaction for School and Admin Creation
     return await db_1.default.$transaction(async (tx) => {
         // A. Create the School
-        const customId = await (0, school_id_1.generateSchoolId)();
         const school = await tx.school.create({
             data: {
                 name: schoolName,
@@ -129,6 +130,8 @@ const startOnboarding = async (data) => {
                 generatedPassword: adminPassword ? undefined : rawPassword
             }
         };
+    }, {
+        timeout: 15000
     });
 };
 exports.startOnboarding = startOnboarding;

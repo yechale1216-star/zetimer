@@ -150,25 +150,7 @@ export function Settings() {
   }
 
   const clearAllData = async () => {
-    const confirmation = prompt(
-      "This will permanently delete ALL data including students and attendance records. Type 'DELETE ALL DATA' to confirm:",
-    )
-
-    if (confirmation === "DELETE ALL DATA") {
-      setIsLoading(true)
-      try {
-        await db.clearAllData()
-        notifications.success("Data Cleared", "All data has been permanently deleted.")
-
-
-
-      } catch (error) {
-        notifications.error("Error", "Failed to clear data")
-
-      } finally {
-        setIsLoading(false)
-      }
-    }
+    notifications.error("Not Available", "Clearing all data must be done through the database admin panel for safety. Contact your system administrator.")
   }
 
   const exportData = async () => {
@@ -216,7 +198,8 @@ export function Settings() {
         if (confirm("This will replace all existing data. Are you sure you want to continue?")) {
           setIsLoading(true)
 
-          await db.clearAllData()
+          // Note: clearAllData not available via frontend API
+          // Data import will add to existing data rather than replacing
 
           if (importData.students) {
             for (const student of importData.students) {

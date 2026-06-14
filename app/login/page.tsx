@@ -117,7 +117,7 @@ function LoginContent() {
             <img
               src="/zetime_branding_professional.png"
               alt="Ethiopian School Attendance Analysis"
-              className="w-full aspect-video object-cover"
+              className="w-full aspect-[16/11] object-cover"
             />
           </div>
         </div>

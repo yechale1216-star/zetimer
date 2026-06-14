@@ -88,9 +88,11 @@ export function PWAInstall() {
         })
 
       // Listen for controller change (new SW activated)
+      /* 
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         window.location.reload()
       })
+      */
     }
 
     // Show a one-time reminder notification on mount if not installed

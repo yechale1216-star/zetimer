@@ -109,7 +109,12 @@ const initSocket = (server) => {
                         },
                     },
                 });
-                io.to(data.conversationId).emit('new_message', message);
+                // Broadcast to everyone in the conversation, including the sender
+                // We include tempId so the sender can replace their optimistic message
+                io.to(data.conversationId).emit('new_message', {
+                    ...message,
+                    tempId: data.tempId
+                });
                 await prisma.conversation.update({
                     where: { id: data.conversationId }, // schoolId check already done above
                     data: { updatedAt: new Date() },

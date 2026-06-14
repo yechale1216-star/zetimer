@@ -36,10 +36,12 @@ export const startOnboarding = async (data: OnboardingData) => {
     throw new Error('An account with this email already exists.');
   }
 
-  // 2. Atomic Transaction for School and Admin Creation
+  // 2. Generate a unique School ID (outside transaction to avoid connection deadlock)
+  const customId = await generateSchoolId();
+
+  // 3. Atomic Transaction for School and Admin Creation
   return await prisma.$transaction(async (tx) => {
     // A. Create the School
-    const customId = await generateSchoolId();
     const school = await tx.school.create({
       data: {
         name: schoolName,
@@ -119,6 +121,8 @@ export const startOnboarding = async (data: OnboardingData) => {
         generatedPassword: adminPassword ? undefined : rawPassword
       }
     };
+  }, {
+    timeout: 15000
   });
 };
 

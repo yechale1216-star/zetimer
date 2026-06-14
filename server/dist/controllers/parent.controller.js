@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkParentsBatch = exports.setActiveSchool = exports.getMySchools = exports.updateProfile = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.deleteNotification = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = exports.listParentSchools = void 0;
+exports.checkParentsBatch = exports.setActiveSchool = exports.getMySchools = exports.updateProfile = exports.updateAnnouncement = exports.getAnnouncements = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.deleteNotification = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = exports.listParentSchools = void 0;
 const parentService = __importStar(require("../services/parent.service"));
 const listParentSchools = async (req, res, next) => {
     try {
@@ -199,6 +199,33 @@ const postAnnouncement = async (req, res, next) => {
     }
 };
 exports.postAnnouncement = postAnnouncement;
+const getAnnouncements = async (req, res, next) => {
+    try {
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const announcements = await parentService.getSchoolAnnouncements(schoolId);
+        res.status(200).json({ success: true, data: announcements });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getAnnouncements = getAnnouncements;
+const updateAnnouncement = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const schoolId = req.user?.schoolId;
+        if (!schoolId)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        const announcement = await parentService.updateAnnouncement(id, schoolId, req.body);
+        res.status(200).json({ success: true, data: announcement, message: "Announcement updated." });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.updateAnnouncement = updateAnnouncement;
 const updateProfile = async (req, res, next) => {
     try {
         const schoolId = req.headers['x-school-id'] || req.user?.schoolId;

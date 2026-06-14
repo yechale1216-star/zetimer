@@ -87,12 +87,16 @@ router.post('/login', async (req, res, next) => {
         if (!email || !password) {
             return res.status(400).json({ success: false, message: 'Email and password are required' });
         }
+        console.log(`[LOGIN] Attempt for email: ${email}`);
+        fs_1.default.appendFileSync(path_1.default.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Login attempt for: ${email}\n`);
         const user = await userService.getUserByEmail(email);
         if (!user) {
+            console.log(`[LOGIN] User not found: ${email}`);
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
         const valid = userService.verifyPassword(password, user.password_hash);
         if (!valid) {
+            console.log(`[LOGIN] Invalid password for: ${email}`);
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
         let customSchoolId = '';

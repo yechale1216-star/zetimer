@@ -309,7 +309,7 @@ function ProfileStep({
 }: {
   data: OnboardingData
   update: (p: Partial<OnboardingData>) => void
-  fileInputRef: React.RefObject<HTMLInputElement>
+  fileInputRef: React.RefObject<HTMLInputElement | null>
   onLogoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
 }) {
   return (

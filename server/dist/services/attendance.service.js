@@ -104,8 +104,18 @@ const getAttendance = async (filters, schoolId) => {
             where.date.lte = new Date(`${dateStr}T23:59:59.999Z`);
         }
     }
-    if (session)
-        where.session = session;
+    // Strict session isolation:
+    // "none"  → daily mode  → WHERE session IS NULL  (only daily records)
+    // "morning"/"afternoon" → session mode → WHERE session = value (only that session's records)
+    // undefined/not sent   → no filter (all records, used by reports/analytics)
+    if (session !== undefined && session !== null) {
+        if (session === 'none') {
+            where.session = null; // daily mode: fetch records with no session
+        }
+        else {
+            where.session = session; // session mode: fetch only that session
+        }
+    }
     if (grade || section) {
         where.student = { schoolId };
         if (grade)
@@ -127,9 +137,19 @@ const getAttendance = async (filters, schoolId) => {
     });
 };
 exports.getAttendance = getAttendance;
-const getAttendanceByStudent = async (studentId, schoolId) => {
+const getAttendanceByStudent = async (studentId, schoolId, filters = {}) => {
+    const { session } = filters;
+    const where = { studentId, schoolId };
+    if (session !== undefined && session !== null) {
+        if (session === 'none') {
+            where.session = null;
+        }
+        else {
+            where.session = session;
+        }
+    }
     return await db_1.default.attendance.findMany({
-        where: { studentId, schoolId },
+        where,
         orderBy: { date: 'desc' },
     });
 };

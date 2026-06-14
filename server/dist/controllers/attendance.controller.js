@@ -73,7 +73,7 @@ const getAttendanceByStudent = async (req, res, next) => {
         if (!schoolId) {
             return res.status(401).json({ success: false, message: 'School ID context missing' });
         }
-        const result = await attendanceService.getAttendanceByStudent(req.params.studentId, schoolId);
+        const result = await attendanceService.getAttendanceByStudent(req.params.studentId, schoolId, req.query);
         res.status(200).json({ success: true, data: result });
     }
     catch (error) {

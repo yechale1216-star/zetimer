@@ -55,6 +55,8 @@ const subscription_routes_1 = __importDefault(require("./routes/subscription.rou
 const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
 const super_admin_routes_1 = __importDefault(require("./routes/super-admin.routes"));
 const group_routes_1 = __importDefault(require("./routes/group.routes"));
+const announcement_routes_1 = __importDefault(require("./routes/announcement.routes"));
+const call_routes_1 = __importDefault(require("./routes/call.routes"));
 const tenant_middleware_1 = require("./middleware/tenant.middleware");
 const maintenance_middleware_1 = require("./middleware/maintenance.middleware");
 const parentController = __importStar(require("./controllers/parent.controller"));
@@ -102,6 +104,8 @@ app.use('/api/attendance-analytics', attendance_analytics_routes_1.default);
 app.use('/api/messages', message_routes_1.default);
 app.use('/api/groups', group_routes_1.default);
 app.use('/api/promotions', promotion_routes_1.default);
+app.use('/api/announcements', announcement_routes_1.default);
+app.use('/api/calls', call_routes_1.default);
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);

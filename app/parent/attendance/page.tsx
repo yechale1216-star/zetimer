@@ -26,7 +26,8 @@ import { db } from "@/lib/db/database"
 import { toEthiopianDate, ET_MONTHS_AM, ET_MONTHS_EN } from "@/lib/utils/ethiopian-calendar"
 import { useRef } from "react"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://zetimer-ctgw.onrender.com"
+import { apiUrl } from "@/lib/api-config"
+const API_URL = apiUrl;
 
 export default function AttendanceHistory() {
   const { t, language } = useLanguage()

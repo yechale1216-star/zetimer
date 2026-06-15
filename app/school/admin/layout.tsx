@@ -19,7 +19,8 @@ import { CallProvider } from '@/components/providers/call-provider'
 import { Logo } from '@/components/logo'
 import { TopNav } from '@/components/layout/top-nav'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://zetimer-ctgw.onrender.com'
+import { apiUrl } from '@/lib/api-config'
+const API_URL = apiUrl;
 
 function SuspendedBanner() {
   const [isSuspended, setIsSuspended] = React.useState(false)

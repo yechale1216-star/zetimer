@@ -20,6 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useLanguage } from '@/lib/context/language-context';
 import { cn } from '@/lib/utils/utils';
+import { apiUrl } from '@/lib/api-config';
 
 interface User {
   id: string;
@@ -65,7 +66,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     try {
       const token = localStorage.getItem('attendance_token');
       const schoolId = localStorage.getItem('x-school-id');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://zetimer-ctgw.onrender.com'}/api/users/contacts`, {
+      const res = await fetch(`${apiUrl}/api/users/contacts`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'x-school-id': schoolId || ''
@@ -124,7 +125,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     try {
       const token = localStorage.getItem('attendance_token');
       const schoolId = localStorage.getItem('x-school-id');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://zetimer-ctgw.onrender.com'}/api/groups`, {
+      const res = await fetch(`${apiUrl}/api/groups`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { appUrl } from "@/lib/api-config"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -6,8 +7,6 @@ export async function GET(request: Request) {
 
   // Simulate user paying and Chapa sending webhook in the background
   if (txRef) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://zetimer-ctgw.onrender.com"
-    
     // Fire and forget webhook simulation
     fetch(`${appUrl}/api/webhooks/chapa`, {
       method: 'POST',
@@ -22,6 +21,5 @@ export async function GET(request: Request) {
   }
 
   // Redirect user back to subscription page
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://zetimer-ctgw.onrender.com"
   return NextResponse.redirect(`${appUrl}/school/admin/subscription`)
 }

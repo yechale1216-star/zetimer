@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
+import { appUrl } from "@/lib/api-config"
 import { createServerSupabaseClient } from "@/lib/utils/supabase-server"
 
 export async function POST(request: NextRequest) {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send reset email
-    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || "https://zetimer-ctgw.onrender.com"}/reset-password?token=${resetToken}`
+    const resetLink = `${appUrl}/reset-password?token=${resetToken}`
 
     const emailContent = `
 Hello ${user.full_name || user.email},
@@ -76,7 +77,7 @@ Best regards,
 Smart Attendance System
     `.trim()
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "https://zetimer-ctgw.onrender.com"}/api/send-email`, {
+    const response = await fetch(`${appUrl}/api/send-email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

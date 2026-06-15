@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io as ClientIO, Socket } from 'socket.io-client';
 
+import { socketUrl } from '@/lib/api-config';
+
 type SocketContextType = {
   socket: Socket | null;
   isConnected: boolean;
@@ -20,8 +22,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://zetimer-ctgw.onrender.com';
-    
     const socketInstance = ClientIO(socketUrl, {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,

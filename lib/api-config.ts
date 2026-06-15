@@ -1,13 +1,21 @@
 /**
- * Centralized API URL configuration to prevent circular dependencies.
+ * Centralized configuration for API, Socket, and App URLs.
+ * Uses environment variables with sensible defaults for development.
  */
-export const getApiUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-  if (typeof window !== "undefined") {
-    // Determine if we are on a local network or localhost
-    return "https://zetimer-ctgw.onrender.com";
-  }
-  return "https://zetimer-ctgw.onrender.com";
-};
 
-export const API_URL = getApiUrl();
+// Backend API URL
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+// Real-time Socket URL (often same as API URL)
+export const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || API_URL;
+
+// Frontend App URL
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 
+  (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+
+// Helper exports for easier importing
+export const apiUrl = API_URL;
+export const socketUrl = SOCKET_URL;
+export const appUrl = APP_URL;
+
+export const getApiUrl = () => API_URL;

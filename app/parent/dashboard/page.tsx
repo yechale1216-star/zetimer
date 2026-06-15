@@ -33,7 +33,8 @@ import { Button } from "@/components/ui/button"
 import { ChevronRight } from "lucide-react"
 import { formatLocalizedDate } from "@/lib/utils/date-utils"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://zetimer-ctgw.onrender.com"
+import { apiUrl } from "@/lib/api-config"
+const API_URL = apiUrl;
 
 export default function ParentDashboard() {
   const router = useRouter()

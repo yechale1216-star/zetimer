@@ -35,7 +35,8 @@ import { notifications } from "@/lib/utils/notifications"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { format } from "date-fns"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://zetimer-ctgw.onrender.com"
+import { apiUrl } from "@/lib/api-config"
+const API_URL = apiUrl;
 
 interface Announcement {
   id: string

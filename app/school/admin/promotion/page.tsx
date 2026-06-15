@@ -57,7 +57,7 @@ import { notifications } from '@/lib/utils/notifications'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://zetimer-ctgw.onrender.com'
 
 interface PromotionCohort {
   id: string

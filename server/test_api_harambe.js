@@ -12,7 +12,7 @@ const options = {
   }
 };
 
-console.log('Making GET request to http://localhost:5000/api/students for test-school-1...');
+console.log('Making GET request to https://zetimer-ctgw.onrender.com/api/students for test-school-1...');
 
 const req = http.request(options, (res) => {
   console.log(`STATUS: ${res.statusCode}`);

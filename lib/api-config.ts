@@ -5,10 +5,9 @@ export const getApiUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
   if (typeof window !== "undefined") {
     // Determine if we are on a local network or localhost
-    const hostname = window.location.hostname;
-    return `${window.location.protocol}//${hostname}:5000`;
+    return "https://zetimer-ctgw.onrender.com";
   }
-  return "http://localhost:5000";
+  return "https://zetimer-ctgw.onrender.com";
 };
 
 export const API_URL = getApiUrl();

@@ -28,12 +28,9 @@ services:
       - key: NODE_VERSION
         value: 20
       - key: NEXT_PUBLIC_API_URL
-        fromService:
-          type: web
-          name: zetime-backend
-          property: host
+        value: https://zetimer-ctgw.onrender.com
       - key: NEXT_PUBLIC_APP_URL
-        value: https://zetime-frontend.onrender.com # Update with actual Render URL
+        value: https://zetimer-ctgw.onrender.com
       - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY

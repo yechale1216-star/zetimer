@@ -1,6 +1,6 @@
 // Using global fetch
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://zetimer-ctgw.onrender.com/api';
 const SCHOOL_ID = 'main-school'; // Assuming this exists or the server defaults to it
 
 async function testAnalytics() {

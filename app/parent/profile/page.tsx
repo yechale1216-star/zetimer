@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/lib/context/language-context"
 import { useSchool } from "@/lib/context/school-context"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://zetimer-ctgw.onrender.com"
 
 export default function ProfilePage() {
   const { t } = useLanguage()

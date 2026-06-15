@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send reset email
-    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/reset-password?token=${resetToken}`
+    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || "https://zetimer-ctgw.onrender.com"}/reset-password?token=${resetToken}`
 
     const emailContent = `
 Hello ${user.full_name || user.email},
@@ -76,7 +76,7 @@ Best regards,
 Smart Attendance System
     `.trim()
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/send-email`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "https://zetimer-ctgw.onrender.com"}/api/send-email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

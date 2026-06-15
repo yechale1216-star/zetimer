@@ -13,7 +13,7 @@ import { useLanguage } from '@/lib/context/language-context';
 import { notifications } from '@/lib/utils/notifications';
 import { formatLocalizedTime } from '@/lib/utils/date-utils';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://zetimer-ctgw.onrender.com';
 
 function getAuthHeaders(): Record<string, string> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('attendance_token') : null;

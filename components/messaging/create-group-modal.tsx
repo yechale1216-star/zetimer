@@ -65,7 +65,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     try {
       const token = localStorage.getItem('attendance_token');
       const schoolId = localStorage.getItem('x-school-id');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/users/contacts`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://zetimer-ctgw.onrender.com'}/api/users/contacts`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'x-school-id': schoolId || ''
@@ -124,7 +124,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     try {
       const token = localStorage.getItem('attendance_token');
       const schoolId = localStorage.getItem('x-school-id');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/groups`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://zetimer-ctgw.onrender.com'}/api/groups`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

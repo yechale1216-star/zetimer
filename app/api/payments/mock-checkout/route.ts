@@ -6,7 +6,7 @@ export async function GET(request: Request) {
 
   // Simulate user paying and Chapa sending webhook in the background
   if (txRef) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://zetimer-ctgw.onrender.com"
     
     // Fire and forget webhook simulation
     fetch(`${appUrl}/api/webhooks/chapa`, {
@@ -22,6 +22,6 @@ export async function GET(request: Request) {
   }
 
   // Redirect user back to subscription page
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://zetimer-ctgw.onrender.com"
   return NextResponse.redirect(`${appUrl}/school/admin/subscription`)
 }

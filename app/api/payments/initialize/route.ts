@@ -93,8 +93,8 @@ export async function POST(request: Request) {
       last_name: school.contactPerson.split(" ")[1] || "School",
       phone_number: school.phone,
       tx_ref: txRef,
-      callback_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/webhooks/chapa`,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/school/admin/subscription`,
+      callback_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://zetimer-ctgw.onrender.com"}/api/webhooks/chapa`,
+      return_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://zetimer-ctgw.onrender.com"}/school/admin/subscription`,
       customization: {
         title: "Zetime Subscription",
         description: `Payment for ${tier} tier`,

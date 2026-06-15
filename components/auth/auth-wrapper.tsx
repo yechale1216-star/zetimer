@@ -80,6 +80,15 @@ export function AuthWrapper({ onAuthSuccess }: AuthWrapperProps) {
               The professional choice for schools to track attendance, manage students, and generate real-time reports with ease.
             </p>
 
+            {/* Illustration Container */}
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-primary/20 border border-border/50 animate-in zoom-in duration-1000 delay-500 mb-10">
+              <img
+                src="/zetime_branding_professional.png"
+                alt="Ethiopian School Attendance Analysis"
+                className="w-full aspect-video object-cover"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-bottom duration-700 delay-300">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white dark:bg-white/5 shadow-sm border border-border flex items-center justify-center">
@@ -130,15 +139,6 @@ export function AuthWrapper({ onAuthSuccess }: AuthWrapperProps) {
                 <span className="typography-label">Parent Access</span>
               </div>
             </div>
-          </div>
-
-          {/* Illustration Container */}
-          <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-primary/20 border border-border/50 animate-in zoom-in duration-1000 delay-500">
-            <img
-              src="/zetime_branding_professional.png"
-              alt="Ethiopian School Attendance Analysis"
-              className="w-full aspect-video object-cover"
-            />
           </div>
         </div>
       </div>

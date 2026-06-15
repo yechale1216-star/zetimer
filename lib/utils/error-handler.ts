@@ -16,7 +16,7 @@ export function handleError(error: unknown) {
   console.error("[API Error]", error)
 
   if (error instanceof ZodError) {
-    const fieldErrors = error.errors.map((err) => ({
+    const fieldErrors = error.issues.map((err) => ({
       field: err.path.join("."),
       message: err.message,
     }))

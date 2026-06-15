@@ -13,9 +13,9 @@ services:
       - key: PORT
         value: 5000
       - key: DATABASE_URL
-        fromConfigVar: DATABASE_URL
+        sync: false
       - key: DIRECT_URL
-        fromConfigVar: DIRECT_URL
+        sync: false
 
   # Frontend Next.js Service
   - type: web

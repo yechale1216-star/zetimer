@@ -2,6 +2,7 @@
 services:
   # Backend Express Service
   - type: web
+    plan: free
     name: zetime-backend
     env: node
     rootDir: server
@@ -19,6 +20,7 @@ services:
 
   # Frontend Next.js Service
   - type: web
+    plan: free
     name: zetime-frontend
     env: node
     rootDir: .

@@ -12,7 +12,13 @@ export async function getAttendanceSummaryStats(headers: any, filters: any = {})
       headers,
       cache: 'no-store'
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      if (res.status === 401) {
+        const { authService } = await import("@/lib/auth/auth");
+        authService.handleUnauthorized();
+      }
+      return null
+    }
     const result = await res.json()
     return result.data
   } catch (error) {
@@ -31,7 +37,13 @@ export async function getAttendanceGradeStats(headers: any, filters: any = {}): 
       headers,
       cache: 'no-store'
     })
-    if (!res.ok) return []
+    if (!res.ok) {
+      if (res.status === 401) {
+        const { authService } = await import("@/lib/auth/auth");
+        authService.handleUnauthorized();
+      }
+      return []
+    }
     const result = await res.json()
     return result.data
   } catch (error) {

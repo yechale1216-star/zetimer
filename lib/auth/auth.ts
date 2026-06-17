@@ -456,8 +456,17 @@ class AuthService {
   logout(): void {
     if (this.isClient()) {
       localStorage.removeItem(this.CURRENT_USER_KEY)
+      localStorage.removeItem("attendance_token")
+      localStorage.removeItem("x-school-id")
     }
     console.log("[pg] User logged out")
+  }
+
+  handleUnauthorized(): void {
+    if (this.isClient()) {
+      this.logout()
+      window.location.href = "/login?reason=expired"
+    }
   }
 
   getCurrentUser(): User | null {

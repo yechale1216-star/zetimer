@@ -41,6 +41,7 @@ export function MessagingCenter() {
 
   const { socket, isConnected } = useSocket();
   const [user, setUser] = useState<any>(null);
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({}); // conversationId -> typing status text
   const { toast } = useToast();
 
   // Use a ref so the socket handler always sees the latest activeConversationId
@@ -586,6 +587,23 @@ export function MessagingCenter() {
       });
     };
 
+    const handleUserTyping = (data: { userId: string, full_name: string, conversationId: string }) => {
+      if (data.userId === userRef.current?.id) return;
+      setTypingUsers(prev => ({
+        ...prev,
+        [data.conversationId]: `${data.full_name} ${(t as any)("is_typing")}...`
+      }));
+    };
+
+
+    const handleUserStopTyping = (data: { userId: string, conversationId: string }) => {
+      setTypingUsers(prev => {
+        const next = { ...prev };
+        delete next[data.conversationId];
+        return next;
+      });
+    };
+
     socket.on('new_message', handleNewMessage);
     socket.on('message_read', handleMessageRead);
     socket.on('initial_online_users', handleInitialOnlineUsers);
@@ -595,6 +613,8 @@ export function MessagingCenter() {
     socket.on('message_deleted', handleMessageDeleted);
     socket.on('reaction_updated', handleReactionUpdated);
     socket.on('message_error', handleMessageError);
+    socket.on('user_typing', handleUserTyping);
+    socket.on('user_stop_typing', handleUserStopTyping);
 
     return () => {
       socket.off('new_message', handleNewMessage);
@@ -606,6 +626,8 @@ export function MessagingCenter() {
       socket.off('message_deleted', handleMessageDeleted);
       socket.off('reaction_updated', handleReactionUpdated);
       socket.off('message_error', handleMessageError);
+      socket.off('user_typing', handleUserTyping);
+      socket.off('user_stop_typing', handleUserStopTyping);
     };
   }, [socket, isConnected, user]);
 
@@ -711,6 +733,7 @@ export function MessagingCenter() {
   return (
     <div className="h-full relative overflow-hidden">
       <ChatLayout
+        showContentOnMobile={!!activeConversationId}
         sidebar={
           <ChatSidebar
             conversations={conversations}
@@ -728,6 +751,7 @@ export function MessagingCenter() {
             <ChatWindow
               activeConversation={activeConversationData}
               messages={currentMessages}
+              typingStatus={activeConversationId ? typingUsers[activeConversationId] : undefined}
               onSendMessage={handleSendMessage}
               isLoading={isLoadingMessages}
               onBack={() => {

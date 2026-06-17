@@ -9,7 +9,13 @@ export async function getNextStudentId(headers: any): Promise<string> {
       headers,
       cache: 'no-store'
     })
-    if (!res.ok) throw new Error(res.statusText)
+    if (!res.ok) {
+      if (res.status === 401) {
+        const { authService } = await import("@/lib/auth/auth");
+        authService.handleUnauthorized();
+      }
+      throw new Error(res.statusText)
+    }
     const result = await res.json()
     return result.data
   } catch (error) {
@@ -25,7 +31,13 @@ export async function getStudents(headers: any, schoolId: string): Promise<Stude
       headers,
       cache: 'no-store'
     })
-    if (!res.ok) throw new Error("Failed to fetch students")
+    if (!res.ok) {
+      if (res.status === 401) {
+        const { authService } = await import("@/lib/auth/auth");
+        authService.handleUnauthorized();
+      }
+      throw new Error("Failed to fetch students")
+    }
     const result = await res.json()
     return result.data.map((s: any) => ({
       ...s,

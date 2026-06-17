@@ -20,7 +20,13 @@ export async function getAttendance(headers: any, schoolId: string): Promise<Att
       headers,
       cache: 'no-store'
     })
-    if (!res.ok) throw new Error(res.statusText)
+    if (!res.ok) {
+      if (res.status === 401) {
+        const { authService } = await import("@/lib/auth/auth");
+        authService.handleUnauthorized();
+      }
+      throw new Error(res.statusText)
+    }
     const result = await res.json()
     return result.data.map((r: any) => mapAttendance(r, schoolId))
   } catch (error) {
@@ -49,5 +55,11 @@ export async function markAttendance(headers: any, schoolId: string, records: Pa
     body: JSON.stringify({ records: formattedRecords }),
   })
 
-  if (!res.ok) throw new Error("Failed to mark attendance")
+  if (!res.ok) {
+    if (res.status === 401) {
+      const { authService } = await import("@/lib/auth/auth");
+      authService.handleUnauthorized();
+    }
+    throw new Error("Failed to mark attendance")
+  }
 }

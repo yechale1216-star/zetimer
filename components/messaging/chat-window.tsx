@@ -28,12 +28,14 @@ import {
   ContextMenuSeparator,
   ContextMenuShortcut,
 } from "@/components/ui/context-menu";
+import { Logo } from '@/components/logo';
 import { useCall } from '@/components/providers/call-provider';
 import { authService } from '@/lib/auth/auth';
 import { supabase } from '@/lib/utils/supabase';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/context/language-context';
-import { Logo } from '@/components/logo';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Badge } from '@/components/ui/badge';
 
 interface Message {
   id: string;
@@ -57,6 +59,7 @@ interface Message {
 interface ChatWindowProps {
   activeConversation: any;
   messages: Message[];
+  typingStatus?: string;
   onSendMessage: (content: string, options?: {
     type?: string;
     attachment?: any;
@@ -74,6 +77,7 @@ interface ChatWindowProps {
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   activeConversation,
   messages,
+  typingStatus,
   onSendMessage,
   onBack,
   onToggleInfo,
@@ -81,7 +85,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   isLoading,
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const { initiateCall } = useCall();
+
   const [inputValue, setInputValue] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -406,33 +412,28 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   if (!activeConversation) {
+    if (isMobile) return null;
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-[#f8fafc] dark:bg-slate-950 p-8 text-center relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-sky-500/5 rounded-full blur-[80px]" />
-
+        
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
           className="relative z-10 flex flex-col items-center"
         >
-          <div className="mb-6 scale-150">
+          <div className="h-24 w-24 bg-primary/10 rounded-full flex items-center justify-center mb-6">
             <Logo size="xl" withText={false} href="" />
           </div>
           
-          <h1 className="text-4xl font-black tracking-tighter text-foreground mb-2">
-            ZETIME <span className="text-emerald-500 font-bold">COMMUNICATION</span>
+          <h1 className="text-2xl font-black tracking-tighter text-foreground mb-2 uppercase">
+            {t("communication")}
           </h1>
           
-          <p className="typography-body text-muted-foreground/60 max-w-sm mx-auto leading-relaxed">
-            {t("start_messaging")}
+          <p className="text-sm text-muted-foreground/60 max-w-[240px] mx-auto leading-relaxed">
+            {t("select_conversation_to_start")}
           </p>
-
-          <div className="mt-8 flex items-center gap-2 px-4 py-2 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-full border border-border/50 text-[11px] text-muted-foreground font-medium uppercase tracking-widest shadow-sm">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            {t("ready_connection")}
-          </div>
         </motion.div>
       </div>
     );
@@ -446,96 +447,101 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       />
 
       {/* Chat Header */}
-      <header className="h-16 border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-4 z-40 sticky top-0 font-sans shadow-sm">
-        <div 
-          className={cn(
-            "flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity",
-            activeConversation.isGroup ? "cursor-pointer" : "cursor-default"
-          )}
-          onClick={() => activeConversation.isGroup && onToggleInfo?.()}
-        >
-          {onBack && (
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onBack(); }} className="md:hidden">
-              <ChevronLeft className="h-5 w-5" />
+      <header className="h-[72px] border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-4 z-40 sticky top-0 font-sans shadow-sm">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {isMobile && onBack && (
+            <Button variant="ghost" size="icon" onClick={onBack} className="h-10 w-10 rounded-full -ml-2">
+              <ChevronLeft className="h-6 w-6" />
             </Button>
           )}
-          <div className="relative shrink-0">
-            <Avatar className="h-10 w-10 border border-border overflow-hidden rounded-full">
-              <AvatarImage src={activeConversation?.avatar || undefined} />
-              <AvatarFallback className="typography-label bg-primary/10 text-primary flex items-center justify-center h-full w-full">
-                {activeConversation.name.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            {activeConversation.isOnline && (
-              <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-background rounded-full" />
+          
+          <div 
+            className={cn(
+              "flex items-center gap-3 flex-1 min-w-0 cursor-pointer transition-all hover:bg-secondary/40 p-1.5 rounded-2xl",
+              activeConversation.isGroup ? "cursor-pointer" : "cursor-default"
             )}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="typography-label text-[15px] truncate">{activeConversation.name}</span>
-            {activeConversation.isGroup ? (
-              <span className="text-[11px] text-muted-foreground/80 truncate">
-                {activeConversation.members?.length} members • {activeConversation.groupType || 'Group'}
+            onClick={() => activeConversation.isGroup && onToggleInfo?.()}
+          >
+            <div className="relative shrink-0">
+              <Avatar className="h-11 w-11 border-2 border-primary/10 overflow-hidden ring-2 ring-background">
+                <AvatarImage src={activeConversation?.avatar || undefined} />
+                <AvatarFallback className="bg-primary/5 text-primary text-sm font-black">
+                  {activeConversation.name.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              {activeConversation.isOnline && (
+                <span className="absolute bottom-0 right-0 h-3.5 w-3.5 bg-green-500 border-2 border-background rounded-full shadow-sm" />
+              )}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-[16px] truncate tracking-tight">{activeConversation.name}</span>
+                {!activeConversation.isGroup && activeConversation.role && (
+                   <Badge variant="secondary" className="h-4 px-1.5 text-[9px] font-black uppercase tracking-tighter bg-primary/10 text-primary border-none">
+                     {t(activeConversation.role.toLowerCase())}
+                   </Badge>
+                )}
+              </div>
+              {activeConversation.isGroup ? (
+              <span className="text-[11px] font-medium text-muted-foreground/80 truncate">
+                {typingStatus || `${activeConversation.members?.length} members • ${activeConversation.groupType || 'Group'}`}
               </span>
+            ) : typingStatus ? (
+              <span className="text-[11px] text-primary font-bold animate-pulse">{typingStatus}</span>
             ) : activeConversation.isOnline ? (
-              <span className="typography-label text-[11px] text-green-500 font-medium">{t("online")}</span>
+              <div className="flex items-center gap-1.5">
+                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                 <span className="text-[11px] text-green-600 font-bold uppercase tracking-widest">{t("online")}</span>
+              </div>
             ) : (
-              <span className="text-[11px] text-muted-foreground/80">
+              <span className="text-[11px] font-medium text-muted-foreground/60">
                 {formatLastSeen(activeConversation.lastActive)}
               </span>
             )}
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
-            <Search className="h-4 w-4" />
+
+        <div className="flex items-center gap-1.5">
+          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-muted-foreground hover:bg-secondary">
+            <Search className="h-5 w-5" />
           </Button>
-          {!isStudent && (
-            <>
+          {!isStudent && !activeConversation.isGroup && (
+            <div className="flex items-center gap-1 mx-1 px-1 border-x border-border/50">
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="text-muted-foreground hover:text-primary transition-all active:scale-95"
+                className="h-10 w-10 rounded-full text-primary hover:bg-primary/10 transition-all active:scale-90"
                 onClick={() => initiateCall(activeConversation.id, 'VOICE', activeConversation)}
-                title={t("voice_call")}
               >
-                <Phone className="h-4 w-4" />
+                <Phone className="h-5 w-5" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="text-muted-foreground hover:text-primary transition-all active:scale-95"
+                className="h-10 w-10 rounded-full text-primary hover:bg-primary/10 transition-all active:scale-90"
                 onClick={() => initiateCall(activeConversation.id, 'VIDEO', activeConversation)}
-                title={t("video_call")}
               >
-                <Video className="h-4 w-4" />
+                <Video className="h-5 w-5" />
               </Button>
-            </>
+            </div>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
-                <MoreVertical className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-muted-foreground hover:bg-secondary">
+                <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-2xl border-none shadow-xl p-2">
-              <DropdownMenuItem className="rounded-xl flex gap-3 h-11" onClick={() => activeConversation.isGroup && onToggleInfo?.()}>
-                <Info className="h-4 w-4" />
-                {activeConversation.isGroup ? 'Group Info' : t("view_profile")}
+            <DropdownMenuContent align="end" className="w-60 rounded-2xl border-border/50 shadow-2xl p-2 animate-in fade-in zoom-in-95 duration-200">
+              <DropdownMenuItem className="rounded-xl h-11 pointer-events-none opacity-50 gap-3">
+                <Info className="h-4 w-4" /> {activeConversation.isGroup ? 'Group Info' : t("view_profile")}
               </DropdownMenuItem>
-              {activeConversation.isGroup && (
-                <DropdownMenuItem className="rounded-xl flex gap-3 h-11">
-                  <Heart className="h-4 w-4" />
-                  View Shared Media
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem className="rounded-xl flex gap-3 h-11">
-                <Bell className="h-4 w-4" />
-                {t("mute_notifications")}
+              <DropdownMenuItem className="rounded-xl h-11 gap-3">
+                <Bell className="h-4 w-4" /> {t("mute_notifications")}
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="my-1 bg-border/50" />
-              <DropdownMenuItem className="rounded-xl flex gap-3 h-11 text-destructive focus:text-destructive">
-                <Trash2 className="h-4 w-4" />
-                {activeConversation.isGroup ? 'Leave Group' : t("delete_chat")}
+              <DropdownMenuSeparator className="my-1 bg-border/40" />
+              <DropdownMenuItem className="rounded-xl h-11 gap-3 text-destructive focus:bg-destructive/10 focus:text-destructive">
+                <Trash2 className="h-4 w-4" /> {activeConversation.isGroup ? 'Leave Group' : t("delete_chat")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -623,7 +629,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       </AnimatePresence>
 
       {/* Message Input */}
-      <div className="p-4 bg-background/80 backdrop-blur-md border-t border-border z-40 sticky bottom-0">
+      <div className="p-4 bg-background/80 backdrop-blur-md border-t border-border z-50 sticky bottom-0">
+
         <div className="max-w-4xl mx-auto space-y-2">
 
           {/* Reply/Edit Preview */}
@@ -742,45 +749,45 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-full h-11 w-11 text-muted-foreground hover:text-primary"
+                className="rounded-full h-12 w-12 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
                 onClick={() => setShowAttachMenu(v => !v)}
               >
-                <Paperclip className="h-5 w-5" />
+                <Paperclip className="h-6 w-6" />
               </Button>
               <AnimatePresence>
                 {showAttachMenu && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    initial={{ opacity: 0, y: 12, scale: 0.9 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                    className="absolute bottom-14 left-0 bg-background border border-border shadow-xl rounded-2xl p-2 flex flex-col gap-1 min-w-[170px] z-50"
+                    exit={{ opacity: 0, y: 12, scale: 0.9 }}
+                    className="absolute bottom-16 left-0 bg-background border border-border/50 shadow-2xl rounded-[24px] p-2.5 flex flex-col gap-1.5 min-w-[200px] z-50 animate-in fade-in slide-in-from-bottom-2"
                   >
                     <button
-                      className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-secondary/60 text-sm text-left transition-colors"
+                      className="flex items-center gap-3.5 px-3.5 py-3 rounded-2xl hover:bg-secondary/70 text-sm text-left transition-all active:scale-[0.98] group"
                       onClick={() => { fileInputRef.current?.click(); }}
                     >
-                      <div className="h-9 w-9 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-                        <ImageIcon className="h-5 w-5 text-blue-500" />
+                      <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                        <ImageIconLucide className="h-5 w-5 text-blue-500 group-hover:text-white" />
                       </div>
-                      <span className="font-medium">Photo</span>
+                      <span className="font-bold text-foreground/80 tracking-tight">Photo</span>
                     </button>
                     <button
-                      className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-secondary/60 text-sm text-left transition-colors"
+                      className="flex items-center gap-3.5 px-3.5 py-3 rounded-2xl hover:bg-secondary/70 text-sm text-left transition-all active:scale-[0.98] group"
                       onClick={() => { videoInputRef.current?.click(); }}
                     >
-                      <div className="h-9 w-9 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
-                        <Video className="h-5 w-5 text-red-500" />
+                      <div className="h-10 w-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 group-hover:bg-red-500 group-hover:text-white transition-colors">
+                        <Video className="h-5 w-5 text-red-500 group-hover:text-white" />
                       </div>
-                      <span className="font-medium">Video</span>
+                      <span className="font-bold text-foreground/80 tracking-tight">Video</span>
                     </button>
                     <button
-                      className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-secondary/60 text-sm text-left transition-colors"
+                      className="flex items-center gap-3.5 px-3.5 py-3 rounded-2xl hover:bg-secondary/70 text-sm text-left transition-all active:scale-[0.98] group"
                       onClick={() => { docInputRef.current?.click(); }}
                     >
-                      <div className="h-9 w-9 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-                        <FileText className="h-5 w-5 text-amber-500" />
+                      <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                        <FileText className="h-5 w-5 text-amber-500 group-hover:text-white" />
                       </div>
-                      <span className="font-medium">Document</span>
+                      <span className="font-bold text-foreground/80 tracking-tight">Document</span>
                     </button>
                   </motion.div>
                 )}
@@ -855,46 +862,53 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             </div>
 
             {/* Send / Mic / Video button */}
-            {(inputValue.trim() || attachedFile) ? (
-              <Button
-                onClick={handleSend}
-                className="rounded-full h-11 w-11 shrink-0 shadow-lg bg-primary hover:bg-primary/90 transition-all active:scale-95"
-              >
-                <Send className="h-5 w-5 text-white" />
-              </Button>
-            ) : isRecording ? (
+            {isRecording ? (
               <Button
                 onClick={() => stopRecording(true)}
-                className="rounded-full h-11 w-11 shrink-0 shadow-lg bg-red-500 hover:bg-red-600 transition-all active:scale-95 animate-pulse"
+                className="rounded-full h-12 w-12 shrink-0 shadow-lg bg-red-500 hover:bg-red-600 transition-all active:scale-95 animate-pulse"
               >
-                <StopCircle className="h-5 w-5 text-white" />
+                <StopCircle className="h-6 w-6 text-white" />
               </Button>
+            ) : (inputValue.trim() || attachedFile) ? (
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="shrink-0"
+              >
+                <Button
+                  onClick={handleSend}
+                  className="rounded-full h-12 w-12 shrink-0 shadow-xl bg-primary hover:bg-primary/90 transition-all active:scale-95 flex items-center justify-center p-0"
+                >
+                  <Send className="h-6 w-6 text-white ml-0.5" />
+                </Button>
+              </motion.div>
             ) : (
               <div className="flex items-center">
                 <Button
                   onMouseDown={startRecording}
                   onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
                   className={cn(
-                    "rounded-full h-11 w-11 shrink-0 shadow-lg transition-all active:scale-95",
+                    "rounded-full h-12 w-12 shrink-0 shadow-lg transition-all active:scale-95",
                     recordMode === 'video' ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground hover:text-primary"
                   )}
                   title={recordMode === 'video' ? "Hold to record video message" : "Hold to record voice message"}
                 >
-                  {recordMode === 'video' ? <Video className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                  {recordMode === 'video' ? <Video className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
                 </Button>
                 {!isRecording && (
                    <Button 
                      variant="ghost" 
                      size="icon" 
-                     className="ml-1 h-8 w-8 text-muted-foreground/30 hover:text-primary"
+                     className="ml-1 h-9 w-9 text-muted-foreground/30 hover:text-primary"
                      onClick={() => setRecordMode(m => m === 'audio' ? 'video' : 'audio')}
                    >
-                     {recordMode === 'video' ? <Mic className="h-3 w-3" /> : <Video className="h-3 w-3" />}
+                     {recordMode === 'video' ? <Mic className="h-4 w-4" /> : <Video className="h-4 w-4" />}
                    </Button>
                 )}
               </div>
             )}
           </div>
+
         </div>
 
         {/* Video Recording Preview */}

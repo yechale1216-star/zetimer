@@ -88,6 +88,12 @@ export default function AdminAnnouncementsPage() {
       })
       
       if (!res.ok) {
+        if (res.status === 401) {
+          console.warn("[fetchAnnouncements] Unauthorized - Redirecting to login");
+          const { authService } = await import("@/lib/auth/auth");
+          authService.handleUnauthorized();
+          return;
+        }
         const text = await res.text()
         console.error(`[fetchAnnouncements] Server returned ${res.status}:`, text)
         throw new Error(text || `HTTP ${res.status}`)

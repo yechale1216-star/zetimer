@@ -1,13 +1,20 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Pin, Plus } from 'lucide-react';
+import { Search, Pin, Plus, Users, User, Settings, MoreVertical } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils/utils';
 import { Button } from '@/components/ui/button';
 import { ChatListSkeleton } from './skeletons';
 import { useLanguage } from '@/lib/context/language-context';
+import { useIsMobile } from '@/hooks/use-mobile';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Conversation {
   id: string;
@@ -23,6 +30,7 @@ interface Conversation {
   isMuted?: boolean;
   isNewContact?: boolean;
   isGroup?: boolean;
+  lastActive?: Date | string;
 }
 
 interface ChatSidebarProps {
@@ -30,7 +38,7 @@ interface ChatSidebarProps {
   activeConversationId?: string;
   onSelectConversation: (id: string) => void;
   isLoading?: boolean;
-  currentUser?: { name?: string; profile_photo?: string } | null;
+  currentUser?: { name?: string; profile_photo?: string; id?: string } | null;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -41,6 +49,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   currentUser
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
 
@@ -49,7 +58,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       (c.phone && c.phone.replace(/\s+/g, '').includes(searchQuery.replace(/\s+/g, '')));
     
     if (activeTab === 'All') return matchesSearch;
-    if (activeTab === 'Teacher') return matchesSearch && (c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin');
+    if (activeTab === 'Staff') return matchesSearch && (c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin' || c.role?.toLowerCase() === 'staff');
     if (activeTab === 'Parents') return matchesSearch && c.role?.toLowerCase() === 'parent';
     if (activeTab === 'Unread') return matchesSearch && (c.unreadCount ?? 0) > 0;
     if (activeTab === 'Groups') return matchesSearch && c.isGroup;
@@ -57,172 +66,213 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     return matchesSearch;
   });
 
+  const onlineUsers = conversations.filter(c => c.isOnline && !c.isGroup);
+
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden">
-      {/* Sidebar Header & Search */}
-      <div className="p-4 space-y-4">
+    <div className="flex flex-col h-full bg-background overflow-hidden border-r border-border">
+      {/* Sidebar Header */}
+      <div className="pt-6 px-4 pb-2 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="typography-section-title">{t("communication")}</h2>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => (window as any).openCreateGroup?.()}
-              className="h-8 w-8 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-90"
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
-            {currentUser && (
-              <Avatar className="h-8 w-8 cursor-pointer border border-border">
-                <AvatarImage src={currentUser.profile_photo || ''} />
-                <AvatarFallback className="typography-label bg-primary/10 text-primary">
-                  {currentUser.name ? currentUser.name.slice(0, 2).toUpperCase() : 'U'}
-                </AvatarFallback>
-              </Avatar>
-            )}
+          <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-secondary transition-colors">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 rounded-2xl p-2 shadow-xl border-border/50">
+                <DropdownMenuItem className="rounded-xl h-11 pointer-events-none opacity-50">
+                  <Settings className="mr-3 h-4 w-4" /> Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem className="rounded-xl h-11" onClick={() => (window as any).openCreateGroup?.()}>
+                  <Users className="mr-3 h-4 w-4" /> New Group
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <h1 className="text-xl font-bold tracking-tight text-foreground/90">{t("messages")}</h1>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          <FilterTab label={t("all")} active={activeTab === 'All'} onClick={() => setActiveTab('All')} count={conversations.length} />
-          <FilterTab label="Groups" active={activeTab === 'Groups'} onClick={() => setActiveTab('Groups')} count={conversations.filter(c => c.isGroup).length} />
-          <FilterTab label={t("staff")} active={activeTab === 'Teacher'} onClick={() => setActiveTab('Teacher')} count={conversations.filter(c => !c.isGroup && (c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin')).length} />
-          <FilterTab label={t("parents")} active={activeTab === 'Parents'} onClick={() => setActiveTab('Parents')} count={conversations.filter(c => !c.isGroup && c.role?.toLowerCase() === 'parent').length} />
-          <FilterTab label={t("unread")} active={activeTab === 'Unread'} onClick={() => setActiveTab('Unread')} count={conversations.filter(c => (c.unreadCount ?? 0) > 0).length} />
+          
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => (window as any).openCreateGroup?.()}
+            className="h-10 w-10 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-95"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
         </div>
 
+        {/* Search Bar */}
         <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 group-focus-within:text-primary transition-colors" />
           <Input
             placeholder={t("search_users")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-secondary/50 border-none focus-visible:ring-1 focus-visible:ring-primary rounded-xl"
+            className="pl-11 h-11 bg-secondary/40 border-none focus-visible:ring-2 focus-visible:ring-primary/20 rounded-2xl transition-all placeholder:text-muted-foreground/50"
           />
         </div>
+
+        {/* Quick Filters */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
+          <FilterTab label={(t as any)("all")} active={activeTab === 'All'} onClick={() => setActiveTab('All')} />
+          <FilterTab label="Groups" active={activeTab === 'Groups'} onClick={() => setActiveTab('Groups')} />
+          <FilterTab label={(t as any)("staff")} active={activeTab === 'Staff'} onClick={() => setActiveTab('Staff')} />
+          <FilterTab label={(t as any)("parents")} active={activeTab === 'Parents'} onClick={() => setActiveTab('Parents')} />
+          <FilterTab label={(t as any)("unread")} active={activeTab === 'Unread'} onClick={() => setActiveTab('Unread')} count={conversations.filter(c => (c.unreadCount ?? 0) > 0).length} />
+        </div>
       </div>
+
+      {/* Online Users Row */}
+      {onlineUsers.length > 0 && activeTab === 'All' && !searchQuery && (
+        <div className="py-2 border-b border-border/50">
+          <div className="flex items-center gap-4 overflow-x-auto px-4 py-2 scrollbar-hide">
+            {onlineUsers.map(user => (
+              <button 
+                key={user.id} 
+                onClick={() => onSelectConversation(user.id)}
+                className="flex flex-col items-center gap-1.5 shrink-0 group"
+              >
+                <div className="relative">
+                  <Avatar className="h-14 w-14 border-2 border-primary/20 group-hover:border-primary transition-all p-0.5">
+                    <AvatarImage src={user.avatar} className="rounded-full" />
+                    <AvatarFallback className="bg-secondary text-primary font-bold">
+                      {user.name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 bg-green-500 border-2 border-background rounded-full" />
+                </div>
+                <span className="text-[11px] font-medium text-muted-foreground truncate w-14 text-center group-hover:text-foreground">
+                  {user.name.split(' ')[0]}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Conversations List */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
         {isLoading ? (
           <ChatListSkeleton />
-        ) : (
-          <div className="px-2 pb-4 space-y-0.5">
-            {filteredConversations.filter(c => !c.isNewContact).length > 0 && (
-              <div className="typography-label px-3 pt-2 pb-1 text-[11px] text-muted-foreground/50 uppercase">
-                {t("recent_chats")}
-              </div>
-            )}
-            {filteredConversations.filter(c => !c.isNewContact).map((chat) => (
-              <button
-                 key={chat.id}
-                 onClick={() => onSelectConversation(chat.id)}
-                 className={cn(
-                   "w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 relative group",
-                   activeConversationId === chat.id
-                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[0.98]"
-                     : "hover:bg-secondary/80 active:scale-[0.98]"
-                 )}
-               >
-                 <div className="relative shrink-0">
-                   <Avatar className="h-12 w-12 border-2 border-transparent group-hover:border-primary/20 transition-all">
-                     <AvatarImage src={chat.avatar || undefined} />
-                     <AvatarFallback className={cn(
-                       "text-sm font-bold",
-                       activeConversationId === chat.id ? "bg-white/20 text-white" : "bg-primary/10 text-primary"
-                     )}>
-                       {chat.name.slice(0, 2).toUpperCase()}
-                     </AvatarFallback>
-                   </Avatar>
-                   {chat.isOnline && (
-                     <span className="absolute bottom-0 right-0 h-3.5 w-3.5 bg-green-500 border-2 border-background rounded-full" />
-                   )}
-                 </div>
-
-                 <div className="flex-1 min-w-0 text-left">
-                   <div className="flex items-center justify-between mb-0.5">
-                     <div className="flex flex-col">
-                       <span className="typography-label truncate text-[15px]">{chat.name}</span>
-                       <span className="typography-label text-[10px] opacity-70 uppercase">
-                         {chat.isGroup ? 'GROUP' : t(chat.role?.toLowerCase() as any)}
-                       </span>
-                     </div>
-                     <span className={cn(
-                       "text-[10px] whitespace-nowrap ml-2",
-                       activeConversationId === chat.id ? "text-primary-foreground/70" : "text-muted-foreground"
-                     )}>
-                       {chat.timestamp || chat.phone}
-                     </span>
-                   </div>
-                   <p className={cn(
-                     "text-sm truncate pr-4",
-                     activeConversationId === chat.id ? "text-primary-foreground/80" : "text-muted-foreground"
-                   )}>
-                     {chat.lastMessage || t("no_messages")}
-                   </p>
-                 </div>
-
-                 <div className="flex flex-col items-end gap-1.5 shrink-0">
-                   {chat.unreadCount ? (
-                     <span className={cn(
-                       "min-w-[20px] h-5 px-1.5 flex items-center justify-center rounded-full text-[10px] font-bold transition-colors",
-                       activeConversationId === chat.id ? "bg-white text-primary" : "bg-primary text-white"
-                     )}>
-                       {chat.unreadCount}
-                     </span>
-                   ) : chat.isPinned ? (
-                     <Pin className="h-3.5 w-3.5 rotate-45 text-muted-foreground" />
-                   ) : null}
-                 </div>
-              </button>
-            ))}
-
-            {filteredConversations.filter(c => !c.isNewContact).length > 0 &&
-             filteredConversations.filter(c => c.isNewContact).length > 0 && (
-              <div className="mx-3 my-2 border-t border-border/30" />
-            )}
-            {filteredConversations.filter(c => c.isNewContact).map((chat) => (
+        ) : filteredConversations.length > 0 ? (
+          <div className="px-2 py-3 space-y-1">
+            {/* Split Recent vs New Contacts */}
+            {filteredConversations.map((chat) => (
                <button
                  key={chat.id}
                  onClick={() => onSelectConversation(chat.id)}
                  className={cn(
-                   "w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 relative group",
+                   "w-full flex items-center gap-3.5 p-3.5 rounded-2xl transition-all duration-200 relative group",
                    activeConversationId === chat.id
-                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[0.98]"
-                     : "hover:bg-secondary/80 active:scale-[0.98]"
+                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[0.98] z-10"
+                     : "hover:bg-secondary/60 active:scale-[0.98]"
                  )}
                >
                  <div className="relative shrink-0">
-                   <Avatar className="h-10 w-10 border border-transparent group-hover:border-primary/20 transition-all opacity-80 group-hover:opacity-100">
-                     <AvatarImage src={chat.avatar || undefined} />
-                     <AvatarFallback className="typography-label bg-secondary text-muted-foreground">
-                       {chat.name.slice(0, 2).toUpperCase()}
-                     </AvatarFallback>
-                   </Avatar>
-                   {chat.isOnline && (
-                     <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-background rounded-full" />
-                   )}
+                    <Avatar className={cn(
+                      "h-14 w-14 transition-all duration-300",
+                      activeConversationId === chat.id ? "scale-105" : "group-hover:scale-105 ring-1 ring-border/50 group-hover:ring-primary/20"
+                    )}>
+                      <AvatarImage src={chat.avatar || undefined} />
+                      <AvatarFallback className={cn(
+                        "text-lg font-bold transition-colors",
+                        activeConversationId === chat.id ? "bg-white/20 text-white" : "bg-primary/5 text-primary"
+                      )}>
+                        {chat.name.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {chat.isOnline && (
+                      <span className="absolute bottom-0.5 right-0.5 h-4 w-4 bg-green-500 border-3 border-background rounded-full" />
+                    )}
                  </div>
 
                  <div className="flex-1 min-w-0 text-left">
-                   <span className="typography-label text-[14px]">{chat.name}</span>
-                   <p className="typography-label text-[10px] text-muted-foreground uppercase">{t(chat.role?.toLowerCase() as any)}</p>
-                 </div>
-                 
-                 <div className="p-2 rounded-lg bg-primary/5 text-primary opacity-0 group-hover:opacity-100 transition-all">
-                    <Plus className="w-4 h-4" />
+                   <div className="flex items-center justify-between mb-1">
+                     <span className={cn(
+                       "font-bold text-[16px] truncate tracking-tight transition-colors",
+                       activeConversationId === chat.id ? "text-white" : "text-foreground/90"
+                     )}>
+                       {chat.name}
+                     </span>
+                     <span className={cn(
+                       "text-[11px] font-medium transition-colors ml-2",
+                       activeConversationId === chat.id ? "text-primary-foreground/60" : "text-muted-foreground/70"
+                     )}>
+                       {chat.timestamp || chat.phone}
+                     </span>
+                   </div>
+                   
+                   <div className="flex items-center justify-between gap-2">
+                     <div className="flex flex-col flex-1 min-w-0">
+                       <p className={cn(
+                         "text-[13px] truncate leading-snug transition-colors",
+                         chat.unreadCount && activeConversationId !== chat.id ? "font-semibold text-foreground" : "opacity-70",
+                         activeConversationId === chat.id ? "text-primary-foreground/80" : "text-muted-foreground"
+                       )}>
+                         {chat.lastMessage || (chat.isNewContact ? (t as any)("start_conversation") : (t as any)("no_messages"))}
+                       </p>
+                       {!chat.isGroup && (
+                         <span className={cn(
+                           "text-[10px] font-bold uppercase tracking-widest mt-1 transition-colors",
+                           activeConversationId === chat.id ? "text-white/40" : "text-muted-foreground/30"
+                         )}>
+                           {(t as any)(chat.role?.toLowerCase() as any)}
+                         </span>
+                       )}
+                     </div>
+
+                     <div className="flex flex-col items-end shrink-0 gap-1.5">
+                       {chat.unreadCount ? (
+                         <div className={cn(
+                           "h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full text-[10px] font-bold shadow-sm transition-all animate-in zoom-in",
+                           activeConversationId === chat.id ? "bg-white text-primary" : "bg-primary text-white"
+                         )}>
+                           {chat.unreadCount}
+                         </div>
+                       ) : chat.isPinned ? (
+                         <Pin className="h-3.5 w-3.5 rotate-45 text-muted-foreground/40" />
+                       ) : null}
+                     </div>
+                   </div>
                  </div>
                </button>
             ))}
-
-            {filteredConversations.length === 0 && (
-              <div className="p-8 text-center">
-                <p className="typography-body text-muted-foreground">{t("no_conv_found")}</p>
-              </div>
-            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-in fade-in slide-in-from-bottom-4">
+            <div className="h-16 w-16 bg-secondary/50 rounded-full flex items-center justify-center mb-4">
+              <Search className="h-8 w-8 text-muted-foreground/30" />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">{t("no_conv_found")}</p>
+            <p className="text-xs text-muted-foreground/50 mt-1">Try a different search term</p>
           </div>
         )}
       </div>
+
+      {/* User Info Footer (Desktop Only) */}
+      {!isMobile && currentUser && (
+        <div className="p-4 bg-secondary/20 border-t border-border/50">
+          <div className="flex items-center gap-3">
+             <Avatar className="h-10 w-10 border border-border">
+               <AvatarImage src={currentUser.profile_photo} />
+               <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                 {currentUser.name?.slice(0, 2).toUpperCase()}
+               </AvatarFallback>
+             </Avatar>
+             <div className="flex-1 min-w-0">
+               <p className="text-sm font-bold truncate">{currentUser.name}</p>
+               <div className="flex items-center gap-1">
+                 <div className="h-1.5 w-1.5 bg-green-500 rounded-full" />
+                 <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Online</p>
+               </div>
+             </div>
+             <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 hover:bg-secondary">
+               <Settings className="h-4 w-4" />
+             </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -231,13 +281,15 @@ const FilterTab = ({ label, active, count, onClick }: { label: string; active: b
   <button 
     onClick={onClick}
     className={cn(
-    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap",
-    active ? "bg-primary text-primary-foreground shadow-sm" : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
+    "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap",
+    active 
+      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
+      : "bg-secondary text-muted-foreground hover:bg-secondary-foreground/10 active:scale-95"
   )}>
     {label}
     {count !== undefined && count > 0 && (
       <span className={cn(
-        "min-w-[16px] h-4 flex items-center justify-center rounded-full text-[10px]",
+        "min-w-[18px] h-4.5 px-1 flex items-center justify-center rounded-full text-[9px] font-black",
         active ? "bg-white text-primary" : "bg-primary text-white"
       )}>
         {count}
@@ -245,3 +297,4 @@ const FilterTab = ({ label, active, count, onClick }: { label: string; active: b
     )}
   </button>
 );
+

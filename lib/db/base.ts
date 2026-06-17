@@ -52,6 +52,13 @@ export class BaseDatabase {
   }
 
   protected async handleError(res: Response): Promise<never> {
+    if (res.status === 401) {
+      console.warn("[BaseDatabase] Unauthorized response (401) - triggering session cleanup");
+      // Use dynamic import to avoid potential circular dependencies if auth needs db
+      const { authService } = await import("@/lib/auth/auth");
+      authService.handleUnauthorized();
+    }
+    
     let message = `HTTP ${res.status}: ${res.statusText}`
     try {
       const data = await res.json()

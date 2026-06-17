@@ -8,6 +8,8 @@ import {
   Settings, LogOut, CreditCard, MessageSquare, Phone, TrendingUp, ShieldBan,
   X, ChevronRight, Megaphone
 } from 'lucide-react'
+import { cn } from "@/lib/utils/utils"
+
 import { authService } from '@/lib/auth/auth'
 import { useRouter } from 'next/navigation'
 import { notifications } from '@/lib/utils/notifications'
@@ -69,6 +71,22 @@ export default function SchoolAdminLayout({
   const [isAdmin, setIsAdmin] = React.useState(false)
   const [isMounted, setIsMounted] = React.useState(false)
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
+  const [showBottomNav, setShowBottomNav] = React.useState(true)
+  const [lastScrollY, setLastScrollY] = React.useState(0)
+
+  const handleMainScroll = (e: React.UIEvent<HTMLElement>) => {
+    const currentScrollY = e.currentTarget.scrollTop
+    const diff = currentScrollY - lastScrollY
+    
+    // Disappear when scroll UP (current < last), Reappear when scroll DOWN (current > last)
+    if (diff < -5 && currentScrollY > 100) {
+      setShowBottomNav(false)
+    } else if (diff > 5) {
+      setShowBottomNav(true)
+    }
+    setLastScrollY(currentScrollY)
+  }
+
 
   React.useEffect(() => {
     setIsMounted(true)
@@ -275,13 +293,19 @@ export default function SchoolAdminLayout({
             <div className="flex-1 flex flex-col overflow-hidden relative z-10">
               <TopNav showMenuButton onMenuClick={() => setSidebarOpen(true)} />
 
-              <main className="flex-1 overflow-auto pb-20 md:pb-0">
+              <main 
+                className="flex-1 overflow-auto pb-20 md:pb-0"
+                onScroll={handleMainScroll}
+              >
                 <SuspendedBanner />
                 {children}
               </main>
 
               {/* ── Mobile Bottom Navigation (5 tabs) ── */}
-              <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md shadow-[0_-2px_20px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_20px_rgba(0,0,0,0.3)]">
+              <nav className={cn(
+                "md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md shadow-[0_-2px_20px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_20px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-in-out",
+                !showBottomNav ? "translate-y-full" : "translate-y-0"
+              )}>
                 <div className="flex items-stretch justify-around">
                   <MobileTabLink
                     href="/school/admin"

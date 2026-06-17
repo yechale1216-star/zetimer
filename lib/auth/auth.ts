@@ -455,11 +455,20 @@ class AuthService {
 
   logout(): void {
     if (this.isClient()) {
-      localStorage.removeItem(this.CURRENT_USER_KEY)
-      localStorage.removeItem("attendance_token")
-      localStorage.removeItem("x-school-id")
+      // Clear ALL school-scoped keys so that no data leaks to the next login session.
+      // Never rely on components cleaning up after themselves — do it here atomically.
+      const keysToRemove = [
+        this.CURRENT_USER_KEY,       // attendance_current_user
+        "attendance_token",           // JWT token
+        "x-school-id",               // active school UUID
+        "attendance_features",        // school feature/permission cache
+        "parent_students",            // parent's student list (school-scoped)
+        "available_schools",          // parent's available schools list
+        "has_multiple_schools",       // parent multi-school flag
+      ]
+      keysToRemove.forEach(key => localStorage.removeItem(key))
     }
-    console.log("[pg] User logged out")
+    console.log("[pg] User logged out — all school-scoped localStorage keys cleared")
   }
 
   handleUnauthorized(): void {

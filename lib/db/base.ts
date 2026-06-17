@@ -3,23 +3,27 @@
 import { API_URL } from "@/lib/api-config"
 
 export class BaseDatabase {
-  protected currentSchoolId: string | null = null
+  // NOTE: No cached schoolId — always read fresh to prevent cross-school data leaks
+  // after logout/login transitions in the same browser session.
 
   protected setSchoolId(schoolId: string | number) {
-    this.currentSchoolId = String(schoolId)
+    // Deprecated: schoolId is now always derived fresh from the current user in localStorage.
+    // This method is kept for backward compatibility but has no effect.
+    console.warn("[BaseDatabase] setSchoolId() is deprecated. SchoolId is derived from current user.")
   }
 
   protected getSchoolId(): string {
+    // Always read fresh — NEVER rely on a cached instance variable.
+    // The db object is a module-level singleton, so a cached value would persist
+    // across logout/login transitions and expose one school's data to another.
+    if (typeof window === "undefined") return ""
+
     const user = this.getCurrentUser()
     if (user?.schoolId) {
-      this.currentSchoolId = String(user.schoolId)
-    } else if (typeof window !== "undefined") {
-      const storedId = localStorage.getItem("x-school-id")
-      if (storedId) {
-        this.currentSchoolId = storedId
-      }
+      return String(user.schoolId)
     }
-    return this.currentSchoolId || ""
+
+    return localStorage.getItem("x-school-id") || ""
   }
 
   public getCurrentUser(): any {

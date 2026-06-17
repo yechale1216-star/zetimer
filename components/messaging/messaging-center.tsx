@@ -12,6 +12,14 @@ import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/lib/context/language-context';
 import { notifications } from '@/lib/utils/notifications';
 import { formatLocalizedTime } from '@/lib/utils/date-utils';
+import {
+  cacheMessages,
+  getCachedMessages,
+  appendCachedMessage,
+  updateCachedMessage,
+  cacheConversations,
+  getCachedConversations,
+} from '@/lib/utils/message-cache';
 
 import { apiUrl } from '@/lib/api-config';
 const API_URL = apiUrl;
@@ -32,9 +40,9 @@ export function MessagingCenter() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [activeConversationData, setActiveConversationData] = useState<any>(null);
   
-  // KEY: messages are stored per-conversation, never mixed
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, any[]>>({});
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  // isFetchingMessages only drives the thin progress bar — never a blocking skeleton
+  const [isFetchingMessages, setIsFetchingMessages] = useState(false);
   const [isLoadingSidebar, setIsLoadingSidebar] = useState(true);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
@@ -62,14 +70,30 @@ export function MessagingCenter() {
     
     // Register global bridge for sidebar to open group modal
     (window as any).openCreateGroup = () => setIsGroupModalOpen(true);
+
+    // ── Telegram-style: Load cached conversations from IndexedDB instantly ──
+    getCachedConversations().then(cached => {
+      if (cached && cached.length > 0) {
+        setConversations(cached);
+        setIsLoadingSidebar(false);
+        console.log('[Messaging] Loaded', cached.length, 'cached conversations from IndexedDB');
+      }
+    }).catch(() => {});
+
     return () => {
       delete (window as any).openCreateGroup;
     };
   }, []);
 
+
   // ── Load sidebar data ────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     if (!user) return;
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+      console.log('[Messaging] Offline — using cached conversations');
+      setIsLoadingSidebar(false);
+      return;
+    }
     try {
       const headers = getAuthHeaders();
 
@@ -161,7 +185,11 @@ export function MessagingCenter() {
       activeChats.sort((a, b) => b.updatedAt - a.updatedAt);
       directory.sort((a, b) => a.name.localeCompare(b.name));
 
-      setConversations([...activeChats, ...directory]);
+      const finalConversations = [...activeChats, ...directory];
+      setConversations(finalConversations);
+
+      // ── Telegram-style: persist conversations to IndexedDB for offline ──
+      cacheConversations(finalConversations).catch(() => {});
     } catch (error) {
       console.error('[Messaging] Failed to load data:', error);
       toast({ 
@@ -188,10 +216,35 @@ export function MessagingCenter() {
 
   // ── Fetch messages for the selected conversation ─────────────────────────────
   const loadMessages = useCallback(async (conversationId: string) => {
-    // If already cached, use cache instantly
-    if (messagesByConversation[conversationId]) return;
+    // ── Step 1: Load from IndexedDB cache instantly (if not already in memory) ──
+    const hasInMemory = messagesByConversation[conversationId]?.length > 0;
+    if (!hasInMemory) {
+      try {
+        const cached = await getCachedMessages(conversationId);
+        if (cached && cached.length > 0) {
+          setMessagesByConversation(prev => {
+            // Don't overwrite if React state already has messages (e.g. from socket)
+            if (prev[conversationId]?.length > 0) return prev;
+            return { ...prev, [conversationId]: cached };
+          });
+          console.log('[Messaging] Loaded', cached.length, 'cached messages for', conversationId);
+        }
+      } catch {
+        // IndexedDB failed — continue to server fetch
+      }
+    }
 
-    setIsLoadingMessages(true);
+    // ── Step 2: Fetch from server in background (if online) ──
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+      console.log('[Messaging] Offline — using cached messages only');
+      return;
+    }
+
+    // Only show thin progress bar if we don't have any messages in memory yet
+    const shouldShowProgress = !hasInMemory && (!messagesByConversation[conversationId] || messagesByConversation[conversationId].length === 0);
+    if (shouldShowProgress) {
+      setIsFetchingMessages(true);
+    }
     try {
       const res = await fetch(`${API_URL}/api/messages/${conversationId}`, {
         headers: getAuthHeaders(),
@@ -223,12 +276,33 @@ export function MessagingCenter() {
 
       // Store messages keyed by conversationId — never mixed
       setMessagesByConversation(prev => ({ ...prev, [conversationId]: formatted }));
+
+      // ── Persist to IndexedDB for offline access ──
+      cacheMessages(conversationId, formatted).catch(() => {});
     } catch (err) {
       console.error('[Messaging] Error loading messages:', err);
     } finally {
-      setIsLoadingMessages(false);
+      if (shouldShowProgress) {
+        setIsFetchingMessages(false);
+      }
     }
   }, [messagesByConversation, language]);
+
+  // Re-fetch conversations and sync messages when network recovers
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => {
+      console.log('[Messaging] Connection restored. Synchronizing conversations...');
+      loadData();
+      if (activeConversationIdRef.current) {
+        loadMessages(activeConversationIdRef.current);
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [loadData, loadMessages]);
 
   // ── Select conversation ──────────────────────────────────────────────────────
   const handleSelectConversation = useCallback(
@@ -302,8 +376,15 @@ export function MessagingCenter() {
         return;
       }
 
-      // --- CORE FIX: switch conversations atomically ---
-      // 1. Switch active conversation FIRST (clears the window immediately)
+      // --- Open conversation instantly (Telegram-style) ---
+      // 1. Pre-seed an empty array immediately so the window renders now
+      //    without any skeleton or blank-white-screen delay.
+      setMessagesByConversation(prev => {
+        if (prev[id]) return prev; // already cached — keep it
+        return { ...prev, [id]: [] };
+      });
+
+      // 2. Switch active conversation
       setActiveConversationId(id);
       
       let finalChatData = chatData;
@@ -474,12 +555,18 @@ export function MessagingCenter() {
           if (index !== -1) {
             const updated = [...existing];
             updated[index] = { ...formatted };
+            // Also update in IndexedDB cache
+            cacheMessages(convId, updated).catch(() => {});
             return { ...prev, [convId]: updated };
           }
         }
 
         // Deduplicate by id
         if (existing.some(m => m.id === formatted.id)) return prev;
+
+        // ── Persist new message to IndexedDB for offline access ──
+        appendCachedMessage(convId, formatted).catch(() => {});
+
         return { ...prev, [convId]: [...existing, formatted] };
       });
 
@@ -513,6 +600,8 @@ export function MessagingCenter() {
       setMessagesByConversation(prev => {
         const msgs = prev[conversationId];
         if (!msgs) return prev;
+        // Update IndexedDB cache too
+        updateCachedMessage(conversationId, messageId, m => ({ ...m, status: 'read' })).catch(() => {});
         return {
           ...prev,
           [conversationId]: msgs.map(m => m.id === messageId ? { ...m, status: 'read' } : m)
@@ -543,6 +632,8 @@ export function MessagingCenter() {
       setMessagesByConversation(prev => {
         const msgs = prev[data.conversationId];
         if (!msgs) return prev;
+        // Update IndexedDB cache
+        updateCachedMessage(data.conversationId, data.messageId, m => ({ ...m, content: data.content, editedAt: new Date() })).catch(() => {});
         return {
           ...prev,
           [data.conversationId]: msgs.map(m => m.id === data.messageId ? { ...m, content: data.content, editedAt: new Date() } : m)
@@ -554,6 +645,8 @@ export function MessagingCenter() {
       setMessagesByConversation(prev => {
         const msgs = prev[data.conversationId];
         if (!msgs) return prev;
+        // Update IndexedDB cache
+        updateCachedMessage(data.conversationId, data.messageId, m => ({ ...m, isDeleted: true, content: null })).catch(() => {});
         return {
           ...prev,
           [data.conversationId]: msgs.map(m => m.id === data.messageId ? { ...m, isDeleted: true, content: null } : m)
@@ -753,7 +846,7 @@ export function MessagingCenter() {
               messages={currentMessages}
               typingStatus={activeConversationId ? typingUsers[activeConversationId] : undefined}
               onSendMessage={handleSendMessage}
-              isLoading={isLoadingMessages}
+              isLoading={isFetchingMessages}
               onBack={() => {
                 setActiveConversationId(null);
                 setActiveConversationData(null);

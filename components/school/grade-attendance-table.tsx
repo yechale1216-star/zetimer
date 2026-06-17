@@ -23,9 +23,10 @@ interface GradeStat {
 interface TableProps {
   data: GradeStat[]
   onDrillDown: (grade: string, section: string, stream: string | null) => void
+  isLoading?: boolean
 }
 
-export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
+export function GradeAttendanceTable({ data, onDrillDown, isLoading }: TableProps) {
   const [sortConfig, setSortConfig] = useState<{ key: keyof GradeStat, direction: 'asc' | 'desc' } | null>(null)
 
   const sortedData = [...data].sort((a, b) => {
@@ -79,7 +80,26 @@ export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedData.map((row, idx) => (
+          {isLoading ? (
+            [1, 2, 3].map((i) => (
+              <TableRow key={i} className="border-slate-100 dark:border-slate-800/50">
+                <TableCell><div className="h-4 bg-slate-200 dark:bg-slate-700 animate-pulse rounded w-16" /></TableCell>
+                <TableCell className="text-center flex items-center justify-center"><div className="h-5 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-full w-10 mt-1" /></TableCell>
+                <TableCell className="text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 animate-pulse rounded w-8 mx-auto" /></TableCell>
+                <TableCell className="text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 animate-pulse rounded w-6 mx-auto" /></TableCell>
+                <TableCell className="text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 animate-pulse rounded w-6 mx-auto" /></TableCell>
+                <TableCell className="text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 animate-pulse rounded w-6 mx-auto" /></TableCell>
+                <TableCell className="text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 animate-pulse rounded w-6 mx-auto" /></TableCell>
+                <TableCell className="text-center"><div className="h-4 bg-slate-200 dark:bg-slate-700 animate-pulse rounded w-6 mx-auto" /></TableCell>
+                <TableCell>
+                  <div className="space-y-1.5">
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 animate-pulse rounded w-8" />
+                    <div className="h-1.5 bg-slate-200 dark:bg-slate-700 animate-pulse rounded w-full" />
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          ) : sortedData.map((row, idx) => (
             <TableRow key={idx} className="border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
               <TableCell className="typography-label text-foreground">{row.grade}</TableCell>
               <TableCell className="text-center">
@@ -101,7 +121,7 @@ export function GradeAttendanceTable({ data, onDrillDown }: TableProps) {
               </TableCell>
             </TableRow>
           ))}
-          {sortedData.length === 0 && (
+          {!isLoading && sortedData.length === 0 && (
             <TableRow>
               <TableCell colSpan={10} className="typography-label h-32 text-center text-muted-foreground">
                 No attendance data found for the selected filters.

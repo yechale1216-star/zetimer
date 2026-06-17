@@ -29,12 +29,15 @@ import { TopNav } from "@/components/layout/top-nav"
 
 import { LanguageProvider, useLanguage } from "@/lib/context/language-context"
 import { useSchool } from "@/lib/context/school-context"
+import { AuthGuard } from "@/components/auth/auth-guard"
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
   return (
-    <LanguageProvider>
-      <ParentLayoutInner>{children}</ParentLayoutInner>
-    </LanguageProvider>
+    <AuthGuard allowedRoles={["parent"]}>
+      <LanguageProvider>
+        <ParentLayoutInner>{children}</ParentLayoutInner>
+      </LanguageProvider>
+    </AuthGuard>
   )
 }
 
@@ -462,8 +465,8 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
         )}
 
         {/* ─── MAIN CONTENT VIEWPORT ───────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto focus:outline-none p-4 md:p-6 bg-muted/10">
-          <div className="max-w-6xl mx-auto space-y-6">
+        <main className="flex-1 flex flex-col overflow-y-auto focus:outline-none p-4 md:p-6 bg-muted/10 relative min-h-0">
+          <div className="max-w-6xl mx-auto space-y-6 flex-1 flex flex-col h-full w-full min-h-0">
             {children}
           </div>
         </main>

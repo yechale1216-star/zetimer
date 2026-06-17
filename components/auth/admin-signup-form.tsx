@@ -10,6 +10,7 @@ import { authService, type SignupCredentials } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 import { ArrowLeft, User, Phone, Mail, Lock, ShieldCheck, Loader2, Eye, EyeOff, CheckCircle2, ExternalLink, MapPin } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/lib/context/auth-context"
 
 interface AdminSignupFormProps {
   onSignupSuccess: () => void
@@ -37,6 +38,7 @@ const strengthConfig = {
 }
 
 export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProps) {
+  const { validateSession } = useAuth()
   const [credentials, setCredentials] = useState<SignupCredentials>({
     phone: "+251",
     email: "",
@@ -182,6 +184,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
           "Admin Account Created",
           `Welcome ${result.user.name}! Let's set up your school.`
         )
+        await validateSession()
         setTimeout(() => {
           onSignupSuccess()
         }, 1000)

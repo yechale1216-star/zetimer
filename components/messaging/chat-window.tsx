@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils/utils';
-import { MessageWindowSkeleton } from './skeletons';
+// MessageWindowSkeleton removed — replaced with Telegram-style thin progress bar
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -169,6 +169,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     isNearBottomRef.current = distFromBottom < 120;
     setShowScrollBtn(distFromBottom > 200);
+
+    const currentScrollY = el.scrollTop;
+    const lastScroll = parseInt(el.dataset.lastScroll || '0', 10);
+    const diff = currentScrollY - lastScroll;
+    
+    if (Math.abs(diff) > 5) {
+      window.dispatchEvent(new CustomEvent('chat-scroll', { 
+        detail: { direction: diff > 0 ? 'down' : 'up' } 
+      }));
+    }
+    el.dataset.lastScroll = currentScrollY.toString();
   };
 
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -432,7 +443,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           </h1>
           
           <p className="text-sm text-muted-foreground/60 max-w-[240px] mx-auto leading-relaxed">
-            {t("select_conversation_to_start")}
+            Select a conversation to start chatting
           </p>
         </motion.div>
       </div>
@@ -548,39 +559,53 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         </div>
       </header>
 
-      {/* Messages Area */}
+      {/* Telegram-style thin loading bar at top of messages — never blocks the chat window */}
+      {isLoading && (
+        <div className="absolute top-[72px] left-0 right-0 z-50 h-[3px] overflow-hidden">
+          <div
+            className="h-full bg-primary/80 rounded-full"
+            style={{
+              width: '40%',
+              animation: 'telegram-progress 1.2s ease-in-out infinite',
+            }}
+          />
+          <style>{`
+            @keyframes telegram-progress {
+              0%   { transform: translateX(-100%); width: 40%; }
+              50%  { width: 60%; }
+              100% { transform: translateX(300%); width: 40%; }
+            }
+          `}</style>
+        </div>
+      )}
+
+      {/* Messages Area - always rendered immediately, never blocked by skeleton */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 scrollbar-hide"
       >
-        {isLoading ? (
-          <MessageWindowSkeleton />
-        ) : (
-          <>
-            <DateSeparator date={t("today")} />
-            {messages.map((message, index) => {
-              const isNextSameSender = messages[index + 1]?.senderId === message.senderId;
-              return (
-                <MessageBubble 
-                  key={message.id} 
-                  message={message} 
-                  isLastInGroup={!isNextSameSender}
-                  isSelectionMode={isSelectionMode}
-                  isSelected={selectedIds.includes(message.id)}
-                  onToggleSelect={() => toggleSelect(message.id)}
-                  onEnterSelectionMode={() => setIsSelectionMode(true)}
-                  t={t}
-                  isGroup={activeConversation.isGroup}
-                  onAction={handleBubbleAction}
-                  currentUser={currentUser}
-                />
-              );
-            })}
-            {/* Invisible anchor element always at the very bottom */}
-            <div ref={messagesEndRef} className="h-0 w-full" />
-          </>
-        )}
+        <DateSeparator date={t("today")} />
+        {messages.map((message, index) => {
+          const isNextSameSender = messages[index + 1]?.senderId === message.senderId;
+          return (
+            <MessageBubble 
+              key={message.id} 
+              message={message} 
+              isLastInGroup={!isNextSameSender}
+              isSelectionMode={isSelectionMode}
+              isSelected={selectedIds.includes(message.id)}
+              onToggleSelect={() => toggleSelect(message.id)}
+              onEnterSelectionMode={() => setIsSelectionMode(true)}
+              t={t}
+              isGroup={activeConversation.isGroup}
+              onAction={handleBubbleAction}
+              currentUser={currentUser}
+            />
+          );
+        })}
+        {/* Invisible anchor element always at the very bottom */}
+        <div ref={messagesEndRef} className="h-0 w-full" />
       </div>
 
       {/* Scroll-to-bottom FAB — visible only when scrolled up */}
@@ -767,7 +792,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                       onClick={() => { fileInputRef.current?.click(); }}
                     >
                       <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                        <ImageIconLucide className="h-5 w-5 text-blue-500 group-hover:text-white" />
+                        <ImageIcon className="h-5 w-5 text-blue-500 group-hover:text-white" />
                       </div>
                       <span className="font-bold text-foreground/80 tracking-tight">Photo</span>
                     </button>

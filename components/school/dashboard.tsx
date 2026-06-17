@@ -475,9 +475,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     })
   }
 
-  if (isLoading) {
-    return <PageSkeleton variant="dashboard" />
-  }
 
   return (
     <div className="space-y-6 px-4 md:px-0">
@@ -568,10 +565,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </div>
               <div className="space-y-0.5">
                 <p className={cn(
-                  "text-[22px] font-bold tracking-tight",
+                  "text-[22px] font-bold tracking-tight flex items-center justify-center min-h-[33px]",
                   item.isRate ? "text-white" : `text-${item.color}-600 dark:text-${item.color}-400`
                 )}>
-                  {item.value}
+                  {isLoading ? (
+                    <span className="inline-block w-12 h-6 bg-current opacity-20 animate-pulse rounded-md" />
+                  ) : (
+                    item.value
+                  )}
                 </p>
                 <p className={cn(
                   "text-[12px] uppercase font-bold tracking-widest leading-none",
@@ -589,14 +590,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
 
       {/* Analytics Dashboard Charts */}
-      {chartData && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-2 px-2">
-              <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <h3 className="typography-card-title text-foreground">5-Day Attendance Trend</h3>
-            </div>
-            <div className="h-[300px] w-full p-6 bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      {/* Analytics Dashboard Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center gap-2 px-2">
+            <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <h3 className="typography-card-title text-foreground">5-Day Attendance Trend</h3>
+          </div>
+          <div className="h-[300px] w-full p-6 bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-center">
+            {isLoading || !chartData ? (
+              <div className="w-full h-full bg-slate-100 dark:bg-slate-800/20 animate-pulse rounded-2xl" />
+            ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData.trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
@@ -617,68 +621,70 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <Area type="monotone" dataKey="rate" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorTrendRate)" />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
+            )}
           </div>
-
-          <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
-            <CardHeader className="pb-0 border-none">
-              <CardTitle className="typography-card-title flex items-center gap-2">
-                <UserCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
-                Today's Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {chartData.statusData.length > 0 ? (
-                <div className="h-[250px] w-full mt-4 p-2 bg-slate-50/50 dark:bg-slate-800/20 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={chartData.statusData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={8}
-                        dataKey="value"
-                      >
-                        {chartData.statusData.map((entry, index) => {
-                          const getColor = (name: string) => {
-                            switch (name.toLowerCase()) {
-                              case 'present': return '#10b981' // Green
-                              case 'late': return '#f59e0b'    // Yellow
-                              case 'absent': return '#ef4444'  // Red
-                              case 'excused': return '#3b82f6' // Blue
-                              default: return '#888888'
-                            }
-                          }
-                          return <Cell key={`cell-${index}`} fill={getColor(entry.name)} />
-                        })}
-                      </Pie>
-                      <RechartsTooltip 
-                        contentStyle={{ backgroundColor: 'var(--card)', borderRadius: '12px', border: '1px solid var(--border)' }}
-                        itemStyle={{ color: 'var(--foreground)', fontWeight: 'bold' }}
-                        labelStyle={{ color: 'var(--muted-foreground)' }}
-                        formatter={(value: number, name: string) => [
-                          `${value} Student${value !== 1 ? 's' : ''}`, 
-                          name
-                        ]}
-                      />
-                      <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-[250px] text-muted-foreground gap-3">
-                  <div className="p-4 bg-muted rounded-full">
-                    <AlertTriangle className="w-8 h-8 opacity-20" />
-                  </div>
-                  <p className="typography-label">No attendance data for today</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
-      )}
+
+        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
+          <CardHeader className="pb-0 border-none">
+            <CardTitle className="typography-card-title flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
+              Today's Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading || !chartData ? (
+              <div className="h-[250px] w-full mt-4 bg-slate-100 dark:bg-slate-800/20 animate-pulse rounded-2xl" />
+            ) : chartData.statusData.length > 0 ? (
+              <div className="h-[250px] w-full mt-4 p-2 bg-slate-50/50 dark:bg-slate-800/20 rounded-xl border border-slate-200 dark:border-slate-700">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData.statusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={8}
+                      dataKey="value"
+                    >
+                      {chartData.statusData.map((entry, index) => {
+                        const getColor = (name: string) => {
+                          switch (name.toLowerCase()) {
+                            case 'present': return '#10b981' // Green
+                            case 'late': return '#f59e0b'    // Yellow
+                            case 'absent': return '#ef4444'  // Red
+                            case 'excused': return '#3b82f6' // Blue
+                            default: return '#888888'
+                          }
+                        }
+                        return <Cell key={`cell-${index}`} fill={getColor(entry.name)} />
+                      })}
+                    </Pie>
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: 'var(--card)', borderRadius: '12px', border: '1px solid var(--border)' }}
+                      itemStyle={{ color: 'var(--foreground)', fontWeight: 'bold' }}
+                      labelStyle={{ color: 'var(--muted-foreground)' }}
+                      formatter={(value: number, name: string) => [
+                        `${value} Student${value !== 1 ? 's' : ''}`, 
+                        name
+                      ]}
+                    />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[250px] text-muted-foreground gap-3">
+                <div className="p-4 bg-muted rounded-full">
+                  <AlertTriangle className="w-8 h-8 opacity-20" />
+                </div>
+                <p className="typography-label">No attendance data for today</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-2">
@@ -686,7 +692,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <h3 className="typography-card-title text-foreground">Recent Activity</h3>
         </div>
         <div className="space-y-3">
-          {recentActivity.length === 0 ? (
+          {isLoading ? (
+            [1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 gap-4 animate-pulse shadow-sm">
+                <div className="flex items-center space-x-4 w-full">
+                  <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
+                  <div className="space-y-2 w-full">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/4" />
+                  </div>
+                </div>
+                <div className="h-6 w-20 bg-slate-200 dark:bg-slate-700 rounded shrink-0" />
+              </div>
+            ))
+          ) : recentActivity.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground bg-white/90 dark:bg-slate-900/90 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
               <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
               <p className="typography-label">No recent attendance activity recorded yet</p>

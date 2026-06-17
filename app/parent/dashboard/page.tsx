@@ -377,9 +377,6 @@ export default function ParentDashboard() {
     return t("good_evening")
   }
 
-  if (isLoading) {
-    return <PageSkeleton variant="dashboard" />
-  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -423,17 +420,33 @@ export default function ParentDashboard() {
               </div>
               <div>
                 <p className="typography-label text-emerald-600 dark:text-emerald-400 uppercase mb-1">{t("today_attendance")}</p>
-                <h2 className="typography-page-title text-foreground">{selectedStudent?.fullName}</h2>
+                <h2 className="typography-page-title text-foreground min-h-[38px] flex items-center">
+                  {isLoading || !selectedStudent ? (
+                    <span className="inline-block w-48 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-md" />
+                  ) : (
+                    selectedStudent?.fullName
+                  )}
+                </h2>
                 <p className="typography-label text-foreground/80 dark:text-foreground/70 mt-1.5 flex items-center gap-2">
-                  <Badge variant="secondary" className="typography-label">{t("grade")} {selectedStudent?.grade}</Badge>
-                  <span className="opacity-40">•</span>
-                  <Badge variant="secondary" className="typography-label">{t("section")} {selectedStudent?.section}</Badge>
+                  {isLoading || !selectedStudent ? (
+                    <span className="inline-block w-24 h-4 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-md" />
+                  ) : (
+                    <>
+                      <Badge variant="secondary" className="typography-label">{t("grade")} {selectedStudent?.grade}</Badge>
+                      <span className="opacity-40">•</span>
+                      <Badge variant="secondary" className="typography-label">{t("section")} {selectedStudent?.section}</Badge>
+                    </>
+                  )}
                 </p>
               </div>
             </div>
 
             <div className="flex-grow max-w-lg w-full">
-              {todayStatus.isSessionBased ? (
+              {isLoading ? (
+                <div className="flex justify-center gap-4">
+                  <div className="p-6 bg-muted/40 border-2 border-border/10 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-sm max-w-xs w-full animate-pulse h-28" />
+                </div>
+              ) : todayStatus.isSessionBased ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Morning */}
                   <div className="p-5 bg-muted/40 border-2 border-border/10 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-sm hover:border-sky-500/20 transition-all">
@@ -494,7 +507,13 @@ export default function ParentDashboard() {
                 />
               </svg>
               <div className="absolute flex flex-col items-center justify-center">
-                <span className="typography-page-title text-foreground">{dashboardStats.rate}%</span>
+                <span className="typography-page-title text-foreground min-h-[38px] flex items-center">
+                  {isLoading ? (
+                    <span className="inline-block w-12 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-md" />
+                  ) : (
+                    `${dashboardStats.rate}%`
+                  )}
+                </span>
                 <span className="typography-label text-muted-foreground uppercase mt-1 opacity-80">{t("rating")}</span>
               </div>
             </div>
@@ -553,25 +572,49 @@ export default function ParentDashboard() {
 
               <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl text-center space-y-1.5 shadow-sm">
                 <span className="typography-label text-emerald-700 dark:text-emerald-400 uppercase">{t("presents")}</span>
-                <p className="typography-page-title text-emerald-600 dark:text-emerald-400">{dashboardStats.presents}</p>
+                <p className="typography-page-title text-emerald-600 dark:text-emerald-400 min-h-[38px] flex items-center justify-center">
+                  {isLoading ? (
+                    <span className="inline-block w-8 h-6 bg-emerald-500/20 animate-pulse rounded-md" />
+                  ) : (
+                    dashboardStats.presents
+                  )}
+                </p>
                 <span className="typography-label text-muted-foreground/80 block">{t("days_in_class")}</span>
               </div>
 
               <div className="p-4 bg-rose-500/5 border border-rose-500/10 rounded-2xl text-center space-y-1.5 shadow-sm">
                 <span className="typography-label text-rose-700 dark:text-rose-400 uppercase">{t("absents")}</span>
-                <p className="typography-page-title text-rose-600 dark:text-rose-400">{dashboardStats.absents}</p>
+                <p className="typography-page-title text-rose-600 dark:text-rose-400 min-h-[38px] flex items-center justify-center">
+                  {isLoading ? (
+                    <span className="inline-block w-8 h-6 bg-rose-500/20 animate-pulse rounded-md" />
+                  ) : (
+                    dashboardStats.absents
+                  )}
+                </p>
                 <span className="typography-label text-muted-foreground/80 block">{t("unexcused_cuts")}</span>
               </div>
 
               <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl text-center space-y-1.5 shadow-sm">
                 <span className="typography-label text-amber-700 dark:text-amber-400 uppercase">{t("late_arrivals")}</span>
-                <p className="typography-page-title text-amber-600 dark:text-amber-400">{dashboardStats.lates}</p>
+                <p className="typography-page-title text-amber-600 dark:text-amber-400 min-h-[38px] flex items-center justify-center">
+                  {isLoading ? (
+                    <span className="inline-block w-8 h-6 bg-amber-500/20 animate-pulse rounded-md" />
+                  ) : (
+                    dashboardStats.lates
+                  )}
+                </p>
                 <span className="typography-label text-muted-foreground/80 block">{t("tardy_logs")}</span>
               </div>
 
               <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl text-center space-y-1.5 shadow-sm">
                 <span className="typography-label text-blue-700 dark:text-blue-400 uppercase">{t("excused")}</span>
-                <p className="typography-page-title text-blue-600 dark:text-blue-400">{dashboardStats.excused}</p>
+                <p className="typography-page-title text-blue-600 dark:text-blue-400 min-h-[38px] flex items-center justify-center">
+                  {isLoading ? (
+                    <span className="inline-block w-8 h-6 bg-blue-500/20 animate-pulse rounded-md" />
+                  ) : (
+                    dashboardStats.excused
+                  )}
+                </p>
                 <span className="typography-label text-muted-foreground/80 block">{t("approved_leaves")}</span>
               </div>
 
@@ -607,7 +650,17 @@ export default function ParentDashboard() {
             </div>
           </CardHeader>
           <CardContent className="p-6 space-y-4 max-h-[300px] overflow-y-auto">
-            {recentAlerts.length === 0 ? (
+            {isLoading ? (
+              [1, 2].map((i) => (
+                <div key={i} className="flex gap-4 p-4 border-2 rounded-2xl animate-pulse bg-slate-50 dark:bg-slate-800/50 border-border/10">
+                  <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700 shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
+                  </div>
+                </div>
+              ))
+            ) : recentAlerts.length === 0 ? (
               <div className="py-12 flex flex-col items-center justify-center text-muted-foreground bg-muted/10 rounded-3xl border-2 border-dashed border-border/20">
                 <CheckCircle className="w-12 h-12 text-emerald-500/50 mb-3" />
                 <p className="typography-label uppercase">{t("no_alerts")}</p>
@@ -669,7 +722,17 @@ export default function ParentDashboard() {
             </Button>
           </CardHeader>
           <CardContent className="p-6 space-y-4 max-h-[350px] overflow-y-auto custom-scrollbar">
-            {announcements.filter(a => a.type !== "emergency").length === 0 ? (
+            {isLoading ? (
+              [1, 2].map((i) => (
+                <div key={i} className="p-5 border-2 rounded-3xl space-y-3 animate-pulse bg-slate-50 dark:bg-slate-800/50 border-border/10">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-12" />
+                  </div>
+                  <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
+                </div>
+              ))
+            ) : announcements.filter(a => a.type !== "emergency").length === 0 ? (
               <div className="py-12 flex flex-col items-center justify-center text-muted-foreground bg-muted/10 rounded-3xl border-2 border-dashed border-border/20">
                 <BookOpen className="w-12 h-12 text-emerald-500/50 mb-3" />
                 <p className="typography-label uppercase font-bold">{t("no_announcements")}</p>

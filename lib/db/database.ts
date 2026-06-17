@@ -359,7 +359,7 @@ class Database extends BaseDatabase {
 
   async initializeSchoolData(schoolId: string | number): Promise<void> {
     this.setSchoolId(schoolId)
-    console.log("[pg] School session initialized:", this.currentSchoolId)
+    console.log("[pg] School session initialized for:", String(schoolId))
   }
 
   async addSchool(schoolData: any): Promise<string | null> {

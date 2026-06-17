@@ -17,6 +17,7 @@ import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Phone } from "lucide-reac
 import { useLanguage } from "@/lib/context/language-context"
 import { useSchool } from "@/lib/context/school-context"
 import { useSearchParams } from "next/navigation"
+import { useAuth } from "@/lib/context/auth-context"
 
 interface LoginFormProps {
   onLoginSuccess: () => void
@@ -29,6 +30,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
   const searchParams = useSearchParams()
   const { t, language, setLanguage } = useLanguage()
   const { setSchoolsFromLogin } = useSchool()
+  const { validateSession } = useAuth()
   const [activeTab, setActiveTab] = useState<"staff" | "parent">("staff")
   const [parentPhone, setParentPhone] = useState("+251")
   const [parentPassword, setParentPassword] = useState("")
@@ -93,6 +95,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         // Populate school context
         if (result.availableSchools && result.availableSchools.length > 0) {
           setSchoolsFromLogin(result.availableSchools, result.user?.schoolId)
+          await validateSession()
           
           if (result.availableSchools.length > 1) {
             router.push("/parent/school-select")
@@ -100,6 +103,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
             router.push("/parent/dashboard")
           }
         } else {
+          await validateSession()
           router.push("/parent/dashboard")
         }
       } else {
@@ -158,6 +162,8 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         setLoginError(null)
         notifications.success("Welcome Back!", `${result.user?.name || "User"}, you've successfully logged in.`)
         
+        await validateSession()
+
         if (result.user?.role === "super_admin") {
           router.push("/super-admin")
         } else {

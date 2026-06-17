@@ -11,9 +11,10 @@ interface ChartsProps {
   trendData: any[]
   distributionData: any[]
   gradeRateData: any[]
+  isLoading?: boolean
 }
 
-export function AttendanceAnalyticsCharts({ trendData, distributionData, gradeRateData }: ChartsProps) {
+export function AttendanceAnalyticsCharts({ trendData, distributionData, gradeRateData, isLoading }: ChartsProps) {
   const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6']
 
   return (
@@ -26,31 +27,35 @@ export function AttendanceAnalyticsCharts({ trendData, distributionData, gradeRa
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData}>
-                <defs>
-                  <linearGradient id="colorRate" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="var(--muted-foreground)" 
-                  fontSize={11} 
-                  tickLine={false} 
-                  axisLine={false}
-                  tickFormatter={(val) => new Date(val).toLocaleDateString("en-ET", { weekday: 'short' })}
-                />
-                <YAxis stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} domain={[0, 100]} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'var(--card)', borderRadius: '12px', border: '1px solid var(--border)' }}
-                />
-                <Area type="monotone" dataKey="rate" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorRate)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-[300px] w-full flex items-center justify-center">
+            {isLoading ? (
+              <div className="w-full h-full bg-slate-100 dark:bg-slate-800/20 animate-pulse rounded-2xl" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendData}>
+                  <defs>
+                    <linearGradient id="colorRate" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="var(--muted-foreground)" 
+                    fontSize={11} 
+                    tickLine={false} 
+                    axisLine={false}
+                    tickFormatter={(val) => new Date(val).toLocaleDateString("en-ET", { weekday: 'short' })}
+                  />
+                  <YAxis stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} domain={[0, 100]} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'var(--card)', borderRadius: '12px', border: '1px solid var(--border)' }}
+                  />
+                  <Area type="monotone" dataKey="rate" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorRate)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -63,28 +68,32 @@ export function AttendanceAnalyticsCharts({ trendData, distributionData, gradeRa
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={distributionData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {distributionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'var(--card)', borderRadius: '12px', border: '1px solid var(--border)' }}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="h-[300px] w-full flex items-center justify-center">
+            {isLoading ? (
+              <div className="w-full h-full bg-slate-100 dark:bg-slate-800/20 animate-pulse rounded-2xl" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={distributionData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {distributionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'var(--card)', borderRadius: '12px', border: '1px solid var(--border)' }}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </CardContent>
       </Card>

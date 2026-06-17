@@ -10,7 +10,8 @@ import {
 } from 'lucide-react'
 import { cn } from "@/lib/utils/utils"
 
-import { authService } from '@/lib/auth/auth'
+import { useAuth } from '@/lib/context/auth-context'
+import { AuthGuard } from '@/components/auth/auth-guard'
 import { useRouter } from 'next/navigation'
 import { notifications } from '@/lib/utils/notifications'
 import { TrialBanner } from '@/components/school/trial-banner'
@@ -26,12 +27,12 @@ const API_URL = apiUrl;
 
 function SuspendedBanner() {
   const [isSuspended, setIsSuspended] = React.useState(false)
+  const { user } = useAuth()
 
   React.useEffect(() => {
     const check = async () => {
       try {
         const token = localStorage.getItem('attendance_token')
-        const user = authService.getCurrentUser()
         if (!user?.schoolId || user?.role === 'super_admin') return
         const res = await fetch(`${API_URL}/api/schools/${user.schoolId}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -44,7 +45,7 @@ function SuspendedBanner() {
       } catch {}
     }
     check()
-  }, [])
+  }, [user])
 
   if (!isSuspended) return null
 
@@ -67,8 +68,8 @@ export default function SchoolAdminLayout({
   const pathname = usePathname()
   const router = useRouter()
 
-  const [user, setUser] = React.useState<any>(null)
-  const [isAdmin, setIsAdmin] = React.useState(false)
+  const { user, features, logout } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [isMounted, setIsMounted] = React.useState(false)
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
   const [showBottomNav, setShowBottomNav] = React.useState(true)
@@ -78,36 +79,41 @@ export default function SchoolAdminLayout({
     const currentScrollY = e.currentTarget.scrollTop
     const diff = currentScrollY - lastScrollY
     
-    // Disappear when scroll UP (current < last), Reappear when scroll DOWN (current > last)
-    if (diff < -5 && currentScrollY > 100) {
+    // Standard behavior: Disappear when scroll DOWN (diff > 5), Reappear when scroll UP (diff < -5)
+    if (diff > 5 && currentScrollY > 100) {
       setShowBottomNav(false)
-    } else if (diff > 5) {
+    } else if (diff < -5) {
       setShowBottomNav(true)
     }
     setLastScrollY(currentScrollY)
   }
 
+  React.useEffect(() => {
+    const handleChatScroll = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.direction === 'down') {
+        setShowBottomNav(false);
+      } else if (customEvent.detail?.direction === 'up') {
+        setShowBottomNav(true);
+      }
+    };
+
+    window.addEventListener('chat-scroll', handleChatScroll);
+    return () => window.removeEventListener('chat-scroll', handleChatScroll);
+  }, []);
 
   React.useEffect(() => {
     setIsMounted(true)
-    const currentUser = authService.getCurrentUser()
-    setUser(currentUser)
-    setIsAdmin(authService.isAdmin())
+  }, [])
 
-    console.log("[RedirectDebug] SchoolAdminLayout mount:", {
-      hasUser: !!currentUser,
-      role: currentUser?.role,
-      onboardingCompleted: currentUser?.onboardingCompleted,
-      pathname
-    })
-
-    if (currentUser?.role === 'admin' && currentUser?.onboardingCompleted === false) {
+  React.useEffect(() => {
+    if (user?.role === 'admin' && user?.onboardingCompleted === false) {
       if (pathname !== "/onboarding") {
         console.log("[RedirectDebug] Redirecting to /onboarding")
         router.replace('/onboarding')
       }
     }
-  }, [router, pathname])
+  }, [user, router, pathname])
 
   // Close sidebar on route change
   React.useEffect(() => {
@@ -116,9 +122,10 @@ export default function SchoolAdminLayout({
 
   const isPublicPage = pathname === "/school/admin/signup"
   const isActive = (path: string) => pathname === path
+  const isCommunicationPage = pathname?.includes('/communication')
 
   const handleLogout = async () => {
-    await authService.logout()
+    await logout()
     notifications.info("Logged Out", "You have been successfully logged out")
     router.push('/login')
   }
@@ -140,16 +147,16 @@ export default function SchoolAdminLayout({
 
   const allNavItems = [
     { href: '/school/admin', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Dashboard', show: true },
-    { href: '/school/admin/announcements', icon: <Megaphone className="w-5 h-5" />, label: 'Announcements', show: true },
-    { href: '/school/admin/communication', icon: <MessageSquare className="w-5 h-5" />, label: 'Communication', show: true },
-    { href: '/school/admin/calls', icon: <Phone className="w-5 h-5" />, label: 'Calls', show: true },
-    { href: '/school/admin/students', icon: <Users className="w-5 h-5" />, label: 'Students', show: true },
-    { href: '/school/admin/teachers', icon: <User className="w-5 h-5" />, label: 'Teachers', show: isAdmin },
-    { href: '/school/admin/teacher-assignments', icon: <BookOpen className="w-5 h-5" />, label: 'Assignments', show: isAdmin },
-    { href: '/school/admin/attendance', icon: <CheckSquare className="w-5 h-5" />, label: 'Attendance', show: true },
-    { href: '/school/admin/attendance-by-grade', icon: <BarChart2 className="w-5 h-5" />, label: 'Grade Analytics', show: true },
-    { href: '/school/admin/reports', icon: <BookOpen className="w-5 h-5" />, label: 'Reports', show: true },
-    { href: '/school/admin/promotion', icon: <TrendingUp className="w-5 h-5" />, label: 'Promotion', show: isAdmin },
+    { href: '/school/admin/announcements', icon: <Megaphone className="w-5 h-5" />, label: 'Announcements', show: features?.includes('messaging') || features?.includes('sms_notifications') },
+    { href: '/school/admin/communication', icon: <MessageSquare className="w-5 h-5" />, label: 'Communication', show: features?.includes('messaging') },
+    { href: '/school/admin/calls', icon: <Phone className="w-5 h-5" />, label: 'Calls', show: features?.includes('video_calls') },
+    { href: '/school/admin/students', icon: <Users className="w-5 h-5" />, label: 'Students', show: features?.includes('student_management') },
+    { href: '/school/admin/teachers', icon: <User className="w-5 h-5" />, label: 'Teachers', show: isAdmin && features?.includes('teacher_management') },
+    { href: '/school/admin/teacher-assignments', icon: <BookOpen className="w-5 h-5" />, label: 'Assignments', show: isAdmin && features?.includes('teacher_management') },
+    { href: '/school/admin/attendance', icon: <CheckSquare className="w-5 h-5" />, label: 'Attendance', show: features?.includes('attendance_tracking') },
+    { href: '/school/admin/attendance-by-grade', icon: <BarChart2 className="w-5 h-5" />, label: 'Grade Analytics', show: features?.includes('advanced_analytics') },
+    { href: '/school/admin/reports', icon: <BookOpen className="w-5 h-5" />, label: 'Reports', show: features?.includes('basic_reports') },
+    { href: '/school/admin/promotion', icon: <TrendingUp className="w-5 h-5" />, label: 'Promotion', show: isAdmin && features?.includes('student_promotion') },
     { href: '/school/admin/subscription', icon: <CreditCard className="w-5 h-5" />, label: 'Subscription & Pricing', show: true },
     { href: '/school/admin/settings', icon: <Settings className="w-5 h-5" />, label: 'Settings', show: isAdmin },
     { href: '/school/admin/profile', icon: <User className="w-5 h-5" />, label: 'Profile', show: true },
@@ -157,9 +164,10 @@ export default function SchoolAdminLayout({
   ]
 
   return (
-    <SubscriptionProvider>
-      <SocketProvider>
-        <CallProvider>
+    <AuthGuard allowedRoles={['admin', 'school_admin']}>
+      <SubscriptionProvider>
+        <SocketProvider>
+          <CallProvider>
           <div className="flex h-screen bg-background dark:bg-slate-950 flex-col md:flex-row relative overflow-hidden">
             {/* Premium Background Pattern & Gradients */}
             <div className="absolute inset-0 pointer-events-none z-0">
@@ -294,18 +302,24 @@ export default function SchoolAdminLayout({
               <TopNav showMenuButton onMenuClick={() => setSidebarOpen(true)} />
 
               <main 
-                className="flex-1 overflow-auto pb-20 md:pb-0"
+                className={cn(
+                  "flex-1 flex flex-col overflow-auto relative min-h-0",
+                  !isCommunicationPage && "pb-20 md:pb-0"
+                )}
                 onScroll={handleMainScroll}
               >
                 <SuspendedBanner />
-                {children}
+                <div className="flex-1 flex flex-col h-full min-h-0">
+                  {children}
+                </div>
               </main>
 
               {/* ── Mobile Bottom Navigation (5 tabs) ── */}
-              <nav className={cn(
-                "md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md shadow-[0_-2px_20px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_20px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-in-out",
-                !showBottomNav ? "translate-y-full" : "translate-y-0"
-              )}>
+              {!isCommunicationPage && (
+                <nav className={cn(
+                  "md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md shadow-[0_-2px_20px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_20px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-in-out",
+                  !showBottomNav ? "translate-y-full" : "translate-y-0"
+                )}>
                 <div className="flex items-stretch justify-around">
                   <MobileTabLink
                     href="/school/admin"
@@ -339,11 +353,13 @@ export default function SchoolAdminLayout({
                   />
                 </div>
               </nav>
+              )}
             </div>
           </div>
         </CallProvider>
       </SocketProvider>
     </SubscriptionProvider>
+    </AuthGuard>
   )
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, Video, Clock, Search, MoreVertical, Calendar, UserPlus, Users, History, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Phone, PhoneOutgoing, PhoneMissed, Video, Clock, Search, MoreVertical, Calendar, UserPlus, Users, History, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils/utils';
 import { format } from 'date-fns';
 import { db } from '@/lib/db/database';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/context/auth-context';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,22 +24,30 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function CallPage() {
+  const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState<'HISTORY' | 'CONTACTS'>('CONTACTS');
   const [filter, setFilter] = useState<'ALL' | 'MISSED'>('ALL');
   const [history, setHistory] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
   
   // Call confirmation state
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any>(null);
 
+  // Re-fetch whenever the view OR the authenticated user/school changes.
+  // This prevents stale contacts from a previous school session showing up.
   useEffect(() => {
-    setCurrentUser(db.getCurrentUser());
+    // Clear contacts immediately when user/school changes to prevent
+    // data from one school flashing before the new school's data loads.
+    setContacts([])
+    setHistory([])
+
+    if (!user?.schoolId) return // Do not fetch until we have a confirmed school
+
     fetchData();
-  }, [view]);
+  }, [view, user?.id, user?.schoolId]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -58,8 +67,8 @@ export default function CallPage() {
   };
 
   const getOtherParticipant = (call: any) => {
-    if (!call.callSession?.participants) return call.user; // Fallback
-    const other = call.callSession.participants.find((p: any) => p.userId !== currentUser?.id);
+    if (!call.callSession?.participants) return call.user;
+    const other = call.callSession.participants.find((p: any) => p.userId !== user?.id);
     return other?.user || call.user;
   };
 

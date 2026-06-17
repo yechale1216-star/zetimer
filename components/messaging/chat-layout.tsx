@@ -18,7 +18,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
   const isMobile = useIsMobile();
 
   return (
-    <div className="flex h-[calc(100vh-64px)] md:h-full bg-background overflow-hidden relative">
+    <div className="flex h-full bg-background overflow-hidden relative">
       {/* Desktop Layout or Mobile Sidebar */}
       <div 
         className={cn(

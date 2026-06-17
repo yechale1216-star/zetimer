@@ -55,6 +55,7 @@ export const viewport: Viewport = {
 import { ThemeProvider } from "@/components/theme-provider"
 import { LanguageProvider } from "@/lib/context/language-context"
 import { SchoolProvider } from "@/lib/context/school-context"
+import { AuthProvider } from "@/lib/context/auth-context"
 
 import { Toaster as SonnerToaster } from "sonner"
 import { PWAClientWrapper } from "@/components/system/pwa-client-wrapper"
@@ -76,12 +77,14 @@ export default function RootLayout({
           enableSystem
         >
           <LanguageProvider>
-            <SchoolProvider>
-              {children}
-              <Toaster />
-              <SonnerToaster position="top-right" richColors />
-              <PWAClientWrapper />
-            </SchoolProvider>
+            <AuthProvider>
+              <SchoolProvider>
+                {children}
+                <Toaster />
+                <SonnerToaster position="top-right" richColors />
+                <PWAClientWrapper />
+              </SchoolProvider>
+            </AuthProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

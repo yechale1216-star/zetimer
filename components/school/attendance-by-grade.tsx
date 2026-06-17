@@ -300,9 +300,6 @@ export function AttendanceByGrade() {
     window.location.href = `/school/admin/attendance/grade/${grade}?${query}`
   }
 
-  if (isLoading && !summary) {
-    return <PageSkeleton variant="table" />
-  }
 
   const gradeRateData = gradeStats.map(s => ({
     grade: `${s.grade} ${s.section}`,
@@ -387,8 +384,12 @@ export function AttendanceByGrade() {
                 <item.icon className={`h-5 w-5 text-${item.color}-600 dark:text-${item.color}-400`} />
               </div>
               <p className="typography-label text-[10px] text-muted-foreground uppercase mb-1">{item.label}</p>
-              <p className={`typography-section-title ${item.isRate ? 'text-primary' : `text-${item.color}-600 dark:text-${item.color}-500`}`}>
-                {item.value}
+              <p className={`typography-section-title flex items-center min-h-[28px] ${item.isRate ? 'text-primary' : `text-${item.color}-600 dark:text-${item.color}-500`}`}>
+                {isLoading ? (
+                  <span className="inline-block w-12 h-6 bg-current opacity-20 animate-pulse rounded-md" />
+                ) : (
+                  item.value
+                )}
               </p>
             </CardContent>
           </Card>
@@ -399,6 +400,7 @@ export function AttendanceByGrade() {
         trendData={trends} 
         distributionData={distributionData} 
         gradeRateData={gradeRateData} 
+        isLoading={isLoading}
       />
 
       <div className="space-y-4">
@@ -406,7 +408,7 @@ export function AttendanceByGrade() {
           <TableIcon className="w-5 h-5 text-primary" />
           <h3 className="typography-label text-foreground">Detailed Grade Statistics</h3>
         </div>
-        <GradeAttendanceTable data={gradeStats} onDrillDown={handleDrillDown} />
+        <GradeAttendanceTable data={gradeStats} onDrillDown={handleDrillDown} isLoading={isLoading} />
       </div>
     </div>
   )

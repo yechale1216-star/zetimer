@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/super-admin/sidebar'
 import { TopNav } from '@/components/super-admin/top-nav'
 import { Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { AuthGuard } from '@/components/auth/auth-guard'
 
 export default function SuperAdminClientLayout({
   children,
@@ -14,7 +15,8 @@ export default function SuperAdminClientLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="flex h-screen bg-background flex-col lg:flex-row">
+    <AuthGuard allowedRoles={['super_admin']}>
+      <div className="flex h-screen bg-background flex-col lg:flex-row">
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
       
       <div className="flex flex-1 flex-col overflow-hidden relative">
@@ -49,5 +51,6 @@ export default function SuperAdminClientLayout({
         />
       )}
     </div>
+    </AuthGuard>
   )
 }

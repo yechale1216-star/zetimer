@@ -21,7 +21,7 @@ import {
   Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/utils'
-import { authService } from '@/lib/auth/auth'
+import { useAuth } from '@/lib/context/auth-context'
 import { useRouter } from 'next/navigation'
 import { Logo } from '@/components/logo'
 
@@ -91,9 +91,10 @@ interface SidebarProps {
 export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { user, logout } = useAuth()
 
   const handleLogout = () => {
-    authService.logout()
+    logout()
     router.push('/login')
   }
 
@@ -146,12 +147,14 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         {/* Bottom Section */}
         <div className="p-4 border-t border-border space-y-2">
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-              <span className="typography-label">SA</span>
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 text-primary font-bold text-xs">
+              <span className="typography-label">
+                {user?.name ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : 'SA'}
+              </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="typography-label text-foreground truncate">Super Admin</p>
-              <p className="typography-helper text-muted-foreground truncate">admin@zetime.io</p>
+              <p className="typography-label text-foreground truncate">{user?.name || 'Super Admin'}</p>
+              <p className="typography-helper text-muted-foreground truncate">{user?.email || 'admin@zetime.io'}</p>
             </div>
           </div>
 

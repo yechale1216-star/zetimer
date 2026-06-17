@@ -18,7 +18,7 @@ export interface AuthenticatedRequest extends Request {
  * Middleware to verify JWT and extract tenant information.
  * Every request must pass through this or a public route.
  */
-export const tenantMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const tenantMiddleware = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   const schoolIdHeader = req.headers['x-school-id'];
 
@@ -46,10 +46,33 @@ export const tenantMiddleware = (req: AuthenticatedRequest, res: Response, next:
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     
-    // For parents, allow overriding schoolId via header
+    // For parents, allow overriding schoolId via header (supports multi-school parents)
+    // BUT validate they actually have a child in the requested school to prevent
+    // cross-school data access via a forged/stale x-school-id header.
     let schoolId = decoded.schoolId;
-    if (decoded.role === 'parent' && schoolIdHeader) {
-      schoolId = schoolIdHeader as string;
+
+    if (decoded.role === 'parent' && schoolIdHeader && schoolIdHeader !== schoolId) {
+      const requestedSchoolId = schoolIdHeader as string;
+      try {
+        // Verify parent has at least one student in the requested school
+        const link = await prisma.parentStudentLink.findFirst({
+          where: {
+            parentId: decoded.id,
+            schoolId: requestedSchoolId,
+          }
+        });
+        if (link) {
+          schoolId = requestedSchoolId;
+        } else {
+          console.warn(
+            `[tenantMiddleware] Parent ${decoded.id} attempted to access school ${requestedSchoolId} but has no student link. Ignoring header override.`
+          );
+          // Keep JWT schoolId - do not allow the override
+        }
+      } catch (dbErr) {
+        console.error('[tenantMiddleware] Failed to verify parent-school link:', dbErr);
+        // On DB error, fall back to JWT schoolId (safe default)
+      }
     }
 
     req.user = {

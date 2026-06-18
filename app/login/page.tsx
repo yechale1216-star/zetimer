@@ -25,16 +25,27 @@ function LoginContent() {
     }
   }, [searchParams])
 
-  const handleLoginSuccess = () => {
-    const user = authService.getCurrentUser()
-    if (user?.role === 'admin') {
-      router.push('/school/admin')
+  const handleLoginSuccess = (userData?: any) => {
+    const user = userData || authService.getCurrentUser()
+    console.log("[Login] Redirecting user with role:", user?.role, "onboarding completed:", user?.onboardingCompleted)
+    
+    if (user?.role === 'admin' || user?.role === 'school_admin' || user?.role === 'school-admin') {
+      if (user?.onboardingCompleted === false) {
+        console.log("[Login] Admin onboarding incomplete, redirecting to Setup Wizard")
+        router.push('/onboarding')
+      } else {
+        router.push('/school/admin')
+      }
     } else if (user?.role === 'teacher') {
       router.push('/school/teacher')
     } else if (user?.role === 'parent') {
       router.push('/parent/dashboard')
     } else if (user?.role === 'super_admin') {
       router.push('/super-admin')
+    } else {
+      // Default fallback to prevent being stuck on login page
+      console.warn("[Login] Unknown role, falling back to school admin dashboard:", user?.role)
+      router.push('/school/admin')
     }
   }
 

@@ -13,7 +13,7 @@ import Link from "next/link"
 import { useAuth } from "@/lib/context/auth-context"
 
 interface AdminSignupFormProps {
-  onSignupSuccess: () => void
+  onSignupSuccess: (user?: any) => void
   onBack: () => void
 }
 
@@ -185,9 +185,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
           `Welcome ${result.user.name}! Let's set up your school.`
         )
         await validateSession()
-        setTimeout(() => {
-          onSignupSuccess()
-        }, 1000)
+        onSignupSuccess(result.user)
       } else {
         const errorMessage = result.error || "Failed to create account"
         setGeneralError(errorMessage)

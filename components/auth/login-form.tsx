@@ -20,7 +20,7 @@ import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/context/auth-context"
 
 interface LoginFormProps {
-  onLoginSuccess: () => void
+  onLoginSuccess: (user?: any) => void
   onShowForgotPassword: () => void
   onShowAdminSignup?: () => void
 }
@@ -167,7 +167,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         if (result.user?.role === "super_admin") {
           router.push("/super-admin")
         } else {
-          onLoginSuccess()
+          onLoginSuccess(result.user)
         }
       } else {
         const errorMessage = result.error || "Invalid email or password"

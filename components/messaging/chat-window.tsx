@@ -74,7 +74,7 @@ interface ChatWindowProps {
   isLoading?: boolean;
 }
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({
+export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   activeConversation,
   messages,
   typingStatus,
@@ -992,7 +992,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       <ImagePreviewListener onPreview={setPreviewImage} />
     </div>
   );
-};
+});
 
 const ImagePreviewListener = ({ onPreview }: { onPreview: (url: string) => void }) => {
   useEffect(() => {
@@ -1011,7 +1011,7 @@ const ImagePreviewListener = ({ onPreview }: { onPreview: (url: string) => void 
   return null;
 };
 
-const CustomAudioPlayer = ({ url, isMe }: { url: string, isMe: boolean }) => {
+const CustomAudioPlayer = React.memo(({ url, isMe }: { url: string, isMe: boolean }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -1079,7 +1079,7 @@ const CustomAudioPlayer = ({ url, isMe }: { url: string, isMe: boolean }) => {
       </div>
     </div>
   );
-};
+});
 
 const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, status }: { file: any, onImageClick: (url: string) => void, isCompact?: boolean, isMe: boolean, status?: string }) => {
   const file = rawFile.create ? rawFile.create : rawFile;
@@ -1230,7 +1230,7 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
   );
 };
 
-const LinkPreview = ({ url }: { url: string }) => {
+const LinkPreview = React.memo(({ url }: { url: string }) => {
   const [metadata, setMetadata] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -1285,9 +1285,9 @@ const LinkPreview = ({ url }: { url: string }) => {
       <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">{metadata?.description}</p>
     </div>
   );
-};
+});
 
-const MessageBubble = ({ 
+const MessageBubble = React.memo(({ 
   message, 
   isLastInGroup, 
   isSelectionMode, 
@@ -1546,8 +1546,18 @@ const MessageBubble = ({
       </div>
     </div>
   </motion.div>
-);
-};
+  );
+}, (prevProps, nextProps) => {
+  // Deep comparison for memoization
+  return prevProps.message.id === nextProps.message.id &&
+         prevProps.message.status === nextProps.message.status &&
+         prevProps.message.content === nextProps.message.content &&
+         prevProps.message.editedAt === nextProps.message.editedAt &&
+         prevProps.isSelected === nextProps.isSelected &&
+         prevProps.isSelectionMode === nextProps.isSelectionMode &&
+         prevProps.isLastInGroup === nextProps.isLastInGroup &&
+         (prevProps.message as any).reactions?.length === (nextProps.message as any).reactions?.length;
+});
 
 const DateSeparator = ({ date }: { date: string }) => (
   <div className="flex justify-center my-6">

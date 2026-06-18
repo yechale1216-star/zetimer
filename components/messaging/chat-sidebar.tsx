@@ -41,7 +41,7 @@ interface ChatSidebarProps {
   currentUser?: { name?: string; profile_photo?: string; id?: string } | null;
 }
 
-export const ChatSidebar: React.FC<ChatSidebarProps> = ({
+export const ChatSidebar: React.FC<ChatSidebarProps> = React.memo(({
   conversations,
   activeConversationId,
   onSelectConversation,
@@ -53,20 +53,24 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
 
-  const filteredConversations = conversations.filter((c) => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.phone && c.phone.replace(/\s+/g, '').includes(searchQuery.replace(/\s+/g, '')));
-    
-    if (activeTab === 'All') return matchesSearch;
-    if (activeTab === 'Staff') return matchesSearch && (c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin' || c.role?.toLowerCase() === 'staff');
-    if (activeTab === 'Parents') return matchesSearch && c.role?.toLowerCase() === 'parent';
-    if (activeTab === 'Unread') return matchesSearch && (c.unreadCount ?? 0) > 0;
-    if (activeTab === 'Groups') return matchesSearch && c.isGroup;
-    
-    return matchesSearch;
-  });
+  const filteredConversations = React.useMemo(() => {
+    return conversations.filter((c) => {
+      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c.phone && c.phone.replace(/\s+/g, '').includes(searchQuery.replace(/\s+/g, '')));
+      
+      if (activeTab === 'All') return matchesSearch;
+      if (activeTab === 'Staff') return matchesSearch && (c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin' || c.role?.toLowerCase() === 'staff');
+      if (activeTab === 'Parents') return matchesSearch && c.role?.toLowerCase() === 'parent';
+      if (activeTab === 'Unread') return matchesSearch && (c.unreadCount ?? 0) > 0;
+      if (activeTab === 'Groups') return matchesSearch && c.isGroup;
+      
+      return matchesSearch;
+    });
+  }, [conversations, searchQuery, activeTab]);
 
-  const onlineUsers = conversations.filter(c => c.isOnline && !c.isGroup);
+  const onlineUsers = React.useMemo(() => 
+    conversations.filter(c => c.isOnline && !c.isGroup),
+  [conversations]);
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden border-r border-border">
@@ -157,86 +161,14 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           <ChatListSkeleton />
         ) : filteredConversations.length > 0 ? (
           <div className="px-2 py-3 space-y-1">
-            {/* Split Recent vs New Contacts */}
             {filteredConversations.map((chat) => (
-               <button
+               <ConversationItem
                  key={chat.id}
-                 onClick={() => onSelectConversation(chat.id)}
-                 className={cn(
-                   "w-full flex items-center gap-3.5 p-3.5 rounded-2xl transition-all duration-200 relative group",
-                   activeConversationId === chat.id
-                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[0.98] z-10"
-                     : "hover:bg-secondary/60 active:scale-[0.98]"
-                 )}
-               >
-                 <div className="relative shrink-0">
-                    <Avatar className={cn(
-                      "h-14 w-14 transition-all duration-300",
-                      activeConversationId === chat.id ? "scale-105" : "group-hover:scale-105 ring-1 ring-border/50 group-hover:ring-primary/20"
-                    )}>
-                      <AvatarImage src={chat.avatar || undefined} />
-                      <AvatarFallback className={cn(
-                        "text-lg font-bold transition-colors",
-                        activeConversationId === chat.id ? "bg-white/20 text-white" : "bg-primary/5 text-primary"
-                      )}>
-                        {chat.name.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    {chat.isOnline && (
-                      <span className="absolute bottom-0.5 right-0.5 h-4 w-4 bg-green-500 border-3 border-background rounded-full" />
-                    )}
-                 </div>
-
-                 <div className="flex-1 min-w-0 text-left">
-                   <div className="flex items-center justify-between mb-1">
-                     <span className={cn(
-                       "font-bold text-[16px] truncate tracking-tight transition-colors",
-                       activeConversationId === chat.id ? "text-white" : "text-foreground/90"
-                     )}>
-                       {chat.name}
-                     </span>
-                     <span className={cn(
-                       "text-[11px] font-medium transition-colors ml-2",
-                       activeConversationId === chat.id ? "text-primary-foreground/60" : "text-muted-foreground/70"
-                     )}>
-                       {chat.timestamp || chat.phone}
-                     </span>
-                   </div>
-                   
-                   <div className="flex items-center justify-between gap-2">
-                     <div className="flex flex-col flex-1 min-w-0">
-                       <p className={cn(
-                         "text-[13px] truncate leading-snug transition-colors",
-                         chat.unreadCount && activeConversationId !== chat.id ? "font-semibold text-foreground" : "opacity-70",
-                         activeConversationId === chat.id ? "text-primary-foreground/80" : "text-muted-foreground"
-                       )}>
-                         {chat.lastMessage || (chat.isNewContact ? (t as any)("start_conversation") : (t as any)("no_messages"))}
-                       </p>
-                       {!chat.isGroup && (
-                         <span className={cn(
-                           "text-[10px] font-bold uppercase tracking-widest mt-1 transition-colors",
-                           activeConversationId === chat.id ? "text-white/40" : "text-muted-foreground/30"
-                         )}>
-                           {(t as any)(chat.role?.toLowerCase() as any)}
-                         </span>
-                       )}
-                     </div>
-
-                     <div className="flex flex-col items-end shrink-0 gap-1.5">
-                       {chat.unreadCount ? (
-                         <div className={cn(
-                           "h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full text-[10px] font-bold shadow-sm transition-all animate-in zoom-in",
-                           activeConversationId === chat.id ? "bg-white text-primary" : "bg-primary text-white"
-                         )}>
-                           {chat.unreadCount}
-                         </div>
-                       ) : chat.isPinned ? (
-                         <Pin className="h-3.5 w-3.5 rotate-45 text-muted-foreground/40" />
-                       ) : null}
-                     </div>
-                   </div>
-                 </div>
-               </button>
+                 chat={chat}
+                 isActive={activeConversationId === chat.id}
+                 onSelect={onSelectConversation}
+                 t={t}
+               />
             ))}
           </div>
         ) : (
@@ -275,9 +207,101 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
       )}
     </div>
   );
-};
+});
 
-const FilterTab = ({ label, active, count, onClick }: { label: string; active: boolean; count?: number, onClick: () => void }) => (
+const ConversationItem = React.memo(({ 
+  chat, 
+  isActive, 
+  onSelect, 
+  t 
+}: { 
+  chat: Conversation; 
+  isActive: boolean; 
+  onSelect: (id: string) => void; 
+  t: any 
+}) => {
+  return (
+    <button
+      onClick={() => onSelect(chat.id)}
+      className={cn(
+        "w-full flex items-center gap-3.5 p-3.5 rounded-2xl transition-all duration-200 relative group",
+        isActive
+          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[0.98] z-10"
+          : "hover:bg-secondary/60 active:scale-[0.98]"
+      )}
+    >
+      <div className="relative shrink-0">
+        <Avatar className={cn(
+          "h-14 w-14 transition-all duration-300",
+          isActive ? "scale-105" : "group-hover:scale-105 ring-1 ring-border/50 group-hover:ring-primary/20"
+        )}>
+          <AvatarImage src={chat.avatar || undefined} />
+          <AvatarFallback className={cn(
+            "text-lg font-bold transition-colors",
+            isActive ? "bg-white/20 text-white" : "bg-primary/5 text-primary"
+          )}>
+            {chat.name.slice(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        {chat.isOnline && (
+          <span className="absolute bottom-0.5 right-0.5 h-4 w-4 bg-green-500 border-3 border-background rounded-full" />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0 text-left">
+        <div className="flex items-center justify-between mb-1">
+          <span className={cn(
+            "font-bold text-[16px] truncate tracking-tight transition-colors",
+            isActive ? "text-white" : "text-foreground/90"
+          )}>
+            {chat.name}
+          </span>
+          <span className={cn(
+            "text-[11px] font-medium transition-colors ml-2",
+            isActive ? "text-primary-foreground/60" : "text-muted-foreground/70"
+          )}>
+            {chat.timestamp || chat.phone}
+          </span>
+        </div>
+        
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col flex-1 min-w-0">
+            <p className={cn(
+              "text-[13px] truncate leading-snug transition-colors",
+              chat.unreadCount && !isActive ? "font-semibold text-foreground" : "opacity-70",
+              isActive ? "text-primary-foreground/80" : "text-muted-foreground"
+            )}>
+              {chat.lastMessage || (chat.isNewContact ? (t as any)("start_conversation") : (t as any)("no_messages"))}
+            </p>
+            {!chat.isGroup && (
+              <span className={cn(
+                "text-[10px] font-bold uppercase tracking-widest mt-1 transition-colors",
+                isActive ? "text-white/40" : "text-muted-foreground/30"
+              )}>
+                {(t as any)(chat.role?.toLowerCase() as any)}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col items-end shrink-0 gap-1.5">
+            {chat.unreadCount ? (
+              <div className={cn(
+                "h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full text-[10px] font-bold shadow-sm transition-all animate-in zoom-in",
+                isActive ? "bg-white text-primary" : "bg-primary text-white"
+              )}>
+                {chat.unreadCount}
+              </div>
+            ) : chat.isPinned ? (
+              <Pin className="h-3.5 w-3.5 rotate-45 text-muted-foreground/40" />
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+});
+
+const FilterTab = React.memo(({ label, active, count, onClick }: { label: string; active: boolean; count?: number, onClick: () => void }) => (
   <button 
     onClick={onClick}
     className={cn(
@@ -296,5 +320,5 @@ const FilterTab = ({ label, active, count, onClick }: { label: string; active: b
       </span>
     )}
   </button>
-);
+));
 

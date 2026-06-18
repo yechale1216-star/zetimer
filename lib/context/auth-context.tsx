@@ -132,8 +132,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: dbUser.email || currentUser!.email,
           phone: dbUser.phone || currentUser!.phone || "",
           profile_photo: dbUser.profile_photo || currentUser!.profile_photo || "",
+          // Critical: preserve existing role if DB returns something suspicious or generic
           role: dbUser.role || currentUser!.role,
+          onboardingCompleted: dbUser.onboardingCompleted ?? currentUser!.onboardingCompleted
         }
+        
+        // Log if role changed unexpectedly
+        if (currentUser!.role && dbUser.role && currentUser!.role !== dbUser.role) {
+          console.warn(`[AuthContext] User role changed from ${currentUser!.role} to ${dbUser.role} during validation`);
+        }
+
         setUser(updatedUser)
         localStorage.setItem("attendance_current_user", JSON.stringify(updatedUser))
         currentUser = updatedUser
@@ -229,6 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Re-validate when network recovers from offline state
   // Use a ref to track offline->online transition to avoid stale closures
+  // Re-validate when network recovers from offline state
   useEffect(() => {
     if (!isOnline) return
     if (!wasOfflineRef.current) return
@@ -236,6 +245,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("[AuthContext] Network recovered from offline. Re-validating session...")
     validateSession()
   }, [isOnline, validateSession])
+
+  // Sync session changes from other tabs or service-level updates
+  useEffect(() => {
+    const handleSessionChange = () => {
+      console.log("[AuthContext] Session changed event detected. Syncing local user...");
+      const cached = localStorage.getItem("attendance_current_user")
+      if (cached) {
+        try {
+          setUser(JSON.parse(cached))
+        } catch (e) {
+          console.error("[AuthContext] Failed to parse session change data", e)
+        }
+      }
+    }
+    window.addEventListener("userSessionChanged", handleSessionChange)
+    window.addEventListener("storage", handleSessionChange) // Support cross-tab sync too
+    return () => {
+      window.removeEventListener("userSessionChanged", handleSessionChange)
+      window.removeEventListener("storage", handleSessionChange)
+    }
+  }, [])
 
   return (
     <AuthContext.Provider

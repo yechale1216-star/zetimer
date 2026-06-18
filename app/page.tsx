@@ -68,17 +68,29 @@ export default function Home() {
     initializeApp()
   }, [])
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = (userData?: any) => {
     setIsAuthenticated(true)
-    const user = authService.getCurrentUser()
+    const user = userData || authService.getCurrentUser()
     console.log("[RedirectDebug] handleAuthSuccess user:", user?.role)
     
-    if (user?.role === "admin") {
-      window.location.href = "/school/admin"
+    if (user?.role === "admin" || user?.role === 'school_admin' || user?.role === 'school-admin') {
+      if (user?.onboardingCompleted === false) {
+        window.location.href = "/onboarding"
+      } else {
+        window.location.href = "/school/admin"
+      }
     } else if (user?.role === "teacher") {
       window.location.href = "/school/teacher"
     } else if (user?.role === "super_admin") {
       window.location.href = "/super-admin"
+    } else if (user?.role === "parent") {
+      window.location.href = "/parent/dashboard"
+    } else {
+       if (user?.onboardingCompleted === false) {
+         window.location.href = "/onboarding"
+       } else {
+         window.location.href = "/school/admin"
+       }
     }
   }
 
@@ -99,15 +111,22 @@ export default function Home() {
   }
 
   // If already authenticated and setup is complete, redirect to dashboard.
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && isAuthenticated) {
     const user = authService.getCurrentUser()
     console.log("[RedirectDebug] app/page.tsx root redirect triggered for role:", user?.role)
     if (user?.role === "super_admin") {
       window.location.replace("/super-admin")
     } else if (user?.role === "teacher") {
       window.location.replace("/school/teacher")
+    } else if (user?.role === "parent") {
+      window.location.replace("/parent/dashboard")
     } else {
-      window.location.replace("/school/admin")
+      // Default fallback for admin or other staff roles
+      if (user?.onboardingCompleted === false) {
+        window.location.replace("/onboarding")
+      } else {
+        window.location.replace("/school/admin")
+      }
     }
   }
 

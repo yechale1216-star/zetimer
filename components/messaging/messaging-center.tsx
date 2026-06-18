@@ -835,7 +835,7 @@ export function MessagingCenter() {
               const chat = conversations.find(c => c.id === id);
               handleSelectConversation(id, chat);
             }}
-            isLoading={isLoadingSidebar}
+            isLoading={isLoadingSidebar || !user}
             currentUser={user}
           />
         }

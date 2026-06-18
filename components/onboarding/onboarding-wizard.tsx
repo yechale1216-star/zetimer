@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { authService } from "@/lib/auth/auth"
+import { useAuth } from "@/lib/context/auth-context"
 import { notifications } from "@/lib/utils/notifications"
 import {
   School,
@@ -55,6 +56,7 @@ const STEPS = [
 
 export default function OnboardingWizard() {
   const router = useRouter()
+  const { validateSession } = useAuth()
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [skipping, setSkipping] = useState(false)
@@ -118,8 +120,11 @@ export default function OnboardingWizard() {
     setSkipping(true)
     // Mark onboarding as done even when skipping so they aren't prompted again
     await authService.completeOnboarding({})
+    // Re-validate session fully so AuthContext has correct schoolId + features
+    // before the Dashboard renders. This prevents any cross-tenant data leak.
+    await validateSession()
     notifications.info("Setup Skipped", "You can complete school setup anytime from Settings.")
-    router.push("/school/admin")
+    router.replace("/school/admin")
   }
 
   const handleFinish = async () => {
@@ -136,7 +141,11 @@ export default function OnboardingWizard() {
 
     if (result.success) {
       notifications.success("Setup Complete!", "Your school is ready to go.")
-      setTimeout(() => router.push("/school/admin"), 800)
+      // Await a full session re-validation (profile + features from backend) before
+      // navigating. This is the guarantee that no stale cross-tenant data ever
+      // reaches the Dashboard — not even for a single render frame.
+      await validateSession()
+      router.replace("/school/admin")
     } else {
       notifications.error("Save Failed", result.message)
     }

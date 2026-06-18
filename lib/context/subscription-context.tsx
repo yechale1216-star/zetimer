@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react"
 import { authService } from "@/lib/auth/auth"
+import { useAuth } from "@/lib/context/auth-context"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
 
 export interface SubscriptionData {
@@ -41,14 +42,24 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Use AuthContext as the single source of truth for the active tenant.
+  // This prevents fetching the wrong school's subscription after onboarding.
+  const { user: authUser } = useAuth()
+  const confirmedSchoolId = authUser?.schoolId || ""
+
   const fetchSubscription = useCallback(async () => {
+    // Never fetch subscription data without a confirmed, non-empty schoolId.
+    // The old code fell back to 's1' (a demo artifact) which would load
+    // completely wrong subscription data for a newly onboarded school.
+    if (!confirmedSchoolId) {
+      setLoading(false)
+      return
+    }
     try {
       setLoading(true)
       setError(null)
-      const user = authService.getCurrentUser()
-      const schoolId = user?.schoolId || "s1" // fallback for demo/dev
 
-      const res = await fetch(`/api/subscriptions/school/${schoolId}`)
+      const res = await fetch(`/api/subscriptions/school/${confirmedSchoolId}`)
       if (!res.ok) {
         if (res.status === 404) {
           setSubscription(null)
@@ -68,8 +79,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [confirmedSchoolId])
 
+  // Re-fetch whenever the confirmed schoolId changes (e.g. post-onboarding)
   useEffect(() => {
     fetchSubscription()
   }, [fetchSubscription])

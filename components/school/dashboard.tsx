@@ -10,6 +10,7 @@ import { notifications } from "@/lib/utils/notifications"
 import { QuickActions } from "@/components/school/quick-actions"
 import { useToast } from "@/hooks/use-toast"
 import { authService } from "@/lib/auth/auth"
+import { useAuth } from "@/lib/context/auth-context"
 import { useSubscription } from "@/lib/context/subscription-context"
 import { useSchoolSettings } from "@/hooks/use-school-settings"
 import { Progress } from "@/components/ui/progress"
@@ -57,6 +58,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [sessionFilter, setSessionFilter] = useState<"morning" | "afternoon" | "total">("total")
   const [rawData, setRawData] = useState<{ today: any[], all: any[], students: Student[] } | null>(null)
   const { toast } = useToast()
+  // Consume the authenticated user from AuthContext — this is the single source of truth
+  // for tenant identity. We NEVER read schoolId directly from localStorage here.
+  const { user: authUser } = useAuth()
   const { subscription } = useSubscription()
   const { settings } = useSchoolSettings()
   const isSessionBased = settings?.attendanceMode === "session_based"
@@ -72,17 +76,25 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       }
     : null
 
+  // CRITICAL TENANT ISOLATION GUARD:
+  // Only load dashboard data once AuthContext has confirmed a non-empty schoolId.
+  // This prevents any cross-tenant data from appearing even for a single render frame
+  // when navigating here immediately after onboarding.
+  const confirmedSchoolId = authUser?.schoolId || ""
+
   useEffect(() => {
+    // Do not fetch anything until the authenticated tenant context is confirmed.
+    if (!confirmedSchoolId) return
+
     loadDashboardData()
 
-    // Add polling for "instant" updates from other users/tabs (every 10 seconds)
+    // Poll for real-time updates from other users/tabs (every 10 seconds)
     const pollInterval = setInterval(() => {
-      // Pass a flag to loadDashboardData to avoid showing full-page loader during background refreshes
       loadDashboardData(true)
     }, 10000)
 
     return () => clearInterval(pollInterval)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [confirmedSchoolId]) // Re-run if schoolId ever changes (e.g. super-admin switching context)
 
   // Re-compute chart/stats when attendance mode setting changes
   // (settings is already loaded, rawData just needs to be re-processed)
@@ -97,7 +109,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const loadDashboardData = async (isBackground = false) => {
     if (!isBackground) setIsLoading(true)
     try {
+      // Safety net: never fetch if schoolId is missing — all API calls would
+      // lack the tenant header and could return another school's data.
       const user = authService.getCurrentUser()
+      if (!user?.schoolId) {
+        console.warn("[Dashboard] loadDashboardData called with no schoolId — aborting to prevent cross-tenant leak")
+        setIsLoading(false)
+        return
+      }
       let students: Student[] = []
 
       if (user?.role === "teacher") {

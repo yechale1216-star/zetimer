@@ -9,6 +9,10 @@ const client_1 = require("@prisma/client");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma = new client_1.PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-long-enough';
+// In-memory cache for school subscription status to avoid repeated DB calls on every message
+// Stores: schoolId -> { status: string, expires: number }
+const schoolStatusCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 const initSocket = (server) => {
     const io = new socket_io_1.Server(server, {
         cors: {
@@ -53,12 +57,28 @@ const initSocket = (server) => {
                 return;
             }
             try {
-                // Verify school subscription status
-                const school = await prisma.school.findUnique({
-                    where: { id: tenant.schoolId },
-                    include: { subscription: true }
-                });
-                const status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
+                // 1. Parallelize initial checks (Subscription status + Conversation verification)
+                // Check cache first for school status
+                const cachedSchool = schoolStatusCache.get(tenant.schoolId);
+                const shouldFetchSchool = !cachedSchool || cachedSchool.expires < Date.now();
+                const [school, conversation] = await Promise.all([
+                    shouldFetchSchool
+                        ? prisma.school.findUnique({
+                            where: { id: tenant.schoolId },
+                            include: { subscription: true }
+                        })
+                        : Promise.resolve(null),
+                    prisma.conversation.findFirst({
+                        where: { id: data.conversationId, schoolId: tenant.schoolId },
+                        select: { id: true } // Only need to know if it exists
+                    })
+                ]);
+                // Update cache if we fetched
+                let status = cachedSchool?.status;
+                if (shouldFetchSchool && school) {
+                    status = (school.subscription?.status || school.subscriptionStatus || 'ACTIVE').toUpperCase();
+                    schoolStatusCache.set(tenant.schoolId, { status: status, expires: Date.now() + CACHE_TTL });
+                }
                 if (status === 'SUSPENDED' || status === 'EXPIRED') {
                     const errorMsg = status === 'SUSPENDED'
                         ? 'Your school account is suspended.'
@@ -69,10 +89,6 @@ const initSocket = (server) => {
                     });
                     return;
                 }
-                // Verify conversation belongs to this school
-                const conversation = await prisma.conversation.findFirst({
-                    where: { id: data.conversationId, schoolId: tenant.schoolId }
-                });
                 if (!conversation) {
                     console.error(`Conversation ${data.conversationId} not found in school ${tenant.schoolId}`);
                     return;
@@ -109,15 +125,17 @@ const initSocket = (server) => {
                         },
                     },
                 });
-                // Broadcast to everyone in the conversation, including the sender
-                // We include tempId so the sender can replace their optimistic message
+                // 3. Broadcast FAST - don't wait for conversation update
                 io.to(data.conversationId).emit('new_message', {
                     ...message,
                     tempId: data.tempId
                 });
-                await prisma.conversation.update({
-                    where: { id: data.conversationId }, // schoolId check already done above
+                // 4. Update conversation timestamp in background (non-blocking)
+                prisma.conversation.update({
+                    where: { id: data.conversationId },
                     data: { updatedAt: new Date() },
+                }).catch(err => {
+                    console.error('Failed to update conversation updatedAt:', err);
                 });
             }
             catch (error) {

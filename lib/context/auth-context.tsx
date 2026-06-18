@@ -134,6 +134,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           profile_photo: dbUser.profile_photo || currentUser!.profile_photo || "",
           // Critical: preserve existing role if DB returns something suspicious or generic
           role: dbUser.role || currentUser!.role,
+          // Always take schoolId from the fresh profile if available — this is
+          // what closes the race window after onboarding completes.
+          schoolId: dbUser.schoolId || dbUser.school_id || currentUser!.schoolId,
           onboardingCompleted: dbUser.onboardingCompleted ?? currentUser!.onboardingCompleted
         }
         
@@ -144,6 +147,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setUser(updatedUser)
         localStorage.setItem("attendance_current_user", JSON.stringify(updatedUser))
+        // Always re-sync x-school-id from the validated profile so the fallback
+        // path in BaseDatabase.getSchoolId() is always authoritative, never stale.
+        if (updatedUser.schoolId) {
+          localStorage.setItem("x-school-id", updatedUser.schoolId)
+        }
         currentUser = updatedUser
       } else {
         throw new Error("Profile API returned success: false")
@@ -259,13 +267,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
+
+    // When onboarding completes, run a FULL re-validation (profile + features from backend).
+    // This prevents any stale features or schoolId from being used during the first
+    // Dashboard render after the wizard completes.
+    const handleOnboardingCompleted = () => {
+      console.log("[AuthContext] Onboarding completed — running full session re-validation...")
+      validateSession()
+    }
+
     window.addEventListener("userSessionChanged", handleSessionChange)
     window.addEventListener("storage", handleSessionChange) // Support cross-tab sync too
+    window.addEventListener("onboardingCompleted", handleOnboardingCompleted)
     return () => {
       window.removeEventListener("userSessionChanged", handleSessionChange)
       window.removeEventListener("storage", handleSessionChange)
+      window.removeEventListener("onboardingCompleted", handleOnboardingCompleted)
     }
-  }, [])
+  }, [validateSession])
 
   return (
     <AuthContext.Provider

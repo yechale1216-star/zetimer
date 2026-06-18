@@ -4,14 +4,18 @@ export const ChatListSkeleton = () => {
   return (
     <div className="flex flex-col gap-1 p-2">
       {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-        <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-transparent">
-          <Skeleton className="h-12 w-12 rounded-full shrink-0" />
-          <div className="flex-1 space-y-2 min-w-0">
+        <div key={i} className="flex items-center gap-3 p-3.5 rounded-2xl border border-transparent">
+          {/* Avatar skeleton */}
+          <Skeleton className="h-14 w-14 rounded-full shrink-0" />
+          <div className="flex-1 space-y-2.5 min-w-0">
             <div className="flex justify-between items-center gap-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-3 w-8" />
+              {/* Name skeleton — varied widths for realistic look */}
+              <Skeleton className={`h-4 ${i % 3 === 0 ? 'w-32' : i % 3 === 1 ? 'w-24' : 'w-28'}`} />
+              {/* Timestamp skeleton */}
+              <Skeleton className="h-3 w-8 shrink-0" />
             </div>
-            <Skeleton className="h-3 w- كامل" />
+            {/* Last message skeleton */}
+            <Skeleton className={`h-3 ${i % 2 === 0 ? 'w-full' : 'w-3/4'}`} />
           </div>
         </div>
       ))}

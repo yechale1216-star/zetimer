@@ -429,7 +429,8 @@ class AuthService {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        // Update local user
+        // Update local user and ALWAYS sync x-school-id so BaseDatabase.getSchoolId()
+        // never falls back to a stale value from a previous session.
         const user = this.getCurrentUser()
         if (user && this.isClient()) {
           const updated = { 
@@ -438,6 +439,13 @@ class AuthService {
             schoolLogo: payload.logoUrl || user.schoolLogo
           }
           localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(updated))
+          // Explicitly overwrite x-school-id so the fallback in BaseDatabase
+          // is always the correct, authenticated tenant — never stale.
+          if (updated.schoolId) {
+            localStorage.setItem("x-school-id", updated.schoolId)
+          }
+          // Signal AuthContext to run a full validateSession() (not just a shallow read).
+          window.dispatchEvent(new CustomEvent("onboardingCompleted", { detail: { schoolId: updated.schoolId } }))
           window.dispatchEvent(new Event("userSessionChanged"))
         }
         return { success: true, message: data.message }

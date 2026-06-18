@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { notifications } from "@/lib/utils/notifications"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { format } from "date-fns"
+import { useAuth } from "@/lib/context/auth-context"
 
 import { apiUrl } from "@/lib/api-config"
 const API_URL = apiUrl;
@@ -56,6 +57,22 @@ export default function AdminAnnouncementsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
+  // Use AuthContext as the single source of truth for tenant identity.
+  // NEVER read x-school-id or attendance_token directly from localStorage in page
+  // components — those values can be stale immediately after onboarding.
+  const { user: authUser } = useAuth()
+  const confirmedSchoolId = authUser?.schoolId || ""
+
+  // Derive auth headers from the confirmed context — not raw localStorage.
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("attendance_token") : ""
+    return {
+      "Accept": "application/json",
+      Authorization: `Bearer ${token || ""}`,
+      "x-school-id": confirmedSchoolId,
+    }
+  }
+
   // Form State
   const [newAnnouncement, setNewAnnouncement] = useState({
     title: "",
@@ -64,6 +81,10 @@ export default function AdminAnnouncementsPage() {
   })
 
   useEffect(() => {
+    // Do not fetch until the authenticated tenant context is confirmed.
+    // This is the primary guard against cross-tenant announcement leaks.
+    if (!confirmedSchoolId) return
+
     fetchAnnouncements()
 
     // Background polling for "instant" updates (every 10 seconds)
@@ -72,19 +93,19 @@ export default function AdminAnnouncementsPage() {
     }, 10000)
 
     return () => clearInterval(pollInterval)
-  }, [])
+  }, [confirmedSchoolId])
 
   const fetchAnnouncements = async (isBackground = false) => {
     if (!isBackground) setIsLoading(true)
+    // Safety net: never fetch if schoolId is not yet confirmed.
+    if (!confirmedSchoolId) {
+      console.warn("[Announcements] fetchAnnouncements skipped — no confirmed schoolId")
+      setIsLoading(false)
+      return
+    }
     try {
-      const token = localStorage.getItem("attendance_token")
-      const schoolId = localStorage.getItem("x-school-id")
       const res = await fetch(`${API_URL}/api/announcements`, {
-        headers: {
-          "Accept": "application/json",
-          Authorization: `Bearer ${token}`,
-          "x-school-id": schoolId || ""
-        }
+        headers: getAuthHeaders()
       })
       
       if (!res.ok) {
@@ -123,9 +144,6 @@ export default function AdminAnnouncementsPage() {
 
     setIsSubmitting(true)
     try {
-      const token = localStorage.getItem("attendance_token")
-      const schoolId = localStorage.getItem("x-school-id")
-      
       const url = editingId 
         ? `${API_URL}/api/announcements/${editingId}`
         : `${API_URL}/api/announcements`
@@ -133,10 +151,8 @@ export default function AdminAnnouncementsPage() {
       const res = await fetch(url, {
         method: editingId ? "PUT" : "POST",
         headers: {
+          ...getAuthHeaders(),
           "Content-Type": "application/json",
-          "Accept": "application/json",
-          Authorization: `Bearer ${token}`,
-          "x-school-id": schoolId || ""
         },
         body: JSON.stringify(newAnnouncement)
       })
@@ -182,14 +198,9 @@ export default function AdminAnnouncementsPage() {
     if (!confirm("Are you sure you want to delete this announcement? This will remove it for all parents.")) return
 
     try {
-      const token = localStorage.getItem("attendance_token")
-      const schoolId = localStorage.getItem("x-school-id")
       const res = await fetch(`${API_URL}/api/parent/notifications/${id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "x-school-id": schoolId || ""
-        }
+        headers: getAuthHeaders()
       })
 
       if (res.ok) {

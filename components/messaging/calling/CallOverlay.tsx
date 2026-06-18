@@ -139,16 +139,34 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
 
     if (status === 'CONNECTING') {
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-white gap-4 p-6 text-center">
-          <Avatar className="h-24 w-24 md:h-28 md:w-28 border-2 border-white/20 animate-pulse shadow-2xl">
+        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-white gap-6 p-6 text-center">
+          <Avatar className="h-28 w-28 border-4 border-white/10 shadow-2xl animate-pulse">
             <AvatarImage src={firstRemote.avatar || undefined} />
-            <AvatarFallback className="text-3xl md:text-4xl bg-slate-800 text-white font-semibold">
+            <AvatarFallback className="text-4xl bg-slate-800 text-white font-semibold">
               {firstRemote.name.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <div className="flex flex-col gap-1">
-            <span className="text-base md:text-lg font-medium tracking-wide">{firstRemote.name}</span>
-            <span className="text-xs md:text-sm text-white/40 animate-pulse">Connecting...</span>
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-xl md:text-2xl font-bold tracking-wide">{firstRemote.name}</span>
+            <div className="flex items-center justify-center gap-2">
+              <div className="flex gap-1">
+                {[0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ scale: [1, 1.5, 1], opacity: [0.4, 1, 0.4] }}
+                    transition={{
+                      repeat: Infinity,
+                      duration: 1,
+                      delay: i * 0.2,
+                    }}
+                    className="h-1.5 w-1.5 rounded-full bg-green-500"
+                  />
+                ))}
+              </div>
+              <p className="text-[10px] md:text-xs text-white/40 uppercase tracking-widest font-semibold">
+                Connecting...
+              </p>
+            </div>
           </div>
         </div>
       );

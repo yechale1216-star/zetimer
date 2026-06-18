@@ -70,13 +70,62 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let timeout: NodeJS.Timeout;
+    let audioCtx: AudioContext | null = null;
+    let oscillator: OscillatorNode | null = null;
+    let gainNode: GainNode | null = null;
+    let ringInterval: NodeJS.Timeout;
+
     if (webrtc.callStatus === 'RINGING' && incomingCallData) {
-      // Auto-missed call after 30 seconds
+      // 1. Auto-missed call after 30 seconds
       timeout = setTimeout(() => {
         handleReject();
       }, 30000);
+
+      // 2. Play synthetic ringing sound
+      try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        audioCtx = new AudioContext();
+        gainNode = audioCtx.createGain();
+        gainNode.connect(audioCtx.destination);
+        
+        const playRing = () => {
+          if (!audioCtx || !gainNode) return;
+          oscillator = audioCtx.createOscillator();
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+          oscillator.frequency.setValueAtTime(480, audioCtx.currentTime + 0.1); // slightly discordant European ring
+          
+          oscillator.connect(gainNode);
+          oscillator.start();
+          gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // low volume
+          
+          // Ring for 2 seconds
+          setTimeout(() => {
+            if (oscillator) {
+              oscillator.stop();
+              oscillator.disconnect();
+            }
+          }, 2000);
+        };
+
+        // Play immediately, then repeat every 4 seconds
+        playRing();
+        ringInterval = setInterval(playRing, 4000);
+      } catch (e) {
+        console.warn('AudioContext not supported or blocked:', e);
+      }
     }
-    return () => clearTimeout(timeout);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(ringInterval);
+      if (oscillator) {
+        try { oscillator.stop(); oscillator.disconnect(); } catch (e) {}
+      }
+      if (audioCtx) {
+        audioCtx.close().catch(() => {});
+      }
+    };
   }, [webrtc.callStatus, incomingCallData]);
 
   const initiateCall = (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => {

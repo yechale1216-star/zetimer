@@ -86,8 +86,12 @@
     "@types/node": "^22",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
+    "fake-indexeddb": "^6.2.5",
+    "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
+    "ts-jest": "^29.4.11",
     "tw-animate-css": "1.3.3",
     "typescript": "^5"
   }

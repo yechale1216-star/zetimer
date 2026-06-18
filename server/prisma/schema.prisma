@@ -513,6 +513,7 @@ model ConversationMember {
   @@unique([conversationId, userId])
   @@index([conversationId])
   @@index([userId])
+  @@index([userId, conversationId])     // presence scoping: find all convs for a user
 }
 
 model Message {
@@ -540,6 +541,8 @@ model Message {
   pinnedIn         PinnedMessage[]
 
   @@index([conversationId])
+  @@index([conversationId, createdAt])   // message pagination — avoids full-table sort
+  @@index([schoolId, conversationId])    // tenant-scoped conversation message fetch
   @@index([senderId])
   @@index([schoolId])
 }

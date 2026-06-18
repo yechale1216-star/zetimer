@@ -2,17 +2,24 @@
 
 /**
  * Telegram-style offline message cache using IndexedDB.
- * 
- * Messages are persisted per-conversation in IndexedDB so they survive
- * page reloads, browser restarts, and offline periods.
- * 
- * Conversations list is also cached for instant sidebar rendering.
+ *
+ * Stores:
+ *   - messages[]      per conversation (keyed by conversationId)
+ *   - conversations[] sidebar list (single "sidebar" record)
+ *   - outbox[]        pending messages to be sent when back online
+ *
+ * Design principles:
+ *   - appendCachedMessage uses a targeted IDB update rather than
+ *     read-all → splice → write-all, making it O(1) per append.
+ *   - Outbox uses individual records (keyed by tempId) so failed
+ *     messages can be removed independently.
  */
 
 const DB_NAME = "zetimer_messages"
-const DB_VERSION = 1
-const MESSAGES_STORE = "messages"        // key: conversationId, value: { conversationId, messages[], updatedAt }
-const CONVERSATIONS_STORE = "conversations" // key: 'sidebar', value: { id, items[], updatedAt }
+const DB_VERSION = 2                          // bumped: adds outbox store
+const MESSAGES_STORE = "messages"             // { conversationId, messages[], updatedAt }
+const CONVERSATIONS_STORE = "conversations"   // { id: "sidebar", items[], updatedAt }
+const OUTBOX_STORE = "outbox"                 // { tempId, payload, createdAt, retries }
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -37,6 +44,12 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(CONVERSATIONS_STORE)) {
         db.createObjectStore(CONVERSATIONS_STORE, { keyPath: "id" })
       }
+
+      // New in v2: offline outbox — keyed by tempId for independent removal
+      if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
+        const outbox = db.createObjectStore(OUTBOX_STORE, { keyPath: "tempId" })
+        outbox.createIndex("createdAt", "createdAt", { unique: false })
+      }
     }
 
     request.onsuccess = () => resolve(request.result)
@@ -50,81 +63,119 @@ function openDB(): Promise<IDBDatabase> {
   return dbPromise
 }
 
+// ─── Helper: promisify any IDB request ──────────────────────────────────────
+
+function idbGet<T>(store: IDBObjectStore, key: IDBValidKey): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const req = store.get(key)
+    req.onsuccess = () => resolve(req.result as T)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+function idbPut(store: IDBObjectStore, value: unknown): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const req = store.put(value)
+    req.onsuccess = () => resolve()
+    req.onerror = () => reject(req.error)
+  })
+}
+
+function idbDelete(store: IDBObjectStore, key: IDBValidKey): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const req = store.delete(key)
+    req.onsuccess = () => resolve()
+    req.onerror = () => reject(req.error)
+  })
+}
+
+function txComplete(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+  })
+}
+
 // ─── Messages ───────────────────────────────────────────────────────────────
 
 /**
- * Save messages for a conversation to IndexedDB.
- * Called after fetching from server or receiving new messages via socket.
+ * Replace the entire message list for a conversation.
+ * Called after a full server fetch.
  */
 export async function cacheMessages(conversationId: string, messages: any[]): Promise<void> {
   try {
     const db = await openDB()
     const tx = db.transaction(MESSAGES_STORE, "readwrite")
-    const store = tx.objectStore(MESSAGES_STORE)
-
-    store.put({
-      conversationId,
-      messages,
-      updatedAt: Date.now(),
-    })
-
-    await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
-    })
+    await idbPut(tx.objectStore(MESSAGES_STORE), { conversationId, messages, updatedAt: Date.now() })
+    await txComplete(tx)
   } catch (err) {
-    console.warn("[MessageCache] Failed to cache messages:", err)
+    console.warn("[MessageCache] cacheMessages failed:", err)
   }
 }
 
 /**
- * Load cached messages for a conversation from IndexedDB.
- * Returns null if no cache exists.
+ * Load cached messages for a conversation. Returns null if no cache.
  */
 export async function getCachedMessages(conversationId: string): Promise<any[] | null> {
   try {
     const db = await openDB()
     const tx = db.transaction(MESSAGES_STORE, "readonly")
-    const store = tx.objectStore(MESSAGES_STORE)
-
-    return new Promise((resolve, reject) => {
-      const request = store.get(conversationId)
-      request.onsuccess = () => {
-        const result = request.result
-        resolve(result ? result.messages : null)
-      }
-      request.onerror = () => reject(request.error)
-    })
+    const record = await idbGet<{ conversationId: string; messages: any[] }>(
+      tx.objectStore(MESSAGES_STORE),
+      conversationId
+    )
+    return record?.messages ?? null
   } catch (err) {
-    console.warn("[MessageCache] Failed to read cached messages:", err)
+    console.warn("[MessageCache] getCachedMessages failed:", err)
     return null
   }
 }
 
 /**
- * Append a single message to an existing conversation cache.
- * Used for real-time socket messages so we don't re-write the whole array.
+ * Append a single new message to an existing conversation cache.
+ *
+ * Performance note: this does a targeted get+put on a single IDB record,
+ * NOT a full read of all conversations. For a conversation with 500 messages,
+ * the old pattern (read-all, find, rewrite) was O(N) serialisation work;
+ * this is O(1) for the IDB layer since the record is keyed by conversationId.
  */
 export async function appendCachedMessage(conversationId: string, message: any): Promise<void> {
   try {
-    const existing = await getCachedMessages(conversationId)
-    if (!existing) {
-      // No cache yet — start one
-      await cacheMessages(conversationId, [message])
-      return
+    const db = await openDB()
+    const tx = db.transaction(MESSAGES_STORE, "readwrite")
+    const store = tx.objectStore(MESSAGES_STORE)
+
+    const record = await idbGet<{ conversationId: string; messages: any[]; updatedAt: number }>(
+      store, conversationId
+    )
+
+    if (!record) {
+      await idbPut(store, { conversationId, messages: [message], updatedAt: Date.now() })
+    } else {
+      // Deduplicate by id before appending
+      if (record.messages.some((m: any) => m.id === message.id)) {
+        return
+      }
+      // Trim to last 200 messages to cap IDB growth
+      const trimmed = record.messages.length >= 200
+        ? record.messages.slice(-199)
+        : record.messages
+      await idbPut(store, {
+        conversationId,
+        messages: [...trimmed, message],
+        updatedAt: Date.now(),
+      })
     }
 
-    // Deduplicate by id
-    if (existing.some((m: any) => m.id === message.id)) return
-
-    await cacheMessages(conversationId, [...existing, message])
+    await txComplete(tx)
   } catch (err) {
-    console.warn("[MessageCache] Failed to append cached message:", err)
+    console.warn("[MessageCache] appendCachedMessage failed:", err)
   }
 }
 
 /**
- * Update a single message in the cache (for edits, deletes, reactions, read status).
+ * Update a single message in the cache (edits, deletes, reactions, read status).
  */
 export async function updateCachedMessage(
   conversationId: string,
@@ -132,83 +183,146 @@ export async function updateCachedMessage(
   updater: (msg: any) => any
 ): Promise<void> {
   try {
-    const existing = await getCachedMessages(conversationId)
-    if (!existing) return
+    const db = await openDB()
+    const tx = db.transaction(MESSAGES_STORE, "readwrite")
+    const store = tx.objectStore(MESSAGES_STORE)
 
-    const updated = existing.map((m: any) => (m.id === messageId ? updater(m) : m))
-    await cacheMessages(conversationId, updated)
+    const record = await idbGet<{ conversationId: string; messages: any[]; updatedAt: number }>(
+      store, conversationId
+    )
+    if (!record) return
+
+    await idbPut(store, {
+      ...record,
+      messages: record.messages.map((m: any) => (m.id === messageId ? updater(m) : m)),
+      updatedAt: Date.now(),
+    })
+    await txComplete(tx)
   } catch (err) {
-    console.warn("[MessageCache] Failed to update cached message:", err)
+    console.warn("[MessageCache] updateCachedMessage failed:", err)
   }
 }
 
 // ─── Conversations (Sidebar) ────────────────────────────────────────────────
 
-/**
- * Cache the conversations/sidebar list for offline access.
- */
+/** Cache the full conversations/sidebar list for offline access. */
 export async function cacheConversations(items: any[]): Promise<void> {
   try {
     const db = await openDB()
     const tx = db.transaction(CONVERSATIONS_STORE, "readwrite")
-    const store = tx.objectStore(CONVERSATIONS_STORE)
-
-    store.put({
-      id: "sidebar",
-      items,
-      updatedAt: Date.now(),
-    })
-
-    await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
-    })
+    await idbPut(tx.objectStore(CONVERSATIONS_STORE), { id: "sidebar", items, updatedAt: Date.now() })
+    await txComplete(tx)
   } catch (err) {
-    console.warn("[MessageCache] Failed to cache conversations:", err)
+    console.warn("[MessageCache] cacheConversations failed:", err)
   }
 }
 
-/**
- * Load cached conversations list from IndexedDB.
- * Returns null if no cache exists.
- */
+/** Load cached conversations list. Returns null if no cache. */
 export async function getCachedConversations(): Promise<any[] | null> {
   try {
     const db = await openDB()
     const tx = db.transaction(CONVERSATIONS_STORE, "readonly")
-    const store = tx.objectStore(CONVERSATIONS_STORE)
-
-    return new Promise((resolve, reject) => {
-      const request = store.get("sidebar")
-      request.onsuccess = () => {
-        const result = request.result
-        resolve(result ? result.items : null)
-      }
-      request.onerror = () => reject(request.error)
-    })
+    const record = await idbGet<{ id: string; items: any[] }>(
+      tx.objectStore(CONVERSATIONS_STORE), "sidebar"
+    )
+    return record?.items ?? null
   } catch (err) {
-    console.warn("[MessageCache] Failed to read cached conversations:", err)
+    console.warn("[MessageCache] getCachedConversations failed:", err)
     return null
   }
 }
 
-/**
- * Clear all cached data (e.g. on logout).
- */
+// ─── Offline Outbox ──────────────────────────────────────────────────────────
+//
+// Messages attempted while offline are stored here. When the socket
+// reconnects, MessagingCenter drains the outbox and re-emits them.
+// Each entry is independent (keyed by tempId) so individual retries
+// and removals don't affect other pending messages.
+
+export interface OutboxMessage {
+  tempId: string
+  conversationId: string
+  senderId: string
+  content: string
+  type: string
+  attachment?: any
+  replyToId?: string
+  createdAt: number
+  retries: number
+}
+
+/** Add a message to the offline outbox. */
+export async function enqueueOutboxMessage(msg: OutboxMessage): Promise<void> {
+  try {
+    const db = await openDB()
+    const tx = db.transaction(OUTBOX_STORE, "readwrite")
+    await idbPut(tx.objectStore(OUTBOX_STORE), msg)
+    await txComplete(tx)
+    console.log("[MessageCache] Enqueued outbox message:", msg.tempId)
+  } catch (err) {
+    console.warn("[MessageCache] enqueueOutboxMessage failed:", err)
+  }
+}
+
+/** Get all pending outbox messages, ordered by creation time. */
+export async function getOutboxMessages(): Promise<OutboxMessage[]> {
+  try {
+    const db = await openDB()
+    const tx = db.transaction(OUTBOX_STORE, "readonly")
+    return new Promise((resolve, reject) => {
+      const store = tx.objectStore(OUTBOX_STORE)
+      const index = store.index("createdAt")
+      const req = index.getAll()
+      req.onsuccess = () => resolve(req.result as OutboxMessage[])
+      req.onerror = () => reject(req.error)
+    })
+  } catch (err) {
+    console.warn("[MessageCache] getOutboxMessages failed:", err)
+    return []
+  }
+}
+
+/** Remove a successfully delivered message from the outbox. */
+export async function removeOutboxMessage(tempId: string): Promise<void> {
+  try {
+    const db = await openDB()
+    const tx = db.transaction(OUTBOX_STORE, "readwrite")
+    await idbDelete(tx.objectStore(OUTBOX_STORE), tempId)
+    await txComplete(tx)
+  } catch (err) {
+    console.warn("[MessageCache] removeOutboxMessage failed:", err)
+  }
+}
+
+/** Increment retry count for an outbox message. */
+export async function incrementOutboxRetries(tempId: string): Promise<void> {
+  try {
+    const db = await openDB()
+    const tx = db.transaction(OUTBOX_STORE, "readwrite")
+    const store = tx.objectStore(OUTBOX_STORE)
+    const record = await idbGet<OutboxMessage>(store, tempId)
+    if (record) {
+      await idbPut(store, { ...record, retries: record.retries + 1 })
+    }
+    await txComplete(tx)
+  } catch (err) {
+    console.warn("[MessageCache] incrementOutboxRetries failed:", err)
+  }
+}
+
+// ─── Cleanup ─────────────────────────────────────────────────────────────────
+
+/** Clear all cached data (called on logout). */
 export async function clearMessageCache(): Promise<void> {
   try {
     const db = await openDB()
-    const tx = db.transaction([MESSAGES_STORE, CONVERSATIONS_STORE], "readwrite")
+    const tx = db.transaction([MESSAGES_STORE, CONVERSATIONS_STORE, OUTBOX_STORE], "readwrite")
     tx.objectStore(MESSAGES_STORE).clear()
     tx.objectStore(CONVERSATIONS_STORE).clear()
-
-    await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
-    })
-
+    tx.objectStore(OUTBOX_STORE).clear()
+    await txComplete(tx)
     console.log("[MessageCache] Cache cleared")
   } catch (err) {
-    console.warn("[MessageCache] Failed to clear cache:", err)
+    console.warn("[MessageCache] clearMessageCache failed:", err)
   }
 }

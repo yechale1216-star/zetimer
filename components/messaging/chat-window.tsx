@@ -1326,7 +1326,7 @@ const MessageBubble = React.memo(({
   };
 
   const handleAction = (action: string, data?: any) => {
-    onAction?.(action, { messageId: message.id, ...data });
+    onAction?.(action, { message, ...data });
   };
 
   const reactions = (message as any).reactions || [];
@@ -1453,11 +1453,11 @@ const MessageBubble = React.memo(({
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent className="w-56 rounded-xl border-none shadow-xl p-2">
-             <ContextMenuItem onClick={handleCopy} className="rounded-lg h-10 gap-3">
+             <ContextMenuItem onClick={() => handleAction('copy')} className="rounded-lg h-10 gap-3">
                <Copy className="h-4 w-4" />
                {t("copy_text")}
              </ContextMenuItem>
-             <ContextMenuItem className="rounded-lg h-10 gap-3">
+             <ContextMenuItem onClick={() => handleAction('reply')} className="rounded-lg h-10 gap-3">
                <Reply className="h-4 w-4" />
                {t("reply")}
              </ContextMenuItem>
@@ -1471,7 +1471,7 @@ const MessageBubble = React.memo(({
                <Pin className="h-4 w-4" />
                Pin Message
              </ContextMenuItem>
-             <ContextMenuItem className="rounded-lg h-10 gap-3">
+             <ContextMenuItem onClick={() => handleAction('forward')} className="rounded-lg h-10 gap-3">
                 <Forward className="h-4 w-4" />
                 {t("forward")}
              </ContextMenuItem>

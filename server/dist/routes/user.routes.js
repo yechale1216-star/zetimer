@@ -75,13 +75,27 @@ router.get('/', async (req, res, next) => {
         next(error);
     }
 });
-// Get all contacts for a school (admin, teacher, parent) - restricted based on requesting user
+// Get all contacts for a school - SECURITY: always scoped to the JWT-authenticated school.
+// For non-parent users, the x-school-id header MUST match the JWT schoolId to prevent
+// cross-school contact list exposure.
 router.get('/contacts', async (req, res, next) => {
     try {
+        // Always use schoolId from JWT (set by tenant middleware) - never blindly trust the header
         const schoolId = req.user?.schoolId;
         if (!schoolId) {
-            return res.status(400).json({ success: false, message: 'School ID required' });
+            return res.status(401).json({ success: false, message: 'Authenticated school ID required' });
         }
+        // For non-parent roles: if x-school-id header is sent, it MUST match the JWT school.
+        // Parents legitimately switch schools via the header, so they are exempt.
+        const headerSchoolId = req.headers['x-school-id'];
+        if (req.user?.role !== 'parent' && headerSchoolId && headerSchoolId !== schoolId) {
+            console.warn(`[contacts] SECURITY: x-school-id header (${headerSchoolId}) does not match JWT schoolId (${schoolId}) for user ${req.user?.id} (role: ${req.user?.role}). Rejecting request.`);
+            return res.status(403).json({
+                success: false,
+                message: 'School ID mismatch: request rejected for security reasons'
+            });
+        }
+        // Always query using JWT schoolId - ignore header value for data scoping
         const contacts = await userService.getContacts(schoolId, req.user);
         res.status(200).json({ success: true, data: contacts });
     }

@@ -64,7 +64,8 @@ const initializePayment = async (data) => {
     // For now we'll just return a simulation URL with the data encoded
     const txId = `TX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     // In a real Chapa integration, we would call Chapa API here and get a real checkout URL
-    const checkoutUrl = `${process.env.FRONTEND_URL || 'https://zetimer-ctgw.onrender.com'}/checkout-simulation?tx_id=${txId}&school_id=${schoolId}&tier=${tier}&period=${billingPeriod}&amount=${totalAmount}&method=${paymentMethod}`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.FRONTEND_URL;
+    const checkoutUrl = `${appUrl}/checkout-simulation?tx_id=${txId}&school_id=${schoolId}&tier=${tier}&period=${billingPeriod}&amount=${totalAmount}&method=${paymentMethod}`;
     return {
         checkout_url: checkoutUrl,
         tx_id: txId

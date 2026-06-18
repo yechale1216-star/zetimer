@@ -57,6 +57,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
   const { socket } = useSocket();
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [remoteMediaStates, setRemoteMediaStates] = useState<Record<string, { isCameraOff: boolean; isMuted: boolean }>>({});
   const [callStatus, setCallStatus] = useState<'IDLE' | 'RINGING' | 'CONNECTING' | 'CONNECTED'>('IDLE');
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
@@ -68,13 +69,28 @@ export const useWebRTC = (options: WebRTCOptions) => {
   const localStreamRef = useRef<MediaStream | null>(null);
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
 
+  // Keep refs of media settings to prevent stale closures in async callbacks
+  const isCameraOffRef = useRef(isCameraOff);
+  const isMutedRef = useRef(isMuted);
+  useEffect(() => { isCameraOffRef.current = isCameraOff; }, [isCameraOff]);
+  useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
+
+  // Queue to buffer incoming ICE candidates until the remote session description is set
+  const queuedCandidates = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+
   const cleanupUser = useCallback((userId: string) => {
     const pc = peerConnections.current.get(userId);
     if (pc) {
       pc.close();
       peerConnections.current.delete(userId);
     }
+    queuedCandidates.current.delete(userId);
     setRemoteStreams(prev => {
+      const next = { ...prev };
+      delete next[userId];
+      return next;
+    });
+    setRemoteMediaStates(prev => {
       const next = { ...prev };
       delete next[userId];
       return next;
@@ -84,11 +100,13 @@ export const useWebRTC = (options: WebRTCOptions) => {
   const cleanupAll = useCallback(() => {
     peerConnections.current.forEach((pc) => pc.close());
     peerConnections.current.clear();
+    queuedCandidates.current.clear();
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
       setLocalStream(null);
     }
     setRemoteStreams({});
+    setRemoteMediaStates({});
     setCallStatus('IDLE');
   }, [localStream]);
 
@@ -102,11 +120,29 @@ export const useWebRTC = (options: WebRTCOptions) => {
     };
 
     pc.ontrack = (event) => {
-      setRemoteStreams(prev => ({
-        ...prev,
-        [userId]: event.streams[0]
-      }));
-      if (options.onRemoteStream) options.onRemoteStream(userId, event.streams[0]);
+      console.log('Received remote track:', event.track.kind);
+      const stream = event.streams[0] || new MediaStream([event.track]);
+      
+      setRemoteStreams(prev => {
+        const existing = prev[userId];
+        if (existing) {
+          // Add track to the existing stream if not present
+          if (!existing.getTracks().find(t => t.id === event.track.id)) {
+            existing.addTrack(event.track);
+          }
+          // Always return a new MediaStream instance so React updates bindings immediately
+          return {
+            ...prev,
+            [userId]: new MediaStream(existing.getTracks())
+          };
+        }
+        return {
+          ...prev,
+          [userId]: stream
+        };
+      });
+
+      if (options.onRemoteStream) options.onRemoteStream(userId, stream);
     };
 
     pc.oniceconnectionstatechange = () => {
@@ -127,7 +163,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
         audio: true,
-        video: type === 'VIDEO',
+        video: type === 'VIDEO' ? { facingMode: 'user' } : false,
       });
       setLocalStream(stream);
 
@@ -161,7 +197,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
         audio: true,
-        video: type === 'VIDEO',
+        video: type === 'VIDEO' ? { facingMode: 'user' } : false,
       });
       setLocalStream(stream);
 
@@ -169,11 +205,30 @@ export const useWebRTC = (options: WebRTCOptions) => {
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+      // Drain queued ICE candidates
+      const queue = queuedCandidates.current.get(fromId) || [];
+      for (const candidate of queue) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+          console.error('Error adding queued candidate:', e);
+        }
+      }
+      queuedCandidates.current.delete(fromId);
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
       if (socket) {
         socket.emit('answer_call', { to: fromId, from: options.userId, answer });
+        // Emit media state immediately on connection
+        socket.emit('media_state_change', {
+          to: fromId,
+          from: options.userId,
+          isCameraOff: isCameraOffRef.current,
+          isMuted: isMutedRef.current,
+        });
       }
       setCallStatus('CONNECTED');
     } catch (error) {
@@ -198,21 +253,47 @@ export const useWebRTC = (options: WebRTCOptions) => {
     if (localStream) {
       const audioTrack = localStream.getAudioTracks()[0];
       if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
+        const nextState = !audioTrack.enabled;
+        audioTrack.enabled = nextState;
+        setIsMuted(!nextState);
+
+        // Notify active connections
+        peerConnections.current.forEach((_, userId) => {
+          if (socket) {
+            socket.emit('media_state_change', {
+              to: userId,
+              from: options.userId,
+              isCameraOff: isCameraOffRef.current,
+              isMuted: !nextState,
+            });
+          }
+        });
       }
     }
-  }, [localStream]);
+  }, [localStream, socket, options.userId]);
 
   const toggleCamera = useCallback(() => {
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
       if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsCameraOff(!videoTrack.enabled);
+        const nextState = !videoTrack.enabled;
+        videoTrack.enabled = nextState;
+        setIsCameraOff(!nextState);
+
+        // Notify active connections
+        peerConnections.current.forEach((_, userId) => {
+          if (socket) {
+            socket.emit('media_state_change', {
+              to: userId,
+              from: options.userId,
+              isCameraOff: !nextState,
+              isMuted: isMutedRef.current,
+            });
+          }
+        });
       }
     }
-  }, [localStream]);
+  }, [localStream, socket, options.userId]);
 
   useEffect(() => {
     if (!socket) return;
@@ -223,8 +304,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
     });
 
     socket.on('call_answered', async (data) => {
-      const pc = peerConnections.current.get(data.from || data.to); // Depending on signal structure
-      // Wait, signaling needs to pass the userId who answered
+      const pc = peerConnections.current.get(data.from || data.to);
     });
 
     // Redefining signaling events for multi-peer
@@ -232,24 +312,62 @@ export const useWebRTC = (options: WebRTCOptions) => {
       const pc = peerConnections.current.get(from);
       if (pc) {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+        // Drain queued ICE candidates
+        const queue = queuedCandidates.current.get(from) || [];
+        for (const candidate of queue) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.error('Error adding queued candidate:', e);
+          }
+        }
+        queuedCandidates.current.delete(from);
+
         setCallStatus('CONNECTED');
         if (options.onCallAccepted) options.onCallAccepted(from);
+
+        // Emit media state immediately on connection
+        if (socket) {
+          socket.emit('media_state_change', {
+            to: from,
+            from: options.userId,
+            isCameraOff: isCameraOffRef.current,
+            isMuted: isMutedRef.current,
+          });
+        }
       }
     };
 
     const handleIceCandidate = async ({ from, candidate }: any) => {
       const pc = peerConnections.current.get(from);
       if (pc) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {
-          console.error('Error adding ice candidate', e);
+        if (pc.remoteDescription && pc.remoteDescription.type) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.error('Error adding ice candidate', e);
+          }
+        } else {
+          if (!queuedCandidates.current.has(from)) {
+            queuedCandidates.current.set(from, []);
+          }
+          queuedCandidates.current.get(from)!.push(candidate);
         }
       }
     };
 
+    const handleMediaStateChanged = ({ from, isCameraOff: remoteCameraOff, isMuted: remoteMuted }: any) => {
+      console.log('Remote media state changed:', from, { remoteCameraOff, remoteMuted });
+      setRemoteMediaStates(prev => ({
+        ...prev,
+        [from]: { isCameraOff: remoteCameraOff, isMuted: remoteMuted }
+      }));
+    };
+
     socket.on('call_answered', handleAnswer);
     socket.on('ice_candidate', handleIceCandidate);
+    socket.on('media_state_changed', handleMediaStateChanged);
     
     socket.on('call_ended', ({ from }: any) => {
       cleanupUser(from);
@@ -271,6 +389,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
       socket.off('incoming_call');
       socket.off('call_answered', handleAnswer);
       socket.off('ice_candidate', handleIceCandidate);
+      socket.off('media_state_changed', handleMediaStateChanged);
       socket.off('call_ended');
       socket.off('call_rejected');
     };
@@ -283,6 +402,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
     isMuted,
     isCameraOff,
     mediaError,
+    remoteMediaStates,
     startCall,
     answerCall,
     endCall,

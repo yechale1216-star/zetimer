@@ -332,6 +332,17 @@ export const initSocket = (server: HttpServer) => {
       }
     });
 
+    socket.on('media_state_change', (data: { to: string; from: string; isCameraOff: boolean; isMuted: boolean }) => {
+      const targetSocketId = userSockets.get(data.to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('media_state_changed', {
+          from: data.from,
+          isCameraOff: data.isCameraOff,
+          isMuted: data.isMuted
+        });
+      }
+    });
+
     socket.on('disconnect', async () => {
       console.log('A user disconnected:', socket.id);
       const data = socketData.get(socket.id);

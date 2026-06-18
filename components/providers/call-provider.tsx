@@ -124,6 +124,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isCameraOff={webrtc.isCameraOff}
           localStream={webrtc.localStream}
           remoteStreams={webrtc.remoteStreams}
+          remoteMediaStates={webrtc.remoteMediaStates}
           participants={participants}
           caller={activeCaller || { name: 'Unknown' }}
           onEndCall={webrtc.endCall}

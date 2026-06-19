@@ -19,13 +19,53 @@ if (firebaseConfig.apiKey) {
 
   messaging.onBackgroundMessage((payload) => {
     console.log('[firebase-messaging-sw.js] Received background message ', payload);
+    
     const notificationTitle = payload.notification.title;
+    const isCall = payload.data && payload.data.type === 'call';
+    
     const notificationOptions = {
       body: payload.notification.body,
-      icon: '/icons/icon-192x192.png',
-      data: payload.data
+      icon: '/icon-192.png', // Fixed path
+      badge: '/icon-192.png', // Added badge for status bar
+      data: payload.data,
+      tag: payload.data ? payload.data.tag || 'zetime-notif' : 'zetime-notif',
+      renotify: true,
+      requireInteraction: isCall, // Keep call notifications on screen until acted upon
+      vibrate: isCall ? [200, 100, 200, 100, 200, 100, 200] : [100],
+      actions: isCall ? [
+        { action: 'answer', title: 'Answer' },
+        { action: 'decline', title: 'Decline' }
+      ] : []
     };
 
     self.registration.showNotification(notificationTitle, notificationOptions);
   });
 }
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const data = event.notification.data;
+  let url = '/';
+
+  if (data && data.url) {
+    url = data.url;
+  } else if (data && data.type === 'call') {
+    url = '/video-call'; // Assuming there is a video call route
+  }
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (var i = 0; i < windowClients.length; i++) {
+        var client = windowClients[i];
+        if (client.url === url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
+  );
+});

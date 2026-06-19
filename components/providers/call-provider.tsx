@@ -94,22 +94,55 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         const playRing = () => {
           if (!audioCtx || !gainNode) return;
-          oscillator = audioCtx.createOscillator();
-          oscillator.type = 'sine';
-          oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
-          oscillator.frequency.setValueAtTime(480, audioCtx.currentTime + 0.1); // slightly discordant European ring
           
-          oscillator.connect(gainNode);
-          oscillator.start();
-          gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // low volume
+          // Create a more professional "musical" dual-tone ring
+          const osc1 = audioCtx.createOscillator();
+          const osc2 = audioCtx.createOscillator();
+          const ringGain = audioCtx.createGain();
           
-          // Ring for 2 seconds
+          osc1.type = 'triangle'; // Softer than sine
+          osc2.type = 'sine';
+          
+          // Classic European dual-tone (400Hz + 450Hz)
+          osc1.frequency.setValueAtTime(400, audioCtx.currentTime); 
+          osc2.frequency.setValueAtTime(450, audioCtx.currentTime);
+          
+          // Add a subtle "warble" or vibrato
+          const vibrato = audioCtx.createOscillator();
+          const vibratoGain = audioCtx.createGain();
+          vibrato.frequency.value = 5; // 5Hz vibrato
+          vibratoGain.gain.value = 5; // 5Hz deviation
+          vibrato.connect(vibratoGain);
+          vibratoGain.connect(osc1.frequency);
+          vibratoGain.connect(osc2.frequency);
+          
+          osc1.connect(ringGain);
+          osc2.connect(ringGain);
+          ringGain.connect(gainNode!);
+          
+          // Fade in/out to avoid clicks
+          const now = audioCtx.currentTime;
+          ringGain.gain.setValueAtTime(0, now);
+          ringGain.gain.linearRampToValueAtTime(0.15, now + 0.1);
+          ringGain.gain.setValueAtTime(0.15, now + 1.8);
+          ringGain.gain.linearRampToValueAtTime(0, now + 2.0);
+          
+          vibrato.start();
+          osc1.start();
+          osc2.start();
+          
+          // Stop after 2 seconds
           setTimeout(() => {
-            if (oscillator) {
-              oscillator.stop();
-              oscillator.disconnect();
-            }
-          }, 2000);
+            try {
+              osc1.stop();
+              osc2.stop();
+              vibrato.stop();
+              osc1.disconnect();
+              osc2.disconnect();
+              vibrato.disconnect();
+              ringGain.disconnect();
+            } catch (e) {}
+          }, 2100);
         };
 
         // Play immediately, then repeat every 4 seconds

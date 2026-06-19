@@ -29,6 +29,7 @@ import { TopNav } from "@/components/layout/top-nav"
 
 import { LanguageProvider, useLanguage } from "@/lib/context/language-context"
 import { useSchool } from "@/lib/context/school-context"
+import { useAuth } from "@/lib/context/auth-context"
 import { AuthGuard } from "@/components/auth/auth-guard"
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
@@ -47,6 +48,7 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
   const { t, language, setLanguage } = useLanguage()
 
   const { activeSchool, availableSchools, clearSchoolContext } = useSchool()
+  const { logout: authLogout } = useAuth()
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [students, setStudents] = useState<any[]>([])
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
@@ -152,8 +154,9 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   const handleLogout = () => {
+    console.log(`[ParentLayout][LOGOUT] parent logout initiated`)
     clearSchoolContext()
-    authService.logout()
+    authLogout() // Uses AuthContext logout to wipe React state AND localStorage
     router.push("/login")
   }
 

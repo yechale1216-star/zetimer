@@ -21,14 +21,25 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
 
   const isLoading = authLoading || permissionsLoading
 
+  // Helper: get the correct home dashboard for a role
+  const getDashboardForRole = (role: string): string => {
+    if (role === "super_admin") return "/super-admin"
+    if (role === "teacher") return "/school/teacher"
+    if (role === "parent") return "/parent/dashboard"
+    if (role === "admin" || role === "school_admin") return "/school/admin"
+    return "/login"
+  }
+
   useEffect(() => {
     if (isLoading) return
 
     if (!user) {
-      console.log(`[AuthGuard] Unauthenticated user. Redirecting to /login from ${pathname}`)
+      console.log(`[AuthGuard] No user — redirecting to /login from ${pathname}`)
       router.replace("/login")
       return
     }
+
+    console.log(`[AuthGuard] Check | userId: ${user.id} | role: ${user.role} | path: ${pathname} | allowedRoles: ${allowedRoles?.join(",") || "any"}`)
 
     if (allowedRoles) {
       const isCurrentlyAuthorized = allowedRoles.includes(user.role);
@@ -47,9 +58,10 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
           return; // Stay on the page, the situational role will settle
         }
 
-        // TRULY UNAUTHORIZED
-        console.warn(`[AuthGuard] Role '${user.role}' not permitted for path '${pathname}' and no alternative role found. Redirecting to home...`);
-        router.replace("/");
+        // TRULY UNAUTHORIZED: redirect to the correct dashboard for this user's role
+        const correctDashboard = getDashboardForRole(user.role)
+        console.warn(`[AuthGuard] Role '${user.role}' not in [${allowedRoles.join(",")}] for path '${pathname}'. Redirecting to: ${correctDashboard}`)
+        router.replace(correctDashboard)
       }
     }
   }, [user, isLoading, allowedRoles, router, pathname, availableSchools])

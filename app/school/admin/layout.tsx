@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils/utils"
 
 import { useAuth } from '@/lib/context/auth-context'
+import { useSchool } from '@/lib/context/school-context'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { useRouter } from 'next/navigation'
 import { notifications } from '@/lib/utils/notifications'
@@ -69,6 +70,7 @@ export default function SchoolAdminLayout({
   const router = useRouter()
 
   const { user, features, logout } = useAuth()
+  const { clearSchoolContext } = useSchool()
   const isAdmin = user?.role === 'admin' || user?.role === 'school_admin'
   const [isMounted, setIsMounted] = React.useState(false)
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
@@ -124,8 +126,10 @@ export default function SchoolAdminLayout({
   const isActive = (path: string) => pathname === path
   const isCommunicationPage = pathname?.includes('/communication')
 
-  const handleLogout = async () => {
-    await logout()
+  const handleLogout = () => {
+    console.log(`[AdminLayout][LOGOUT] userId: ${user?.id} | role: ${user?.role}`)
+    clearSchoolContext()
+    logout()
     notifications.info("Logged Out", "You have been successfully logged out")
     router.push('/login')
   }

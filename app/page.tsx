@@ -71,19 +71,24 @@ export default function Home() {
   const handleAuthSuccess = (userData?: any) => {
     setIsAuthenticated(true)
     const user = userData || authService.getCurrentUser()
-    console.log("[RedirectDebug] handleAuthSuccess user:", user?.role)
+    console.log(`[RootPage] handleAuthSuccess | userId: ${user?.id} | role: ${user?.role}`)
     
     if (user?.role === "admin" || user?.role === 'school_admin' || user?.role === 'school-admin') {
       if (user?.onboardingCompleted === false) {
+        console.log(`[RootPage] Admin onboarding incomplete — redirecting to /onboarding`)
         window.location.href = "/onboarding"
       } else {
+        console.log(`[RootPage] School admin — redirecting to /school/admin`)
         window.location.href = "/school/admin"
       }
     } else if (user?.role === "teacher") {
+      console.log(`[RootPage] Teacher — redirecting to /school/teacher`)
       window.location.href = "/school/teacher"
     } else if (user?.role === "super_admin") {
+      console.log(`[RootPage] Super admin — redirecting to /super-admin`)
       window.location.href = "/super-admin"
     } else if (user?.role === "parent") {
+      console.log(`[RootPage] Parent — redirecting to /parent/dashboard`)
       window.location.href = "/parent/dashboard"
     } else {
        if (user?.onboardingCompleted === false) {
@@ -117,7 +122,7 @@ export default function Home() {
     const schools = availableStr ? JSON.parse(availableStr) : []
     const xSchoolId = localStorage.getItem("x-school-id")
 
-    console.log("[RedirectDebug] app/page.tsx root redirect triggered for role:", user?.role, "Multiple schools:", schools.length)
+    console.log(`[RootPage] Root redirect | userId: ${user?.id} | role: ${user?.role} | multiSchool: ${schools.length > 1}`)
     
     // If multiple schools and haven't explicitly picked one (or just to be safe)
     if (schools.length > 1 && !xSchoolId) {

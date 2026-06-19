@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { authService, type SignupCredentials } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
-import { ArrowLeft, User, Phone, Mail, Lock, ShieldCheck, Loader2, Eye, EyeOff, CheckCircle2, ExternalLink, MapPin } from "lucide-react"
+import { ArrowLeft, User, Phone, Mail, Lock, ShieldCheck, Loader2, Eye, EyeOff, CheckCircle2, ExternalLink, MapPin, ArrowRight } from "lucide-react"
+import { Logo } from "@/components/logo"
 import Link from "next/link"
 
 interface AdminSignupFormProps {
@@ -31,9 +33,9 @@ function getPasswordStrength(password: string): PasswordStrength {
 }
 
 const strengthConfig = {
-  weak: { label: "Weak", color: "bg-destructive", textColor: "text-destructive", width: "w-1/3" },
-  medium: { label: "Medium", color: "bg-yellow-500", textColor: "text-yellow-500", width: "w-2/3" },
-  strong: { label: "Strong", color: "bg-emerald-500", textColor: "text-emerald-500", width: "w-full" },
+  weak: { label: "Weak", color: "bg-destructive", textColor: "text-red-500", width: "w-1/3" },
+  medium: { label: "Medium", color: "bg-yellow-500", textColor: "text-yellow-600", width: "w-2/3" },
+  strong: { label: "Strong", color: "bg-emerald-500", textColor: "text-emerald-600", width: "w-full" },
 }
 
 export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProps) {
@@ -152,7 +154,6 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
       newErrors.terms = "You must accept the Terms & Conditions"
     }
 
-    // Preserve any async field errors already set (e.g., email/phone taken)
     const merged = { ...newErrors }
     if (fieldErrors.email && !newErrors.email) merged.email = fieldErrors.email
     if (fieldErrors.phone && !newErrors.phone) merged.phone = fieldErrors.phone
@@ -182,10 +183,6 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
           "Admin Account Created",
           `Welcome ${result.user.name}! Let's set up your school.`
         )
-        // Redirect immediately — do NOT call validateSession() here.
-        // validateSession() would race against the redirect and could
-        // overwrite localStorage with stale DB data before onboarding loads.
-        // The onboarding page's AuthGuard will call validateSession on mount.
         onSignupSuccess(result.user)
       } else {
         const errorMessage = result.error || "Failed to create account"
@@ -201,27 +198,28 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
   }
 
   return (
-    <Card className="border-border/40 shadow-2xl bg-card/80 backdrop-blur-xl rounded-3xl overflow-hidden border">
-      <CardHeader className="space-y-1 pb-6 pt-8 px-8 text-center relative">
+    <Card className="border-slate-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-2xl bg-white/70 dark:bg-slate-900/40 backdrop-blur-3xl rounded-3xl overflow-hidden border animate-in fade-in duration-500 relative z-10">
+      <CardHeader className="space-y-3 pb-6 pt-9 px-8 text-center relative flex flex-col items-center">
         <Button
           variant="ghost"
           size="icon"
           onClick={onBack}
-          className="absolute left-4 top-4 text-muted-foreground hover:text-foreground rounded-full"
+          className="absolute left-4 top-4 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <CardTitle className="typography-page-title">Create Admin Account</CardTitle>
-        <CardDescription className="text-muted-foreground">
-          Register your school and start tracking attendance
+        <Logo size="md" href="/" withText={true} className="mb-1" />
+        <CardTitle className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none pt-2">Create School Account</CardTitle>
+        <CardDescription className="typography-label text-slate-600 dark:text-slate-400">
+           Enter your school details to get started
         </CardDescription>
       </CardHeader>
 
       <CardContent className="px-6 sm:px-8 pb-8">
         {generalError && (
-          <div className="typography-body bg-destructive/10 border border-destructive/20 rounded-xl p-4 mb-6 animate-in slide-in-from-top-2">
-            <p className="typography-label text-destructive flex items-center gap-2">
-              <span className="typography-card-title">✕</span>
+          <div className="typography-body bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 animate-in slide-in-from-top-2">
+            <p className="typography-label text-red-600 dark:text-red-400 flex items-center gap-2">
+              <span className="typography-card-title text-red-600">✕</span>
               {generalError}
             </p>
           </div>
@@ -231,9 +229,9 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
 
           {/* Admin Name */}
           <div className="space-y-1.5">
-            <Label htmlFor="name">Admin Name</Label>
+            <Label htmlFor="name" className="text-slate-800 dark:text-slate-300">Admin Name</Label>
             <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
                 <User className="w-4 h-4" />
               </div>
               <Input
@@ -242,19 +240,19 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                 value={credentials.name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 required
-                className={`pl-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
-                  fieldErrors.name ? "border-destructive ring-destructive/10" : ""
+                className={`pl-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-11 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl ${
+                  fieldErrors.name ? "border-red-500/50 ring-red-500/20" : ""
                 }`}
               />
             </div>
-            {fieldErrors.name && <p className="text-[10px] text-destructive ml-1">{fieldErrors.name}</p>}
+            {fieldErrors.name && <p className="text-[10px] text-red-600 dark:text-red-400 ml-1 font-medium">{fieldErrors.name}</p>}
           </div>
 
           {/* School Name */}
           <div className="space-y-1.5">
-            <Label htmlFor="schoolName">School Name</Label>
+            <Label htmlFor="schoolName" className="text-slate-800 dark:text-slate-300">School Name</Label>
             <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <Input
@@ -266,106 +264,105 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                   setFieldErrors((prev) => ({ ...prev, schoolName: "" }))
                 }}
                 required
-                className={`pl-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
-                  fieldErrors.schoolName ? "border-destructive ring-destructive/10" : ""
+                className={`pl-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-11 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl ${
+                  fieldErrors.schoolName ? "border-red-500/50 ring-red-500/20" : ""
                 }`}
               />
             </div>
+            {fieldErrors.schoolName && <p className="text-[10px] text-red-600 dark:text-red-400 ml-1 font-medium">{fieldErrors.schoolName}</p>}
           </div>
 
-          <div className="space-y-4">
-            {/* School Address */}
+          {/* School Address */}
+          <div className="space-y-1.5">
+            <Label htmlFor="schoolAddress" className="text-slate-800 dark:text-slate-300">School Address</Label>
+            <div className="relative group">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
+                <MapPin className="w-4 h-4" />
+              </div>
+              <Input
+                id="schoolAddress"
+                placeholder="e.g. Bole, Addis Ababa"
+                value={credentials.schoolAddress}
+                onChange={(e) => {
+                  setCredentials((prev) => ({ ...prev, schoolAddress: e.target.value }))
+                  setFieldErrors((prev) => ({ ...prev, schoolAddress: "" }))
+                }}
+                required
+                className={`pl-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-11 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl ${
+                  fieldErrors.schoolAddress ? "border-red-500/50 ring-red-500/20" : ""
+                }`}
+              />
+            </div>
+            {fieldErrors.schoolAddress && <p className="text-[10px] text-red-600 dark:text-red-400 ml-1 font-medium">{fieldErrors.schoolAddress}</p>}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Phone */}
             <div className="space-y-1.5">
-              <Label htmlFor="schoolAddress">School Address</Label>
+              <Label htmlFor="phone" className="text-slate-800 dark:text-slate-300">Phone</Label>
               <div className="relative group">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
-                  <MapPin className="w-4 h-4" />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
+                  <Phone className="w-4 h-4" />
                 </div>
                 <Input
-                  id="schoolAddress"
-                  placeholder="e.g. Bole, Addis Ababa"
-                  value={credentials.schoolAddress}
-                  onChange={(e) => {
-                    setCredentials((prev) => ({ ...prev, schoolAddress: e.target.value }))
-                    setFieldErrors((prev) => ({ ...prev, schoolAddress: "" }))
-                  }}
+                  id="phone"
+                  type="tel"
+                  placeholder="+2519..."
+                  maxLength={13}
+                  value={credentials.phone}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  onBlur={(e) => handlePhoneBlur(e.target.value)}
                   required
-                  className={`pl-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
-                    fieldErrors.schoolAddress ? "border-destructive ring-destructive/10" : ""
+                  className={`pl-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-11 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl ${
+                    fieldErrors.phone ? "border-red-500/50 ring-red-500/20" : ""
                   }`}
                 />
+                {checkingPhone && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                  </div>
+                )}
               </div>
-              {fieldErrors.schoolAddress && <p className="text-[10px] text-destructive ml-1">{fieldErrors.schoolAddress}</p>}
+              {fieldErrors.phone && <p className="text-[10px] text-red-600 dark:text-red-400 ml-1 font-medium">{fieldErrors.phone}</p>}
             </div>
-          </div>
 
-
-          {/* Phone */}
-          <div className="space-y-1.5">
-            <Label htmlFor="phone">Phone Number</Label>
-            <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
-                <Phone className="w-4 h-4" />
-              </div>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="+251911234567"
-                maxLength={13}
-                value={credentials.phone}
-                onChange={(e) => handlePhoneChange(e.target.value)}
-                onBlur={(e) => handlePhoneBlur(e.target.value)}
-                required
-                className={`pl-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
-                  fieldErrors.phone ? "border-destructive ring-destructive/10" : ""
-                }`}
-              />
-              {checkingPhone && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            {/* Email */}
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-slate-800 dark:text-slate-300">Email</Label>
+              <div className="relative group">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
+                  <Mail className="w-4 h-4" />
                 </div>
-              )}
-            </div>
-            <p className="text-[10px] text-muted-foreground ml-1">Format: +251 911 223344</p>
-            {fieldErrors.phone && <p className="text-[10px] text-destructive ml-1">{fieldErrors.phone}</p>}
-          </div>
-
-          {/* Email */}
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
-                <Mail className="w-4 h-4" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@school.com"
+                  value={credentials.email}
+                  onChange={(e) => {
+                    setCredentials((prev) => ({ ...prev, email: e.target.value }))
+                    setFieldErrors((prev) => ({ ...prev, email: "" }))
+                  }}
+                  onBlur={(e) => handleEmailBlur(e.target.value)}
+                  required
+                  className={`pl-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-11 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl ${
+                    fieldErrors.email ? "border-red-500/50 ring-red-500/20" : ""
+                  }`}
+                />
+                {checkingEmail && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                  </div>
+                )}
               </div>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@school.com"
-                value={credentials.email}
-                onChange={(e) => {
-                  setCredentials((prev) => ({ ...prev, email: e.target.value }))
-                  setFieldErrors((prev) => ({ ...prev, email: "" }))
-                }}
-                onBlur={(e) => handleEmailBlur(e.target.value)}
-                required
-                className={`pl-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
-                  fieldErrors.email ? "border-destructive ring-destructive/10" : ""
-                }`}
-              />
-              {checkingEmail && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                </div>
-              )}
+              {fieldErrors.email && <p className="text-[10px] text-red-600 dark:text-red-400 ml-1 font-medium">{fieldErrors.email}</p>}
             </div>
-            {fieldErrors.email && <p className="text-[10px] text-destructive ml-1">{fieldErrors.email}</p>}
           </div>
 
           {/* Password */}
           <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" className="text-slate-800 dark:text-slate-300">Password</Label>
             <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
                 <Lock className="w-4 h-4" />
               </div>
               <Input
@@ -378,15 +375,15 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                   setFieldErrors((prev) => ({ ...prev, password: "" }))
                 }}
                 required
-                className={`pl-10 pr-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
-                  fieldErrors.password ? "border-destructive ring-destructive/10" : ""
+                className={`pl-10 pr-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-11 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl ${
+                  fieldErrors.password ? "border-red-500/50 ring-red-500/20" : ""
                 }`}
               />
               <button
                 type="button"
                 tabIndex={-1}
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -396,25 +393,24 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
             {/* Password strength indicator */}
             {credentials.password && passwordStrength && (
               <div className="space-y-1 mt-1">
-                <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                <div className="h-1 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${strengthConfig[passwordStrength].color} ${strengthConfig[passwordStrength].width}`}
                   />
                 </div>
-                <p className={`text-[10px] ml-1 font-medium ${strengthConfig[passwordStrength].textColor}`}>
+                <p className={`text-[10px] ml-1 font-bold ${strengthConfig[passwordStrength].textColor}`}>
                   Password strength: {strengthConfig[passwordStrength].label}
                 </p>
               </div>
             )}
-
-            {fieldErrors.password && <p className="text-[10px] text-destructive ml-1">{fieldErrors.password}</p>}
+            {fieldErrors.password && <p className="text-[10px] text-red-600 dark:text-red-400 ml-1 font-medium">{fieldErrors.password}</p>}
           </div>
 
           {/* Confirm Password */}
           <div className="space-y-1.5">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Label htmlFor="confirmPassword" className="text-slate-800 dark:text-slate-300">Confirm Password</Label>
             <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <Input
@@ -427,108 +423,72 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                   setFieldErrors((prev) => ({ ...prev, confirmPassword: "" }))
                 }}
                 required
-                className={`pl-10 pr-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
-                  fieldErrors.confirmPassword ? "border-destructive ring-destructive/10" : ""
+                className={`pl-10 pr-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-11 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl ${
+                  fieldErrors.confirmPassword ? "border-red-500/50 ring-red-500/20" : ""
                 }`}
               />
               <button
                 type="button"
                 tabIndex={-1}
                 onClick={() => setShowConfirmPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                 aria-label={showConfirmPassword ? "Hide password" : "Show password"}
               >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
-              {credentials.confirmPassword && credentials.password === credentials.confirmPassword && (
-                <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                </div>
-              )}
             </div>
-            {fieldErrors.confirmPassword && <p className="text-[10px] text-destructive ml-1">{fieldErrors.confirmPassword}</p>}
+            {fieldErrors.confirmPassword && <p className="text-[10px] text-red-600 dark:text-red-400 ml-1 font-medium">{fieldErrors.confirmPassword}</p>}
           </div>
 
           {/* Terms & Conditions */}
-          <div className="space-y-1">
-            <label
-              htmlFor="terms"
-              className="flex gap-3 items-start cursor-pointer group select-none"
-            >
-              {/* Visual box — pointer-events-none so all clicks reach the label→input */}
-              <div
-                className={`mt-0.5 w-5 h-5 shrink-0 rounded border-2 transition-all flex items-center justify-center pointer-events-none ${
-                  termsAccepted
-                    ? "bg-primary border-primary"
-                    : fieldErrors.terms
-                    ? "border-destructive bg-destructive/5"
-                    : "border-border/70 bg-muted/30 group-hover:border-primary/60"
-                }`}
+          <div className="flex items-start space-x-2 pt-2">
+            <Checkbox
+              id="terms"
+              checked={termsAccepted}
+              onCheckedChange={(checked) => {
+                setTermsAccepted(checked as boolean)
+                setFieldErrors((prev) => ({ ...prev, terms: "" }))
+              }}
+              className="mt-1 border-slate-400 dark:border-white/20 data-[state=checked]:bg-blue-600"
+            />
+            <div className="grid gap-1.5 leading-none">
+              <label
+                htmlFor="terms"
+                className="text-[11px] font-medium text-slate-600 dark:text-slate-400 leading-normal"
               >
-                {termsAccepted && (
-                  <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 12 12">
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </div>
-
-              {/* Hidden native input — label's htmlFor points here, so clicking anywhere in the label toggles this */}
-              <input
-                type="checkbox"
-                id="terms"
-                checked={termsAccepted}
-                onChange={(e) => {
-                  setTermsAccepted(e.target.checked)
-                  setFieldErrors((prev) => ({ ...prev, terms: "" }))
-                }}
-                className="sr-only"
-              />
-
-              <span className="text-xs text-muted-foreground leading-relaxed">
                 I agree to the{" "}
-                <Link
-                  href="/terms"
-                  target="_blank"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-primary underline underline-offset-2 hover:text-primary/80 inline-flex items-center gap-0.5"
-                >
-                  Terms &amp; Conditions
-                  <ExternalLink className="w-2.5 h-2.5" />
+                <Link href="/terms" className="text-blue-700 dark:text-blue-400 hover:underline font-bold">
+                  Terms of Service
                 </Link>{" "}
-                and consent to my school data being processed by Zetime.
-              </span>
-            </label>
-            {fieldErrors.terms && <p className="text-[10px] text-destructive ml-1">{fieldErrors.terms}</p>}
+                and{" "}
+                <Link href="/privacy" className="text-blue-700 dark:text-blue-400 hover:underline font-bold">
+                  Privacy Policy
+                </Link>
+                .
+              </label>
+              {fieldErrors.terms && <p className="text-[10px] text-red-600 dark:text-red-400 font-medium">{fieldErrors.terms}</p>}
+            </div>
           </div>
 
-          {/* Info banner */}
-          <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 flex gap-3 items-start animate-in zoom-in-95 duration-500 delay-150">
-            <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-            <p className="typography-helper text-muted-foreground">
-              <strong className="text-foreground">Full Admin Control:</strong> You&apos;ll complete school setup in a quick onboarding wizard after registration.
-            </p>
-          </div>
-
-          <Button
-            type="submit"
-            className="typography-card-title w-full h-11 rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-[0.98] mt-2"
-            disabled={isLoading || !termsAccepted}
+          <Button 
+            type="submit" 
+            disabled={isLoading} 
+            className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all active:scale-[0.98] mt-4"
           >
             {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating Account...
-              </>
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              "Create Admin Account"
+              <>
+                Create Account <ArrowRight className="ml-2 h-4 w-4" />
+              </>
             )}
           </Button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-border/50 text-center">
-          <p className="typography-helper text-muted-foreground">
+        <div className="mt-8 pt-6 border-t border-slate-300 dark:border-white/5 text-center">
+          <p className="typography-body text-slate-600 dark:text-slate-400">
             Already have an account?{" "}
-            <Button variant="link" onClick={onBack} className="typography-label h-auto p-0 text-primary">
+            <Button variant="link" onClick={onBack} className="text-blue-700 dark:text-blue-400 p-0 h-auto font-bold">
               Sign In
             </Button>
           </p>

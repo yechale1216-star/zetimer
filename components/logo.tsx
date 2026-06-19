@@ -89,7 +89,7 @@ export const Logo: React.FC<LogoProps> = ({
       </div>
       {withText && (
         <span className={cn(
-          "font-black tracking-tighter bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-300 bg-clip-text text-transparent transition-all duration-300 group-hover:tracking-normal drop-shadow-sm",
+          "font-black tracking-tighter transition-all duration-300 group-hover:tracking-normal drop-shadow-sm text-slate-900 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-blue-400 dark:to-indigo-300 dark:text-white",
           textSizes[size]
         )}>
           ZETIME

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { authService } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
+import { Logo } from "@/components/logo"
 import { Eye, EyeOff, CheckCircle2, Lock, Loader2, XCircle } from "lucide-react"
 
 interface ResetPasswordFormProps {
@@ -82,10 +83,10 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
 
   if (tokenValid === null) {
     return (
-      <Card className="border-border/40 shadow-2xl bg-card/80 backdrop-blur-xl rounded-3xl overflow-hidden border animate-pulse">
+      <Card className="border-slate-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-2xl bg-white/70 dark:bg-slate-900/40 backdrop-blur-3xl rounded-3xl overflow-hidden border animate-pulse relative z-10">
         <CardContent className="flex flex-col items-center justify-center py-12 space-y-4">
-          <Loader2 className="h-10 w-10 text-primary animate-spin" />
-          <p className="typography-label text-muted-foreground">Verifying reset token...</p>
+          <Loader2 className="h-10 w-10 text-blue-600 dark:text-blue-400 animate-spin" />
+          <p className="typography-label text-slate-600 dark:text-slate-400">Verifying reset token...</p>
         </CardContent>
       </Card>
     )
@@ -93,19 +94,19 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
 
   if (tokenValid === false) {
     return (
-      <Card className="border-border/40 shadow-2xl bg-card/80 backdrop-blur-xl rounded-3xl overflow-hidden border">
-        <CardHeader className="text-center pt-8 pb-4">
-          <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center mb-4 border border-destructive/20">
-            <XCircle className="w-8 h-8 text-destructive" />
+      <Card className="border-slate-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-2xl bg-white/70 dark:bg-slate-900/40 backdrop-blur-3xl rounded-3xl overflow-hidden border relative z-10">
+        <CardHeader className="text-center pt-9 pb-4 px-8">
+          <div className="mx-auto w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mb-4 border border-red-500/20">
+            <XCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
           </div>
-          <CardTitle className="typography-page-title text-destructive">Invalid Reset Link</CardTitle>
-          <CardDescription>This link is invalid or has expired</CardDescription>
+          <CardTitle className="text-3xl font-black text-red-600 dark:text-red-400 tracking-tight leading-none pt-2">Invalid Reset Link</CardTitle>
+          <CardDescription className="typography-label text-slate-600 dark:text-slate-400">This link is invalid or has expired</CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-8 text-center space-y-6">
-          <p className="typography-body text-muted-foreground">
+          <p className="typography-body text-slate-800 dark:text-slate-300">
             Password reset links expire after 1 hour for security reasons. Please request a new link if needed.
           </p>
-          <Button onClick={() => (window.location.href = "/login")} className="w-full h-11 rounded-xl shadow-lg shadow-primary/10">
+          <Button onClick={() => (window.location.href = "/login")} className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all font-bold">
             Request New Reset Link
           </Button>
         </CardContent>
@@ -114,19 +115,20 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
   }
 
   return (
-    <Card className="border-border/40 shadow-2xl bg-card/80 backdrop-blur-xl rounded-3xl overflow-hidden border">
-      <CardHeader className="space-y-1 pb-6 pt-8 px-8 text-center relative">
-        <CardTitle className="typography-page-title">Set New Password</CardTitle>
-        <CardDescription className="text-muted-foreground">
+    <Card className="border-slate-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-2xl bg-white/70 dark:bg-slate-900/40 backdrop-blur-3xl rounded-3xl overflow-hidden border animate-in fade-in duration-500 relative z-10">
+      <CardHeader className="space-y-4 pb-6 pt-9 px-8 text-center relative flex flex-col items-center">
+        <Logo size="md" withText={true} href="/" className="mb-1" />
+        <CardTitle className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none pt-2">Set New Password</CardTitle>
+        <CardDescription className="typography-label text-slate-600 dark:text-slate-400">
           Create a secure new password for your account
         </CardDescription>
       </CardHeader>
       <CardContent className="px-8 pb-8">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="password">New Password</Label>
+            <Label htmlFor="password" className="text-slate-800 dark:text-slate-300">New Password</Label>
             <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
                 <Lock className="w-4 h-4" />
               </div>
               <Input
@@ -137,12 +139,12 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
                 onChange={(e) => setPasswords((prev) => ({ ...prev, password: e.target.value }))}
                 required
                 minLength={6}
-                className="pl-10 pr-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl"
+                className="pl-10 pr-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-12 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -150,9 +152,9 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm New Password</Label>
+            <Label htmlFor="confirmPassword" className="text-slate-800 dark:text-slate-300">Confirm New Password</Label>
             <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
                 <Lock className="w-4 h-4" />
               </div>
               <Input
@@ -163,12 +165,12 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
                 onChange={(e) => setPasswords((prev) => ({ ...prev, confirmPassword: e.target.value }))}
                 required
                 minLength={6}
-                className="pl-10 pr-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl"
+                className="pl-10 pr-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-12 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -178,12 +180,12 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
           {passwords.password && passwords.confirmPassword && (
             <div className="animate-in fade-in duration-300">
               {passwords.password === passwords.confirmPassword ? (
-                <div className="typography-helper flex items-center text-green-600 bg-green-500/10 p-2 rounded-lg border border-green-500/20">
+                <div className="typography-helper flex items-center text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
                   Passwords match
                 </div>
               ) : (
-                <div className="typography-helper flex items-center text-destructive bg-destructive/10 p-2 rounded-lg border border-destructive/20">
+                <div className="typography-helper flex items-center text-red-600 dark:text-red-400 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
                   <XCircle className="w-3.5 h-3.5 mr-1.5" />
                   Passwords do not match
                 </div>
@@ -193,7 +195,7 @@ export function ResetPasswordForm({ token, onResetSuccess }: ResetPasswordFormPr
 
           <Button 
             type="submit" 
-            className="typography-card-title w-full h-12 rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-[0.98]" 
+            className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all active:scale-[0.98]" 
             disabled={isLoading || passwords.password !== passwords.confirmPassword}
           >
             {isLoading ? (

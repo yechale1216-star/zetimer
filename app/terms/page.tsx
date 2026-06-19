@@ -2,30 +2,22 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { FileText, Scale, AlertCircle, ArrowLeft } from "lucide-react"
+import { Scale, ArrowLeft, ShieldCheck, AlertCircle, Clock } from "lucide-react"
 import { ModeToggle } from "@/components/mode-toggle"
+import { Logo } from "@/components/logo"
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary/20">
+    <div className="min-h-screen premium-mesh-gradient text-slate-900 dark:text-slate-100 selection:bg-blue-500/20">
       {/* Navigation */}
-      <nav className="border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-50 w-full overflow-hidden">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <Link href="/" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-xs sm:text-sm">Z</span>
-              </div>
-              <span className="text-lg sm:text-xl font-bold tracking-tight">Zetime</span>
-            </Link>
-            <div className="flex items-center gap-2 sm:gap-4">
-              <Link href="/about" className="text-xs sm:text-sm font-medium hover:text-primary transition-colors hidden sm:block">
-                About
-              </Link>
-              <div className="scale-90 sm:scale-100">
-                <ModeToggle />
-              </div>
-              <Button asChild size="sm" variant="outline" className="h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm">
+      <nav className="sticky top-0 z-50 w-full border-b border-white/40 dark:border-white/10 bg-white/40 dark:bg-slate-950/40 backdrop-blur-2xl">
+        <div className="max-w-7xl mx-auto px-8">
+          <div className="flex justify-between h-20 items-center">
+            <Logo size="md" withText={true} href="/" />
+            <div className="flex items-center gap-6">
+              <Link href="/about" className="text-[11px] font-black text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors uppercase tracking-widest hidden sm:block">About</Link>
+              <ModeToggle />
+              <Button asChild size="sm" variant="outline" className="rounded-xl border-slate-200 dark:border-white/10 font-bold">
                 <Link href="/login">Login</Link>
               </Button>
             </div>
@@ -33,99 +25,95 @@ export default function TermsPage() {
         </div>
       </nav>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <Link href="/about" className="inline-flex items-center text-sm text-primary mb-8 hover:underline">
-          <ArrowLeft className="mr-2 w-4 h-4" /> Back to About
+      <main className="max-w-4xl mx-auto px-8 py-20 relative z-10">
+        <Link href="/" className="inline-flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-12 hover:translate-x-[-4px] transition-transform">
+          <ArrowLeft className="mr-2 w-4 h-4" /> Back to Home
         </Link>
         
-        <div className="space-y-4 mb-12">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-            <Scale className="w-8 h-8 text-primary" />
+        <div className="space-y-6 mb-16">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-500/20">
+            <Scale className="w-8 h-8" />
           </div>
-          <h1 className="text-4xl font-bold tracking-tight">Terms of Service</h1>
-          <p className="text-muted-foreground">Last updated: June 13, 2026</p>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-none">Terms of <br /><span className="text-indigo-600">Service.</span></h1>
+          <p className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-relaxed">System Agreement &middot; Last updated: June 13, 2026</p>
         </div>
 
-        <div className="prose prose-slate dark:prose-invert max-w-none">
-          <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">1. Acceptance of Terms</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              By accessing and using Zetime, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
+        <div className="space-y-12 text-slate-600 dark:text-slate-400">
+          <section>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 uppercase tracking-tight">1. Core Agreement</h2>
+            <p className="leading-relaxed font-medium">
+              By accessing and using Zetime, you agree to be bound by these Terms of Service. These terms govern the relationship between your institution and Zetime's technical infrastructure.
             </p>
           </section>
 
-          <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">2. Account & Onboarding</h2>
-            <p className="text-muted-foreground mb-4 leading-relaxed">
-              Schools must complete the official onboarding process to verify institutional status. 
-              You are responsible for maintaining the confidentiality of your account credentials. 
-              Admins are responsible for the accuracy of student data and teacher assignments.
+          <section>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 uppercase tracking-tight">2. Institutional Onboarding</h2>
+            <p className="mb-6 leading-relaxed">
+              Account activation requires official school verification. The Primary Administrator holds sole responsibility for:
             </p>
-          </section>
-
-          <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-6 mb-10">
-            <div className="flex items-center gap-3 mb-3">
-              <AlertCircle className="w-5 h-5 text-amber-600" />
-              <h3 className="font-bold text-amber-700">Messaging & Document Policy</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <PolicyCard 
+                icon={<ShieldCheck className="w-4 h-4" />}
+                title="Staff Validation"
+                desc="Ensuring only authorized educators access student attendance data."
+              />
+              <PolicyCard 
+                icon={<Clock className="w-4 h-4" />}
+                title="Audit Accuracy"
+                desc="Maintaining precise records for legal and institutional compliance."
+              />
             </div>
-            <p className="text-sm text-amber-800/80 leading-relaxed">
-              The Zetime Messaging Center is for professional educational communication only. 
-              Users are prohibited from sharing sensitive personal data of students in chat text, 
-              and must only upload documents relevant to official school business.
-            </p>
+          </section>
+
+          <div className="p-8 rounded-[32px] bg-slate-950 text-white border border-white/10 shadow-2xl relative overflow-hidden">
+             <div className="flex items-center gap-4 mb-6">
+                <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                   <AlertCircle className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-black uppercase tracking-widest">Communication Policy</h3>
+             </div>
+             <p className="text-slate-400 leading-relaxed font-medium">
+                The Messaging Center and high-priority notification system are strictly for professional educational coordination. 
+                Any misuse of these channels for non-academic solicitation or unverified document sharing will lead to 
+                immediate institutional account suspension.
+             </p>
           </div>
 
-          <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">3. Subscriptions & PWA Usage</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              Service is provided based on the selected subscription tier. Full functionality, including 
-              offline mode via our PWA, is subject to maintaining an active subscription. 
-              Offline data synchronization occurs automatically when a connection is restored.
-            </p>
-          </section>
-
-          <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">4. System Integrity</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              Unauthorized attempts to bypass security measures, access other school databases, 
-              or manipulate audit logs will result in immediate termination of service and 
-              potential legal action.
-            </p>
-          </section>
-
-          <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">5. Limitation of Liability</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              Zetime provides the platform "as is". While we strive for 100% uptime, 
-              we are not liable for data loss due to device hardware failure or service 
-              interruptions beyond our control.
-            </p>
-          </section>
-
-          <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">6. Changes to Terms</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              We reserve the right to modify these terms at any time. Significant changes will be notified to 
-              account administrators via email or platform announcements to ensure full awareness of policy updates.
+          <section>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 uppercase tracking-tight">3. System Rights</h2>
+            <p className="leading-relaxed">
+              Zetime provides the platform on an institutional subscription basis. Service levels, including offline sync and advanced analytics, are dependent on maintaining an active tier. Unauthorized attempts to manipulate audit logs or bypass system security are strictly prohibited.
             </p>
           </section>
         </div>
 
-        <div className="mt-16 pt-8 border-t border-border flex flex-col items-center text-center">
-          <p className="text-sm text-muted-foreground mb-4">
-            Need clarification on our terms?
+        <div className="mt-24 pt-12 border-t border-white/40 dark:border-white/10 text-center">
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">
+            Legal or Compliance Questions?
           </p>
-          <Button asChild>
-            <Link href="/contact">Contact Support</Link>
+          <Button asChild className="rounded-xl h-12 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold hover:bg-slate-50">
+            <Link href="/contact">Contact Compliance</Link>
           </Button>
         </div>
       </main>
 
-      <footer className="border-t border-border py-12 bg-muted/20">
-        <div className="max-w-5xl mx-auto px-4 text-center text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} Zetime Attendance Tracker. All rights reserved.
+      <footer className="py-12 border-t border-white/40 dark:border-white/10 bg-white/20 dark:bg-slate-950/20 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-8 text-center">
+          <p className="text-[10px] font-bold text-slate-500/60 uppercase tracking-[0.3em]">
+            &copy; {new Date().getFullYear()} Zetime &bull; Institutional Compliance Standard
+          </p>
         </div>
       </footer>
+    </div>
+  )
+}
+
+function PolicyCard({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
+  return (
+    <div className="p-6 rounded-2xl bg-white/40 dark:bg-white/5 border border-white/60 dark:border-white/10 backdrop-blur-xl transition-all hover:bg-white/60">
+      <div className="text-indigo-600 dark:text-indigo-400 mb-3">{icon}</div>
+      <h4 className="font-bold text-slate-900 dark:text-white mb-1 uppercase text-xs tracking-widest">{title}</h4>
+      <p className="text-xs text-slate-500/80 dark:text-slate-400 leading-relaxed font-medium">{desc}</p>
     </div>
   )
 }

@@ -19,7 +19,6 @@ export function PWAInstall() {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
   const [showManualInstructions, setShowManualInstructions] = useState(false)
-  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false)
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
   const [swSupported, setSwSupported] = useState(false)
 
@@ -70,9 +69,8 @@ export function PWAInstall() {
             if (newWorker) {
               newWorker.addEventListener("statechange", () => {
                 if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                  // New service worker available
-                  setWaitingWorker(newWorker)
-                  setShowUpdatePrompt(true)
+                  // New service worker available - skip waiting automatically
+                  newWorker.postMessage({ type: "SKIP_WAITING" })
                 }
               })
             }
@@ -125,54 +123,9 @@ export function PWAInstall() {
     }
   }
 
-  const handleUpdate = () => {
-    if (waitingWorker) {
-      waitingWorker.postMessage({ type: "SKIP_WAITING" })
-      setShowUpdatePrompt(false)
-    }
-  }
-
   const handleDismiss = () => {
     setShowInstallPrompt(false)
     setShowManualInstructions(false)
-  }
-
-  const handleDismissUpdate = () => {
-    setShowUpdatePrompt(false)
-  }
-
-  // Show update prompt
-  if (showUpdatePrompt) {
-    return (
-      <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:max-w-sm">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg shadow-lg p-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h3 className="typography-label text-blue-900 mb-1">Update Available</h3>
-              <p className="typography-body text-blue-700 mb-3">
-                A new version of the app is available. Update now to get the latest features and improvements.
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleUpdate}
-                  size="sm"
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Update Now
-                </Button>
-                <Button onClick={handleDismissUpdate} variant="outline" size="sm">
-                  Later
-                </Button>
-              </div>
-            </div>
-            <Button onClick={handleDismissUpdate} variant="ghost" size="sm" className="ml-2 h-6 w-6 p-0">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   // Don't show install prompt if already installed

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, LogOut, User, CheckSquare, BarChart2, BookOpen, MessageSquare } from 'lucide-react'
 import { useAuth } from '@/lib/context/auth-context'
+import { useSchool } from '@/lib/context/school-context'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { useRouter } from 'next/navigation'
 import { notifications } from '@/lib/utils/notifications'
@@ -45,6 +46,7 @@ export default function TeacherLayout({
   const router = useRouter()
   const [mounted, setMounted] = React.useState(false)
   const { user, logout } = useAuth()
+  const { clearSchoolContext } = useSchool()
 
   React.useEffect(() => {
     setMounted(true)
@@ -52,8 +54,10 @@ export default function TeacherLayout({
 
   const isActive = (path: string) => pathname === path
 
-  const handleLogout = async () => {
-    await logout()
+  const handleLogout = () => {
+    console.log(`[TeacherLayout][LOGOUT] userId: ${user?.id} | role: ${user?.role}`)
+    clearSchoolContext()
+    logout()
     notifications.info("Logged Out", "You have been successfully logged out")
     router.push('/login')
   }

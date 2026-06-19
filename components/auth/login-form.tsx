@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { authService, type LoginCredentials } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Phone } from "lucide-react"
+import { Logo } from "@/components/logo"
 import { useLanguage } from "@/lib/context/language-context"
 import { useSchool } from "@/lib/context/school-context"
 import { useSearchParams } from "next/navigation"
@@ -92,18 +93,27 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         setLoginError(null)
         notifications.success(t("welcome_back_parent"), t("login_success_parent"))
         
+        console.log(`[Login][PARENT] Success | userId: ${result.user?.id} | role: ${result.user?.role}`)
+
+        // Mark as fresh login so validateSession preserves the parent role
+        localStorage.setItem("_zt_fresh_login", "1")
+        localStorage.setItem("_zt_login_role", "parent")
+
         // Populate school context
         if (result.availableSchools && result.availableSchools.length > 0) {
           setSchoolsFromLogin(result.availableSchools, result.user?.schoolId)
           await validateSession()
           
           if (result.availableSchools.length > 1) {
+            console.log(`[Login][PARENT] Multiple schools — redirecting to /auth/school-select`)
             router.push("/auth/school-select")
           } else {
+            console.log(`[Login][PARENT] Single school — redirecting to /parent/dashboard`)
             router.push("/parent/dashboard")
           }
         } else {
           await validateSession()
+          console.log(`[Login][PARENT] No schools — redirecting to /parent/dashboard`)
           router.push("/parent/dashboard")
         }
       } else {
@@ -160,33 +170,47 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
       if (result.success) {
         setLoginError(null)
         notifications.success("Welcome Back!", `${result.user?.name || "User"}, you've successfully logged in.`)
+
+        const confirmedRole = result.user?.role || ""
+        console.log(`[Login][STAFF] Success | userId: ${result.user?.id} | role: ${confirmedRole} | email: ${result.user?.email}`)
+
+        // Set FRESH_LOGIN_KEY so validateSession preserves this confirmed role
+        // and does NOT overwrite it with stale path-inferred data from the old URL.
+        localStorage.setItem("_zt_fresh_login", "1")
+        localStorage.setItem("_zt_login_role", confirmedRole)
         
         // Populate school context
         if (result.availableSchools && result.availableSchools.length > 0) {
           setSchoolsFromLogin(result.availableSchools, result.user?.schoolId)
         }
 
+        // Run validateSession AFTER marking fresh login so the role is preserved
         await validateSession()
 
         // Handle multi-school redirection
         if (result.availableSchools && result.availableSchools.length > 1) {
-          // If they have multiple schools, let them choose
+          console.log(`[Login][STAFF] Multiple schools — redirecting to /auth/school-select`)
           router.push("/auth/school-select")
           return
         }
 
-        // Single school or global role
-        if (result.user?.role === "super_admin") {
+        // Single school or global role — redirect based on the confirmed role from login API
+        if (confirmedRole === "super_admin") {
+          console.log(`[Login][STAFF] Redirecting super_admin —> /super-admin`)
           router.push("/super-admin")
-        } else if (result.user?.role === "teacher") {
+        } else if (confirmedRole === "teacher") {
+          console.log(`[Login][STAFF] Redirecting teacher —> /school/teacher`)
           router.push("/school/teacher")
-        } else if (result.user?.role === "admin" || result.user?.role === "school_admin") {
+        } else if (confirmedRole === "admin" || confirmedRole === "school_admin") {
           if (result.user?.onboardingCompleted === false) {
+            console.log(`[Login][STAFF] Admin onboarding incomplete —> /onboarding`)
             router.push("/onboarding")
           } else {
+            console.log(`[Login][STAFF] Redirecting school_admin —> /school/admin`)
             router.push("/school/admin")
           }
         } else {
+          console.warn(`[Login][STAFF] Unknown role '${confirmedRole}' — calling onLoginSuccess fallback`)
           onLoginSuccess(result.user)
         }
       } else {
@@ -204,40 +228,37 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
   }
 
   return (
-    <Card className="border-border/40 shadow-2xl bg-card/80 backdrop-blur-xl rounded-3xl overflow-hidden border animate-in fade-in duration-300">
-      <CardHeader className="space-y-2 pb-6 pt-8 px-8 text-center">
-        <div className="md:hidden flex justify-center mb-4">
-           {/* Mobile only logo is handled in page.tsx now */}
-        </div>
-        <CardTitle className="typography-page-title">{t("welcome_back")}</CardTitle>
-        <CardDescription className="typography-label text-muted-foreground transition-all duration-300">
+    <Card className="border-slate-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-2xl bg-white/70 dark:bg-slate-900/40 backdrop-blur-3xl rounded-3xl overflow-hidden border animate-in fade-in duration-500 relative z-10">
+      <CardHeader className="space-y-3 pb-6 pt-0 px-8 text-center flex flex-col items-center">
+        <Logo size="md" withText={true} href="/" className="mb-1" />
+        <CardTitle className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none pt-2">{t("welcome_back")}</CardTitle>
+        <CardDescription className="typography-label text-slate-600 dark:text-slate-400 max-w-[280px] mx-auto">
           {activeTab === "parent" 
             ? t("login_desc_parent")
             : t("login_desc_staff")}
         </CardDescription>
-
       </CardHeader>
       <CardContent className="px-8 pb-8">
         {/* Modern Segmented Tab Switcher */}
-        <div className="flex p-1 bg-muted/40 dark:bg-slate-900/40 rounded-2xl border border-border/20 mb-6">
+        <div className="flex p-1 bg-slate-200/50 dark:bg-white/5 rounded-2xl border border-slate-300 dark:border-white/10 mb-6">
           <button
             type="button"
             onClick={() => { setActiveTab("staff"); setLoginError(null); }}
-            className={`typography-label flex-1 py-2.5 uppercase rounded-xl transition-all duration-200 ${ activeTab === "staff" ? "bg-background text-foreground shadow-sm font-black" : "text-muted-foreground hover:text-foreground" }`}
+            className={`typography-label flex-1 py-2.5 uppercase rounded-xl transition-all duration-200 ${ activeTab === "staff" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm font-black" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white" }`}
           >
             {t("school_staff")}
           </button>
           <button
             type="button"
             onClick={() => { setActiveTab("parent"); setLoginError(null); }}
-            className={`typography-label flex-1 py-2.5 uppercase rounded-xl transition-all duration-200 ${ activeTab === "parent" ? "bg-background text-emerald-600 dark:text-emerald-400 shadow-sm font-black" : "text-muted-foreground hover:text-foreground" }`}
+            className={`typography-label flex-1 py-2.5 uppercase rounded-xl transition-all duration-200 ${ activeTab === "parent" ? "bg-emerald-600/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 shadow-sm font-black" : "text-slate-600 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400" }`}
           >
             {t("parent_portal_tab")}
           </button>
         </div>
 
         {loginError && (
-          <Alert variant="destructive" className="mb-6 animate-in slide-in-from-top-2 duration-300">
+          <Alert variant="destructive" className="mb-6 animate-in slide-in-from-top-2 duration-300 bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400">
             <AlertDescription className="typography-label">{loginError}</AlertDescription>
           </Alert>
         )}
@@ -245,9 +266,9 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         {activeTab === "parent" ? (
           <form onSubmit={handleParentLogin} className="space-y-5 animate-in fade-in duration-300">
             <div className="space-y-2">
-              <Label htmlFor="parentPhone" className="typography-label">{t("registered_phone")}</Label>
+              <Label htmlFor="parentPhone" className="typography-label text-slate-800 dark:text-slate-300">{t("registered_phone")}</Label>
               <div className="relative group">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-emerald-500 transition-colors">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-emerald-600 dark:group-focus-within:text-emerald-400 transition-colors">
                   <Phone className="w-4 h-4" />
                 </div>
                 <Input
@@ -267,25 +288,25 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                     setParentPhone(val)
                   }}
                   required
-                  className="typography-body pl-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all rounded-xl"
+                  className="typography-body pl-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-12 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all rounded-xl"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="parentPassword">{t("password")}</Label>
+                <Label htmlFor="parentPassword" className="text-slate-800 dark:text-slate-300">{t("password")}</Label>
                 <Button
                   variant="link"
                   type="button"
                   onClick={onShowForgotPassword}
-                  className="typography-helper text-emerald-600 hover:text-emerald-700 h-auto p-0"
+                  className="typography-helper text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 h-auto p-0 font-bold"
                 >
                   {t("forgot_password")}
                 </Button>
               </div>
               <div className="relative group">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-emerald-500 transition-colors">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-emerald-600 dark:group-focus-within:text-emerald-400 transition-colors">
                   <Lock className="w-4 h-4" />
                 </div>
                 <Input
@@ -295,12 +316,12 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                   value={parentPassword}
                   onChange={(e) => setParentPassword(e.target.value)}
                   required
-                  className="typography-body pl-10 pr-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all rounded-xl"
+                  className="typography-body pl-10 pr-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-12 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all rounded-xl"
                 />
                 <button
                   type="button"
                   onClick={() => setShowParentPassword(!showParentPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                 >
                   {showParentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -314,12 +335,12 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                 onCheckedChange={(checked) => setRememberMe(checked as boolean)}
                 className="rounded-md border-emerald-600 data-[state=checked]:bg-emerald-600 text-white"
               />
-              <label htmlFor="rememberParent" className="typography-label cursor-pointer select-none">
+              <label htmlFor="rememberParent" className="typography-label cursor-pointer select-none text-slate-600 dark:text-slate-400">
                 Remember me on this device
               </label>
             </div>
 
-            <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg transition-all active:scale-[0.98]">
+            <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20 transition-all active:scale-[0.98]">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Sign In <ArrowRight className="ml-2 h-4 w-4" /></>}
             </Button>
           </form>
@@ -327,9 +348,9 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-5 animate-in fade-in duration-300">
               <div className="space-y-2">
-                <Label htmlFor="email" className="typography-label">Email Address</Label>
+                <Label htmlFor="email" className="typography-label text-slate-800 dark:text-slate-300">Email Address</Label>
                 <div className="relative group">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
                     <Mail className="w-4 h-4" />
                   </div>
                   <Input
@@ -339,25 +360,25 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                     value={credentials.email}
                     onChange={(e) => setCredentials((prev) => ({ ...prev, email: e.target.value }))}
                     required
-                    className="typography-body pl-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl"
+                    className="typography-body pl-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-12 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="typography-label">Password</Label>
+                  <Label htmlFor="password" className="typography-label text-slate-800 dark:text-slate-300">Password</Label>
                   <Button
                     variant="link"
                     type="button"
                     onClick={onShowForgotPassword}
-                    className="typography-label text-primary hover:text-primary/80 h-auto p-0"
+                    className="typography-label text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 h-auto p-0 font-bold"
                   >
                     Forgot password?
                   </Button>
                 </div>
                 <div className="relative group">
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
                     <Lock className="w-4 h-4" />
                   </div>
                   <Input
@@ -367,12 +388,12 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                     value={credentials.password}
                     onChange={(e) => setCredentials((prev) => ({ ...prev, password: e.target.value }))}
                     required
-                    className="typography-body pl-10 pr-10 bg-background/50 border-border/50 h-12 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl"
+                    className="typography-body pl-10 pr-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-12 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -384,11 +405,11 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
                   id="remember" 
                   checked={rememberMe}
                   onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                  className="rounded-md"
+                  className="rounded-md border-slate-400 dark:border-white/20 data-[state=checked]:bg-blue-600"
                 />
                 <label
                   htmlFor="remember"
-                  className="typography-label peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  className="typography-label peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer text-slate-600 dark:text-slate-400"
                 >
                   Remember me on this device
                 </label>
@@ -397,7 +418,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
 
             <Button 
               type="submit" 
-              className="typography-card-title w-full h-12 rounded-xl shadow-lg transition-all active:scale-[0.98] shadow-primary/10"
+              className="typography-card-title w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all active:scale-[0.98]"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -416,12 +437,12 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         )}
 
         {onShowAdminSignup && (
-          <div className="mt-8 pt-6 border-t border-border/50 text-center">
-            <p className="typography-body text-muted-foreground mb-4">New to Zetime? Create a school account</p>
+          <div className="mt-8 pt-6 border-t border-slate-300 dark:border-white/5 text-center">
+            <p className="typography-body text-slate-600 dark:text-slate-400 mb-4 font-medium">New to Zetime? Create a school account</p>
             <Button
               variant="outline"
               onClick={onShowAdminSignup}
-              className="w-full h-11 rounded-xl border-border/50 hover:bg-muted/50 hover:border-primary/30 transition-all"
+              className="w-full h-11 rounded-xl bg-transparent border-slate-400 dark:border-white/10 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-white/5 hover:border-slate-500 dark:hover:border-white/20 transition-all font-bold"
             >
               Get Started for Free
             </Button>
@@ -429,31 +450,31 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         )}
 
         <div className="mt-8 flex flex-col items-center gap-4">
-          <div className="typography-label flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-muted-foreground uppercase">
-            <Link href="/about" className="hover:text-primary transition-colors">{t("about")}</Link>
-            <Link href="/pricing" className="hover:text-primary transition-colors">{t("pricing")}</Link>
-            <Link href="/privacy" className="hover:text-primary transition-colors">{t("privacy")}</Link>
-            <Link href="/terms" className="hover:text-primary transition-colors">{t("terms")}</Link>
+          <div className="typography-label flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-slate-500 dark:text-slate-500 uppercase font-bold">
+            <Link href="/about" className="hover:text-blue-700 dark:hover:text-blue-400 transition-colors uppercase">{t("about")}</Link>
+            <Link href="/pricing" className="hover:text-blue-700 dark:hover:text-blue-400 transition-colors uppercase">{t("pricing")}</Link>
+            <Link href="/privacy" className="hover:text-blue-700 dark:hover:text-blue-400 transition-colors uppercase">{t("privacy")}</Link>
+            <Link href="/terms" className="hover:text-blue-700 dark:hover:text-blue-400 transition-colors uppercase">{t("terms")}</Link>
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-muted/30 p-1.5 px-3 rounded-full border border-border/50">
-               <span className="typography-label text-[10px] text-muted-foreground uppercase">{t("theme")}</span>
+            <div className="flex items-center gap-2 bg-slate-200/50 dark:bg-white/5 p-1.5 px-3 rounded-full border border-slate-300 dark:border-white/10">
+               <span className="typography-label text-[10px] text-slate-600 dark:text-slate-500 uppercase font-bold">{t("theme")}</span>
                <div className="scale-75">
                  <ModeToggle />
                </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-muted/30 p-1.5 px-3 rounded-full border border-border/50">
+            <div className="flex items-center gap-2 bg-slate-200/50 dark:bg-white/5 p-1.5 px-3 rounded-full border border-slate-300 dark:border-white/10">
               <button 
                 onClick={() => setLanguage('en')}
-                className={`typography-label text-[10px] px-2 py-0.5 rounded ${language === 'en' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                className={`typography-label text-[10px] px-2 py-0.5 rounded transition-colors font-bold ${language === 'en' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900'}`}
               >
                 EN
               </button>
               <button 
                 onClick={() => setLanguage('am')}
-                className={`typography-label text-[10px] px-2 py-0.5 rounded ${language === 'am' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                className={`typography-label text-[10px] px-2 py-0.5 rounded transition-colors font-bold ${language === 'am' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900'}`}
               >
                 አማ
               </button>
@@ -464,4 +485,3 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
     </Card>
   )
 }
-

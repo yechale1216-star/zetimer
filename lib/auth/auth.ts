@@ -531,14 +531,17 @@ class AuthService {
       // Clear ALL school-scoped keys so that no data leaks to the next login session.
       // Never rely on components cleaning up after themselves — do it here atomically.
       const keysToRemove = [
-        this.CURRENT_USER_KEY,       // attendance_current_user
-        "attendance_token",           // JWT token
-        "x-school-id",               // active school UUID
-        "attendance_features",        // school feature/permission cache
-        "parent_students",            // parent's student list (school-scoped)
-        "available_schools",          // parent's available schools list
-        "has_multiple_schools",       // parent multi-school flag
-        "active_school",              // active school context (SchoolContext)
+        this.CURRENT_USER_KEY,          // attendance_current_user
+        "attendance_token",              // JWT token
+        "x-school-id",                  // active school UUID
+        "attendance_features",           // school feature/permission cache
+        "parent_students",               // parent's student list (school-scoped)
+        "parent_selected_student_id",    // last-selected student for parent portal
+        "available_schools",             // parent's available schools list
+        "has_multiple_schools",          // parent multi-school flag
+        "active_school",                 // active school context (SchoolContext)
+        "_zt_fresh_login",               // fresh-login guard flag
+        "_zt_login_role",                // fresh-login confirmed role
       ]
       keysToRemove.forEach(key => localStorage.removeItem(key))
     }

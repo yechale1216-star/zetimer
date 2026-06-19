@@ -39,7 +39,11 @@ export const startOnboarding = async (data: OnboardingData) => {
   // 2. Generate a unique School ID (outside transaction to avoid connection deadlock)
   const customId = await generateSchoolId();
 
-  // 3. Atomic Transaction for School and Admin Creation
+  // 3. Prepare credentials outside to avoid blocking the transaction with CPU-intensive hashing
+  const rawPassword = adminPassword || crypto.randomBytes(8).toString('hex');
+  const hashedPassword = bcrypt.hashSync(rawPassword, 10);
+
+  // 4. Atomic Transaction for School and Admin Creation
   return await prisma.$transaction(async (tx) => {
     // A. Create the School
     const school = await tx.school.create({
@@ -95,10 +99,6 @@ export const startOnboarding = async (data: OnboardingData) => {
     });
 
     // B. Create the Admin User (Inside transaction with tx)
-    // If no password provided (Super Admin flow), generate a random one
-    const rawPassword = adminPassword || crypto.randomBytes(8).toString('hex');
-    const hashedPassword = bcrypt.hashSync(rawPassword, 10);
-    
     const user = await tx.user.create({
       data: {
         email: adminEmail.toLowerCase().trim(),
@@ -122,7 +122,7 @@ export const startOnboarding = async (data: OnboardingData) => {
       }
     };
   }, {
-    timeout: 15000
+    timeout: 30000
   });
 };
 

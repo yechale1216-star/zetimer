@@ -249,6 +249,12 @@ class AuthService {
     try {
       console.log("[pg] Signup attempt for:", credentials.email)
 
+      // SECURITY: Clear any existing session data before starting a new signup
+      // This ensures a "Clean Slate" for the new school and prevents ID leakage.
+      if (this.isClient()) {
+        this.logout();
+      }
+
       if (!this.isValidEthiopianPhone(credentials.phone)) {
         return {
           success: false,
@@ -462,12 +468,29 @@ class AuthService {
           localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(updated))
           // Explicitly overwrite x-school-id so the fallback in BaseDatabase
           // is always the correct, authenticated tenant — never stale.
+          // Explicitly update the active_school in localStorage so SchoolContext picks it up
           if (updated.schoolId) {
             localStorage.setItem("x-school-id", updated.schoolId)
+            
+            const schoolData = {
+              id: updated.schoolId,
+              name: updated.schoolName || "My School", 
+              logo: payload.logoUrl || "",
+              customSchoolId: updated.customSchoolId || ""
+            }
+            localStorage.setItem("active_school", JSON.stringify(schoolData))
           }
-          // Signal AuthContext to run a full validateSession() (not just a shallow read).
-          window.dispatchEvent(new CustomEvent("onboardingCompleted", { detail: { schoolId: updated.schoolId } }))
+
+          // Signal AuthContext and SchoolContext to refresh
+          window.dispatchEvent(new CustomEvent("onboardingCompleted", { 
+            detail: { 
+              schoolId: updated.schoolId,
+              logoUrl: payload.logoUrl,
+              schoolName: user.schoolName 
+            } 
+          }))
           window.dispatchEvent(new Event("userSessionChanged"))
+          window.dispatchEvent(new Event("schoolSwitched")) // Force SchoolContext to reload from localStorage
         }
         return { success: true, message: data.message }
       }

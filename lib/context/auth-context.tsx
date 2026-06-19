@@ -148,6 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Always take schoolId from the fresh profile if available — this is
           // what closes the race window after onboarding completes.
           schoolId: dbUser.schoolId || dbUser.school_id || currentUser!.schoolId,
+          schoolName: dbUser.schoolName || currentUser!.schoolName || "",
+          schoolLogo: dbUser.schoolLogo || currentUser!.schoolLogo || "",
           onboardingCompleted: dbUser.onboardingCompleted ?? currentUser!.onboardingCompleted
         }
         

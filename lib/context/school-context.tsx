@@ -50,8 +50,8 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
   const [isLoadingSchool, setIsLoadingSchool] = useState(false)
   const { validateSession, user } = useAuth()
 
-  // Restore from localStorage on mount
-  useEffect(() => {
+  // Restore from localStorage on mount and on switch events
+  const loadStoredData = useCallback(() => {
     try {
       const stored = localStorage.getItem("active_school")
       const schoolsStored = localStorage.getItem("available_schools")
@@ -59,6 +59,12 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
       if (schoolsStored) setAvailableSchools(JSON.parse(schoolsStored))
     } catch {}
   }, [])
+
+  useEffect(() => {
+    loadStoredData()
+    window.addEventListener("schoolSwitched", loadStoredData)
+    return () => window.removeEventListener("schoolSwitched", loadStoredData)
+  }, [loadStoredData])
 
   /** Called immediately after login with the list of schools from the login response */
   const setSchoolsFromLogin = useCallback((schools: School[], initialSchoolId?: string) => {

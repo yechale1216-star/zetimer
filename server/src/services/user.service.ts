@@ -12,7 +12,10 @@ export const getUserByEmail = async (email: string) => {
 export const getUserById = async (id: string, schoolId?: string) => {
   const where: any = { id };
   if (schoolId) where.schoolId = schoolId;
-  return await prisma.user.findFirst({ where });
+  return await prisma.user.findFirst({ 
+    where,
+    include: { school: { include: { settings: true } } }
+  });
 };
 
 export const getUsers = async (schoolId: string) => {

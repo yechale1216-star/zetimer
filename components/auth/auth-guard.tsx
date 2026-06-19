@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react"
 import { useAuth } from "@/lib/context/auth-context"
+import { useSchool } from "@/lib/context/school-context"
 import { useRouter, usePathname } from "next/navigation"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { Button } from "@/components/ui/button"
@@ -14,6 +15,7 @@ interface AuthGuardProps {
 
 export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   const { user, authLoading, permissionsLoading, error, validateSession, logout } = useAuth()
+  const { availableSchools } = useSchool()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -28,23 +30,29 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
       return
     }
 
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
-      console.warn(`[AuthGuard] Role '${user.role}' not permitted for path '${pathname}'. Redirecting to default home...`)
+    if (allowedRoles) {
+      const isCurrentlyAuthorized = allowedRoles.includes(user.role);
       
-      // Redirect to correct workspace home
-      if (user.role === "super_admin") {
-        router.replace("/super-admin")
-      } else if (user.role === "teacher") {
-        router.replace("/school/teacher")
-      } else if (user.role === "parent") {
-        router.replace("/parent/dashboard")
-      } else if (user.role === "admin" || user.role === "school_admin") {
-        router.replace("/school/admin")
-      } else {
-        router.replace("/login")
+      if (!isCurrentlyAuthorized) {
+        // CHECK IF POTENTIALLY AUTHORIZED:
+        // The current role in AuthContext might be 'teacher' but we're on a '/parent' page.
+        // If the user has a 'parent' membership for this school, we should NOT redirect.
+        // instead, we wait for validateSession to refresh the situational role.
+        const hasPotentialRole = availableSchools.some(m => 
+          m.id === user.schoolId && allowedRoles.includes(m.role || '')
+        );
+
+        if (hasPotentialRole) {
+          console.log(`[AuthGuard] Role mismatch ('${user.role}'), but user has potential role in school. Waiting for session sync...`);
+          return; // Stay on the page, the situational role will settle
+        }
+
+        // TRULY UNAUTHORIZED
+        console.warn(`[AuthGuard] Role '${user.role}' not permitted for path '${pathname}' and no alternative role found. Redirecting to home...`);
+        router.replace("/");
       }
     }
-  }, [user, isLoading, allowedRoles, router, pathname])
+  }, [user, isLoading, allowedRoles, router, pathname, availableSchools])
 
   // 1. Show skeleton during startup, reconnect, refresh, token validation
   if (isLoading) {
@@ -61,16 +69,9 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     )
   }
 
-  // 2. If token is invalid or missing, show loading while redirect runs
+  // 2. If token is invalid or missing, redirect is already running via useEffect
   if (!user) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="text-center space-y-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="text-sm text-muted-foreground">Redirecting to login...</p>
-        </div>
-      </div>
-    )
+    return null
   }
 
   // 3. If role is unauthorized, show loading while redirect runs

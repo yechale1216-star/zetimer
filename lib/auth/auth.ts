@@ -28,6 +28,7 @@ export interface AuthResponse {
   message: string
   user?: User
   error?: string
+  availableSchools?: any[] // Added to support multi-school staff
 }
 
 export interface SignupCredentials {
@@ -70,7 +71,7 @@ class AuthService {
         }
       }
 
-      const { user: dbUser, token } = data.data
+      const { user: dbUser, token, availableSchools } = data.data
 
       // Get school name and logo from settings
       let schoolName = data.data.schoolName || "My School"
@@ -95,12 +96,17 @@ class AuthService {
       if (this.isClient()) {
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user))
         localStorage.setItem("attendance_token", token) // Store the JWT token
+        
+        if (availableSchools) {
+          localStorage.setItem("available_schools", JSON.stringify(availableSchools))
+        }
+
         if (user.schoolId) {
           localStorage.setItem("x-school-id", user.schoolId);
         }
       }
 
-      return { success: true, message: "Login successful", user }
+      return { success: true, message: "Login successful", user, availableSchools }
     } catch (error) {
       console.error("[pg] Login error:", error)
       return { success: false, message: "Login failed", error: "An error occurred during login" }
@@ -321,6 +327,21 @@ class AuthService {
     
     if (schoolId) {
       headers["x-school-id"] = schoolId
+    }
+
+    // SITUATIONAL ROLE INFERENCE: 
+    // Automatically tell the server which context we are in based on the current URL.
+    if (this.isClient()) {
+      const pathname = window.location.pathname;
+      if (pathname.startsWith('/parent')) {
+        headers["x-requested-role"] = 'parent';
+      } else if (pathname.startsWith('/school/teacher')) {
+        headers["x-requested-role"] = 'teacher';
+      } else if (pathname.startsWith('/school/admin')) {
+        headers["x-requested-role"] = 'school_admin';
+      } else if (pathname.startsWith('/super-admin')) {
+        headers["x-requested-role"] = 'super_admin';
+      }
     }
     
     return headers

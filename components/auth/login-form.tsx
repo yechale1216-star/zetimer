@@ -98,7 +98,7 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
           await validateSession()
           
           if (result.availableSchools.length > 1) {
-            router.push("/parent/school-select")
+            router.push("/auth/school-select")
           } else {
             router.push("/parent/dashboard")
           }
@@ -151,7 +151,6 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
     }
 
     setIsLoading(true)
-
     try {
       const result = await authService.login({
         email: credentials.email,
@@ -162,10 +161,31 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         setLoginError(null)
         notifications.success("Welcome Back!", `${result.user?.name || "User"}, you've successfully logged in.`)
         
+        // Populate school context
+        if (result.availableSchools && result.availableSchools.length > 0) {
+          setSchoolsFromLogin(result.availableSchools, result.user?.schoolId)
+        }
+
         await validateSession()
 
+        // Handle multi-school redirection
+        if (result.availableSchools && result.availableSchools.length > 1) {
+          // If they have multiple schools, let them choose
+          router.push("/auth/school-select")
+          return
+        }
+
+        // Single school or global role
         if (result.user?.role === "super_admin") {
           router.push("/super-admin")
+        } else if (result.user?.role === "teacher") {
+          router.push("/school/teacher")
+        } else if (result.user?.role === "admin" || result.user?.role === "school_admin") {
+          if (result.user?.onboardingCompleted === false) {
+            router.push("/onboarding")
+          } else {
+            router.push("/school/admin")
+          }
         } else {
           onLoginSuccess(result.user)
         }

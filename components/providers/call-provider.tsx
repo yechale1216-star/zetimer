@@ -44,11 +44,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const onCallEnded = useCallback((userId: string) => {
-    setParticipants(prev => prev.filter(p => p.id !== userId));
-    if (participants.length <= 1) { // Only local left
-       setIncomingCallData(null);
-    }
-  }, [participants.length]);
+    setParticipants(prev => {
+      const next = prev.filter(p => p.id !== userId);
+      // If only the local participant remains, clear the incoming call data
+      if (next.length <= 1) {
+        setIncomingCallData(null);
+      }
+      return next;
+    });
+  }, []);
 
   const webrtc = useWebRTC({
     userId: currentUser?.id || '',

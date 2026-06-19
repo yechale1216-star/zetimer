@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.featureGuard = exports.subscriptionGuard = exports.authorize = exports.tenantMiddleware = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const auth_resolution_service_1 = require("../services/auth_resolution.service");
 const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-long-enough';
 /**
  * Middleware to verify JWT and extract tenant information.
@@ -33,40 +34,63 @@ const tenantMiddleware = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     try {
         const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-        // For parents, allow overriding schoolId via header (supports multi-school parents)
-        // BUT validate they actually have a child in the requested school to prevent
-        // cross-school data access via a forged/stale x-school-id header.
         let schoolId = decoded.schoolId;
-        if (decoded.role === 'parent' && schoolIdHeader && schoolIdHeader !== schoolId) {
-            const requestedSchoolId = schoolIdHeader;
-            try {
-                // Verify parent has at least one student in the requested school
-                const link = await db_1.default.parentStudentLink.findFirst({
-                    where: {
-                        parentId: decoded.id,
-                        schoolId: requestedSchoolId,
-                    }
-                });
-                if (link) {
-                    schoolId = requestedSchoolId;
-                }
-                else {
-                    console.warn(`[tenantMiddleware] Parent ${decoded.id} attempted to access school ${requestedSchoolId} but has no student link. Ignoring header override.`);
-                    // Keep JWT schoolId - do not allow the override
-                }
+        let role = decoded.role;
+        // Resolve context-specific role
+        const activeSchoolId = schoolIdHeader || schoolId;
+        let requestedRole = req.headers['x-requested-role'];
+        // SITUATIONAL ROLE RESOLUTION:
+        // If the user is accessing a specific portal's API, infer the requested role.
+        // This allows dual-role users (e.g. Teacher + Parent) to use both portals
+        // in different tabs without conflict.
+        if (!requestedRole) {
+            if (url.startsWith('/api/parent')) {
+                requestedRole = 'parent';
             }
-            catch (dbErr) {
-                console.error('[tenantMiddleware] Failed to verify parent-school link:', dbErr);
-                // On DB error, fall back to JWT schoolId (safe default)
+            else if (url.startsWith('/api/teachers') || url.includes('/attendance-sessions')) {
+                // Broadly speaking, routes under /api/teachers or attendance tracking require teacher role
+                requestedRole = 'teacher';
+            }
+            else if (url.startsWith('/api/school/') || url.startsWith('/api/settings')) {
+                // Admin portal routes
+                requestedRole = 'school_admin';
+            }
+        }
+        if (activeSchoolId) {
+            // Fetch the role for THIS specific school and situational context (requestedRole)
+            const contextRole = await (0, auth_resolution_service_1.resolveRoleInSchool)(decoded.id, activeSchoolId, requestedRole);
+            console.log(`[tenantMiddleware] resolveRole(${decoded.id}, ${activeSchoolId}, ${requestedRole}) => ${contextRole}`);
+            if (contextRole) {
+                schoolId = activeSchoolId;
+                role = contextRole;
+            }
+            else if (decoded.role === 'super_admin') {
+                // Super admins are global, role doesn't change
+                role = 'super_admin';
+            }
+            else {
+                // Context resolution failed.
+                // For identity endpoints (profile), never block - just use token defaults
+                const isIdentityEndpoint = url.startsWith('/api/users/profile') || url.startsWith('/api/users/me');
+                if (!isIdentityEndpoint && schoolIdHeader && decoded.schoolId && schoolIdHeader !== decoded.schoolId) {
+                    console.warn(`[tenantMiddleware] User ${decoded.id} denied access to school ${activeSchoolId} (mismatch)`);
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Access denied: You do not have an active role in the requested school context.'
+                    });
+                }
+                // Fallback: use decoded values from JWT token
+                console.log(`[tenantMiddleware] Context resolution failed, using JWT defaults: role=${decoded.role}, school=${decoded.schoolId}`);
             }
         }
         req.user = {
             id: decoded.id,
             email: decoded.email,
-            role: decoded.role,
+            role: role, // Now context-aware!
             schoolId: schoolId,
             customSchoolId: decoded.customSchoolId,
         };
+        console.log(`[tenantMiddleware] User: ${decoded.email}, School: ${schoolId}, Role: ${role}`);
         next();
     }
     catch (error) {

@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import * as userService from '../services/user.service';
 import * as schoolService from '../services/school.service';
 import * as onboardingService from '../services/onboarding.service';
+import { getMemberships } from '../services/auth_resolution.service';
 import { generateToken } from '../utils/jwt';
 import { sendResetPasswordEmail } from '../utils/email';
 import prisma from '../config/db';
@@ -68,20 +69,36 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    let customSchoolId = '';
-    let schoolName = 'My School';
-    let schoolLogo = '';
+    // Resolve all memberships for this user
+    const memberships = await getMemberships(user.id);
+    
+    if (memberships.length === 0 && user.role !== 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Account exists but no school associations found.' });
+    }
+
+    // Determine default/active school for initial token
+    // Prioritize the schoolId set on the User record if it exists and is in memberships
+    let activeMembership = memberships.find(m => m.schoolId === user.schoolId && m.role === user.role) || memberships[0];
+    
+    // If user is super_admin, they might not have a school membership
+    if (user.role === 'super_admin' && !activeMembership) {
+      activeMembership = {
+        schoolId: 'global',
+        schoolName: 'Zetime Platform',
+        role: 'super_admin'
+      };
+    }
+
+    let schoolName = activeMembership?.schoolName || 'My School';
+    let schoolLogo = activeMembership?.logo || '';
     let onboardingCompleted = false;
 
-    if (user.schoolId) {
-      const school = await schoolService.getSchoolById(user.schoolId);
+    if (activeMembership && activeMembership.schoolId !== 'global') {
+      const school = await schoolService.getSchoolById(activeMembership.schoolId);
       if (school) {
-        customSchoolId = school.schoolId || '';
-        schoolName = school.name || 'My School';
         onboardingCompleted = school.onboardingCompleted ?? false;
-        // Get logo from settings
         if (school.settings) {
-          schoolLogo = school.settings.school_logo || '';
+          schoolLogo = school.settings.school_logo || schoolLogo;
         }
       }
     }
@@ -89,9 +106,9 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     const token = generateToken({
       id: user.id,
       email: user.email,
-      role: user.role,
-      schoolId: user.schoolId || '',
-      customSchoolId: customSchoolId,
+      role: activeMembership?.role || user.role,
+      schoolId: activeMembership?.schoolId || '',
+      customSchoolId: activeMembership?.customSchoolId || '',
     });
 
     res.status(200).json({
@@ -102,13 +119,14 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
           id: user.id,
           email: user.email,
           name: user.full_name,
-          role: user.role,
-          schoolId: user.schoolId,
-          customSchoolId,
+          role: activeMembership?.role || user.role,
+          schoolId: activeMembership?.schoolId || '',
+          customSchoolId: activeMembership?.customSchoolId || '',
         },
         schoolName,
         schoolLogo,
         onboardingCompleted,
+        availableSchools: memberships, // Return all schools for selection
       }
     });
   } catch (error) {

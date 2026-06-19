@@ -1,13 +1,14 @@
 "use client"
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react"
-
+import { useAuth } from "./auth-context"
 import { apiUrl } from "@/lib/api-config"
 const API_URL = apiUrl;
 
 export interface School {
   id: string
   name: string
+  role?: string // Contextual role
   logo: string
   customSchoolId: string
 }
@@ -19,6 +20,7 @@ interface SchoolContextValue {
   switchSchool: (schoolId: string) => Promise<boolean>
   setSchoolsFromLogin: (schools: School[], initialSchoolId?: string) => void
   clearSchoolContext: () => void
+  refreshSchools: () => Promise<void>
 }
 
 const SchoolContext = createContext<SchoolContextValue | null>(null)
@@ -29,6 +31,16 @@ function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" }
   if (token) headers["Authorization"] = `Bearer ${token}`
   if (schoolId) headers["x-school-id"] = schoolId
+
+  // Situational Role Inference (Frontend)
+  if (typeof window !== "undefined") {
+    const pathname = window.location.pathname;
+    if (pathname.startsWith('/parent')) headers["x-requested-role"] = 'parent';
+    else if (pathname.startsWith('/school/teacher')) headers["x-requested-role"] = 'teacher';
+    else if (pathname.startsWith('/school/admin')) headers["x-requested-role"] = 'school_admin';
+    else if (pathname.startsWith('/super-admin')) headers["x-requested-role"] = 'super_admin';
+  }
+  
   return headers
 }
 
@@ -36,6 +48,7 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
   const [activeSchool, setActiveSchool] = useState<School | null>(null)
   const [availableSchools, setAvailableSchools] = useState<School[]>([])
   const [isLoadingSchool, setIsLoadingSchool] = useState(false)
+  const { validateSession, user } = useAuth()
 
   // Restore from localStorage on mount
   useEffect(() => {
@@ -62,18 +75,21 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Switch the active school — validates with the backend first.
-   * Returns true on success, false on failure (e.g. no child in school).
+   * Returns true on success.
    */
   const switchSchool = useCallback(async (schoolId: string): Promise<boolean> => {
     setIsLoadingSchool(true)
     try {
-      const res = await fetch(`${API_URL}/api/parent/me/active-school`, {
+      const res = await fetch(`${API_URL}/api/users/me/active-school`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({ schoolId }),
       })
 
-      if (!res.ok) return false
+      if (!res.ok) {
+        // Fallback or retry?
+        return false
+      }
 
       const result = await res.json()
       if (!result.success) return false
@@ -83,20 +99,24 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("active_school", JSON.stringify(school))
       localStorage.setItem("x-school-id", school.id)
 
-      // Dispatch event so all components (layout, pages) react
+      // CRITICAL: Re-validate session to update role in AuthContext
+      await validateSession()
+
+      // Dispatch event so all components reaction
       window.dispatchEvent(new CustomEvent("schoolSwitched", { detail: school }))
       return true
-    } catch {
+    } catch (err) {
+      console.error("[switchSchool] Error:", err)
       return false
     } finally {
       setIsLoadingSchool(false)
     }
-  }, [])
+  }, [validateSession])
 
   /** Fetch fresh school list from backend (used on page refresh) */
   const refreshSchools = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/parent/me/schools`, {
+      const res = await fetch(`${API_URL}/api/users/me/schools`, {
         headers: getAuthHeaders(),
       })
       if (!res.ok) return
@@ -125,6 +145,7 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
         switchSchool,
         setSchoolsFromLogin,
         clearSchoolContext,
+        refreshSchools
       }}
     >
       {children}

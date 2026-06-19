@@ -10,7 +10,6 @@ import { authService, type SignupCredentials } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 import { ArrowLeft, User, Phone, Mail, Lock, ShieldCheck, Loader2, Eye, EyeOff, CheckCircle2, ExternalLink, MapPin } from "lucide-react"
 import Link from "next/link"
-import { useAuth } from "@/lib/context/auth-context"
 
 interface AdminSignupFormProps {
   onSignupSuccess: (user?: any) => void
@@ -38,7 +37,6 @@ const strengthConfig = {
 }
 
 export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProps) {
-  const { validateSession } = useAuth()
   const [credentials, setCredentials] = useState<SignupCredentials>({
     phone: "+251",
     email: "",
@@ -184,7 +182,10 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
           "Admin Account Created",
           `Welcome ${result.user.name}! Let's set up your school.`
         )
-        await validateSession()
+        // Redirect immediately — do NOT call validateSession() here.
+        // validateSession() would race against the redirect and could
+        // overwrite localStorage with stale DB data before onboarding loads.
+        // The onboarding page's AuthGuard will call validateSession on mount.
         onSignupSuccess(result.user)
       } else {
         const errorMessage = result.error || "Failed to create account"
@@ -241,7 +242,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                 value={credentials.name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 required
-                className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
+                className={`pl-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
                   fieldErrors.name ? "border-destructive ring-destructive/10" : ""
                 }`}
               />
@@ -265,7 +266,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                   setFieldErrors((prev) => ({ ...prev, schoolName: "" }))
                 }}
                 required
-                className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
+                className={`pl-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
                   fieldErrors.schoolName ? "border-destructive ring-destructive/10" : ""
                 }`}
               />
@@ -289,7 +290,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                     setFieldErrors((prev) => ({ ...prev, schoolAddress: "" }))
                   }}
                   required
-                  className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
+                  className={`pl-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
                     fieldErrors.schoolAddress ? "border-destructive ring-destructive/10" : ""
                   }`}
                 />
@@ -315,7 +316,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                 onChange={(e) => handlePhoneChange(e.target.value)}
                 onBlur={(e) => handlePhoneBlur(e.target.value)}
                 required
-                className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
+                className={`pl-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
                   fieldErrors.phone ? "border-destructive ring-destructive/10" : ""
                 }`}
               />
@@ -347,7 +348,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                 }}
                 onBlur={(e) => handleEmailBlur(e.target.value)}
                 required
-                className={`pl-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
+                className={`pl-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
                   fieldErrors.email ? "border-destructive ring-destructive/10" : ""
                 }`}
               />
@@ -377,7 +378,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                   setFieldErrors((prev) => ({ ...prev, password: "" }))
                 }}
                 required
-                className={`pl-10 pr-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
+                className={`pl-10 pr-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
                   fieldErrors.password ? "border-destructive ring-destructive/10" : ""
                 }`}
               />
@@ -426,7 +427,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                   setFieldErrors((prev) => ({ ...prev, confirmPassword: "" }))
                 }}
                 required
-                className={`pl-10 pr-10 bg-background/50 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
+                className={`pl-10 pr-10 bg-muted/30 border-border/50 h-11 focus:ring-2 focus:ring-primary/20 transition-all rounded-xl ${
                   fieldErrors.confirmPassword ? "border-destructive ring-destructive/10" : ""
                 }`}
               />
@@ -461,7 +462,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
                     ? "bg-primary border-primary"
                     : fieldErrors.terms
                     ? "border-destructive bg-destructive/5"
-                    : "border-border/70 bg-background/50 group-hover:border-primary/60"
+                    : "border-border/70 bg-muted/30 group-hover:border-primary/60"
                 }`}
               >
                 {termsAccepted && (

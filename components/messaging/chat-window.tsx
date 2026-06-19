@@ -43,7 +43,7 @@ interface Message {
   senderName: string;
   content: string;
   timestamp: string;
-  status: 'sending' | 'sent' | 'read';
+  status: 'sending' | 'sent' | 'delivered' | 'read';
   type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'VIDEO_MESSAGE' | 'CALL_VOICE' | 'CALL_VIDEO' | 'CALL_MISSED_VOICE' | 'CALL_MISSED_VIDEO';
   isMe: boolean;
   attachments?: {
@@ -523,7 +523,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                 variant="ghost" 
                 size="icon" 
                 className="h-10 w-10 rounded-full text-primary hover:bg-primary/10 transition-all active:scale-90"
-                onClick={() => initiateCall(activeConversation.id, 'VOICE', activeConversation)}
+                onClick={() => initiateCall(activeConversation.realContactId || activeConversation.id, 'VOICE', activeConversation)}
               >
                 <Phone className="h-5 w-5" />
               </Button>
@@ -531,7 +531,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                 variant="ghost" 
                 size="icon" 
                 className="h-10 w-10 rounded-full text-primary hover:bg-primary/10 transition-all active:scale-90"
-                onClick={() => initiateCall(activeConversation.id, 'VIDEO', activeConversation)}
+                onClick={() => initiateCall(activeConversation.realContactId || activeConversation.id, 'VIDEO', activeConversation)}
               >
                 <Video className="h-5 w-5" />
               </Button>
@@ -1500,6 +1500,8 @@ const MessageBubble = React.memo(({
                 <Clock className="h-3 w-3 animate-pulse" />
               ) : message.status === 'read' ? (
                 <CheckCheck className="h-3 w-3 text-sky-400" />
+              ) : message.status === 'delivered' ? (
+                <CheckCheck className="h-3 w-3 opacity-70" />
               ) : (
                 <Check className="h-3 w-3" />
               )}

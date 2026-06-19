@@ -303,9 +303,6 @@ export const useWebRTC = (options: WebRTCOptions) => {
       setCallStatus('RINGING');
     });
 
-    socket.on('call_answered', async (data) => {
-      const pc = peerConnections.current.get(data.from || data.to);
-    });
 
     // Redefining signaling events for multi-peer
     const handleAnswer = async ({ from, answer }: any) => {

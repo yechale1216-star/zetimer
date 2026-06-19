@@ -115,7 +115,7 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
               <h1 className="typography-card-title text-primary sm:text-2xl truncate">
                 {schoolName}
               </h1>
-              <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2">
                 <span className="typography-label text-[10px] text-primary/70 uppercase tracking-[0.2em]">
                   {user?.role === "parent" ? "Parent Portal" : user?.role === "teacher" ? "Teacher Portal" : user?.role === "admin" || user?.role === "school_admin" ? "Admin Portal" : "Management Portal"}
                 </span>

@@ -113,7 +113,18 @@ export default function Home() {
   // If already authenticated and setup is complete, redirect to dashboard.
   if (typeof window !== "undefined" && isAuthenticated) {
     const user = authService.getCurrentUser()
-    console.log("[RedirectDebug] app/page.tsx root redirect triggered for role:", user?.role)
+    const availableStr = localStorage.getItem("available_schools")
+    const schools = availableStr ? JSON.parse(availableStr) : []
+    const xSchoolId = localStorage.getItem("x-school-id")
+
+    console.log("[RedirectDebug] app/page.tsx root redirect triggered for role:", user?.role, "Multiple schools:", schools.length)
+    
+    // If multiple schools and haven't explicitly picked one (or just to be safe)
+    if (schools.length > 1 && !xSchoolId) {
+      window.location.replace("/auth/school-select")
+      return
+    }
+
     if (user?.role === "super_admin") {
       window.location.replace("/super-admin")
     } else if (user?.role === "teacher") {

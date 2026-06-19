@@ -172,9 +172,9 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
   }
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div className="flex flex-col gap-4 h-full overflow-y-auto md:overflow-hidden">
       {/* Header & Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <StatCard 
           icon={<CheckCircle2 className="text-emerald-500" />} 
           label="Valid Rows" 

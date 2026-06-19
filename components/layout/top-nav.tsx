@@ -94,8 +94,8 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
           </Button>
         )}
 
-        <div className="flex items-center gap-4 flex-1 overflow-hidden">
-          <div className="flex items-center gap-4 overflow-hidden">
+        <div className="flex items-center gap-4 flex-1 min-w-0 overflow-hidden">
+          <div className="flex items-center gap-4 min-w-0 overflow-hidden">
             <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0 border border-primary/20 shadow-inner">
               {logoUrl && !logoError ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -111,9 +111,9 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
                 </div>
               )}
             </div>
-            <div className="flex flex-col overflow-hidden">
-              <h1 className="typography-card-title text-primary sm:text-2xl truncate">
-                {schoolName}
+            <div className="flex flex-col min-w-0">
+              <h1 className="typography-card-title text-primary sm:text-2xl truncate font-bold">
+                {schoolName || "Zetime Portal"}
               </h1>
               <div className="hidden sm:flex items-center gap-2">
                 <span className="typography-label text-[10px] text-primary/70 uppercase tracking-[0.2em]">

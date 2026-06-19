@@ -17,6 +17,8 @@ const PUBLIC_ROOT_FILES = new Set([
   "/ethiopian_admin_attendance_v2.png",
   "/ethiopian_admin_attendance_v3.png",
   "/zetime_branding_professional.png",
+  "/firebase-messaging-sw.js",
+  "/firebase-cloud-messaging-push-scope"
 ])
 
 export function proxy(request: NextRequest) {
@@ -65,6 +67,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json|icon-192.png|icon-512.png|offline.html|browserconfig.xml|icon.svg|placeholder.svg|placeholder-logo.svg).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json|icon-192.png|icon-512.png|offline.html|browserconfig.xml|icon.svg|placeholder.svg|placeholder-logo.svg|firebase-messaging-sw.js|firebase-cloud-messaging-push-scope).*)",
   ],
 }

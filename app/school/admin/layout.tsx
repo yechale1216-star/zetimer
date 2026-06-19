@@ -69,7 +69,7 @@ export default function SchoolAdminLayout({
   const router = useRouter()
 
   const { user, features, logout } = useAuth()
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = user?.role === 'admin' || user?.role === 'school_admin'
   const [isMounted, setIsMounted] = React.useState(false)
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
   const [showBottomNav, setShowBottomNav] = React.useState(true)
@@ -147,18 +147,18 @@ export default function SchoolAdminLayout({
 
   const allNavItems = [
     { href: '/school/admin', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Dashboard', show: true },
-    { href: '/school/admin/announcements', icon: <Megaphone className="w-5 h-5" />, label: 'Announcements', show: features?.includes('messaging') || features?.includes('sms_notifications') },
-    { href: '/school/admin/communication', icon: <MessageSquare className="w-5 h-5" />, label: 'Communication', show: features?.includes('messaging') },
-    { href: '/school/admin/calls', icon: <Phone className="w-5 h-5" />, label: 'Calls', show: features?.includes('video_calls') },
-    { href: '/school/admin/students', icon: <Users className="w-5 h-5" />, label: 'Students', show: features?.includes('student_management') },
-    { href: '/school/admin/teachers', icon: <User className="w-5 h-5" />, label: 'Teachers', show: isAdmin && features?.includes('teacher_management') },
-    { href: '/school/admin/teacher-assignments', icon: <BookOpen className="w-5 h-5" />, label: 'Assignments', show: isAdmin && features?.includes('teacher_management') },
-    { href: '/school/admin/attendance', icon: <CheckSquare className="w-5 h-5" />, label: 'Attendance', show: features?.includes('attendance_tracking') },
-    { href: '/school/admin/attendance-by-grade', icon: <BarChart2 className="w-5 h-5" />, label: 'Grade Analytics', show: features?.includes('advanced_analytics') },
-    { href: '/school/admin/reports', icon: <BookOpen className="w-5 h-5" />, label: 'Reports', show: features?.includes('basic_reports') },
-    { href: '/school/admin/promotion', icon: <TrendingUp className="w-5 h-5" />, label: 'Promotion', show: isAdmin && features?.includes('student_promotion') },
+    { href: '/school/admin/announcements', icon: <Megaphone className="w-5 h-5" />, label: 'Announcements', show: true },
+    { href: '/school/admin/communication', icon: <MessageSquare className="w-5 h-5" />, label: 'Communication', show: true },
+    { href: '/school/admin/calls', icon: <Phone className="w-5 h-5" />, label: 'Calls', show: true },
+    { href: '/school/admin/students', icon: <Users className="w-5 h-5" />, label: 'Students', show: true },
+    { href: '/school/admin/teachers', icon: <User className="w-5 h-5" />, label: 'Teachers', show: true },
+    { href: '/school/admin/teacher-assignments', icon: <BookOpen className="w-5 h-5" />, label: 'Assignments', show: true },
+    { href: '/school/admin/attendance', icon: <CheckSquare className="w-5 h-5" />, label: 'Attendance', show: true },
+    { href: '/school/admin/attendance-by-grade', icon: <BarChart2 className="w-5 h-5" />, label: 'Grade Analytics', show: true },
+    { href: '/school/admin/reports', icon: <BookOpen className="w-5 h-5" />, label: 'Reports', show: true },
+    { href: '/school/admin/promotion', icon: <TrendingUp className="w-5 h-5" />, label: 'Promotion', show: true },
     { href: '/school/admin/subscription', icon: <CreditCard className="w-5 h-5" />, label: 'Subscription & Pricing', show: true },
-    { href: '/school/admin/settings', icon: <Settings className="w-5 h-5" />, label: 'Settings', show: isAdmin },
+    { href: '/school/admin/settings', icon: <Settings className="w-5 h-5" />, label: 'Settings', show: true },
     { href: '/school/admin/profile', icon: <User className="w-5 h-5" />, label: 'Profile', show: true },
     { href: '/school/admin/support', icon: <MessageSquare className="w-5 h-5" />, label: 'Help & Support', show: true },
   ]

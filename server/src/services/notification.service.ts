@@ -1,8 +1,8 @@
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 
 // Initialize firebase admin with env variables
 // The user should provide FIREBASE_SERVICE_ACCOUNT as a JSON string in .env
-if (process.env.FIREBASE_SERVICE_ACCOUNT && !admin.apps.length) {
+if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length === 0) {
   try {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     admin.initializeApp({

@@ -5,251 +5,216 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initSocket = void 0;
 const socket_io_1 = require("socket.io");
-const db_1 = __importDefault(require("./config/db"));
+const client_1 = require("@prisma/client");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const node_crypto_1 = require("node:crypto");
+const notification_service_1 = require("./services/notification.service");
+const prisma = new client_1.PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-long-enough';
-// In-memory caches to minimize DB hits in the critical path
+// ── School subscription status cache ────────────────────────────────────────
 const schoolStatusCache = new Map();
-const userProfileCache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+const SCHOOL_CACHE_TTL = 5 * 60 * 1000;
+// ── Conversation membership cache ────────────────────────────────────────────
+const convMemberCache = new Map();
+const CONV_CACHE_TTL = 60 * 1000;
+// ── Recent message tempId deduplication window ───────────────────────────────
+const recentTempIds = new Map();
+const TEMPID_TTL = 60 * 1000;
+function cleanupTempIds() {
+    const now = Date.now();
+    for (const [key, val] of recentTempIds) {
+        if (val.expires < now)
+            recentTempIds.delete(key);
+    }
+}
 const initSocket = (server) => {
     const io = new socket_io_1.Server(server, {
-        cors: {
-            origin: '*',
-            methods: ['GET', 'POST'],
-        },
-        transports: ['websocket', 'polling'],
-        pingTimeout: 60000,
+        cors: { origin: '*', methods: ['GET', 'POST'] },
         pingInterval: 25000,
+        pingTimeout: 60000,
+        transports: ['websocket'],
     });
-    const userSockets = new Map(); // userId -> socketId
-    const socketData = new Map(); // socketId -> data
-    const onlineUsers = new Set(); // Set of online userIds
+    const userSockets = new Map();
+    const socketData = new Map();
+    const userSchoolMap = new Map();
+    const onlineUsers = new Set();
+    async function getConversationMemberIds(conversationId) {
+        const cached = convMemberCache.get(conversationId);
+        if (cached && cached.expires > Date.now())
+            return cached.memberIds;
+        const members = await prisma.conversationMember.findMany({
+            where: { conversationId },
+            select: { userId: true },
+        });
+        const memberIds = members.map(m => m.userId);
+        convMemberCache.set(conversationId, { memberIds, expires: Date.now() + CONV_CACHE_TTL });
+        return memberIds;
+    }
+    async function emitPresenceToSchoolMates(event, userId, schoolId, excludeSocketId) {
+        try {
+            const sharedConvMembers = await prisma.conversationMember.findMany({
+                where: {
+                    conversation: { schoolId },
+                    conversationId: { in: (await prisma.conversationMember.findMany({ where: { userId }, select: { conversationId: true } })).map(m => m.conversationId) }
+                },
+                select: { userId: true },
+                distinct: ['userId'],
+            });
+            for (const { userId: mateId } of sharedConvMembers) {
+                if (mateId === userId)
+                    continue;
+                const mateSocketId = userSockets.get(mateId);
+                if (mateSocketId && mateSocketId !== excludeSocketId)
+                    io.to(mateSocketId).emit(event, userId);
+            }
+        }
+        catch (err) {
+            console.error(`[Socket] Failed to emit ${event}:`, err);
+        }
+    }
     io.on('connection', (socket) => {
         socket.on('authenticate', async ({ token }) => {
             try {
-                const start = Date.now();
                 const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
                 const { id: userId, schoolId } = decoded;
-                if (!userId || !schoolId)
-                    throw new Error('Invalid token');
                 userSockets.set(userId, socket.id);
                 socketData.set(socket.id, { userId, schoolId });
+                userSchoolMap.set(userId, schoolId);
                 onlineUsers.add(userId);
-                // Auto-join conversation rooms
-                const memberships = await db_1.default.conversationMember.findMany({
-                    where: { userId },
-                    select: { conversationId: true }
-                });
-                memberships.forEach(m => socket.join(m.conversationId));
-                socket.join(`user_${userId}`);
-                console.log(`[Socket] Auth ${userId}: ${Date.now() - start}ms`);
-                socket.emit('initial_online_users', Array.from(onlineUsers));
-                socket.broadcast.emit('user_online', userId);
+                const schoolOnline = Array.from(onlineUsers).filter(uid => userSchoolMap.get(uid) === schoolId);
+                socket.emit('initial_online_users', schoolOnline);
+                emitPresenceToSchoolMates('user_online', userId, schoolId, socket.id);
             }
             catch (error) {
                 socket.emit('auth_error', { message: 'Authentication failed' });
             }
         });
-        socket.on('join_conversation', (conversationId) => {
-            if (conversationId)
-                socket.join(conversationId);
+        socket.on('register_push_token', async ({ token }) => {
+            const tenant = socketData.get(socket.id);
+            if (!tenant || !token)
+                return;
+            try {
+                await prisma.user.update({ where: { id: tenant.userId }, data: { pushToken: token } });
+            }
+            catch (err) {
+                console.error('[Socket] push token error:', err);
+            }
+        });
+        socket.on('join_conversation', async (conversationId) => {
+            socket.join(conversationId);
+            const tenant = socketData.get(socket.id);
+            if (!tenant)
+                return;
+            prisma.message.findMany({
+                where: { conversationId, schoolId: tenant.schoolId, senderId: { not: tenant.userId }, readBy: { none: { userId: tenant.userId } } },
+                select: { id: true }, take: 100, orderBy: { createdAt: 'desc' },
+            }).then(unread => {
+                if (unread.length > 0)
+                    socket.to(conversationId).emit('messages_delivered', { conversationId, userId: tenant.userId, messageIds: unread.map(m => m.id) });
+            });
         });
         socket.on('send_message', async (data) => {
-            const start = Date.now();
             const tenant = socketData.get(socket.id);
             if (!tenant || tenant.userId !== data.senderId)
                 return;
             try {
-                const cachedSchool = schoolStatusCache.get(tenant.schoolId);
-                const shouldFetchSchool = !cachedSchool || cachedSchool.expires < Date.now();
-                const [school, cachedSender] = await Promise.all([
-                    shouldFetchSchool
-                        ? db_1.default.school.findUnique({
-                            where: { id: tenant.schoolId },
-                            select: { subscriptionStatus: true, subscription: { select: { status: true } } }
-                        })
-                        : Promise.resolve(null),
-                    userProfileCache.get(data.senderId) ? Promise.resolve(userProfileCache.get(data.senderId)) : db_1.default.user.findUnique({
-                        where: { id: data.senderId },
-                        select: { id: true, full_name: true, profile_photo: true }
-                    })
-                ]);
-                if (shouldFetchSchool && school) {
-                    const status = (school.subscription?.status || school.subscriptionStatus || 'ACTIVE').toUpperCase();
-                    schoolStatusCache.set(tenant.schoolId, { status, expires: Date.now() + CACHE_TTL });
-                    if (status === 'SUSPENDED' || status === 'EXPIRED') {
-                        socket.emit('message_error', { message: 'Subscription issue', code: `SCHOOL_${status}` });
+                if (data.tempId) {
+                    const dedupeKey = `${tenant.schoolId}:${data.tempId}`;
+                    const existing = recentTempIds.get(dedupeKey);
+                    if (existing && existing.expires > Date.now()) {
+                        socket.emit('message_sent', { tempId: data.tempId, messageId: existing.messageId });
                         return;
                     }
                 }
-                if (cachedSender)
-                    userProfileCache.set(data.senderId, cachedSender);
-                const messageId = (0, node_crypto_1.randomUUID)();
-                const createdAt = new Date();
-                const messagePayload = {
-                    id: messageId,
-                    conversationId: data.conversationId,
-                    senderId: data.senderId,
-                    schoolId: tenant.schoolId,
-                    content: data.content,
-                    type: data.type,
-                    createdAt,
-                    sender: cachedSender,
-                    tempId: data.tempId,
-                    status: 'sent',
-                    attachments: data.attachment ? [data.attachment] : undefined,
-                    metadata: data.content ? {
-                        links: Array.from(data.content.matchAll(/((https?:\/\/[^\s]+)|(www\.[^\s]+))/g)).map(m => m[0])
-                    } : undefined,
-                };
-                io.to(data.conversationId).emit('new_message', messagePayload);
-                console.log(`[Socket] Send -> Broadcast: ${Date.now() - start}ms`);
-                db_1.default.$transaction([
-                    db_1.default.message.create({
-                        data: {
-                            id: messageId,
-                            conversationId: data.conversationId,
-                            senderId: data.senderId,
-                            schoolId: tenant.schoolId,
-                            content: data.content,
-                            type: data.type,
-                            createdAt,
-                            attachments: data.attachment ? [data.attachment] : undefined,
-                            metadata: messagePayload.metadata
-                        }
-                    }),
-                    db_1.default.conversation.update({
-                        where: { id: data.conversationId },
-                        data: { updatedAt: new Date() }
-                    })
-                ]).catch(err => {
-                    console.error('[Socket] DB error:', err);
-                    socket.emit('message_error', { message: 'Save failed', tempId: data.tempId });
+                const message = await prisma.message.create({
+                    data: { conversationId: data.conversationId, senderId: data.senderId, schoolId: tenant.schoolId, content: data.content, type: data.type, replyToId: data.replyToId },
+                    include: { sender: { select: { id: true, full_name: true, profile_photo: true } } }
+                });
+                if (data.tempId)
+                    recentTempIds.set(`${tenant.schoolId}:${data.tempId}`, { messageId: message.id, expires: Date.now() + TEMPID_TTL });
+                io.to(data.conversationId).emit('new_message', { ...message, tempId: data.tempId });
+                socket.emit('message_sent', { tempId: data.tempId, messageId: message.id });
+                // Push notification logic
+                getConversationMemberIds(data.conversationId).then(async (memberIds) => {
+                    const targets = memberIds.filter(id => id !== data.senderId);
+                    const usersWithTokens = await prisma.user.findMany({ where: { id: { in: targets }, pushToken: { not: null } }, select: { pushToken: true } });
+                    for (const u of usersWithTokens) {
+                        if (u.pushToken)
+                            (0, notification_service_1.sendPushNotification)(u.pushToken, `New from ${message.sender.full_name}`, data.content || 'Attachment', { type: 'message', conversationId: data.conversationId });
+                    }
                 });
             }
             catch (error) {
-                socket.emit('message_error', { message: 'Failed to send' });
+                socket.emit('message_error', { message: 'Failed to send', tempId: data.tempId });
             }
         });
-        socket.on('mark_as_delivered', (data) => {
-            // Broadcast delivery status to the sender
-            socket.to(data.conversationId).emit('message_delivered', data);
-        });
-        socket.on('mark_as_read', async (data) => {
+        socket.on('typing', (data) => socket.to(data.conversationId).emit('user_typing', data));
+        socket.on('mark_conversation_read', async (data) => {
             const tenant = socketData.get(socket.id);
-            if (!tenant)
+            if (!tenant || tenant.userId !== data.userId || !data.messageIds?.length)
                 return;
-            db_1.default.messageRead.upsert({
-                where: { messageId_userId: { messageId: data.messageId, userId: data.userId } },
-                update: { readAt: new Date() },
-                create: { messageId: data.messageId, userId: data.userId, schoolId: tenant.schoolId }
-            }).catch(() => { });
-            socket.to(data.conversationId).emit('message_read', data);
+            try {
+                await prisma.$transaction(data.messageIds.map((messageId) => prisma.messageRead.upsert({
+                    where: { messageId_userId: { messageId, userId: data.userId } }, update: { readAt: new Date() }, create: { messageId, userId: data.userId, schoolId: tenant.schoolId }
+                })));
+                socket.to(data.conversationId).emit('messages_read', { conversationId: data.conversationId, userId: data.userId, messageIds: data.messageIds });
+            }
+            catch (err) { }
         });
-        socket.on('typing', (d) => socket.to(d.conversationId).emit('user_typing', d));
-        socket.on('edit_message', (d) => {
-            db_1.default.message.update({ where: { id: d.messageId }, data: { content: d.content, editedAt: new Date() } }).catch(() => { });
-            io.to(d.conversationId).emit('message_edited', d);
-        });
-        socket.on('delete_message', (d) => {
-            db_1.default.message.update({ where: { id: d.messageId }, data: { isDeleted: true } }).catch(() => { });
-            io.to(d.conversationId).emit('message_deleted', d);
-        });
-        // --- ENHANCED CALL HANDLING ---
         socket.on('call_user', async (data) => {
             const tenant = socketData.get(socket.id);
             if (!tenant || tenant.userId !== data.from)
                 return;
-            const targetUser = await db_1.default.user.findUnique({
-                where: { id: data.to },
-                select: { schoolId: true, is_active: true }
-            });
-            if (!targetUser || targetUser.schoolId !== tenant.schoolId)
+            const targetUser = await prisma.user.findFirst({ where: { id: data.to, schoolId: tenant.schoolId, is_active: true }, select: { id: true, pushToken: true } });
+            if (!targetUser)
                 return;
             const targetSocketId = userSockets.get(data.to);
-            const session = await db_1.default.callSession.create({
-                data: {
-                    schoolId: tenant.schoolId,
-                    type: data.type,
-                    status: 'RINGING',
-                    participants: {
-                        create: [
-                            { userId: data.from, schoolId: tenant.schoolId },
-                            { userId: data.to, schoolId: tenant.schoolId }
-                        ]
-                    }
-                }
-            });
-            if (targetSocketId) {
-                io.to(targetSocketId).emit('incoming_call', {
-                    ...data,
-                    sessionId: session.id
-                });
+            if (targetSocketId)
+                io.to(targetSocketId).emit('incoming_call', data);
+            if (targetUser.pushToken) {
+                (0, notification_service_1.sendPushNotification)(targetUser.pushToken, `Incoming ${data.type} call`, `${data.profile.name} is calling...`, { type: 'incoming_call', from: data.from, callType: data.type, profile: JSON.stringify(data.profile) });
             }
+            prisma.callSession?.create({ data: { schoolId: tenant.schoolId, type: data.type, status: 'RINGING', participants: { create: [{ userId: data.from, schoolId: tenant.schoolId }, { userId: data.to, schoolId: tenant.schoolId }] } } }).catch(() => { });
         });
-        socket.on('answer_call', (d) => {
-            const s = userSockets.get(d.to);
+        socket.on('answer_call', (data) => {
+            const s = userSockets.get(data.to);
             if (s)
-                io.to(s).emit('call_answered', d);
+                io.to(s).emit('call_answered', { from: data.from, answer: data.answer });
         });
-        socket.on('ice_candidate', (d) => {
-            const s = userSockets.get(d.to);
+        socket.on('ice_candidate', (data) => {
+            const s = userSockets.get(data.to);
             if (s)
-                io.to(s).emit('ice_candidate', d);
+                io.to(s).emit('ice_candidate', { from: data.from, candidate: data.candidate });
         });
-        socket.on('reject_call', async (d) => {
+        socket.on('reject_call', async (data) => {
             const tenant = socketData.get(socket.id);
-            const s = userSockets.get(d.to);
+            if (!tenant)
+                return;
+            const s = userSockets.get(data.to);
             if (s)
-                io.to(s).emit('call_rejected', { from: d.from });
-            if (d.conversationId && tenant) {
-                const msg = await db_1.default.message.create({
-                    data: {
-                        conversationId: d.conversationId,
-                        senderId: d.from,
-                        schoolId: tenant.schoolId,
-                        content: 'Missed Call',
-                        type: 'CALL_MISSED_VOICE'
-                    },
-                    include: { sender: { select: { id: true, full_name: true, profile_photo: true } } }
-                });
-                io.to(d.conversationId).emit('new_message', msg);
+                io.to(s).emit('call_rejected', { from: data.from });
+            if (data.conversationId) {
+                const msg = await prisma.message.create({ data: { conversationId: data.conversationId, senderId: data.from, schoolId: tenant.schoolId, content: 'Missed Call', type: data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE' } });
+                io.to(data.conversationId).emit('new_message', msg);
             }
         });
-        socket.on('end_call', async (d) => {
+        socket.on('end_call', async (data) => {
             const tenant = socketData.get(socket.id);
-            const s = userSockets.get(d.to);
+            if (!tenant)
+                return;
+            const s = userSockets.get(data.to);
             if (s)
-                io.to(s).emit('call_ended', { from: d.from });
-            if (d.conversationId && tenant) {
-                const durationText = d.duration ? `(${Math.floor(d.duration / 60)}m ${d.duration % 60}s)` : '';
-                const msg = await db_1.default.message.create({
-                    data: {
-                        conversationId: d.conversationId,
-                        senderId: d.from,
-                        schoolId: tenant.schoolId,
-                        content: `Call ended ${durationText}`,
-                        type: 'CALL_VOICE'
-                    },
-                    include: { sender: { select: { id: true, full_name: true, profile_photo: true } } }
-                });
-                io.to(d.conversationId).emit('new_message', msg);
+                io.to(s).emit('call_ended', { from: data.from });
+            if (data.conversationId) {
+                const msg = await prisma.message.create({ data: { conversationId: data.conversationId, senderId: data.from, schoolId: tenant.schoolId, content: 'Call ended', type: 'CALL_VOICE' } });
+                io.to(data.conversationId).emit('new_message', msg);
             }
-        });
-        socket.on('media_state_change', (d) => {
-            const s = userSockets.get(d.to);
-            if (s)
-                io.to(s).emit('media_state_changed', d);
         });
         socket.on('disconnect', () => {
             const data = socketData.get(socket.id);
             if (data) {
                 userSockets.delete(data.userId);
                 onlineUsers.delete(data.userId);
-                socket.broadcast.emit('user_offline', data.userId);
-                db_1.default.user.update({ where: { id: data.userId }, data: { lastActive: new Date() } }).catch(() => { });
+                emitPresenceToSchoolMates('user_offline', data.userId, data.schoolId, socket.id);
             }
             socketData.delete(socket.id);
         });

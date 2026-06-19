@@ -412,12 +412,28 @@ export const initSocket = (server: HttpServer) => {
       const tenant = socketData.get(socket.id);
       if (!tenant || tenant.userId !== data.from) return;
 
+      // ── Step 1: Validate target user quickly ────────────────────────────
       const targetUser = await prisma.user.findFirst({
         where: { id: data.to, schoolId: tenant.schoolId, is_active: true },
+        select: { id: true }
       });
       if (!targetUser) return;
 
-      const session = await (prisma as any).callSession.create({
+      // ── Step 2: Instant Ringing Delivery ───────────────────────────────
+      // Match Telegram's logic: deliver the ring before logging to DB.
+      // This saves another ~100-200ms of signaling delay.
+      const targetSocketId = userSockets.get(data.to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('incoming_call', {
+          from: data.from,
+          offer: data.offer,
+          profile: data.profile,
+          type: data.type,
+        });
+      }
+
+      // ── Step 3: Log Session in Background ───────────────────────────────
+      (prisma as any).callSession?.create({
         data: {
           schoolId: tenant.schoolId,
           type: data.type,
@@ -429,18 +445,7 @@ export const initSocket = (server: HttpServer) => {
             ],
           },
         },
-      });
-
-      const targetSocketId = userSockets.get(data.to);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('incoming_call', {
-          from: data.from,
-          offer: data.offer,
-          profile: data.profile,
-          type: data.type,
-          sessionId: session.id,
-        });
-      }
+      }).catch((err: any) => console.error('[Socket] Failed to create callSession:', err));
     });
 
     socket.on('answer_call', (data: { to: string; from: string; answer: any }) => {
@@ -453,7 +458,7 @@ export const initSocket = (server: HttpServer) => {
       if (targetSocketId) io.to(targetSocketId).emit('ice_candidate', { from: data.from, candidate: data.candidate });
     });
 
-    socket.on('reject_call', async (data: { to: string; from: string; conversationId: string }) => {
+    socket.on('reject_call', async (data: { to: string; from: string; conversationId: string; type?: 'VOICE' | 'VIDEO' }) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
 
@@ -461,13 +466,14 @@ export const initSocket = (server: HttpServer) => {
       if (targetSocketId) io.to(targetSocketId).emit('call_rejected', { from: data.from });
 
       if (data.conversationId) {
+        const missedType = data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE';
         const msg = await prisma.message.create({
           data: {
             conversationId: data.conversationId,
             senderId: data.from,
             schoolId: tenant.schoolId,
             content: 'Missed Call',
-            type: 'CALL_MISSED_VOICE',
+            type: missedType,
           },
         });
         io.to(data.conversationId).emit('new_message', { ...msg });

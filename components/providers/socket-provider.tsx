@@ -24,10 +24,21 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
-  const authenticate = useCallback((s: Socket) => {
+  const authenticate = useCallback(async (s: Socket) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('attendance_token') : null;
     if (token && s.connected) {
       s.emit('authenticate', { token });
+
+      // --- Register Push Token ---
+      try {
+        const { requestPushNotificationPermission } = await import('@/lib/firebase-client');
+        const pushToken = await requestPushNotificationPermission();
+        if (pushToken) {
+          s.emit('register_push_token', { token: pushToken });
+        }
+      } catch (err) {
+        console.warn('[SocketProvider] Push registration failed:', err);
+      }
     }
   }, []);
 
@@ -105,6 +116,13 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', handleOnline);
       window.addEventListener('offline', handleOffline);
+
+      // Register Firebase Service Worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          .then((reg) => console.log('[SocketProvider] Service Worker registered:', reg.scope))
+          .catch((err) => console.warn('[SocketProvider] SW registration failed:', err));
+      }
     }
 
     return () => {

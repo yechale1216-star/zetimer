@@ -193,6 +193,7 @@ model User {
   reset_password_token       String?              @unique
   address                    String?
   lastActive                 DateTime?
+  pushToken                  String?
   callHistory                CallHistory[]
   callSessions               CallParticipant[]
   conversations              ConversationMember[]

@@ -1,14 +1,22 @@
-import admin from 'firebase-admin';
+import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
+import { getMessaging, Message } from 'firebase-admin/messaging';
+
+let app: App | undefined;
 
 // Initialize firebase admin with env variables
-// The user should provide FIREBASE_SERVICE_ACCOUNT as a JSON string in .env
-if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length === 0) {
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    console.log('[NotificationService] Firebase Admin initialized');
+    const existingApps = getApps();
+    
+    if (existingApps.length === 0) {
+      app = initializeApp({
+        credential: cert(serviceAccount)
+      });
+      console.log('[NotificationService] Firebase Admin initialized');
+    } else {
+      app = existingApps[0];
+    }
   } catch (e) {
     console.error('[NotificationService] Failed to initialize Firebase Admin:', e);
   }
@@ -24,16 +32,17 @@ export async function sendPushNotification(
   body: string, 
   data: Record<string, string> = {}
 ) {
-  if (!admin.apps.length) {
+  const activeApp = app || (getApps().length > 0 ? getApps()[0] : undefined);
+  
+  if (!activeApp) {
     console.warn('[NotificationService] Firebase Admin not initialized. Skipping push.');
     return;
   }
   
-  const message: admin.messaging.Message = {
+  const message: Message = {
     notification: { title, body },
     data: { 
       ...data, 
-      // This helps the mobile/PWA client handle the click
       click_action: 'FLUTTER_NOTIFICATION_CLICK', 
       type: data.type || 'message' 
     },
@@ -56,10 +65,10 @@ export async function sendPushNotification(
   };
 
   try {
-    const response = await admin.messaging().send(message);
+    const messaging = getMessaging(activeApp);
+    const response = await messaging.send(message);
     return response;
   } catch (error: any) {
-    // If the token is invalid or expired, we should return null or handle it
     if (error.code === 'messaging/registration-token-not-registered') {
       console.warn('[NotificationService] Token is no longer valid');
       return 'EXPIRED_TOKEN';

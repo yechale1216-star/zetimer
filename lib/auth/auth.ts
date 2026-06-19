@@ -104,6 +104,17 @@ class AuthService {
         if (user.schoolId) {
           localStorage.setItem("x-school-id", user.schoolId);
         }
+
+        // Persist active_school so SchoolContext (and TopNav) can display the school name immediately
+        if (user.schoolId && user.schoolName) {
+          const activeSchool = {
+            id: user.schoolId,
+            name: user.schoolName,
+            logo: user.schoolLogo || "",
+            customSchoolId: user.customSchoolId || ""
+          }
+          localStorage.setItem("active_school", JSON.stringify(activeSchool))
+        }
       }
 
       return { success: true, message: "Login successful", user, availableSchools }
@@ -309,6 +320,16 @@ class AuthService {
         localStorage.setItem("attendance_token", token)
         if (user.schoolId) {
           localStorage.setItem("x-school-id", user.schoolId);
+        }
+        // Persist active_school so SchoolContext (and TopNav) shows school name immediately
+        if (user.schoolId && user.schoolName) {
+          const activeSchool = {
+            id: user.schoolId,
+            name: user.schoolName,
+            logo: user.schoolLogo || "",
+            customSchoolId: user.customSchoolId || ""
+          }
+          localStorage.setItem("active_school", JSON.stringify(activeSchool))
         }
       }
 
@@ -517,6 +538,7 @@ class AuthService {
         "parent_students",            // parent's student list (school-scoped)
         "available_schools",          // parent's available schools list
         "has_multiple_schools",       // parent multi-school flag
+        "active_school",              // active school context (SchoolContext)
       ]
       keysToRemove.forEach(key => localStorage.removeItem(key))
     }

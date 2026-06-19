@@ -51,7 +51,10 @@ router.get('/profile', async (req, res, next) => {
         const contextUser = {
             ...user,
             role: req.user?.role || user.role,
-            schoolId: schoolId || user.schoolId
+            schoolId: schoolId || user.schoolId,
+            // Map school info for the frontend
+            schoolName: user.school?.name || '',
+            schoolLogo: user.school?.settings?.school_logo || ''
         };
         res.status(200).json({ success: true, data: contextUser });
     }

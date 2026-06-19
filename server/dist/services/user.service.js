@@ -18,7 +18,10 @@ const getUserById = async (id, schoolId) => {
     const where = { id };
     if (schoolId)
         where.schoolId = schoolId;
-    return await db_1.default.user.findFirst({ where });
+    return await db_1.default.user.findFirst({
+        where,
+        include: { school: { include: { settings: true } } }
+    });
 };
 exports.getUserById = getUserById;
 const getUsers = async (schoolId) => {

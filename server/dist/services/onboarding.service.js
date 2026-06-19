@@ -55,7 +55,10 @@ const startOnboarding = async (data) => {
     }
     // 2. Generate a unique School ID (outside transaction to avoid connection deadlock)
     const customId = await (0, school_id_1.generateSchoolId)();
-    // 3. Atomic Transaction for School and Admin Creation
+    // 3. Prepare credentials outside to avoid blocking the transaction with CPU-intensive hashing
+    const rawPassword = adminPassword || crypto_1.default.randomBytes(8).toString('hex');
+    const hashedPassword = bcryptjs_1.default.hashSync(rawPassword, 10);
+    // 4. Atomic Transaction for School and Admin Creation
     return await db_1.default.$transaction(async (tx) => {
         // A. Create the School
         const school = await tx.school.create({
@@ -106,9 +109,6 @@ const startOnboarding = async (data) => {
             }
         });
         // B. Create the Admin User (Inside transaction with tx)
-        // If no password provided (Super Admin flow), generate a random one
-        const rawPassword = adminPassword || crypto_1.default.randomBytes(8).toString('hex');
-        const hashedPassword = bcryptjs_1.default.hashSync(rawPassword, 10);
         const user = await tx.user.create({
             data: {
                 email: adminEmail.toLowerCase().trim(),
@@ -131,7 +131,7 @@ const startOnboarding = async (data) => {
             }
         };
     }, {
-        timeout: 15000
+        timeout: 30000
     });
 };
 exports.startOnboarding = startOnboarding;

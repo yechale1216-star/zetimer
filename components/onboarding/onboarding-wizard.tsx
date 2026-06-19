@@ -61,10 +61,11 @@ export default function OnboardingWizard() {
   const [saving, setSaving] = useState(false)
   const [skipping, setSkipping] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
+  const [mounted, setMounted] = useState(false)
+  
   const user = authService.getCurrentUser()
-  const adminName = user?.name?.split(" ")[0] || "Admin"
-  const schoolName = user?.schoolName || "Your School"
+  const adminName = mounted ? (user?.name?.split(" ")[0] || "Admin") : "Admin"
+  const schoolName = mounted ? (user?.schoolName || "Your School") : "Your School"
 
   const [data, setData] = useState<OnboardingData>({
     schoolEmail: "",
@@ -78,6 +79,7 @@ export default function OnboardingWizard() {
   
   // Auth guard: If not logged in as admin, redirect to login
   useEffect(() => {
+    setMounted(true)
     if (typeof window !== "undefined") {
       const currentUser = authService.getCurrentUser()
       const isAdmin = authService.isAdmin()

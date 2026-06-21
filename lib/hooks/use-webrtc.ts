@@ -7,6 +7,7 @@ interface WebRTCOptions {
   userId: string;
   onIncomingCall?: (data: { from: string; profile: any; type: 'VOICE' | 'VIDEO' }) => void;
   onCallAccepted?: (userId: string) => void;
+  onCallRejected?: (userId: string) => void;
   onCallEnded?: (userId: string) => void;
   onRemoteStream?: (userId: string, stream: MediaStream) => void;
 }
@@ -243,9 +244,20 @@ export const useWebRTC = (options: WebRTCOptions) => {
       if (socket) socket.emit('end_call', { 
         to: userId, 
         from: options.userId,
-        conversationId: (window as any).activeConversationId, // Hack to get conversationId if not passed
+        conversationId: (window as any).activeConversationId,
       });
     });
+    cleanupAll();
+  }, [socket, options.userId, cleanupAll]);
+
+  // Emitted by the RECEIVER to notify the caller they were declined
+  const rejectCall = useCallback((callerId: string) => {
+    if (socket) {
+      socket.emit('reject_call', {
+        to: callerId,
+        from: options.userId,
+      });
+    }
     cleanupAll();
   }, [socket, options.userId, cleanupAll]);
 
@@ -375,11 +387,10 @@ export const useWebRTC = (options: WebRTCOptions) => {
     });
 
     socket.on('call_rejected', ({ from }: any) => {
+      // The callee rejected — notify the caller and clean up
+      if (options.onCallRejected) options.onCallRejected(from);
       cleanupUser(from);
-      if (peerConnections.current.size === 0) {
-        cleanupAll();
-        if (options.onCallEnded) options.onCallEnded(from);
-      }
+      cleanupAll();
     });
 
     return () => {
@@ -403,6 +414,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
     startCall,
     answerCall,
     endCall,
+    rejectCall,
     toggleMute,
     toggleCamera,
   };

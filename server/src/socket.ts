@@ -116,8 +116,27 @@ export const initSocket = (server: HttpServer) => {
             return;
           }
         }
+
+        // Build attachment JSON — strip local blob URLs so only real URLs reach the DB
+        let attachmentsJson: any = undefined;
+        if (data.attachment) {
+          const { isLocal, ...cleanAttachment } = data.attachment;
+          // Only persist if it has a real (non-blob) URL
+          if (cleanAttachment.url && !cleanAttachment.url.startsWith('blob:')) {
+            attachmentsJson = [cleanAttachment];
+          }
+        }
+
         const message = await prisma.message.create({
-          data: { conversationId: data.conversationId, senderId: data.senderId, schoolId: tenant.schoolId, content: data.content, type: data.type, replyToId: data.replyToId },
+          data: {
+            conversationId: data.conversationId,
+            senderId: data.senderId,
+            schoolId: tenant.schoolId,
+            content: data.content,
+            type: data.type,
+            replyToId: data.replyToId,
+            attachments: attachmentsJson ?? undefined,
+          },
           include: { sender: { select: { id: true, full_name: true, profile_photo: true } } }
         });
         if (data.tempId) recentTempIds.set(`${tenant.schoolId}:${data.tempId}`, { messageId: message.id, expires: Date.now() + TEMPID_TTL });

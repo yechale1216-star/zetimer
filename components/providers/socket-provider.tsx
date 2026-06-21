@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { io as ClientIO, Socket } from 'socket.io-client';
 import { socketUrl } from '@/lib/api-config';
+import { authService } from '@/lib/auth/auth';
 
 type SocketContextType = {
   socket: Socket | null;
@@ -96,6 +97,40 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       console.log(`[Socket] Reconnect attempt #${attempt}`);
     });
 
+    socketInstance.on('new_message', (message: any) => {
+      const currentUser = authService.getCurrentUser();
+      
+      // Don't notify for our own messages
+      if (currentUser && message.senderId === currentUser.id) return;
+
+      // Dispatch event so NotificationPopover refreshes
+      window.dispatchEvent(new Event('new_notification'));
+      
+      // Only notify if permissions are granted
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const title = message.senderName || message.sender?.full_name || 'New Message';
+        const body = message.content || (message.type !== 'TEXT' ? 'Sent an attachment' : 'New message');
+        const icon = message.senderAvatar || message.sender?.profile_photo || '/favicon.ico';
+        
+        try {
+          const notification = new Notification(title, {
+            body,
+            icon,
+            tag: `chat-${message.conversationId}`,
+          });
+          
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+            // If they are on a different page, this brings the app to focus. 
+            // In a more complex app, we could navigate to /chat or the specific conversation.
+          };
+        } catch (e) {
+          console.error('[Socket] Failed to show notification:', e);
+        }
+      }
+    });
+
     setSocket(socketInstance);
 
     // ── Network-aware reconnection.
@@ -116,6 +151,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', handleOnline);
       window.addEventListener('offline', handleOffline);
+
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(err => console.warn('[SocketProvider] Notification permission error:', err));
+      }
 
       // Register Firebase Service Worker
       if ('serviceWorker' in navigator) {

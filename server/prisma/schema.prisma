@@ -168,6 +168,7 @@ model School {
   featureOverrides     SchoolFeatureOverride[]
   subscription         SchoolSubscription?
   supportTickets       SupportTicket[]
+  userNotifications    UserNotification[]
 }
 
 model User {
@@ -202,6 +203,7 @@ model User {
   messageReads               MessageRead[]
   parentStudents             ParentStudentLink[]
   school                     School?              @relation(fields: [schoolId], references: [id])
+  notifications              UserNotification[]
 
   @@index([email])
   @@index([schoolId])
@@ -732,4 +734,20 @@ enum SubscriptionStatus {
   expiring
   cancelled
   paused
+}
+
+model UserNotification {
+  id        String   @id @default(uuid())
+  schoolId  String?
+  userId    String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  school    School?  @relation(fields: [schoolId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([userId])
 }

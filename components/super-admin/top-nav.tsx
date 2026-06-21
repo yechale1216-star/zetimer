@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Search, Bell, Settings, LogOut } from 'lucide-react'
+import { Search, Settings, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { authService } from '@/lib/auth/auth'
 import { useRouter } from 'next/navigation'
 import { ModeToggle } from '@/components/mode-toggle'
+import { NotificationPopover } from '@/components/ui/notification-popover'
 
 export function TopNav() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -35,10 +36,7 @@ export function TopNav() {
         <ModeToggle />
         
         {/* Notifications */}
-        <button className="relative p-1.5 hover:bg-secondary rounded-lg transition-colors" title="Notifications">
-          <Bell className="w-5 h-5 text-foreground" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-card" />
-        </button>
+        <NotificationPopover />
 
         {/* Settings */}
         <button className="p-1.5 hover:bg-secondary rounded-lg transition-colors hidden sm:block" title="Settings">

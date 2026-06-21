@@ -13,12 +13,13 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
-import { LogOut, User, Bell, Menu, GraduationCap } from "lucide-react"
+import { LogOut, User, Menu, GraduationCap } from "lucide-react"
 import { useSchoolSettings } from "@/hooks/use-school-settings"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils/utils"
 import { authService } from "@/lib/auth/auth"
 import { useSchool } from "@/lib/context/school-context"
+import { NotificationPopover } from "@/components/ui/notification-popover"
 
 interface TopNavProps {
   onMenuClick?: () => void
@@ -132,10 +133,7 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
         <div className="flex items-center gap-3">
           <ModeToggle />
           
-          <Button variant="ghost" size="icon" className="relative group">
-            <Bell className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border-2 border-background" />
-          </Button>
+          <NotificationPopover />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

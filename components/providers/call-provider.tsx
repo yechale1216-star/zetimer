@@ -43,6 +43,16 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('Call accepted by:', userId);
   }, []);
 
+  const onCallRejected = useCallback((userId: string) => {
+    // Show the caller a clear "call rejected" notification
+    const name = participants.find(p => p.id === userId)?.name || 'The other person';
+    toast({
+      title: '📵 Call Declined',
+      description: `${name} declined your call.`,
+      variant: 'destructive',
+    });
+  }, [participants, toast]);
+
   const onCallEnded = useCallback((userId: string) => {
     setParticipants(prev => {
       const next = prev.filter(p => p.id !== userId);
@@ -58,6 +68,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     userId: currentUser?.id || '',
     onIncomingCall,
     onCallAccepted,
+    onCallRejected,
     onCallEnded,
   });
 
@@ -182,7 +193,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const handleReject = () => {
-    webrtc.endCall();
+    // Emit reject_call to notify the caller before cleaning up
+    if (incomingCallData) {
+      webrtc.rejectCall(incomingCallData.from);
+    } else {
+      webrtc.endCall();
+    }
     setIncomingCallData(null);
     setParticipants(prev => prev.filter(p => p.isLocal));
   };

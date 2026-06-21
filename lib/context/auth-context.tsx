@@ -239,9 +239,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return
     }
-
-    setAuthLoading(true)
-    setPermissionsLoading(true)
     setError(null)
 
     // 1. Verify / fetch profile from backend

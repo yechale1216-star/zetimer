@@ -37,23 +37,37 @@ async function sendPushNotification(token, title, body, data = {}) {
         notification: { title, body },
         data: {
             ...data,
-            click_action: 'FLUTTER_NOTIFICATION_CLICK',
-            type: data.type || 'message'
+            type: data.type || 'message',
+            tag: data.tag || (data.type === 'call' ? 'incoming-call' : 'new-message')
         },
         token: token,
         android: {
             priority: 'high',
             notification: {
                 sound: 'default',
-                channelId: 'calls'
+                channelId: data.type === 'call' ? 'calls' : 'messages',
+                tag: data.tag || (data.type === 'call' ? 'incoming-call' : 'new-message')
             }
         },
         apns: {
             payload: {
                 aps: {
                     contentAvailable: true,
-                    sound: 'default'
+                    sound: 'default',
+                    category: data.type === 'call' ? 'INCOMING_CALL' : undefined
                 }
+            }
+        },
+        webpush: {
+            headers: {
+                Urgency: 'high'
+            },
+            notification: {
+                icon: '/icon-192.png',
+                badge: '/icon-192.png',
+                tag: data.tag || (data.type === 'call' ? 'incoming-call' : 'new-message'),
+                renotify: true,
+                requireInteraction: data.type === 'call'
             }
         }
     };

@@ -32,9 +32,31 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.checkParentsBatch = exports.setActiveSchool = exports.getMySchools = exports.updateProfile = exports.updateAnnouncement = exports.getAnnouncements = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.deleteNotification = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = exports.listParentSchools = void 0;
 const parentService = __importStar(require("../services/parent.service"));
+const db_1 = __importDefault(require("../config/db"));
+/**
+ * Helper to verify that the requested phone belongs to the authenticated user.
+ * If the user is a super_admin, we bypass this check.
+ */
+const verifyPhoneOwnership = async (req, requestedPhone) => {
+    if (!req.user?.id)
+        return false;
+    if (req.user.role === 'super_admin')
+        return true;
+    const user = await db_1.default.user.findUnique({
+        where: { id: req.user.id }
+    });
+    if (!user || !user.phone)
+        return false;
+    const normalizedUserPhone = parentService.normalizePhoneNumber(user.phone);
+    const normalizedRequestedPhone = parentService.normalizePhoneNumber(requestedPhone);
+    return normalizedUserPhone === normalizedRequestedPhone;
+};
 const listParentSchools = async (req, res, next) => {
     try {
         const { phone } = req.query;
@@ -58,6 +80,14 @@ const loginParent = async (req, res, next) => {
         }
         const normalizedPhone = parentService.normalizePhoneNumber(phone);
         const result = await parentService.loginParent(normalizedPhone, password, schoolId);
+        if (result.success && result.token) {
+            res.cookie('attendance_token', result.token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+            });
+        }
         res.status(200).json(result);
     }
     catch (error) {
@@ -94,6 +124,10 @@ const updatePassword = async (req, res, next) => {
         if (!phone || !currentPassword || !newPassword) {
             return res.status(400).json({ success: false, message: "Phone, current password, and new password are required." });
         }
+        const isOwner = await verifyPhoneOwnership(req, phone);
+        if (!isOwner) {
+            return res.status(403).json({ success: false, message: "Forbidden: You cannot modify another parent's account." });
+        }
         const result = await parentService.updatePassword(phone, currentPassword, newPassword, schoolId);
         res.status(200).json(result);
     }
@@ -108,6 +142,10 @@ const getNotifications = async (req, res, next) => {
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
+        const isOwner = await verifyPhoneOwnership(req, phone);
+        if (!isOwner) {
+            return res.status(403).json({ success: false, message: "Forbidden: You cannot access another parent's data." });
+        }
         const notifications = await parentService.getNotifications(phone, schoolId);
         res.status(200).json({ success: true, data: notifications });
     }
@@ -122,6 +160,20 @@ const markAsRead = async (req, res, next) => {
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { id } = req.params;
+        // Secure it: check if this notification belongs to a student of this parent (if studentId is set)
+        const notification = await db_1.default.parentNotification.findUnique({
+            where: { id }
+        });
+        if (notification && notification.studentId && req.user?.role !== 'super_admin') {
+            if (!req.user)
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            const link = await db_1.default.parentStudentLink.findFirst({
+                where: { parentId: req.user.id, studentId: notification.studentId }
+            });
+            if (!link) {
+                return res.status(403).json({ success: false, message: "Forbidden: Notification belongs to another parent's child." });
+            }
+        }
         await parentService.markNotificationAsRead(id, schoolId);
         res.status(200).json({ success: true, message: "Notification marked as read." });
     }
@@ -136,6 +188,20 @@ const deleteNotification = async (req, res, next) => {
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { id } = req.params;
+        // Secure it: check if this notification belongs to a student of this parent (if studentId is set)
+        const notification = await db_1.default.parentNotification.findUnique({
+            where: { id }
+        });
+        if (notification && notification.studentId && req.user?.role !== 'super_admin') {
+            if (!req.user)
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            const link = await db_1.default.parentStudentLink.findFirst({
+                where: { parentId: req.user.id, studentId: notification.studentId }
+            });
+            if (!link) {
+                return res.status(403).json({ success: false, message: "Forbidden: Notification belongs to another parent's child." });
+            }
+        }
         await parentService.deleteNotification(id, schoolId);
         res.status(200).json({ success: true, message: "Notification deleted." });
     }
@@ -150,6 +216,10 @@ const markAllAsRead = async (req, res, next) => {
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
+        const isOwner = await verifyPhoneOwnership(req, phone);
+        if (!isOwner) {
+            return res.status(403).json({ success: false, message: "Forbidden: You cannot modify another parent's data." });
+        }
         await parentService.markAllNotificationsAsRead(phone, schoolId);
         res.status(200).json({ success: true, message: "All notifications marked as read." });
     }
@@ -164,6 +234,10 @@ const getPreferences = async (req, res, next) => {
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
+        const isOwner = await verifyPhoneOwnership(req, phone);
+        if (!isOwner) {
+            return res.status(403).json({ success: false, message: "Forbidden: You cannot access another parent's preferences." });
+        }
         const preferences = await parentService.getPreferences(phone, schoolId);
         res.status(200).json({ success: true, data: preferences });
     }
@@ -178,6 +252,10 @@ const updatePreferences = async (req, res, next) => {
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
+        const isOwner = await verifyPhoneOwnership(req, phone);
+        if (!isOwner) {
+            return res.status(403).json({ success: false, message: "Forbidden: You cannot modify another parent's preferences." });
+        }
         const preferences = await parentService.updatePreferences(phone, schoolId, req.body);
         res.status(200).json({ success: true, data: preferences, message: "Preferences updated successfully." });
     }
@@ -232,6 +310,10 @@ const updateProfile = async (req, res, next) => {
         if (!schoolId)
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         const { phone } = req.params;
+        const isOwner = await verifyPhoneOwnership(req, phone);
+        if (!isOwner) {
+            return res.status(403).json({ success: false, message: "Forbidden: You cannot modify another parent's profile." });
+        }
         const { name, email, address } = req.body;
         if (!name) {
             return res.status(400).json({ success: false, message: "Name is required." });

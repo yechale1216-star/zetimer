@@ -3,6 +3,7 @@ dotenv.config();
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import studentRoutes from './routes/student.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import schoolRoutes from './routes/school.routes';
@@ -27,9 +28,16 @@ import * as parentController from './controllers/parent.controller';
 const app = express();
 
 // Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(cors({
+  origin: function (origin, callback) {
+    // Reflect origin to allow credentials from any frontend port in dev
+    callback(null, true);
+  },
+  credentials: true
+}));
+app.use(cookieParser());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {

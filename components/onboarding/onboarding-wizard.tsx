@@ -32,6 +32,7 @@ import Image from "next/image"
 interface OnboardingData {
   // Step 1 – School Profile
   schoolEmail: string
+  address: string
   logoUrl: string
   logoPreview: string
   // Step 2 – Academic Structure
@@ -56,19 +57,19 @@ const STEPS = [
 
 export default function OnboardingWizard() {
   const router = useRouter()
-  const { validateSession } = useAuth()
+  const { user, validateSession } = useAuth()
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [skipping, setSkipping] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [mounted, setMounted] = useState(false)
   
-  const user = authService.getCurrentUser()
   const adminName = mounted ? (user?.name?.split(" ")[0] || "Admin") : "Admin"
   const schoolName = mounted ? (user?.schoolName || "Your School") : "Your School"
 
   const [data, setData] = useState<OnboardingData>({
     schoolEmail: "",
+    address: "",
     logoUrl: "",
     logoPreview: "",
     academicYear: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`,
@@ -133,6 +134,7 @@ export default function OnboardingWizard() {
     setSaving(true)
     const result = await authService.completeOnboarding({
       schoolEmail: data.schoolEmail || undefined,
+      address: data.address || undefined,
       logoUrl: data.logoUrl || undefined,
       academicYear: data.academicYear || undefined,
       attendanceMode: data.attendanceMode,
@@ -369,6 +371,25 @@ function ProfileStep({
           />
         </div>
         <p className="text-[10px] text-muted-foreground ml-1">Used for school-wide notifications and announcements</p>
+      </div>
+
+      {/* School Address */}
+      <div className="space-y-1.5">
+        <Label htmlFor="schoolAddress">
+          School Address <span className="text-muted-foreground text-xs">(Optional)</span>
+        </Label>
+        <div className="relative">
+          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            id="schoolAddress"
+            type="text"
+            placeholder="Addis Ababa, Ethiopia"
+            value={data.address}
+            onChange={(e) => update({ address: e.target.value })}
+            className="pl-10 h-11 rounded-xl bg-background/50 border-border/50"
+          />
+        </div>
+        <p className="text-[10px] text-muted-foreground ml-1">Used for student registries and official records</p>
       </div>
     </div>
   )

@@ -43,6 +43,7 @@ const onboardingService = __importStar(require("../services/onboarding.service")
 const auth_resolution_service_1 = require("../services/auth_resolution.service");
 const jwt_1 = require("../utils/jwt");
 const email_1 = require("../utils/email");
+const validate_1 = require("../middleware/validate");
 const db_1 = __importDefault(require("../config/db"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -135,6 +136,12 @@ router.post('/login', async (req, res, next) => {
             schoolId: activeMembership?.schoolId || '',
             customSchoolId: activeMembership?.customSchoolId || '',
         });
+        res.cookie('attendance_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+        });
         res.status(200).json({
             success: true,
             data: {
@@ -159,16 +166,9 @@ router.post('/login', async (req, res, next) => {
     }
 });
 // Signup (Admin creates school and account)
-router.post('/signup', async (req, res, next) => {
+router.post('/signup', validate_1.validateSignup, async (req, res, next) => {
     try {
         const { email, password, name, schoolName, schoolAddress, phone } = req.body;
-        // Server-side validation
-        if (!name || name.trim().length < 2) {
-            return res.status(400).json({ success: false, message: 'Admin name must be at least 2 characters' });
-        }
-        if (!password || password.length < 8) {
-            return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
-        }
         const { school, admin } = await onboardingService.startOnboarding({
             schoolName,
             address: schoolAddress,
@@ -184,6 +184,12 @@ router.post('/signup', async (req, res, next) => {
             role: admin.role,
             schoolId: school.id,
             customSchoolId: school.schoolId || '',
+        });
+        res.cookie('attendance_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
         });
         res.status(201).json({
             success: true,
@@ -210,6 +216,15 @@ router.post('/signup', async (req, res, next) => {
             message: error instanceof Error ? error.message : 'Signup failed'
         });
     }
+});
+// Logout
+router.post('/logout', (req, res) => {
+    res.clearCookie('attendance_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+    });
+    res.status(200).json({ success: true, message: 'Logged out successfully' });
 });
 // Forgot Password
 router.post('/forgot-password', async (req, res, next) => {

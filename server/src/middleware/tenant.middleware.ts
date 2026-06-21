@@ -38,11 +38,17 @@ export const tenantMiddleware = async (req: AuthenticatedRequest, res: Response,
     return next();
   }
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, message: 'Authorization token required' });
+  let token: string | undefined;
+
+  if (req.cookies && req.cookies.attendance_token) {
+    token = req.cookies.attendance_token;
+  } else if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
   }
 
-  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'Authorization token required' });
+  }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;

@@ -4,9 +4,11 @@ import React, { useEffect } from "react"
 import { useAuth } from "@/lib/context/auth-context"
 import { useSchool } from "@/lib/context/school-context"
 import { useRouter, usePathname } from "next/navigation"
-import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { SessionTransition } from "@/components/auth/session-transition"
 import { Button } from "@/components/ui/button"
-import { AlertCircle, RotateCw, ShieldAlert } from "lucide-react"
+import { AlertCircle, RotateCw } from "lucide-react"
+import { ShieldAlert } from "lucide-react"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 
 interface AuthGuardProps {
   children: React.ReactNode
@@ -14,12 +16,10 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
-  const { user, authLoading, permissionsLoading, error, validateSession, logout } = useAuth()
+  const { user, authLoading, permissionsLoading, sessionReady, error, validateSession, logout } = useAuth()
   const { availableSchools } = useSchool()
   const router = useRouter()
   const pathname = usePathname()
-
-  const isLoading = authLoading || permissionsLoading
 
   // Helper: get the correct home dashboard for a role
   const getDashboardForRole = (role: string): string => {
@@ -31,7 +31,9 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   }
 
   useEffect(() => {
-    if (isLoading) return
+    // Do NOT run role checks while the session is still loading.
+    // sessionReady=true is the authoritative signal that user+permissions+school are all settled.
+    if (!sessionReady) return
 
     if (!user) {
       console.log(`[AuthGuard] No user — redirecting to /login from ${pathname}`)
@@ -48,14 +50,13 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
         // CHECK IF POTENTIALLY AUTHORIZED:
         // The current role in AuthContext might be 'teacher' but we're on a '/parent' page.
         // If the user has a 'parent' membership for this school, we should NOT redirect.
-        // instead, we wait for validateSession to refresh the situational role.
         const hasPotentialRole = availableSchools.some(m => 
           m.id === user.schoolId && allowedRoles.includes(m.role || '')
         );
 
         if (hasPotentialRole) {
           console.log(`[AuthGuard] Role mismatch ('${user.role}'), but user has potential role in school. Waiting for session sync...`);
-          return; // Stay on the page, the situational role will settle
+          return;
         }
 
         // TRULY UNAUTHORIZED: redirect to the correct dashboard for this user's role
@@ -64,21 +65,13 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
         router.replace(correctDashboard)
       }
     }
-  }, [user, isLoading, allowedRoles, router, pathname, availableSchools])
+  }, [user, sessionReady, allowedRoles, router, pathname, availableSchools])
 
-  // 1. Show skeleton during startup, reconnect, refresh, token validation
-  if (isLoading) {
-    return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-950">
-        <div className="max-w-6xl w-full space-y-6">
-          <div className="flex items-center gap-3 justify-center mb-6">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <span className="text-sm font-semibold text-muted-foreground">Securing session...</span>
-          </div>
-          <PageSkeleton variant="dashboard" />
-        </div>
-      </div>
-    )
+  // 1. SECURITY GATE: Show SessionTransition during any auth/session loading.
+  //    This BLOCKS rendering of any protected content until the session is fully verified.
+  //    This is the primary defence against stale-data flashes between user switches.
+  if (!sessionReady) {
+    return <SessionTransition message="Securing your session..." />
   }
 
   // 2. If token is invalid or missing, redirect is already running via useEffect
@@ -88,19 +81,25 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
 
   // 3. If role is unauthorized, show loading while redirect runs
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="text-center space-y-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="text-sm text-muted-foreground">Redirecting to authorized dashboard...</p>
+    // Check if user might have potential role (multi-school)
+    const hasPotentialRole = availableSchools.some(m => 
+      m.id === user.schoolId && allowedRoles.includes(m.role || '')
+    );
+
+    if (!hasPotentialRole) {
+      return (
+        <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+          <div className="text-center space-y-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+            <p className="text-sm text-muted-foreground">Redirecting to authorized dashboard...</p>
+          </div>
         </div>
-      </div>
-    )
+      )
+    }
   }
 
-  // 4. If permissions fetch failed (and we are online but server is broken), show error/retry state.
-  // Never fall back to defaults or show the screen when permissions are required but failed.
-  if (error && user.role !== "super_admin" && user.role !== "parent") {
+  // 4. If verification or permissions fetch failed, show error/retry state.
+  if (error) {
     return (
       <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">
         <div className="max-w-md w-full text-center space-y-6 p-8 bg-card rounded-3xl border border-destructive/20 shadow-2xl">
@@ -109,7 +108,7 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
           </div>
           
           <div className="space-y-2">
-            <h2 className="text-xl font-bold text-foreground">Permission Fetch Failed</h2>
+            <h2 className="text-xl font-bold text-foreground">Verification Failed</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {error}
             </p>

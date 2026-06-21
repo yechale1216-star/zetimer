@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react"
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react"
 import { useAuth } from "./auth-context"
 import { apiUrl } from "@/lib/api-config"
 const API_URL = apiUrl;
@@ -45,10 +45,57 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export function SchoolProvider({ children }: { children: React.ReactNode }) {
+  const { validateSession, sessionId, registerClearSchoolContext } = useAuth()
   const [activeSchool, setActiveSchool] = useState<School | null>(null)
   const [availableSchools, setAvailableSchools] = useState<School[]>([])
   const [isLoadingSchool, setIsLoadingSchool] = useState(false)
-  const { validateSession, user } = useAuth()
+
+  // Synchronous session change reset during render:
+  // This prevents any frame of stale school data from showing during user switches/signup.
+  const [renderedSessionId, setRenderedSessionId] = useState<string | null | undefined>(undefined)
+
+  if (renderedSessionId === undefined) {
+    // Initial mount: record initial sessionId
+    setRenderedSessionId(sessionId)
+  } else if (renderedSessionId !== sessionId) {
+    // Session changed! Reset state synchronously during render to avoid stale data flashes
+    console.log(`[SchoolContext] Render-time SessionId switch detected (${renderedSessionId} → ${sessionId}) — resetting school state`)
+    setActiveSchool(null)
+    setAvailableSchools([])
+    setRenderedSessionId(sessionId)
+  }
+
+  const clearSchoolContext = useCallback(() => {
+    setActiveSchool(null)
+    setAvailableSchools([])
+    localStorage.removeItem("active_school")
+    localStorage.removeItem("available_schools")
+    localStorage.removeItem("x-school-id")
+    console.log("[SchoolContext] Cleared — session transition")
+  }, [])
+
+  // Register clearSchoolContext with AuthContext so AuthContext.logout() can call it
+  // without creating a circular context dependency.
+  useEffect(() => {
+    registerClearSchoolContext(clearSchoolContext)
+  }, [registerClearSchoolContext, clearSchoolContext])
+
+  // When the sessionId changes, reload the fresh school data from localStorage.
+  // This executes after the synchronous render reset has cleared the old session's data.
+  useEffect(() => {
+    if (sessionId) {
+      const stored = localStorage.getItem("active_school")
+      const schoolsStored = localStorage.getItem("available_schools")
+      if (stored) {
+        try { setActiveSchool(JSON.parse(stored)) } catch {}
+      }
+      if (schoolsStored) {
+        try { setAvailableSchools(JSON.parse(schoolsStored)) } catch {}
+      }
+    } else {
+      clearSchoolContext()
+    }
+  }, [sessionId, clearSchoolContext])
 
   // Restore from localStorage on mount and on switch events
   const loadStoredData = useCallback(() => {
@@ -93,7 +140,6 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (!res.ok) {
-        // Fallback or retry?
         return false
       }
 
@@ -108,7 +154,7 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
       // CRITICAL: Re-validate session to update role in AuthContext
       await validateSession()
 
-      // Dispatch event so all components reaction
+      // Dispatch event so all components react
       window.dispatchEvent(new CustomEvent("schoolSwitched", { detail: school }))
       return true
     } catch (err) {
@@ -132,14 +178,6 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem("available_schools", JSON.stringify(result.data))
       }
     } catch {}
-  }, [])
-
-  const clearSchoolContext = useCallback(() => {
-    setActiveSchool(null)
-    setAvailableSchools([])
-    localStorage.removeItem("active_school")
-    localStorage.removeItem("available_schools")
-    localStorage.removeItem("x-school-id")
   }, [])
 
   return (

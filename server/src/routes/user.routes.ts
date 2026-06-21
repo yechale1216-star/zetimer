@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import * as userService from '../services/user.service';
-import { AuthenticatedRequest } from '../middleware/tenant.middleware';
+import { AuthenticatedRequest, authorize } from '../middleware/tenant.middleware';
 
 const router = Router();
 
@@ -22,7 +22,8 @@ router.get('/profile', async (req: AuthenticatedRequest, res: Response, next: Ne
       schoolId: schoolId || user.schoolId,
       // Map school info for the frontend
       schoolName: (user as any).school?.name || '',
-      schoolLogo: (user as any).school?.settings?.school_logo || ''
+      schoolLogo: (user as any).school?.settings?.school_logo || '',
+      onboardingCompleted: (user as any).school?.onboardingCompleted ?? false
     };
     
     res.status(200).json({ success: true, data: contextUser });
@@ -79,8 +80,8 @@ router.get('/contacts', async (req: AuthenticatedRequest, res: Response, next: N
   } catch (error) { next(error); }
 });
 
-// Create user
-router.post('/', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+// Create user (Admin only)
+router.post('/', authorize(['admin', 'school_admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.user?.schoolId;
     const data = { ...req.body };
@@ -90,17 +91,42 @@ router.post('/', async (req: AuthenticatedRequest, res: Response, next: NextFunc
   } catch (error) { next(error); }
 });
 
-// Update user
+// Update user (Admin or Self)
 router.put('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.user?.schoolId;
-    const user = await userService.updateUser(req.params.id, req.body, schoolId);
+    const requestingUserRole = req.user?.role;
+    const requestingUserId = req.user?.id;
+    const targetUserId = req.params.id;
+
+    if (!requestingUserId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const isAdmin = requestingUserRole === 'admin' || requestingUserRole === 'school_admin' || requestingUserRole === 'super_admin';
+
+    // Non-admins can only update themselves
+    if (!isAdmin && requestingUserId !== targetUserId) {
+      return res.status(403).json({ success: false, message: 'Forbidden: You cannot modify another user\'s profile' });
+    }
+
+    const updateData = { ...req.body };
+
+    // Non-admins cannot update privilege-escalating fields
+    if (!isAdmin) {
+      delete updateData.role;
+      delete updateData.is_active;
+      delete updateData.schoolId;
+      delete updateData.teacher_id;
+    }
+
+    const user = await userService.updateUser(targetUserId, updateData, schoolId);
     res.status(200).json({ success: true, data: user });
   } catch (error) { next(error); }
 });
 
-// Delete user
-router.delete('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+// Delete user (Admin only)
+router.delete('/:id', authorize(['admin', 'school_admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.user?.schoolId;
     if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });

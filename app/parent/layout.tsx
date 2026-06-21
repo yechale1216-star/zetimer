@@ -31,6 +31,7 @@ import { LanguageProvider, useLanguage } from "@/lib/context/language-context"
 import { useSchool } from "@/lib/context/school-context"
 import { useAuth } from "@/lib/context/auth-context"
 import { AuthGuard } from "@/components/auth/auth-guard"
+import { clearMessageCache } from "@/lib/utils/message-cache"
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -48,33 +49,22 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
   const { t, language, setLanguage } = useLanguage()
 
   const { activeSchool, availableSchools, clearSchoolContext } = useSchool()
-  const { logout: authLogout } = useAuth()
-  const [currentUser, setCurrentUser] = useState<any>(null)
+  // SECURITY FIX: Use AuthContext user instead of raw localStorage read.
+  // Raw localStorage reads bypass AuthContext and can show stale/previous-user data.
+  const { user: currentUser, logout: authLogout } = useAuth()
   const [students, setStudents] = useState<any[]>([])
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false)
 
-  // 1. Auth check and initial data loading
+  // 1. Load student data from localStorage (AuthGuard already ensures user is authenticated)
   useEffect(() => {
-    const userStr = localStorage.getItem("attendance_current_user")
+    // currentUser comes from AuthContext — no need to re-check auth here
     const studentsStr = localStorage.getItem("parent_students")
 
-    if (!userStr) {
-      router.push("/login")
-      return
-    }
-
-    try {
-      const user = JSON.parse(userStr)
-      if (user.role !== "parent") {
-        router.push("/login")
-        return
-      }
-      setCurrentUser(user)
-
-      if (studentsStr) {
+    if (studentsStr) {
+      try {
         const studentList = JSON.parse(studentsStr)
         setStudents(studentList)
 
@@ -93,12 +83,11 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
           setSelectedStudent(current)
           localStorage.setItem("parent_selected_student_id", current.id)
         }
+      } catch (e) {
+        console.error("[ParentLayout] Failed to parse student data:", e)
       }
-    } catch (e) {
-      localStorage.removeItem("attendance_current_user")
-      router.push("/login")
     }
-  }, [router, activeSchool])
+  }, [activeSchool])
 
   // Filter students based on active school
   const filteredStudents = activeSchool
@@ -119,10 +108,11 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
 
   // 2. Fetch notification count periodically
   useEffect(() => {
-    if (!currentUser?.phone) return
+    const phone = currentUser?.phone
+    if (!phone) return
 
     const fetchCounts = async () => {
-      const list = await parentDb.getNotifications(currentUser.phone, activeSchool?.id)
+      const list = await parentDb.getNotifications(phone, activeSchool?.id)
       const unread = list.filter(n => !n.isRead).length
       setUnreadCount(unread)
     }
@@ -155,12 +145,13 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     console.log(`[ParentLayout][LOGOUT] parent logout initiated`)
+    clearMessageCache().catch(() => {})
     clearSchoolContext()
     authLogout() // Uses AuthContext logout to wipe React state AND localStorage
     router.push("/login")
   }
 
-  if (!currentUser || !selectedStudent) {
+  if (!selectedStudent) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -451,7 +442,7 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
               <div className="pt-4 border-t border-border/20 flex flex-col gap-3">
                 <div className="typography-label flex items-center justify-between px-2 text-muted-foreground">
                   <span>{t("logged_in_as")}</span>
-                  <span>{currentUser.name}</span>
+                  <span>{currentUser?.name || ""}</span>
                 </div>
 
                 <button

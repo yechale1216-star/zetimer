@@ -28,10 +28,16 @@ const tenantMiddleware = async (req, res, next) => {
     if (publicPaths.some(path => url.startsWith(path))) {
         return next();
     }
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    let token;
+    if (req.cookies && req.cookies.attendance_token) {
+        token = req.cookies.attendance_token;
+    }
+    else if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+    }
+    if (!token) {
         return res.status(401).json({ success: false, message: 'Authorization token required' });
     }
-    const token = authHeader.split(' ')[1];
     try {
         const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
         let schoolId = decoded.schoolId;

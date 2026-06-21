@@ -25,6 +25,7 @@ import { TopNav } from '@/components/layout/top-nav'
 
 import { apiUrl } from '@/lib/api-config'
 const API_URL = apiUrl;
+import { clearMessageCache } from '@/lib/utils/message-cache'
 
 function SuspendedBanner() {
   const [isSuspended, setIsSuspended] = React.useState(false)
@@ -128,6 +129,7 @@ export default function SchoolAdminLayout({
 
   const handleLogout = () => {
     console.log(`[AdminLayout][LOGOUT] userId: ${user?.id} | role: ${user?.role}`)
+    clearMessageCache().catch(() => {})
     clearSchoolContext()
     logout()
     notifications.info("Logged Out", "You have been successfully logged out")

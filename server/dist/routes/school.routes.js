@@ -129,7 +129,7 @@ router.get('/me/streams', async (req, res, next) => {
     }
 });
 // Complete onboarding: save school profile + settings, mark onboarding done
-router.post('/onboarding', (0, tenant_middleware_1.authorize)(['admin']), async (req, res, next) => {
+router.post('/onboarding', (0, tenant_middleware_1.authorize)(['admin', 'school_admin']), async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;
         if (!schoolId)

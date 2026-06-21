@@ -40,6 +40,7 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const student_routes_1 = __importDefault(require("./routes/student.routes"));
 const attendance_routes_1 = __importDefault(require("./routes/attendance.routes"));
 const school_routes_1 = __importDefault(require("./routes/school.routes"));
@@ -62,9 +63,16 @@ const maintenance_middleware_1 = require("./middleware/maintenance.middleware");
 const parentController = __importStar(require("./controllers/parent.controller"));
 const app = (0, express_1.default)();
 // Middleware
-app.use((0, cors_1.default)());
-app.use(express_1.default.json({ limit: '10mb' }));
-app.use(express_1.default.urlencoded({ limit: '10mb', extended: true }));
+app.use((0, cors_1.default)({
+    origin: function (origin, callback) {
+        // Reflect origin to allow credentials from any frontend port in dev
+        callback(null, true);
+    },
+    credentials: true
+}));
+app.use((0, cookie_parser_1.default)());
+app.use(express_1.default.json({ limit: '50mb' }));
+app.use(express_1.default.urlencoded({ limit: '50mb', extended: true }));
 // Debug middleware to log all requests
 app.use((req, res, next) => {
     console.log(`[DEBUG] ${req.method} ${req.url}`);

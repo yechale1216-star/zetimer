@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
+import { useRouter } from "next/navigation"
 import { AuthWrapper } from "@/components/auth/auth-wrapper"
 import { Header } from "@/components/layout/header"
 import { Navigation } from "@/components/layout/navigation"
@@ -21,6 +22,7 @@ import { ErrorBoundary } from "@/components/system/error-boundary"
 
 
 export default function Home() {
+  const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [activeTab, setActiveTab] = useState("dashboard")
   const [isLoading, setIsLoading] = useState(true)
@@ -76,29 +78,62 @@ export default function Home() {
     if (user?.role === "admin" || user?.role === 'school_admin' || user?.role === 'school-admin') {
       if (user?.onboardingCompleted === false) {
         console.log(`[RootPage] Admin onboarding incomplete — redirecting to /onboarding`)
-        window.location.href = "/onboarding"
+        router.push("/onboarding")
       } else {
         console.log(`[RootPage] School admin — redirecting to /school/admin`)
-        window.location.href = "/school/admin"
+        router.push("/school/admin")
       }
     } else if (user?.role === "teacher") {
       console.log(`[RootPage] Teacher — redirecting to /school/teacher`)
-      window.location.href = "/school/teacher"
+      router.push("/school/teacher")
     } else if (user?.role === "super_admin") {
       console.log(`[RootPage] Super admin — redirecting to /super-admin`)
-      window.location.href = "/super-admin"
+      router.push("/super-admin")
     } else if (user?.role === "parent") {
       console.log(`[RootPage] Parent — redirecting to /parent/dashboard`)
-      window.location.href = "/parent/dashboard"
+      router.push("/parent/dashboard")
     } else {
        if (user?.onboardingCompleted === false) {
-         window.location.href = "/onboarding"
+         router.push("/onboarding")
        } else {
-         window.location.href = "/school/admin"
+         router.push("/school/admin")
        }
     }
   }
 
+
+  useEffect(() => {
+    // If already authenticated and setup is complete, redirect to dashboard.
+    if (typeof window !== "undefined" && isAuthenticated && !isLoading) {
+      const user = authService.getCurrentUser()
+      const availableStr = localStorage.getItem("available_schools")
+      const schools = availableStr ? JSON.parse(availableStr) : []
+      const xSchoolId = localStorage.getItem("x-school-id")
+
+      console.log(`[RootPage] Root redirect | userId: ${user?.id} | role: ${user?.role} | multiSchool: ${schools.length > 1}`)
+      
+      // If multiple schools and haven't explicitly picked one (or just to be safe)
+      if (schools.length > 1 && !xSchoolId) {
+        router.replace("/auth/school-select")
+        return
+      }
+
+      if (user?.role === "super_admin") {
+        router.replace("/super-admin")
+      } else if (user?.role === "teacher") {
+        router.replace("/school/teacher")
+      } else if (user?.role === "parent") {
+        router.replace("/parent/dashboard")
+      } else {
+        // Default fallback for admin or other staff roles
+        if (user?.onboardingCompleted === false) {
+          router.replace("/onboarding")
+        } else {
+          router.replace("/school/admin")
+        }
+      }
+    }
+  }, [isAuthenticated, isLoading, router])
 
   if (isLoading) {
     return (
@@ -115,36 +150,7 @@ export default function Home() {
     return <AuthWrapper onAuthSuccess={handleAuthSuccess} />
   }
 
-  // If already authenticated and setup is complete, redirect to dashboard.
-  if (typeof window !== "undefined" && isAuthenticated) {
-    const user = authService.getCurrentUser()
-    const availableStr = localStorage.getItem("available_schools")
-    const schools = availableStr ? JSON.parse(availableStr) : []
-    const xSchoolId = localStorage.getItem("x-school-id")
 
-    console.log(`[RootPage] Root redirect | userId: ${user?.id} | role: ${user?.role} | multiSchool: ${schools.length > 1}`)
-    
-    // If multiple schools and haven't explicitly picked one (or just to be safe)
-    if (schools.length > 1 && !xSchoolId) {
-      window.location.replace("/auth/school-select")
-      return
-    }
-
-    if (user?.role === "super_admin") {
-      window.location.replace("/super-admin")
-    } else if (user?.role === "teacher") {
-      window.location.replace("/school/teacher")
-    } else if (user?.role === "parent") {
-      window.location.replace("/parent/dashboard")
-    } else {
-      // Default fallback for admin or other staff roles
-      if (user?.onboardingCompleted === false) {
-        window.location.replace("/onboarding")
-      } else {
-        window.location.replace("/school/admin")
-      }
-    }
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center">

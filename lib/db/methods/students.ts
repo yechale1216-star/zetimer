@@ -32,11 +32,13 @@ export async function getStudents(headers: any, schoolId: string): Promise<Stude
       cache: 'no-store'
     })
     if (!res.ok) {
+      const errorText = await res.text().catch(() => "Could not read error text");
+      console.error(`[pg] getStudents error response: ${res.status} ${res.statusText} - ${errorText}`);
       if (res.status === 401) {
         const { authService } = await import("@/lib/auth/auth");
         authService.handleUnauthorized();
       }
-      throw new Error("Failed to fetch students")
+      throw new Error(`Failed to fetch students: ${errorText}`)
     }
     const result = await res.json()
     return result.data.map((s: any) => ({
@@ -56,7 +58,11 @@ export async function addStudent(headers: any, schoolId: string, student: Partia
     headers,
     body: JSON.stringify(student),
   })
-  if (!res.ok) throw new Error("Failed to add student")
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "Could not read error text");
+    console.error(`[pg] addStudent error response: ${res.status} ${res.statusText} - ${errorText}`);
+    throw new Error(`Failed to add student: ${errorText}`)
+  }
   const result = await res.json()
   return {
     ...result.data,

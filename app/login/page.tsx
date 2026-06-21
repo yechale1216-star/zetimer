@@ -11,6 +11,15 @@ function LoginContent() {
   const handleAuthSuccess = (userData?: any) => {
     const user = userData || authService.getCurrentUser()
     
+    // Check if multiple schools exist and redirect to select-school page
+    const availableStr = localStorage.getItem("available_schools")
+    const schools = availableStr ? JSON.parse(availableStr) : []
+    if (schools.length > 1) {
+      console.log(`[Login] Multiple schools found — redirecting to /auth/school-select`)
+      router.push('/auth/school-select')
+      return
+    }
+    
     if (user?.role === 'admin' || user?.role === 'school_admin' || user?.role === 'school-admin') {
       if (user?.onboardingCompleted === false) {
         router.push('/onboarding')

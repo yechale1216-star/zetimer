@@ -2,6 +2,19 @@
 
 import { API_URL, getApiUrl } from "@/lib/api-config";
 
+// ─── Session Identity Key ─────────────────────────────────────────────────────
+// A nonce written to localStorage on every login/signup and cleared on logout.
+// AuthContext and SchoolContext compare this to detect user switches and
+// perform atomic in-memory state resets before rendering any protected page.
+export const SESSION_ID_KEY = "_zt_session_id"
+
+function generateSessionId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 export interface LoginCredentials {
   email: string
   password: string
@@ -94,8 +107,10 @@ class AuthService {
       }
 
       if (this.isClient()) {
+        // Write a new session nonce FIRST — contexts detect user change via this key
+        localStorage.setItem(SESSION_ID_KEY, generateSessionId())
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user))
-        localStorage.setItem("attendance_token", token) // Store the JWT token
+        // NOTE: JWT token is now managed by HTTP-Only cookies
         
         if (availableSchools) {
           localStorage.setItem("available_schools", JSON.stringify(availableSchools))
@@ -183,8 +198,10 @@ class AuthService {
       };
 
       if (this.isClient()) {
+        // Write a new session nonce FIRST — contexts detect user change via this key
+        localStorage.setItem(SESSION_ID_KEY, generateSessionId())
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user));
-        localStorage.setItem("attendance_token", data.token); // Store the JWT token
+        // NOTE: JWT token is now managed by HTTP-Only cookies
         localStorage.setItem("parent_students", JSON.stringify(students));
         localStorage.setItem("available_schools", JSON.stringify(availableSchools));
         
@@ -316,8 +333,9 @@ class AuthService {
       }
 
       if (this.isClient()) {
+        localStorage.setItem(SESSION_ID_KEY, generateSessionId())
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user))
-        localStorage.setItem("attendance_token", token)
+        // NOTE: JWT token is now managed by HTTP-Only cookies
         if (user.schoolId) {
           localStorage.setItem("x-school-id", user.schoolId);
         }
@@ -526,13 +544,19 @@ class AuthService {
     return /^\+251[179]\d{8}$/.test(phone.trim())
   }
 
-  logout(): void {
+  async logout(): Promise<void> {
     if (this.isClient()) {
+      try {
+        await fetch(`${API_URL}/api/auth/logout`, { method: "POST" });
+      } catch (e) {
+        console.error("Logout API call failed", e);
+      }
+      
       // Clear ALL school-scoped keys so that no data leaks to the next login session.
       // Never rely on components cleaning up after themselves — do it here atomically.
       const keysToRemove = [
         this.CURRENT_USER_KEY,          // attendance_current_user
-        "attendance_token",              // JWT token
+        "attendance_token",              // (Legacy) JWT token
         "x-school-id",                  // active school UUID
         "attendance_features",           // school feature/permission cache
         "parent_students",               // parent's student list (school-scoped)
@@ -542,6 +566,7 @@ class AuthService {
         "active_school",                 // active school context (SchoolContext)
         "_zt_fresh_login",               // fresh-login guard flag
         "_zt_login_role",                // fresh-login confirmed role
+        SESSION_ID_KEY,                  // session identity nonce — MUST be cleared last
       ]
       keysToRemove.forEach(key => localStorage.removeItem(key))
     }
@@ -550,8 +575,7 @@ class AuthService {
 
   handleUnauthorized(): void {
     if (this.isClient()) {
-      this.logout()
-      window.location.href = "/login?reason=expired"
+      window.dispatchEvent(new Event("sessionExpired"))
     }
   }
 

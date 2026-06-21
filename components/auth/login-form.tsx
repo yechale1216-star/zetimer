@@ -19,6 +19,7 @@ import { useLanguage } from "@/lib/context/language-context"
 import { useSchool } from "@/lib/context/school-context"
 import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/context/auth-context"
+import { clearMessageCache } from "@/lib/utils/message-cache"
 
 interface LoginFormProps {
   onLoginSuccess: (user?: any) => void
@@ -88,6 +89,9 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
 
     setIsLoading(true)
     try {
+      // SECURITY: Clear previous user's IndexedDB message cache before starting new session
+      await clearMessageCache().catch(() => {})
+
       const result = await authService.loginParent(cleanPhone, parentPassword)
       if (result.success) {
         setLoginError(null)
@@ -162,6 +166,9 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
 
     setIsLoading(true)
     try {
+      // SECURITY: Clear previous user's IndexedDB message cache before starting new session
+      await clearMessageCache().catch(() => {})
+
       const result = await authService.login({
         email: credentials.email,
         password: credentials.password,
@@ -256,6 +263,14 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
             {t("parent_portal_tab")}
           </button>
         </div>
+
+        {searchParams.get("reason") === "expired" && !loginError && (
+          <Alert className="mb-6 animate-in slide-in-from-top-2 duration-300 bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400">
+            <AlertDescription className="typography-label">
+              Your session has expired. Please sign in again to continue.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {loginError && (
           <Alert variant="destructive" className="mb-6 animate-in slide-in-from-top-2 duration-300 bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400">

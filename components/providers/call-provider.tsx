@@ -75,7 +75,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let timeout: NodeJS.Timeout;
     let audioCtx: AudioContext | null = null;
-    let oscillator: OscillatorNode | null = null;
+    let oscillator: any = null;
     let gainNode: GainNode | null = null;
     let ringInterval: NodeJS.Timeout;
 

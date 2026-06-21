@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const userService = __importStar(require("../services/user.service"));
+const tenant_middleware_1 = require("../middleware/tenant.middleware");
 const router = (0, express_1.Router)();
 // Get current user profile
 router.get('/profile', async (req, res, next) => {
@@ -54,7 +55,8 @@ router.get('/profile', async (req, res, next) => {
             schoolId: schoolId || user.schoolId,
             // Map school info for the frontend
             schoolName: user.school?.name || '',
-            schoolLogo: user.school?.settings?.school_logo || ''
+            schoolLogo: user.school?.settings?.school_logo || '',
+            onboardingCompleted: user.school?.onboardingCompleted ?? false
         };
         res.status(200).json({ success: true, data: contextUser });
     }
@@ -116,8 +118,8 @@ router.get('/contacts', async (req, res, next) => {
         next(error);
     }
 });
-// Create user
-router.post('/', async (req, res, next) => {
+// Create user (Admin only)
+router.post('/', (0, tenant_middleware_1.authorize)(['admin', 'school_admin']), async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;
         const data = { ...req.body };
@@ -130,19 +132,38 @@ router.post('/', async (req, res, next) => {
         next(error);
     }
 });
-// Update user
+// Update user (Admin or Self)
 router.put('/:id', async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;
-        const user = await userService.updateUser(req.params.id, req.body, schoolId);
+        const requestingUserRole = req.user?.role;
+        const requestingUserId = req.user?.id;
+        const targetUserId = req.params.id;
+        if (!requestingUserId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+        const isAdmin = requestingUserRole === 'admin' || requestingUserRole === 'school_admin' || requestingUserRole === 'super_admin';
+        // Non-admins can only update themselves
+        if (!isAdmin && requestingUserId !== targetUserId) {
+            return res.status(403).json({ success: false, message: 'Forbidden: You cannot modify another user\'s profile' });
+        }
+        const updateData = { ...req.body };
+        // Non-admins cannot update privilege-escalating fields
+        if (!isAdmin) {
+            delete updateData.role;
+            delete updateData.is_active;
+            delete updateData.schoolId;
+            delete updateData.teacher_id;
+        }
+        const user = await userService.updateUser(targetUserId, updateData, schoolId);
         res.status(200).json({ success: true, data: user });
     }
     catch (error) {
         next(error);
     }
 });
-// Delete user
-router.delete('/:id', async (req, res, next) => {
+// Delete user (Admin only)
+router.delete('/:id', (0, tenant_middleware_1.authorize)(['admin', 'school_admin']), async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;
         if (!schoolId)

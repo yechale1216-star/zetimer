@@ -316,10 +316,15 @@ export async function incrementOutboxRetries(tempId: string): Promise<void> {
 export async function clearMessageCache(): Promise<void> {
   try {
     const db = await openDB()
-    const tx = db.transaction([MESSAGES_STORE, CONVERSATIONS_STORE, OUTBOX_STORE], "readwrite")
-    tx.objectStore(MESSAGES_STORE).clear()
-    tx.objectStore(CONVERSATIONS_STORE).clear()
-    tx.objectStore(OUTBOX_STORE).clear()
+    const storesToClear = [MESSAGES_STORE, CONVERSATIONS_STORE, OUTBOX_STORE].filter(store => 
+      db.objectStoreNames.contains(store)
+    )
+    if (storesToClear.length === 0) return
+
+    const tx = db.transaction(storesToClear, "readwrite")
+    storesToClear.forEach(store => {
+      tx.objectStore(store).clear()
+    })
     await txComplete(tx)
     console.log("[MessageCache] Cache cleared")
   } catch (err) {

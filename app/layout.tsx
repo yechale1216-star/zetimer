@@ -59,6 +59,7 @@ import { AuthProvider } from "@/lib/context/auth-context"
 
 import { Toaster as SonnerToaster } from "sonner"
 import { PWAClientWrapper } from "@/components/system/pwa-client-wrapper"
+import { FetchInterceptor } from "@/components/providers/fetch-interceptor"
 
 export default function RootLayout({
   children,
@@ -76,16 +77,18 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
-          <LanguageProvider>
-            <AuthProvider>
-              <SchoolProvider>
-                {children}
-                <Toaster />
-                <SonnerToaster position="top-right" richColors />
-                <PWAClientWrapper />
-              </SchoolProvider>
-            </AuthProvider>
-          </LanguageProvider>
+          <FetchInterceptor>
+            <LanguageProvider>
+              <AuthProvider>
+                <SchoolProvider>
+                  {children}
+                  <Toaster />
+                  <SonnerToaster position="top-right" richColors />
+                  <PWAClientWrapper />
+                </SchoolProvider>
+              </AuthProvider>
+            </LanguageProvider>
+          </FetchInterceptor>
         </ThemeProvider>
       </body>
     </html>

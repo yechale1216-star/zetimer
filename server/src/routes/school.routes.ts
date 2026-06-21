@@ -89,7 +89,7 @@ router.get('/me/streams', async (req: AuthenticatedRequest, res: Response, next:
 });
 
 // Complete onboarding: save school profile + settings, mark onboarding done
-router.post('/onboarding', authorize(['admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.post('/onboarding', authorize(['admin', 'school_admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.user?.schoolId;
     if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });

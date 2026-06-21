@@ -1,10 +1,12 @@
-import OnboardingWizard from "@/components/onboarding/onboarding-wizard"
+"use client"
 
-export const metadata = {
-  title: "School Setup — Zetime",
-  description: "Complete your school onboarding setup",
-}
+import OnboardingWizard from "@/components/onboarding/onboarding-wizard"
+import { AuthGuard } from "@/components/auth/auth-guard"
 
 export default function OnboardingPage() {
-  return <OnboardingWizard />
+  return (
+    <AuthGuard allowedRoles={["admin", "school_admin"]}>
+      <OnboardingWizard />
+    </AuthGuard>
+  )
 }

@@ -61,6 +61,33 @@ const createAssignment = async (data, schoolId) => {
             teacherId = newTeacher.id;
         }
     }
+    // VALIDATION: Ensure Teacher, Grade, Section, and Stream belong to this school
+    const teacher = await db_1.default.teacher.findFirst({
+        where: { id: teacherId, schoolId }
+    });
+    if (!teacher) {
+        throw new Error("Teacher does not exist in this school context.");
+    }
+    const grade = await db_1.default.grade.findFirst({
+        where: { id: data.gradeId, schoolId }
+    });
+    if (!grade) {
+        throw new Error("Grade does not exist in this school context.");
+    }
+    const section = await db_1.default.section.findFirst({
+        where: { id: data.sectionId, schoolId }
+    });
+    if (!section) {
+        throw new Error("Section does not exist in this school context.");
+    }
+    if (data.streamId) {
+        const stream = await db_1.default.stream.findFirst({
+            where: { id: data.streamId, schoolId }
+        });
+        if (!stream) {
+            throw new Error("Stream does not exist in this school context.");
+        }
+    }
     // Check for duplicate class assignment for this teacher in this school
     const existing = await db_1.default.teacherAssignment.findFirst({
         where: {
@@ -95,10 +122,45 @@ const deleteAssignment = async (id, schoolId) => {
 };
 exports.deleteAssignment = deleteAssignment;
 const updateAssignment = async (id, data, schoolId) => {
+    let teacherId = data.teacher_id;
+    // Resolve User.id -> Teacher.id if a User ID was passed
+    const user = await db_1.default.user.findFirst({
+        where: { id: teacherId, schoolId }
+    });
+    if (user && user.teacher_id) {
+        teacherId = user.teacher_id;
+    }
+    // VALIDATION: Ensure Teacher, Grade, Section, and Stream belong to this school
+    const teacher = await db_1.default.teacher.findFirst({
+        where: { id: teacherId, schoolId }
+    });
+    if (!teacher) {
+        throw new Error("Teacher does not exist in this school context.");
+    }
+    const grade = await db_1.default.grade.findFirst({
+        where: { id: data.gradeId, schoolId }
+    });
+    if (!grade) {
+        throw new Error("Grade does not exist in this school context.");
+    }
+    const section = await db_1.default.section.findFirst({
+        where: { id: data.sectionId, schoolId }
+    });
+    if (!section) {
+        throw new Error("Section does not exist in this school context.");
+    }
+    if (data.streamId) {
+        const stream = await db_1.default.stream.findFirst({
+            where: { id: data.streamId, schoolId }
+        });
+        if (!stream) {
+            throw new Error("Stream does not exist in this school context.");
+        }
+    }
     return await db_1.default.teacherAssignment.update({
         where: { id, schoolId },
         data: {
-            teacher_id: data.teacher_id,
+            teacher_id: teacherId,
             gradeId: data.gradeId,
             sectionId: data.sectionId,
             streamId: data.streamId || null,

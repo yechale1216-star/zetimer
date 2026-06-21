@@ -71,6 +71,12 @@ self.addEventListener("fetch", (event) => {
     return
   }
 
+  // Skip API requests to prevent caching sensitive user data and returning stale profiles
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(fetch(request))
+    return
+  }
+
   // Handle navigation requests (HTML pages)
   if (request.mode === "navigate") {
     event.respondWith(

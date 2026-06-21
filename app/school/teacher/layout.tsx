@@ -17,6 +17,7 @@ import { LanguageProvider } from '@/lib/context/language-context'
 import { SocketProvider } from '@/components/providers/socket-provider'
 import { CallProvider } from '@/components/providers/call-provider'
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { clearMessageCache } from '@/lib/utils/message-cache'
 
 function NavLink({ href, icon, label, active, onClick }: { href: string; icon: React.ReactNode; label: string; active: boolean; onClick?: () => void }) {
   return (
@@ -58,6 +59,7 @@ export default function TeacherLayout({
 
   const handleLogout = () => {
     console.log(`[TeacherLayout][LOGOUT] userId: ${user?.id} | role: ${user?.role}`)
+    clearMessageCache().catch(() => {})
     clearSchoolContext()
     logout()
     notifications.info("Logged Out", "You have been successfully logged out")

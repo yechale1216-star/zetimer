@@ -12,6 +12,8 @@ import { notifications } from "@/lib/utils/notifications"
 import { ArrowLeft, User, Phone, Mail, Lock, ShieldCheck, Loader2, Eye, EyeOff, CheckCircle2, ExternalLink, MapPin, ArrowRight } from "lucide-react"
 import { Logo } from "@/components/logo"
 import Link from "next/link"
+import { useAuth } from "@/lib/context/auth-context"
+import { clearMessageCache } from "@/lib/utils/message-cache"
 
 interface AdminSignupFormProps {
   onSignupSuccess: (user?: any) => void
@@ -39,6 +41,7 @@ const strengthConfig = {
 }
 
 export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProps) {
+  const { validateSession } = useAuth()
   const [credentials, setCredentials] = useState<SignupCredentials>({
     phone: "+251",
     email: "",
@@ -51,6 +54,7 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
   })
 
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingMessage, setLoadingMessage] = useState("")
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [generalError, setGeneralError] = useState<string>("")
   const [showPassword, setShowPassword] = useState(false)
@@ -174,8 +178,12 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
     }
 
     setIsLoading(true)
+    setLoadingMessage("Creating account...")
 
     try {
+      // SECURITY: Clear previous user's IndexedDB message cache before creating new session
+      await clearMessageCache().catch(() => {})
+
       const result = await authService.signup(credentials)
 
       if (result.success && result.user) {
@@ -183,17 +191,41 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
           "Admin Account Created",
           `Welcome ${result.user.name}! Let's set up your school.`
         )
-        onSignupSuccess(result.user)
+
+        setLoadingMessage("Initializing secure session...")
+
+        // Mark as fresh login so validateSession preserves the new admin role.
+        // We set this here, but because we call forceRefetch: true, validateSession
+        // will fetch from backend profile endpoint rather than reading raw cached user.
+        localStorage.setItem("_zt_fresh_login", "1")
+        localStorage.setItem("_zt_login_role", result.user.role || "admin")
+
+        // Initialize AuthContext with the new user BEFORE calling onSignupSuccess.
+        // We force a refetch from the backend to ensure we verify the session.
+        await validateSession({ forceRefetch: true })
+
+        // Verification logic: fetch the user from authService to verify the session.
+        const verifiedUser = authService.getCurrentUser()
+        console.log("[DEBUG SIGNUP] result.user.id:", result.user?.id);
+        console.log("[DEBUG SIGNUP] verifiedUser?.id:", verifiedUser?.id);
+        if (!verifiedUser || verifiedUser.id !== result.user.id) {
+          console.warn("[DEBUG SIGNUP] Mismatch details - verifiedUserId:", verifiedUser?.id, "resultUserId:", result.user?.id);
+          // Don't throw here, just warn. The backend already created the account.
+        }
+
+        onSignupSuccess(verifiedUser || result.user)
       } else {
         const errorMessage = result.error || "Failed to create account"
         setGeneralError(errorMessage)
         notifications.error("Signup Failed", errorMessage)
       }
-    } catch {
-      setGeneralError("An unexpected error occurred.")
-      notifications.error("Signup Error", "An unexpected error occurred")
+    } catch (err: any) {
+      const msg = err?.message || "An unexpected error occurred."
+      setGeneralError(msg)
+      notifications.error("Signup Error", msg)
     } finally {
       setIsLoading(false)
+      setLoadingMessage("")
     }
   }
 
@@ -476,7 +508,10 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
             className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all active:scale-[0.98] mt-4"
           >
             {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{loadingMessage || "Please wait..."}</span>
+              </div>
             ) : (
               <>
                 Create Account <ArrowRight className="ml-2 h-4 w-4" />

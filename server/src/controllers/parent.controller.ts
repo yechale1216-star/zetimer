@@ -1,6 +1,27 @@
 import { Request, Response, NextFunction } from 'express';
 import * as parentService from '../services/parent.service';
 import { AuthenticatedRequest } from '../middleware/tenant.middleware';
+import prisma from '../config/db';
+
+/**
+ * Helper to verify that the requested phone belongs to the authenticated user.
+ * If the user is a super_admin, we bypass this check.
+ */
+const verifyPhoneOwnership = async (req: AuthenticatedRequest, requestedPhone: string): Promise<boolean> => {
+  if (!req.user?.id) return false;
+  if (req.user.role === 'super_admin') return true;
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id }
+  });
+
+  if (!user || !user.phone) return false;
+
+  const normalizedUserPhone = parentService.normalizePhoneNumber(user.phone);
+  const normalizedRequestedPhone = parentService.normalizePhoneNumber(requestedPhone);
+
+  return normalizedUserPhone === normalizedRequestedPhone;
+};
 
 export const listParentSchools = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -24,6 +45,16 @@ export const loginParent = async (req: Request, res: Response, next: NextFunctio
     }
     const normalizedPhone = parentService.normalizePhoneNumber(phone);
     const result = await parentService.loginParent(normalizedPhone, password, schoolId);
+    
+    if (result.success && result.token) {
+      res.cookie('attendance_token', result.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+      });
+    }
+
     res.status(200).json(result);
   } catch (error: any) {
     res.status(400).json({ success: false, message: error.message || "Failed to login." });
@@ -58,6 +89,12 @@ export const updatePassword = async (req: AuthenticatedRequest, res: Response, n
     if (!phone || !currentPassword || !newPassword) {
       return res.status(400).json({ success: false, message: "Phone, current password, and new password are required." });
     }
+
+    const isOwner = await verifyPhoneOwnership(req, phone);
+    if (!isOwner) {
+      return res.status(403).json({ success: false, message: "Forbidden: You cannot modify another parent's account." });
+    }
+
     const result = await parentService.updatePassword(phone, currentPassword, newPassword, schoolId);
     res.status(200).json(result);
   } catch (error: any) {
@@ -71,6 +108,11 @@ export const getNotifications = async (req: AuthenticatedRequest, res: Response,
     if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     const { phone } = req.params;
+    const isOwner = await verifyPhoneOwnership(req, phone);
+    if (!isOwner) {
+      return res.status(403).json({ success: false, message: "Forbidden: You cannot access another parent's data." });
+    }
+
     const notifications = await parentService.getNotifications(phone, schoolId);
     res.status(200).json({ success: true, data: notifications });
   } catch (error: any) {
@@ -84,6 +126,21 @@ export const markAsRead = async (req: AuthenticatedRequest, res: Response, next:
     if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     const { id } = req.params;
+
+    // Secure it: check if this notification belongs to a student of this parent (if studentId is set)
+    const notification = await prisma.parentNotification.findUnique({
+      where: { id }
+    });
+    if (notification && notification.studentId && req.user?.role !== 'super_admin') {
+      if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      const link = await prisma.parentStudentLink.findFirst({
+        where: { parentId: req.user.id, studentId: notification.studentId }
+      });
+      if (!link) {
+        return res.status(403).json({ success: false, message: "Forbidden: Notification belongs to another parent's child." });
+      }
+    }
+
     await parentService.markNotificationAsRead(id, schoolId);
     res.status(200).json({ success: true, message: "Notification marked as read." });
   } catch (error: any) {
@@ -97,6 +154,21 @@ export const deleteNotification = async (req: AuthenticatedRequest, res: Respons
     if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     const { id } = req.params;
+
+    // Secure it: check if this notification belongs to a student of this parent (if studentId is set)
+    const notification = await prisma.parentNotification.findUnique({
+      where: { id }
+    });
+    if (notification && notification.studentId && req.user?.role !== 'super_admin') {
+      if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      const link = await prisma.parentStudentLink.findFirst({
+        where: { parentId: req.user.id, studentId: notification.studentId }
+      });
+      if (!link) {
+        return res.status(403).json({ success: false, message: "Forbidden: Notification belongs to another parent's child." });
+      }
+    }
+
     await parentService.deleteNotification(id, schoolId);
     res.status(200).json({ success: true, message: "Notification deleted." });
   } catch (error: any) {
@@ -110,6 +182,11 @@ export const markAllAsRead = async (req: AuthenticatedRequest, res: Response, ne
     if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     const { phone } = req.params;
+    const isOwner = await verifyPhoneOwnership(req, phone);
+    if (!isOwner) {
+      return res.status(403).json({ success: false, message: "Forbidden: You cannot modify another parent's data." });
+    }
+
     await parentService.markAllNotificationsAsRead(phone, schoolId);
     res.status(200).json({ success: true, message: "All notifications marked as read." });
   } catch (error: any) {
@@ -123,6 +200,11 @@ export const getPreferences = async (req: AuthenticatedRequest, res: Response, n
     if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     
     const { phone } = req.params;
+    const isOwner = await verifyPhoneOwnership(req, phone);
+    if (!isOwner) {
+      return res.status(403).json({ success: false, message: "Forbidden: You cannot access another parent's preferences." });
+    }
+
     const preferences = await parentService.getPreferences(phone, schoolId);
     res.status(200).json({ success: true, data: preferences });
   } catch (error: any) {
@@ -136,6 +218,11 @@ export const updatePreferences = async (req: AuthenticatedRequest, res: Response
     if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     
     const { phone } = req.params;
+    const isOwner = await verifyPhoneOwnership(req, phone);
+    if (!isOwner) {
+      return res.status(403).json({ success: false, message: "Forbidden: You cannot modify another parent's preferences." });
+    }
+
     const preferences = await parentService.updatePreferences(phone, schoolId, req.body);
     res.status(200).json({ success: true, data: preferences, message: "Preferences updated successfully." });
   } catch (error: any) {
@@ -186,6 +273,11 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response, ne
     if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     
     const { phone } = req.params;
+    const isOwner = await verifyPhoneOwnership(req, phone);
+    if (!isOwner) {
+      return res.status(403).json({ success: false, message: "Forbidden: You cannot modify another parent's profile." });
+    }
+
     const { name, email, address } = req.body;
 
     if (!name) {

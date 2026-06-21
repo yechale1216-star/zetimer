@@ -110,6 +110,10 @@ class AuthService {
         // Write a new session nonce FIRST — contexts detect user change via this key
         localStorage.setItem(SESSION_ID_KEY, generateSessionId())
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user))
+        // Store token in localStorage as fallback/auth header for cross-origin environments
+        if (token) {
+          localStorage.setItem("attendance_token", token)
+        }
         // NOTE: JWT token is now managed by HTTP-Only cookies
         
         if (availableSchools) {
@@ -201,6 +205,10 @@ class AuthService {
         // Write a new session nonce FIRST — contexts detect user change via this key
         localStorage.setItem(SESSION_ID_KEY, generateSessionId())
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user));
+        // Store token in localStorage as fallback/auth header for cross-origin environments
+        if (data.token) {
+          localStorage.setItem("attendance_token", data.token);
+        }
         // NOTE: JWT token is now managed by HTTP-Only cookies
         localStorage.setItem("parent_students", JSON.stringify(students));
         localStorage.setItem("available_schools", JSON.stringify(availableSchools));
@@ -335,6 +343,10 @@ class AuthService {
       if (this.isClient()) {
         localStorage.setItem(SESSION_ID_KEY, generateSessionId())
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(user))
+        // Store token in localStorage as fallback/auth header for cross-origin environments
+        if (token) {
+          localStorage.setItem("attendance_token", token)
+        }
         // NOTE: JWT token is now managed by HTTP-Only cookies
         if (user.schoolId) {
           localStorage.setItem("x-school-id", user.schoolId);

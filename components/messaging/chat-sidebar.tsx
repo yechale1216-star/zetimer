@@ -73,9 +73,9 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = React.memo(({
   [conversations]);
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden border-r border-border">
+    <div className="flex flex-col h-full bg-background overflow-hidden border-r border-border pt-safe">
       {/* Sidebar Header */}
-      <div className="pt-6 px-4 pb-2 space-y-4">
+      <div className="pt-2 md:pt-6 px-4 pb-2 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <DropdownMenu>

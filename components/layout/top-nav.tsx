@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-import { Logo } from "@/components/logo"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -30,17 +29,15 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
   const router = useRouter()
   const { settings } = useSchoolSettings()
   const { activeSchool } = useSchool()
-  const [mounted, setMounted] = React.useState(false)
   const [user, setUser] = React.useState<any>(null)
   const [logoError, setLogoError] = React.useState(false)
 
   React.useEffect(() => {
-    setMounted(true)
     setUser(authService.getCurrentUser())
 
     const handleSchoolSwitch = () => {
       setUser(authService.getCurrentUser())
-      setLogoError(false) // Reset error state on switch
+      setLogoError(false)
     }
 
     const handleProfileUpdate = () => {
@@ -55,18 +52,9 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
     }
   }, [])
 
-  // Force reactivity by strictly using context first
-  // If activeSchool is present, it MUST take absolute priority (even if its logo is an empty string)
   const schoolName = activeSchool ? activeSchool.name : (user?.schoolName || "Zetime Portal")
   const schoolLogo = activeSchool ? (activeSchool.logo || "") : (user?.schoolLogo || "")
-  const customId = activeSchool ? activeSchool.customSchoolId : (user?.customSchoolId || "")
-  
   const logoUrl = schoolLogo || ""
-
-  // Reset logo error when logo URL changes
-  React.useEffect(() => {
-    setLogoError(false)
-  }, [logoUrl])
 
   const handleLogout = async () => {
     await authService.logout()
@@ -81,96 +69,78 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
     .slice(0, 2) || "U"
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
-      <div className="w-full flex h-20 items-center px-4 md:px-8">
+    <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 shadow-sm pt-safe">
+      <div className="w-full flex h-16 md:h-20 items-center px-4 md:px-8">
         {showMenuButton && (
           <Button
             variant="ghost"
             size="icon"
-            className="mr-2 md:hidden hover:bg-primary/10 transition-colors"
+            className="mr-3 md:hidden h-10 w-10 rounded-xl hover:bg-primary/10 transition-all active:scale-90"
             onClick={onMenuClick}
-            aria-label="Open navigation menu"
           >
             <Menu className="h-5 w-5" />
           </Button>
         )}
 
-        <div className="flex items-center gap-4 flex-1 min-w-0 overflow-hidden">
-          <div className="flex items-center gap-4 min-w-0 overflow-hidden">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0 border border-primary/20 shadow-inner">
-              {logoUrl && !logoError ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img 
-                  src={logoUrl} 
-                  alt="School Logo" 
-                  className="w-full h-full object-cover" 
-                  onError={() => setLogoError(true)}
-                />
-              ) : (
-                <div className="bg-emerald-50 dark:bg-emerald-950 w-full h-full flex items-center justify-center">
-                  <GraduationCap className="h-6 w-6 text-emerald-600" />
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <h1 className="typography-card-title text-primary sm:text-2xl truncate font-bold">
-                {schoolName || "Zetime Portal"}
-              </h1>
-              <div className="hidden sm:flex items-center gap-2">
-                <span className="typography-label text-[10px] text-primary/70 uppercase tracking-[0.2em]">
-                  {user?.role === "parent" ? "Parent Portal" : user?.role === "teacher" ? "Teacher Portal" : user?.role === "admin" || user?.role === "school_admin" ? "Admin Portal" : "Management Portal"}
-                </span>
-                {customId && (
-                  <span className="typography-label text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20">
-                    {customId}
-                  </span>
-                )}
+        <div className="flex items-center gap-2.5 md:gap-4 flex-1 min-w-0">
+          <div className="h-9 w-9 md:h-12 md:w-12 rounded-lg md:rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0 border border-primary/20 shadow-inner">
+            {logoUrl && !logoError ? (
+              <img 
+                src={logoUrl} 
+                alt="Logo" 
+                className="w-full h-full object-cover" 
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <div className="bg-primary/5 w-full h-full flex items-center justify-center">
+                <GraduationCap className="h-4 w-4 md:h-6 md:w-6 text-primary" />
               </div>
-            </div>
+            )}
+          </div>
+          <div className="flex flex-col min-w-0">
+            <h1 className="text-sm md:text-xl font-black tracking-tight text-foreground truncate uppercase">
+              {schoolName}
+            </h1>
+            <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest truncate">
+              {user?.role?.replace('_', ' ')} Portal
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <ModeToggle />
+        <div className="flex items-center gap-1 md:gap-3">
+          <div className="hidden sm:block">
+            <ModeToggle />
+          </div>
           
           <NotificationPopover />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 border border-border/50 hover:border-primary/30 transition-all shadow-sm">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={user?.profile_photo || undefined} alt={user?.name} />
-                  <AvatarFallback className="typography-label bg-primary/10 text-primary">{initials}</AvatarFallback>
+              <Button variant="ghost" className="h-9 w-9 md:h-10 md:w-10 rounded-full p-0 border border-border/50 hover:border-primary/30 transition-all shadow-sm">
+                <Avatar className="h-8 w-8 md:h-9 md:w-9">
+                  <AvatarImage src={user?.profile_photo || undefined} />
+                  <AvatarFallback className="text-[10px] md:text-xs font-bold bg-primary/10 text-primary">{initials}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuLabel className="typography-body">
+            <DropdownMenuContent className="w-56 rounded-2xl p-2" align="end" forceMount>
+              <DropdownMenuLabel className="p-2 font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="typography-label">{user?.name}</p>
-                  <p className="typography-helper text-muted-foreground">{user?.email}</p>
+                  <p className="text-sm font-bold truncate">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => {
+              <DropdownMenuSeparator className="opacity-50" />
+              <DropdownMenuItem className="rounded-xl h-10 gap-2 font-semibold" onClick={() => {
                 const target = user?.role === "parent" ? "/parent/profile" : "/school/admin/profile"
                 router.push(target)
               }}>
-                <User className="mr-2 h-4 w-4" />
+                <User className="h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              {user?.role === "parent" && typeof window !== "undefined" && localStorage.getItem("available_schools") && JSON.parse(localStorage.getItem("available_schools") || "[]").length > 1 && (
-                <DropdownMenuItem onClick={() => router.push("/parent/school-select")}>
-                  <div className="flex items-center text-emerald-600">
-                    <LogOut className="mr-2 h-4 w-4 rotate-180" />
-                    <span>Switch School</span>
-                  </div>
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-red-500 hover:text-red-600 focus:text-red-600">
-                <LogOut className="mr-2 h-4 w-4" />
+              <DropdownMenuSeparator className="opacity-50" />
+              <DropdownMenuItem onClick={handleLogout} className="rounded-xl h-10 gap-2 font-semibold text-rose-500 focus:bg-rose-50 focus:text-rose-600">
+                <LogOut className="h-4 w-4" />
                 <span>Sign out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>

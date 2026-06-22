@@ -251,24 +251,30 @@ export function Settings() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 pb-32">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
         <div>
-          <h1 className="typography-page-title text-foreground">Settings</h1>
-          <p className="text-muted-foreground">Manage system configuration and preferences</p>
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            Settings
+          </h1>
+          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+            System Configuration & Preferences
+          </p>
         </div>
-        <Badge variant="secondary" className="flex items-center gap-1">
-          <span className="typography-card-title">👑</span>
-          Admin Panel
-        </Badge>
+        <div className="flex gap-2 w-full md:w-auto">
+          <Badge variant="secondary" className="h-11 px-6 rounded-2xl bg-slate-100 dark:bg-slate-800 border-none font-black text-[10px] uppercase tracking-widest text-slate-600 dark:text-slate-400">
+            Admin Panel
+          </Badge>
+        </div>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="system">System</TabsTrigger>
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList className="flex w-full bg-slate-100/50 dark:bg-slate-900/50 p-1 rounded-[20px] overflow-x-auto scrollbar-hide border border-slate-200/50 dark:border-slate-800/50 h-12">
+          <TabsTrigger value="general" className="flex-1 rounded-2xl data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm text-[10px] uppercase font-black tracking-widest transition-all">General</TabsTrigger>
+          <TabsTrigger value="notifications" className="flex-1 rounded-2xl data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm text-[10px] uppercase font-black tracking-widest transition-all">Alerts</TabsTrigger>
+          <TabsTrigger value="attendance" className="flex-1 rounded-2xl data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm text-[10px] uppercase font-black tracking-widest transition-all">Rules</TabsTrigger>
+          <TabsTrigger value="system" className="flex-1 rounded-2xl data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm text-[10px] uppercase font-black tracking-widest transition-all">System</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -637,16 +643,39 @@ export function Settings() {
         </TabsContent>
       </Tabs>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Save Changes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={saveSettings} disabled={isSaving} className="w-full">
-            {isSaving ? "Saving..." : "Save Settings"}
+      {/* Mobile Sticky Save Button */}
+      <div className="md:hidden fixed bottom-24 left-0 right-0 z-40 px-4 pb-safe pointer-events-none">
+        <div className="bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur-xl rounded-[32px] p-2.5 border border-white/10 shadow-2xl flex items-center gap-2 pointer-events-auto max-w-lg mx-auto transform translate-y-[-10px]">
+          <div className="flex-1 px-4">
+               <p className="text-[8px] font-black text-white/40 uppercase tracking-widest leading-tight">Status</p>
+               <p className="text-sm font-black text-white leading-none">Ready to Save</p>
+          </div>
+          <Button
+            onClick={saveSettings}
+            disabled={isSaving}
+            className="h-12 px-8 rounded-2xl bg-primary text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-primary/30 active:scale-95 transition-all outline-none"
+          >
+            {isSaving ? (
+              <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              "Save All"
+            )}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      <div className="hidden md:block">
+        <Card className="rounded-[32px] border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-black uppercase tracking-tight">Save Changes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={saveSettings} disabled={isSaving} className="w-full h-11 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20">
+              {isSaving ? "Saving..." : "Save System Settings"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

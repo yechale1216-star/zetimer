@@ -60,6 +60,7 @@ import { AuthProvider } from "@/lib/context/auth-context"
 import { Toaster as SonnerToaster } from "sonner"
 import { PWAClientWrapper } from "@/components/system/pwa-client-wrapper"
 import { FetchInterceptor } from "@/components/providers/fetch-interceptor"
+import { CapacitorInitializer } from "@/components/capacitor-initializer"
 
 export default function RootLayout({
   children,
@@ -80,6 +81,7 @@ export default function RootLayout({
           <FetchInterceptor>
             <LanguageProvider>
               <AuthProvider>
+                <CapacitorInitializer />
                 <SchoolProvider>
                   {children}
                   <Toaster />

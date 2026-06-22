@@ -1,5 +1,9 @@
-import { SubscriptionDetailView } from "@/components/super-admin/subscription-detail-view"
+import SubscriptionDetailClient from "./client"
+
+export function generateStaticParams() {
+  return [{ id: "placeholder" }]
+}
 
 export default function SubscriptionDetailPage() {
-  return <SubscriptionDetailView />
+  return <SubscriptionDetailClient />
 }

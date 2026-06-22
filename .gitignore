@@ -18,3 +18,16 @@ node_modules
 .env
 .env.*
 !.env.example
+
+# Build outputs
+out/
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -241,35 +241,41 @@ export function TeacherAssignmentManagement() {
     <div className="space-y-8 pb-12">
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
         <div>
-          <h1 className="typography-page-title text-slate-900 dark:text-white">
-            Class Assignments
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            Assignments
           </h1>
-          <p className="typography-body text-slate-500 dark:text-slate-400 mt-1">
-            Assign teachers to grade sections and manage their classes.
+          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+            Teacher Class Allocation
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 w-full md:w-auto">
           <Button
             onClick={() => loadAllData(schoolId)}
             variant="outline"
-            size="sm"
-            className="rounded-xl border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80"
+            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            Sync
           </Button>
           <Button
             onClick={() => { resetForm(); setIsDialogOpen(true) }}
-            size="sm"
-            className="h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow transition-all duration-200"
+            className="hidden md:flex h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest px-6 shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Assign Teacher
+            New Assignment
           </Button>
         </div>
       </div>
+
+      {/* Mobile Floating Add Button */}
+      <Button
+        onClick={() => { resetForm(); setIsDialogOpen(true) }}
+        className="md:hidden fixed bottom-24 right-6 h-14 w-14 rounded-2xl bg-primary text-white shadow-2xl shadow-primary/40 z-40 flex items-center justify-center active:scale-95 transition-all outline-none"
+      >
+        <Plus className="w-7 h-7" />
+      </Button>
 
       {/* Assignment Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) { setIsDialogOpen(false); setShowSuccess(false) } }}>
@@ -418,89 +424,73 @@ export function TeacherAssignmentManagement() {
         </div>
 
         {assignments.length === 0 ? (
-          <Card className="rounded-3xl border border-dashed border-slate-200/80 dark:border-slate-800/80 p-12 bg-white/40 dark:bg-slate-900/40 text-center">
-            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center mx-auto mb-4 text-slate-400">
-              <Users className="w-6 h-6" />
+          <div className="py-24 text-center bg-slate-50 dark:bg-slate-900/30 rounded-[40px] border border-dashed border-slate-200 dark:border-slate-800 mx-1">
+            <div className="w-20 h-20 bg-background rounded-[28px] shadow-sm flex items-center justify-center mx-auto mb-6">
+              <Users className="w-8 h-8 text-slate-200" />
             </div>
-            <h3 className="typography-card-title text-slate-800 dark:text-slate-200">No assignments yet</h3>
-            <p className="typography-body text-slate-500 mt-1 max-w-sm mx-auto">Click "Assign Teacher" to create your first class assignment.</p>
-          </Card>
+            <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No assignments found</p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-1 md:px-0">
             {assignments.map((assignment) => {
               const teacherName = assignment.teacher?.full_name || "Unknown Teacher"
               const bgGradient = getAvatarGradient(assignment.teacher?.id || assignment.teacher_id)
               return (
-                <Card
+                <div
                   key={assignment.id}
-                  className="group hover:border-blue-500/30 hover:shadow-md rounded-3xl border border-slate-200/50 dark:border-slate-800/50 bg-white/90 dark:bg-slate-900/90 shadow-sm overflow-hidden transition-all duration-300 flex flex-col justify-between"
+                  className="group relative overflow-hidden bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.98] transition-all hover:shadow-md h-[180px] flex flex-col justify-between"
                 >
-                  <CardContent className="p-4 space-y-2.5">
-                    {/* Avatar + Delete */}
-                    <div className="flex justify-between items-start gap-3">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-4">
                       {assignment.teacher?.profile_photo ? (
                         <img
                           src={assignment.teacher.profile_photo}
                           alt={teacherName}
-                          className="w-10 h-10 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform duration-300 ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-900"
+                          className="w-14 h-14 rounded-[20px] object-cover border-2 border-white dark:border-slate-800 shadow-sm"
                         />
                       ) : (
-                        <div className={`typography-label w-10 h-10 rounded-full bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform duration-300`}>
+                        <div className={`w-14 h-14 rounded-[20px] bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white text-lg font-black shadow-inner`}>
                           {getInitials(teacherName)}
                         </div>
                       )}
-                        <div className="flex gap-1">
-                          <Button
-                            onClick={() => handleEditAssignment(assignment)}
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-full"
-                            title="Edit Assignment"
-                          >
-                            <Plus className="w-3.5 h-3.5 rotate-45" /> 
-                          </Button>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              window.alert("DELETE CLICKED - ID: " + assignment.id);
-                              handleRemoveAssignment(null, assignment.id);
-                            }}
-                            disabled={deletingId === assignment.id}
-                            className="h-8 w-8 flex items-center justify-center text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-full border border-transparent transition-all"
-                            title="Remove Assignment"
-                          >
-                            {deletingId === assignment.id ? (
-                               <div className="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                               <Trash2 className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
-                    </div>
-
-                    {/* Name */}
-                    <div>
-                      <h3 className="typography-card-title text-slate-900 dark:text-slate-100 group-hover:text-blue-600 truncate transition-colors duration-200" title={teacherName}>
-                        {teacherName}
-                      </h3>
-                    </div>
-
-                    {/* Class Details */}
-                    <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800/50 space-y-1.5">
-                      <div className="typography-helper flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-                        <Users className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        <span>Grade {assignment.grade?.name || "N/A"} - Section {assignment.section?.name || "N/A"}</span>
+                      <div className="min-w-0">
+                        <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 leading-none truncate uppercase tracking-tight">
+                          {teacherName}
+                        </h3>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1.5 flex items-center gap-1.5 truncate">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Grade {assignment.grade?.name || ""} {assignment.section?.name || ""}
+                        </p>
                       </div>
-                      {assignment.stream?.name && (
-                        <div className="typography-helper flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                          <GraduationCap className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                          <span>{assignment.stream.name} Stream</span>
-                        </div>
-                      )}
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="flex gap-1.5">
+                       <button 
+                         onClick={(e) => { e.stopPropagation(); handleEditAssignment(assignment); }}
+                         className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-primary transition-colors"
+                       >
+                         <Plus className="w-4 h-4 rotate-45" />
+                       </button>
+                       <button 
+                         onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(null, assignment.id); }}
+                         className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-rose-400 hover:text-rose-600 transition-colors"
+                       >
+                         <Trash2 className="w-4 h-4" />
+                       </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800/50">
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest">Stream</span>
+                        <span className="text-xs font-bold text-foreground">{assignment.stream?.name || "General"}</span>
+                      </div>
+                    </div>
+                    <div className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                       <span className="text-[9px] font-black text-foreground uppercase tracking-widest">Active</span>
+                    </div>
+                  </div>
+                </div>
               )
             })}
           </div>

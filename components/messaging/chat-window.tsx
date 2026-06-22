@@ -458,7 +458,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
       />
 
       {/* Chat Header */}
-      <header className="h-[72px] border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-4 z-40 sticky top-0 font-sans shadow-sm">
+      <header className="h-[64px] md:h-[72px] border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-4 z-40 sticky top-0 font-sans shadow-sm pt-safe">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {isMobile && onBack && (
             <Button variant="ghost" size="icon" onClick={onBack} className="h-10 w-10 rounded-full -ml-2">
@@ -654,7 +654,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
       </AnimatePresence>
 
       {/* Message Input */}
-      <div className="p-4 bg-background/80 backdrop-blur-md border-t border-border z-50 sticky bottom-0">
+      <div className="p-4 bg-background/80 backdrop-blur-md border-t border-border z-50 sticky bottom-0 pb-safe">
 
         <div className="max-w-4xl mx-auto space-y-2">
 

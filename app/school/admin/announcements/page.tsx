@@ -28,6 +28,7 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils/utils"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -234,149 +235,114 @@ export default function AdminAnnouncementsPage() {
   }
 
   return (
-    <div className="p-6 space-y-8 animate-in fade-in duration-500">
-      {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-          <div className="space-y-1.5">
-            <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
-               <div className="p-3 bg-primary/10 rounded-2xl">
-                 <Megaphone className="w-8 h-8 text-primary" />
-               </div>
-               School Announcements
-            </h2>
-            <div className="flex items-center gap-3 text-muted-foreground ml-1">
-              <p>Broadcast important news and alerts to all parent portals.</p>
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                Live System • Updated {lastUpdated.toLocaleTimeString()}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={() => { resetForm(); setIsCreateModalOpen(true); }}
-              className="rounded-2xl h-14 px-8 bg-primary hover:bg-primary/90 text-white shadow-xl shadow-primary/20 gap-3 font-bold text-lg active:scale-95 transition-all text-sm md:text-base"
-            >
-              <Plus className="w-6 h-6" />
-              Create Announcement
-            </Button>
-          </div>
+    <div className="space-y-8 pb-32">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe mx-4 md:mx-0">
+        <div>
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            Announcements
+          </h1>
+          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+            Broadcast & Alerts
+          </p>
         </div>
+        <div className="hidden md:block">
+          <Button 
+            onClick={() => { resetForm(); setIsCreateModalOpen(true); }}
+            className="h-11 rounded-2xl bg-primary hover:bg-primary/90 text-white font-black text-[10px] uppercase tracking-widest px-6 shadow-lg shadow-primary/20 active:scale-95 transition-all"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Broadcast
+          </Button>
+        </div>
+      </div>
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <Card className="border-none shadow-sm bg-primary/5 dark:bg-primary/10 rounded-2xl">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-primary/10 rounded-xl">
-              <Megaphone className="w-6 h-6 text-primary" />
+      {/* Stats Summary - Mobile Optimized */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 px-4 md:px-0">
+        {[
+          { label: "Total", value: announcements.length, icon: Megaphone, bg: "bg-primary/10", text: "text-primary" },
+          { label: "Active", value: announcements.filter(a => new Date(a.createdAt).toDateString() === new Date().toDateString()).length, icon: CheckCircle2, bg: "bg-emerald-500/10", text: "text-emerald-600" },
+          { label: "Priority", value: announcements.filter(a => a.type === 'emergency').length, icon: Bell, bg: "bg-rose-500/10", text: "text-rose-600" }
+        ].map((stat, idx) => (
+          <div key={idx} className="bg-white dark:bg-slate-900 p-4 rounded-[24px] border border-slate-100 dark:border-slate-800 shadow-sm">
+            <div className={cn("w-10 h-10 flex items-center justify-center rounded-2xl mb-2", stat.bg)}>
+              <stat.icon className={cn("w-5 h-5", stat.text)} />
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Published</p>
-              <p className="text-2xl font-bold text-foreground">{announcements.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100/50 dark:border-emerald-900/30">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-emerald-100/50 dark:bg-emerald-900/40 rounded-xl">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Active Today</p>
-              <p className="text-2xl font-bold text-emerald-600">
-                {announcements.filter(a => new Date(a.createdAt).toDateString() === new Date().toDateString()).length}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm bg-red-50/50 dark:bg-red-950/20 rounded-2xl border border-red-100/50 dark:border-red-900/30">
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-red-100/50 dark:bg-red-900/40 rounded-xl">
-              <Bell className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Priority Alerts</p>
-              <p className="text-2xl font-bold text-red-600">
-                {announcements.filter(a => a.type === 'emergency').length}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{stat.label}</p>
+            <p className={cn("text-xl font-black uppercase tracking-tight", stat.text)}>{stat.value}</p>
+          </div>
+        ))}
       </div>
 
       {/* Main Content Card */}
-      <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
-        <CardHeader className="flex flex-row items-center justify-between pb-6">
-          <div className="space-y-1">
-            <CardTitle className="typography-section-title">Broadcast History</CardTitle>
-            <CardDescription className="typography-helper">Manage your communication history and active portal alerts.</CardDescription>
+        <div className="px-4 md:px-0">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">Broadcast History</h3>
+              <p className="text-[10px] font-bold text-slate-500/60 uppercase tracking-widest">Manage active alerts</p>
+            </div>
+            <div className="relative w-full md:w-72">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input 
+                placeholder="Search alerts..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-12 h-11 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 rounded-2xl focus:ring-primary/20"
+              />
+            </div>
           </div>
-          <div className="relative w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search announcements..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-slate-50 dark:bg-slate-800/50 border-none rounded-xl"
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
+
           {isLoading ? (
             <PageSkeleton variant="cards" />
           ) : filteredAnnouncements.length === 0 ? (
-            <div className="py-20 text-center space-y-3">
+            <div className="py-20 text-center space-y-4 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800">
               <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mx-auto">
                 <Megaphone className="w-10 h-10 text-slate-300" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">No announcements found</h3>
-              <p className="text-slate-500 max-w-xs mx-auto">Click "Create Announcement" to publish your first update to parents.</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 uppercase tracking-tight">No alerts found</h3>
+              <p className="text-[10px] uppercase font-bold text-slate-500/60 tracking-widest max-w-xs mx-auto">Broadcast your first message</p>
             </div>
           ) : (
             <div className="space-y-4">
               {filteredAnnouncements.map((announcement) => (
                 <div 
                   key={announcement.id}
-                  className="group relative flex gap-6 p-5 bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800/50 hover:bg-white dark:hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-200/40 dark:hover:shadow-none transition-all duration-300"
+                  className="group relative flex gap-4 p-5 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.98] transition-all"
                 >
-                  {/* Type Icon Indicator */}
-                  <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${getTypeStyles(announcement.type)}`}>
+                  <div className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center ${getTypeStyles(announcement.type)}`}>
                     {getTypeIcon(announcement.type)}
                   </div>
 
-                  {/* Content */}
-                  <div className="flex-1 space-y-1.5 min-w-0">
-                    <div className="flex items-center gap-3">
-                      <h4 className="font-bold text-foreground text-lg leading-snug group-hover:text-primary transition-colors truncate">
+                  <div className="flex-1 space-y-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-black text-slate-900 dark:text-white text-sm uppercase tracking-tight truncate">
                         {announcement.title}
                       </h4>
-                      <Badge className={`text-[10px] uppercase h-5 px-2 font-bold ${getTypeStyles(announcement.type)} border-none shadow-none`}>
+                      <Badge className={cn("text-[8px] uppercase px-2 py-0 h-4 font-black border-none shadow-none", getTypeStyles(announcement.type))}>
                         {announcement.type}
                       </Badge>
                     </div>
-                    <p className="text-muted-foreground text-sm line-clamp-2 leading-relaxed">
-                      {announcement.message}
+                    <p className="text-slate-500 dark:text-slate-400 text-[11px] font-bold leading-relaxed line-clamp-2">
+                       {announcement.message}
                     </p>
-                    <div className="flex items-center gap-4 pt-1">
-                      <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {format(new Date(announcement.createdAt), 'MMM dd, yyyy')}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
-                        <Clock className="w-3.5 h-3.5" />
-                        {format(new Date(announcement.createdAt), 'hh:mm a')}
-                      </div>
+                    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-50 dark:border-slate-800/50">
+                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {format(new Date(announcement.createdAt), 'MMM dd')}
+                       </span>
+                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {format(new Date(announcement.createdAt), 'hh:mm a')}
+                       </span>
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex flex-col justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex flex-col justify-center gap-3">
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       onClick={() => startEdit(announcement)}
                       className="h-9 w-9 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-xl"
-                      title="Edit"
                     >
                       <Edit2 className="w-4 h-4" />
                     </Button>
@@ -384,8 +350,7 @@ export default function AdminAnnouncementsPage() {
                       variant="ghost" 
                       size="icon" 
                       onClick={() => handleDelete(announcement.id)}
-                      className="h-9 w-9 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"
-                      title="Delete"
+                      className="h-9 w-9 text-slate-400 hover:text-rose-500"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -394,8 +359,7 @@ export default function AdminAnnouncementsPage() {
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Create Modal */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
@@ -492,6 +456,15 @@ export default function AdminAnnouncementsPage() {
           </form>
         </DialogContent>
       </Dialog>
+      {/* Mobile Floating Action Button */}
+      <div className="md:hidden fixed bottom-24 right-6 z-50">
+        <Button
+          onClick={() => { resetForm(); setIsCreateModalOpen(true); }}
+          className="h-14 w-14 rounded-full bg-primary text-white shadow-2xl shadow-primary/40 flex items-center justify-center p-0 active:scale-95 transition-all"
+        >
+          <Plus className="w-6 h-6" />
+        </Button>
+      </div>
     </div>
   )
 }

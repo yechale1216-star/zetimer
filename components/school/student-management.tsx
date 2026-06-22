@@ -20,6 +20,10 @@ import { ValidationService } from "@/lib/utils/validation"
 import { authService } from "@/lib/auth/auth"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { MobileCard, MobileCardList } from "@/components/ui/mobile-card"
+import { NativeBridge } from "@/lib/utils/native-bridge"
+import { Camera } from "lucide-react"
+import { cn } from "@/lib/utils/utils"
 
 
 
@@ -244,6 +248,20 @@ export function StudentManagement() {
 
     setValidationErrors(combinedResult.errors)
     return combinedResult.isValid
+  }
+
+  const handleTakePhoto = async () => {
+    try {
+      const photoPath = await NativeBridge.takePhoto()
+      // In a real app, you would upload this URI or convert it to a blob
+      // For now, we'll just log it or set it to a preview state
+      console.log('Mobile photo taken:', photoPath)
+      notifications.success("Success", "Photo captured. In a production build, this would be uploaded to storage.")
+    } catch (error: any) {
+      if (error.message !== 'User cancelled photos app') {
+        notifications.error("Camera Error", error.message)
+      }
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -651,41 +669,48 @@ export function StudentManagement() {
   }, [students])
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-700">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/80 dark:bg-slate-900/80 p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 backdrop-blur-md shadow-sm">
+    <div className="space-y-8 pb-32">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
         <div>
-          <h2 className="typography-page-title text-foreground">Student Directory</h2>
-          <p className="typography-label text-muted-foreground mt-1">
-            Manage and monitor your school's student database
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            Students
+          </h1>
+          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+            Directory & Enrollment
           </p>
         </div>
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex gap-2 w-full md:w-auto">
           <Button 
             onClick={() => setShowUploadDialog(true)} 
             variant="outline"
-            className="flex-1 md:flex-none h-11 rounded-xl border-border/50 bg-background/50 hover:bg-muted transition-all"
+            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
           >
-            <Upload className="w-4 h-4 mr-2 text-primary" />
-            Import CSV
+            <Upload className="w-4 h-4 mr-2" />
+            Import
           </Button>
           <Button 
             onClick={exportStudentListToCSV} 
             disabled={filteredStudents.length === 0}
             variant="outline"
-            className="flex-1 md:flex-none h-11 rounded-xl border-border/50 bg-background/50 hover:bg-muted transition-all"
+            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
           >
-            <Download className="w-4 h-4 mr-2 text-primary" />
-            Export CSV
+            <Download className="w-4 h-4 mr-2" />
+            Export
           </Button>
-           <Dialog open={isAddModalOpen} onOpenChange={(open) => { if (!open) { setIsAddModalOpen(false); setShowSuccess(false) } }}>
-             <Button 
-               onClick={() => { resetForm(); setIsAddModalOpen(true); }} 
-               className="flex-1 md:flex-none h-11 rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
-             >
-               <Plus className="w-4 h-4 mr-2" />
-               Add Student
-             </Button>
+        </div>
+      </div>
+          <div className="hidden md:block">
+            <Button 
+              onClick={() => { resetForm(); setIsAddModalOpen(true); }} 
+              className="h-11 rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Student
+            </Button>
+          </div>
+          
+          <Dialog open={isAddModalOpen} onOpenChange={(open) => { if (!open) { setIsAddModalOpen(false); setShowSuccess(false) } }}>
              <DialogContent className="sm:max-w-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-3xl border border-slate-200/50 dark:border-slate-800/50 shadow-2xl p-0 overflow-hidden">
               {showSuccess ? (
                 <div className="flex flex-col items-center justify-center py-20 animate-in fade-in zoom-in duration-500">
@@ -1072,8 +1097,6 @@ export function StudentManagement() {
               )}
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
 
       {/* Import Section */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
@@ -1206,87 +1229,134 @@ export function StudentManagement() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            {/* Table View */}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[45%]">Student Details</TableHead>
-                  <TableHead className="w-[20%]">ID Number</TableHead>
-                  <TableHead className="w-[25%]">Class / Section / Stream</TableHead>
-                  <TableHead className="w-[10%] text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredStudents.map((student) => (
-                  <TableRow key={student.id} className="group hover:bg-primary/[0.02] transition-colors border-b border-slate-100 dark:border-slate-800/80">
-                    <TableCell>
-                      <div className="flex items-center gap-4">
-                        <div className="typography-card-title h-11 w-11 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center text-primary shadow-sm border border-primary/10 group-hover:scale-110 transition-transform">
-                          {student.name?.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="typography-label text-foreground mb-1">{student.name}</p>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="typography-label bg-background/50 border-border/50 text-[9px] h-4 py-0 opacity-70">
-                              {student.gender || 'N/A'}
-                            </Badge>
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-slate-100 dark:border-slate-800/80">
+                    <TableHead className="w-[45%] font-black uppercase text-[10px] tracking-widest text-muted-foreground/70">Student Details</TableHead>
+                    <TableHead className="w-[20%] font-black uppercase text-[10px] tracking-widest text-muted-foreground/70">ID Number</TableHead>
+                    <TableHead className="w-[25%] font-black uppercase text-[10px] tracking-widest text-muted-foreground/70">Class / Section</TableHead>
+                    <TableHead className="w-[10%] text-right font-black uppercase text-[10px] tracking-widest text-muted-foreground/70">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredStudents.map((student) => (
+                    <TableRow key={student.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100/50 dark:border-slate-800/50">
+                      <TableCell>
+                        <div className="flex items-center gap-4">
+                          <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black border border-primary/20 group-hover:scale-105 transition-transform">
+                            {student.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-foreground uppercase tracking-tight">{student.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-tight bg-background/50 border-border/50 h-4 py-0 opacity-70">
+                                {student.gender || 'N/A'}
+                              </Badge>
+                            </div>
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <code className="text-[11px] font-bold text-muted-foreground bg-muted/30 px-2 py-1 rounded-lg border border-border/30 font-mono">
+                          {student.student_id}
+                        </code>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <p className="text-sm font-bold text-foreground uppercase">{student.grade}</p>
+                          <p className="text-[10px] font-bold text-primary/70 uppercase tracking-tight">
+                            {student.section} {student.stream ? `• ${student.stream}` : ""}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setSelectedStudent(student)}
+                            className="h-9 w-9 rounded-xl hover:bg-blue-500/10 hover:text-blue-600 transition-all"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleEdit(student)}
+                            className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-all"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => handleDelete(e, student)}
+                            disabled={deletingId === student.id}
+                            className="h-9 w-9 rounded-xl hover:bg-red-500/10 hover:text-red-600 transition-all text-muted-foreground"
+                          >
+                            {deletingId === student.id ? (
+                              <div className="h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden">
+              <MobileCardList>
+                {filteredStudents.map((student) => (
+                  <MobileCard
+                    key={student.id}
+                    title={student.name || "Unknown"}
+                    subtitle={`${student.grade} • ${student.section} ${student.stream ? `• ${student.stream}` : ""}`}
+                    avatar={
+                      <div className="bg-primary/10 w-full h-full flex items-center justify-center text-primary font-black text-lg">
+                        {student.name?.charAt(0).toUpperCase()}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <code className="typography-label text-muted-foreground bg-muted/50 px-2 py-1 rounded-md border border-border/50">
+                    }
+                    onClick={() => setSelectedStudent(student)}
+                    status={
+                      <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-tight bg-background/50 border-border/50 h-4 py-0 opacity-70">
                         {student.student_id}
-                      </code>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <p className="typography-label text-foreground">{student.grade}</p>
-                        <p className="typography-label text-[10px] text-primary/70 uppercase">
-                          {student.section} {student.stream ? `• ${student.stream}` : ""}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setSelectedStudent(student)}
-                          className="h-9 w-9 rounded-xl hover:bg-blue-500/10 hover:text-blue-600 transition-all"
-                          title="View Profile"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleEdit(student)}
-                          className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-all"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={(e) => handleDelete(e, student)}
-                          disabled={deletingId === student.id}
-                          className="h-9 w-9 rounded-xl hover:bg-red-500/10 hover:text-red-600 transition-all text-muted-foreground"
-                        >
-                          {deletingId === student.id ? (
-                            <div className="h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      </Badge>
+                    }
+                    metadata={
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3 h-3 opacity-50" />
+                          <span>{student.parent_phone}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" size="icon" className="h-8 w-8 rounded-full"
+                            onClick={(e) => { e.stopPropagation(); handleEdit(student); }}
+                          >
+                            <Edit className="w-3.5 h-3.5 text-primary" />
+                          </Button>
+                          <Button 
+                            variant="ghost" size="icon" className="h-8 w-8 rounded-full"
+                            onClick={(e) => { e.stopPropagation(); handleDelete(e, student); }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          </Button>
+                        </div>
+                      </>
+                    }
+                  />
                 ))}
-              </TableBody>
-            </Table>
-          </div>
+              </MobileCardList>
+            </div>
+          </>
         )}
       </div>
 
@@ -1305,6 +1375,30 @@ export function StudentManagement() {
               >
                 <X className="w-5 h-5" />
               </Button>
+              
+              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[32px] bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
+                <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center shadow-sm">
+                  <UploadCloud className="w-8 h-8 text-primary" />
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Upload Student Photo</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">JPG, PNG up to 5MB</p>
+                </div>
+                <div className="flex gap-3 w-full">
+                  <Button variant="outline" className="flex-1 h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest">
+                    Choose File
+                  </Button>
+                  {NativeBridge.isNative() && (
+                    <Button 
+                      onClick={handleTakePhoto}
+                      className="flex-1 h-11 rounded-2xl bg-primary text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20"
+                    >
+                      <Camera className="w-4 h-4 mr-2" />
+                      Take Photo
+                    </Button>
+                  )}
+                </div>
+              </div>
               
               <div className="flex flex-col sm:flex-row items-center gap-6 mt-4">
                 <div className="typography-page-title w-24 h-24 rounded-full bg-white text-emerald-800 flex items-center justify-center shadow-lg ring-4 ring-white/30">
@@ -1433,6 +1527,17 @@ export function StudentManagement() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Mobile Floating Action Button */}
+      {!isTeacher && (
+        <div className="md:hidden fixed bottom-24 right-6 z-50">
+          <Button
+            onClick={() => { resetForm(); setIsAddModalOpen(true); }}
+            className="h-14 w-14 rounded-full bg-primary text-white shadow-2xl shadow-primary/40 flex items-center justify-center p-0 active:scale-90 transition-all"
+          >
+            <Plus className="w-6 h-6" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -32,6 +32,9 @@ import { notifications, combinedNotificationService, emailService } from "@/lib/
 import { useSchoolSettings } from "@/hooks/use-school-settings"
 import { authService } from "@/lib/auth/auth"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
+import { NativeBridge } from "@/lib/utils/native-bridge"
+import { ImpactStyle } from "@capacitor/haptics"
+import { cn } from "@/lib/utils/utils"
 
 
 interface AttendanceState {
@@ -225,6 +228,7 @@ export function AttendanceTracking() {
   }
 
   const updateAttendance = (studentId: string, status: "present" | "late" | "absent" | "excused", note = "") => {
+    NativeBridge.vibrate(ImpactStyle.Light)
     setAttendanceState((prev) => ({
       ...prev,
       [studentId]: {
@@ -632,18 +636,31 @@ export function AttendanceTracking() {
   const sections = [...new Set(students.map((s) => s.section))].filter(Boolean)
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="typography-page-title text-foreground">Mark Attendance</h2>
-        <div className="flex gap-2">
-          <Button onClick={exportAttendanceToCSV} disabled={filteredStudents.length === 0} variant="outline">
+    <div className="space-y-6 pb-24">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
+        <div>
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            Attendance
+          </h1>
+          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+            Student Daily Status
+          </p>
+        </div>
+        <div className="flex gap-2 w-full md:w-auto">
+          <Button 
+            onClick={exportAttendanceToCSV} 
+            disabled={filteredStudents.length === 0} 
+            variant="outline"
+            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
+          >
             <Download className="w-4 h-4 mr-2" />
-            Export CSV
+            CSV
           </Button>
           <Button
             onClick={saveAttendance}
             disabled={isSaving}
-            className="typography-label bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+            className="hidden md:flex h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest px-6 shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
           >
             <Save className="w-4 h-4 mr-2" />
             {isSaving ? "Saving..." : "Save Now"}
@@ -902,87 +919,72 @@ export function AttendanceTracking() {
           <p className="text-gray-600">No students found</p>
         </div>
       ) : uiType === "card_based" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-24 md:pb-0 px-1 md:px-0">
           {filteredStudents.map((student) => {
             const attendance = attendanceState[student.id] || { status: null, note: "" }
             return (
-              <Card key={student.id} className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 transition-all hover:shadow-lg group active:scale-[0.99]">
-                <CardContent className="p-6">
-                  <div className="flex items-center mb-6">
-                    <div className="flex-shrink-0 h-14 w-14">
-                      <div className="typography-section-title h-14 w-14 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
-                        {(student.name || student.first_name || "S").charAt(0).toUpperCase()}
-                      </div>
-                    </div>
-                    <div className="ml-4 flex-1 min-w-0">
-                      <h3 className="typography-card-title text-foreground truncate uppercase">{student.name}</h3>
-                      <div className="typography-label text-[10px] text-muted-foreground uppercase opacity-70">
-                        {student.student_id || ""} • {student.grade || ""} {student.stream || ""} {student.section || ""}
-                      </div>
-                    </div>
+              <div 
+                key={student.id} 
+                className={cn(
+                  "group relative overflow-hidden bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.98] transition-all",
+                  attendance.status === 'present' && "ring-2 ring-emerald-500/30",
+                  attendance.status === 'absent' && "ring-2 ring-rose-500/30",
+                  attendance.status === 'late' && "ring-2 ring-amber-500/30",
+                  attendance.status === 'excused' && "ring-2 ring-sky-500/30"
+                )}
+              >
+                <div className="flex items-center gap-4 mb-5">
+                  <div className="h-12 w-12 rounded-[18px] bg-primary/10 flex items-center justify-center text-primary text-base font-black border border-primary/20 shadow-inner shrink-0">
+                    {(student.name || "S").charAt(0).toUpperCase()}
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white truncate uppercase tracking-tight leading-none mb-1.5">
+                      {student.name}
+                    </h3>
+                    <p className="text-[9px] font-black text-slate-500/50 uppercase tracking-widest truncate">
+                      {student.student_id} • {student.grade} {student.section}
+                    </p>
+                  </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-2 mb-6">
-                    {(["present", "late", "absent", "excused"] as const).map((status) => (
-                      <Button
-                        key={status}
-                        variant={attendance.status === status ? "default" : "outline"}
-                        size="sm"
-                        className={`typography-label capitalize h-10 rounded-xl text-[11px] uppercase ${ attendance.status === status ? getStatusColor(status) : "bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700" } transition-all active:scale-95`}
-                        onClick={() => updateAttendance(student.id, status)}
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { id: 'present', icon: UserCheck, color: 'text-emerald-500', bg: 'bg-emerald-500' },
+                    { id: 'late', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500' },
+                    { id: 'absent', icon: UserX, color: 'text-rose-500', bg: 'bg-rose-500' },
+                    { id: 'excused', icon: AlertTriangle, color: 'text-sky-500', bg: 'bg-sky-500' }
+                  ].map((status) => {
+                    const Icon = status.icon
+                    const isActive = attendance.status === status.id
+                    return (
+                      <button
+                        key={status.id}
+                        onClick={() => updateAttendance(student.id, status.id as any)}
+                        className={cn(
+                          "flex flex-col items-center justify-center gap-1.5 h-14 rounded-2xl transition-all border",
+                          isActive 
+                            ? cn(status.bg, "text-white border-transparent shadow-lg shadow-current/20 scale-[1.05] z-10") 
+                            : "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-400"
+                        )}
                       >
-                        <div className="flex items-center gap-1">
-                          {attendance.status === status && <Check className="w-3 h-3" />}
-                          {status}
-                        </div>
-                      </Button>
-                    ))}
+                        <Icon className={cn("w-4 h-4", isActive ? "text-white" : status.color)} />
+                        <span className="text-[8px] font-black uppercase tracking-widest leading-none">{status.id}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {attendance.status && ["absent", "late", "excused"].includes(attendance.status) && (
+                  <div className="mt-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <Input
+                      placeholder="Reason for status..."
+                      value={attendance.note}
+                      onChange={(e) => updateNote(student.id, e.target.value)}
+                      className="h-9 text-[10px] uppercase font-black tracking-widest bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 rounded-xl focus:ring-primary/20 placeholder:text-slate-400/50"
+                    />
                   </div>
-
-                  {attendance.status && ["absent", "late", "excused"].includes(attendance.status) && (
-                    <div className="space-y-2">
-                      <Label htmlFor={`note-${student.id}`} className="typography-label text-[10px] uppercase text-muted-foreground ml-1">
-                        Note (optional)
-                      </Label>
-                      <Textarea
-                        id={`note-${student.id}`}
-                        placeholder="Add a reason or note..."
-                        value={attendance.note}
-                        onChange={(e) => updateNote(student.id, e.target.value)}
-                        className="typography-helper min-h-[70px] bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl focus:ring-primary/20"
-                      />
-                    </div>
-                  )}
-
-                  {attendance.status && (
-                    <div className="mt-4 pt-4 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between">
-                      <Badge className={`typography-label ${getStatusColor(attendance.status)} text-[9px] uppercase px-2.5 py-0.5`}>
-                        {attendance.status}
-                      </Badge>
-                      {["absent", "late", "excused"].includes(attendance.status) && (
-                        <div className="flex gap-1.5">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full transition-colors"
-                            onClick={() => sendStudentNotification(student.id, "email")}
-                          >
-                            <Mail className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-full transition-colors"
-                            onClick={() => sendStudentNotification(student.id, "sms")}
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                )}
+              </div>
             )
           })}
         </div>
@@ -1302,6 +1304,37 @@ export function AttendanceTracking() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Mobile Sticky Action Bar */}
+      <div className="md:hidden fixed bottom-24 left-0 right-0 z-40 px-4 pb-safe pointer-events-none">
+        <div className="bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur-xl rounded-[32px] p-2.5 border border-white/10 shadow-2xl flex items-center gap-2 pointer-events-auto max-w-lg mx-auto transform translate-y-[-10px]">
+          <div className="flex-1 flex items-center gap-1 px-4">
+            <div className="text-left">
+              <p className="text-[8px] font-black text-white/40 uppercase tracking-widest leading-tight">Unmarked</p>
+              <p className="text-base font-black text-white leading-none">{stats.unmarked}</p>
+            </div>
+            <div className="w-px h-6 bg-white/10 mx-3" />
+            <div className="text-left">
+              <p className="text-[8px] font-black text-white/40 uppercase tracking-widest leading-tight">Present</p>
+              <p className="text-base font-black text-emerald-400 leading-none">{stats.present}</p>
+            </div>
+          </div>
+          
+          <Button
+            onClick={saveAttendance}
+            disabled={isSaving}
+            className="h-12 px-8 rounded-2xl bg-primary text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-primary/30 active:scale-95 transition-all outline-none"
+          >
+            {isSaving ? (
+              <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Submit
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

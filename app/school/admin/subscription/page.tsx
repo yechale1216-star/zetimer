@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { CreditCard, Calendar, Users, AlertCircle, Loader2, ArrowUpCircle } from 'lucide-react'
+import { CreditCard, Calendar, Users, AlertCircle, Loader2, ArrowUpCircle, RefreshCw } from 'lucide-react'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
 import Link from 'next/link'
 import { authService } from '@/lib/auth/auth'
@@ -132,7 +132,28 @@ export default function SubscriptionOverviewPage() {
   const usagePercentage = isEnterprise ? 0 : Math.min(100, (activeStudents / maxStudents) * 100)
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 pb-32">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe mx-4 md:mx-0">
+        <div>
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            Subscription
+          </h1>
+          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+            Plan & Billing Management
+          </p>
+        </div>
+        <div className="flex gap-2 w-full md:w-auto">
+          <Button 
+            onClick={fetchSubscription} 
+            variant="outline"
+            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Sync
+          </Button>
+        </div>
+      </div>
       
       {/* Alerts */}
       {subscription.status === 'pending_payment' && (
@@ -174,94 +195,41 @@ export default function SubscriptionOverviewPage() {
         </Card>
       )}
 
-      {/* Main Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Current Plan Card */}
-        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 relative overflow-hidden group hover:shadow-lg transition-all active:scale-[0.98] hover:scale-[1.02]">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2.5 bg-primary/10 rounded-xl">
-                <CreditCard className="w-5 h-5 text-primary" />
-              </div>
-              <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'} className="capitalize font-black text-[10px] tracking-wider px-2.5 py-0.5">
-                {subscription.status}
-              </Badge>
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Current Plan</p>
-            <p className="text-2xl font-black text-foreground capitalize flex items-center gap-2">
-              {isTrial ? 'Free Trial' : (subscription.plan?.name || subscription.plan?.slug)}
-            </p>
-            <p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase tracking-widest opacity-70">
-              {isTrial ? 'Expires automatically' : `${subscription.billingPeriod} Billing`}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Main Stats - Mobile Optimized */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 md:px-0">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="w-10 h-10 bg-primary/10 flex items-center justify-center rounded-2xl mb-3">
+            <CreditCard className="w-5 h-5 text-primary" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
+          <p className="text-xl font-black uppercase text-primary tracking-tight truncate">{subscription.status}</p>
+        </div>
 
-        {/* Monthly Cost Card */}
-        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 relative overflow-hidden group hover:shadow-lg transition-all active:scale-[0.98] hover:scale-[1.02]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2.5 bg-green-500/10 rounded-xl">
-                <span className="text-green-600 font-black text-sm">ETB</span>
-              </div>
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Effective Monthly</p>
-            <p className="text-2xl font-black text-foreground">
-              {effectiveMrr.toLocaleString('en-ET', { maximumFractionDigits: 0 })} <span className="text-sm font-bold text-primary">ETB</span>
-            </p>
-            <p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase tracking-widest opacity-70">
-              Excludes add-ons
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="w-10 h-10 bg-emerald-500/10 flex items-center justify-center rounded-2xl mb-3">
+            <span className="text-emerald-600 font-black text-xs">ETB</span>
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Monthly</p>
+          <p className="text-xl font-black uppercase text-emerald-600 tracking-tight">{effectiveMrr.toLocaleString()}</p>
+        </div>
 
-        {/* Renewal Card */}
-        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 relative overflow-hidden group hover:shadow-lg transition-all active:scale-[0.98] hover:scale-[1.02]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2.5 bg-blue-500/10 rounded-xl">
-                <Calendar className="w-5 h-5 text-blue-500" />
-              </div>
-              {daysUntilRenewal <= 14 && (
-                <Badge variant="destructive" className="font-black text-[10px] tracking-wider px-2.5 py-0.5">Renewing Soon</Badge>
-              )}
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">{isTrial ? 'Trial Expires' : 'Renewal Date'}</p>
-            <p className="text-2xl font-black text-foreground">
-              {Math.max(0, daysUntilRenewal)} <span className="text-sm font-bold text-muted-foreground">days</span>
-            </p>
-            <p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase tracking-widest opacity-70">
-              On {nextRenewalDate.toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="w-10 h-10 bg-blue-500/10 flex items-center justify-center rounded-2xl mb-3">
+            <Calendar className="w-5 h-5 text-blue-500" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Renewal</p>
+          <p className="text-xl font-black uppercase text-blue-600 tracking-tight">{Math.max(0, daysUntilRenewal)} Days</p>
+        </div>
 
-        {/* Active Students Card */}
-        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 relative overflow-hidden group hover:shadow-lg transition-all active:scale-[0.98] hover:scale-[1.02]">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2.5 bg-orange-500/10 rounded-xl">
-                <Users className="w-5 h-5 text-orange-500" />
-              </div>
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">{isTrial ? 'Student Capacity' : 'Active Students'}</p>
-            <p className="text-2xl font-black text-foreground">
-              {activeStudents.toLocaleString()}
-            </p>
-            {!isEnterprise ? (
-              <div className="mt-2 space-y-1">
-                <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
-                   <span>{isTrial ? 'Trial Limit' : 'Usage Limit'}</span>
-                  <span>{maxStudents.toLocaleString()}</span>
-                </div>
-                <Progress value={usagePercentage} className="h-1 bg-slate-100 dark:bg-slate-800" />
-              </div>
-            ) : (
-              <p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase tracking-widest opacity-70">Unlimited usage</p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="w-10 h-10 bg-orange-500/10 flex items-center justify-center rounded-2xl mb-3">
+            <Users className="w-5 h-5 text-orange-500" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Usage</p>
+          <p className="text-xl font-black uppercase text-orange-600 tracking-tight">
+            {Math.round(usagePercentage)}%
+          </p>
+        </div>
       </div>
 
       {/* Action / Upgrade Section */}

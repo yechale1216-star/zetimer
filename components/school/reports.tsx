@@ -18,6 +18,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
 } from "recharts"
+import { cn } from "@/lib/utils/utils"
 
 interface StudentReport {
   student: Student
@@ -502,16 +503,19 @@ export function Reports() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white/90 dark:bg-slate-900/90 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 backdrop-blur-sm shadow-sm">
-        <h2 className="typography-page-title text-foreground">Attendance Reports</h2>
-        <div className="flex gap-2">
-          <Button onClick={printReport} variant="outline" className="typography-label bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl h-10 px-4 uppercase">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[24px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-black text-foreground uppercase tracking-tight">Reports</h2>
+          <p className="text-[10px] md:text-sm font-bold text-muted-foreground/60 uppercase tracking-widest mt-1">Analytics & Export</p>
+        </div>
+        <div className="flex gap-2 w-full md:w-auto">
+          <Button onClick={printReport} variant="outline" className="flex-1 md:flex-none font-black text-[10px] uppercase bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-2xl h-11 px-4 tracking-widest">
             <Printer className="w-4 h-4 mr-2" />
             Print
           </Button>
-          <Button onClick={exportToCSV} disabled={filteredReports.length === 0} className="typography-label rounded-xl h-10 px-4 uppercase shadow-md hover:scale-[1.02] transition-transform">
+          <Button onClick={exportToCSV} disabled={filteredReports.length === 0} className="flex-1 md:flex-none font-black text-[10px] uppercase rounded-2xl h-11 px-6 tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all">
             <Download className="w-4 h-4 mr-2" />
-            Export CSV
+            CSV
           </Button>
         </div>
       </div>
@@ -630,54 +634,41 @@ export function Reports() {
 
       {/* Summary Stats */}
       {filteredReports.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-              <p className="typography-label text-[10px] text-muted-foreground uppercase">Students</p>
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4 px-1 md:px-0">
+          {[
+            { label: "Students", value: totalStats.totalStudents, icon: Users, color: "blue" },
+            { label: "Present", value: totalStats.totalPresent, icon: UserCheck, color: "emerald" },
+            { label: "Late", value: totalStats.totalLate, icon: Clock, color: "amber" },
+            { label: "Absent", value: totalStats.totalAbsent, icon: UserX, color: "rose" },
+            { label: "Excused", value: totalStats.totalExcused, icon: AlertTriangle, color: "sky" },
+            { label: "Avg Rate", value: `${totalStats.averageAttendance}%`, icon: TrendingUp, color: "indigo", isRate: true },
+          ].map((item, idx) => (
+            <div key={idx} className={cn(
+              "flex flex-col items-center justify-center p-4 rounded-[24px] border shadow-sm transition-all active:scale-[0.98]",
+              item.isRate 
+                ? "bg-slate-900 dark:bg-primary text-white border-transparent" 
+                : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800"
+            )}>
+              <div className={cn(
+                "w-9 h-9 rounded-2xl flex items-center justify-center mb-2.5",
+                item.isRate ? "bg-white/10" : `bg-${item.color}-500/10 text-${item.color}-600 dark:text-${item.color}-400`
+              )}>
+                <item.icon className="h-4 w-4" />
+              </div>
+              <p className={cn(
+                "text-lg font-black text-center tracking-tight leading-none mb-1",
+                item.isRate ? "text-white" : "text-foreground"
+              )}>
+                {item.value}
+              </p>
+              <p className={cn(
+                "text-[9px] font-black uppercase tracking-widest text-center",
+                item.isRate ? "text-white/60" : "text-muted-foreground/60"
+              )}>
+                {item.label}
+              </p>
             </div>
-            <p className="typography-page-title text-foreground">{totalStats.totalStudents}</p>
-          </div>
-
-          <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
-            <div className="flex items-center gap-2 mb-2">
-              <UserCheck className="h-4 w-4 text-green-500 dark:text-green-400" />
-              <p className="typography-label text-[10px] text-muted-foreground uppercase">Present</p>
-            </div>
-            <p className="typography-page-title text-green-600 dark:text-green-500">{totalStats.totalPresent}</p>
-          </div>
-
-          <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />
-              <p className="typography-label text-[10px] text-muted-foreground uppercase">Late</p>
-            </div>
-            <p className="typography-page-title text-yellow-600 dark:text-yellow-500">{totalStats.totalLate}</p>
-          </div>
-
-          <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
-            <div className="flex items-center gap-2 mb-2">
-              <UserX className="h-4 w-4 text-red-500 dark:text-red-400" />
-              <p className="typography-label text-[10px] text-muted-foreground uppercase">Absent</p>
-            </div>
-            <p className="typography-page-title text-red-600 dark:text-red-500">{totalStats.totalAbsent}</p>
-          </div>
-
-          <div className="flex flex-col p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transform transition-all hover:scale-[1.02] active:scale-[0.98] hover:shadow-md">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-              <p className="typography-label text-[10px] text-muted-foreground uppercase">Excused</p>
-            </div>
-            <p className="typography-page-title text-blue-600 dark:text-blue-500">{totalStats.totalExcused}</p>
-          </div>
-
-          <div className="flex flex-col p-4 bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-800 rounded-xl shadow-lg transform transition-all hover:scale-[1.02] active:scale-[0.98] text-white">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4 text-white/80" />
-              <p className="typography-label text-[10px] text-white/80 uppercase">Avg Rate</p>
-            </div>
-            <p className="typography-page-title">{totalStats.averageAttendance}%</p>
-          </div>
+          ))}
         </div>
       )}
 
@@ -799,48 +790,79 @@ export function Reports() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="overflow-x-auto scrollbar-hide">
+            <div className="md:hidden space-y-4">
+              {filteredReports.map((report) => (
+                <div key={report.student.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[28px] shadow-sm flex flex-col gap-4 active:scale-[0.98] transition-all">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black border border-primary/20">
+                        {report.student.name?.slice(0, 1) || '?'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-foreground uppercase truncate">
+                          {report.student.name || 'Unknown Student'}
+                        </p>
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-tight">
+                          ID: {report.student.student_id} • {report.student.grade} - {report.student.section}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge className={cn("text-[10px] font-black uppercase rounded-full px-2.5", getAttendanceRateBadge(report.attendanceRate))}>
+                      {report.attendanceRate}%
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-800/50">
+                    <div className="text-center">
+                      <p className="text-[10px] font-black text-emerald-600">{report.presentDays}</p>
+                      <p className="text-[8px] font-bold text-muted-foreground/40 uppercase">Pre</p>
+                    </div>
+                    <div className="text-center border-l border-border/50">
+                      <p className="text-[10px] font-black text-amber-600">{report.lateDays}</p>
+                      <p className="text-[8px] font-bold text-muted-foreground/40 uppercase">Lat</p>
+                    </div>
+                    <div className="text-center border-l border-border/50">
+                      <p className="text-[10px] font-black text-rose-600">{report.absentDays}</p>
+                      <p className="text-[8px] font-bold text-muted-foreground/40 uppercase">Abs</p>
+                    </div>
+                    <div className="text-center border-l border-border/50">
+                      <p className="text-[10px] font-black text-sky-600">{report.excusedDays}</p>
+                      <p className="text-[8px] font-bold text-muted-foreground/40 uppercase">Exc</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto scrollbar-hide">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/50 dark:bg-slate-800/50 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800">
-                    <th className="typography-label px-4 py-4 text-left text-[10px] text-muted-foreground uppercase">Student Name</th>
-                    <th className="typography-label px-4 py-4 text-left text-[10px] text-muted-foreground uppercase">ID</th>
-                    <th className="typography-label px-4 py-4 text-left text-[10px] text-muted-foreground uppercase">Grade</th>
-                    <th className="typography-label px-4 py-4 text-left text-[10px] text-muted-foreground uppercase">Stream</th>
-                    <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Section</th>
-                    <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Total</th>
-                    <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Present</th>
-                    <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Late</th>
-                    <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Absent</th>
-                    <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Excused</th>
-                    <th className="typography-label px-4 py-4 text-center text-[10px] text-muted-foreground uppercase">Rate %</th>
+                  <tr className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">Student</th>
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">Grade</th>
+                    <th className="px-4 py-4 text-center text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">Sect</th>
+                    <th className="px-4 py-4 text-center text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest text-emerald-600">P</th>
+                    <th className="px-4 py-4 text-center text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest text-amber-600">L</th>
+                    <th className="px-4 py-4 text-center text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest text-rose-600">A</th>
+                    <th className="px-4 py-4 text-center text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest text-sky-600">E</th>
+                    <th className="px-4 py-4 text-right text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">Rate</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                   {filteredReports.map((report) => (
                     <tr key={report.student.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="typography-label px-4 py-4 text-foreground">{report.student.name}</td>
-                      <td className="typography-helper px-4 py-4 text-muted-foreground">{report.student.student_id}</td>
-                      <td className="typography-helper px-4 py-4 text-muted-foreground">{report.student.grade}</td>
-                      <td className="typography-helper px-4 py-4 text-muted-foreground">{report.student.stream || "-"}</td>
-                      <td className="typography-helper px-4 py-4 text-center text-muted-foreground">{report.student.section}</td>
-                      <td className="typography-label px-4 py-4 text-center text-foreground">{report.totalDays}</td>
-                      {isSessionBased && sessionFilter === "total" && (
-                        <>
-                          <td className="typography-label px-4 py-4 text-center text-foreground">{report.morningRate}%</td>
-                          <td className="typography-label px-4 py-4 text-center text-foreground">{report.afternoonRate}%</td>
-                        </>
-                      )}
-                      <td className="typography-label px-4 py-4 text-center text-green-600 dark:text-green-500">
-                        {report.presentDays}
+                      <td className="px-4 py-4">
+                        <p className="text-sm font-black text-foreground uppercase">{report.student.name}</p>
+                        <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-tight">ID: {report.student.student_id}</p>
                       </td>
-                      <td className="typography-label px-4 py-4 text-center text-yellow-600 dark:text-yellow-500">
-                        {report.lateDays}
-                      </td>
-                      <td className="typography-label px-4 py-4 text-center text-red-600 dark:text-red-500">{report.absentDays}</td>
-                      <td className="typography-label px-4 py-4 text-center text-blue-600 dark:text-blue-500">{report.excusedDays}</td>
-                      <td className="px-4 py-4 text-center">
-                        <Badge className={`typography-label ${getAttendanceRateBadge(report.attendanceRate)} text-[10px] uppercase px-2.5`}>
+                      <td className="px-4 py-4 text-xs font-bold text-muted-foreground">{report.student.grade}</td>
+                      <td className="px-4 py-4 text-center text-xs font-bold text-muted-foreground">{report.student.section}</td>
+                      <td className="px-4 py-4 text-center text-sm font-black text-emerald-600">{report.presentDays}</td>
+                      <td className="px-4 py-4 text-center text-sm font-black text-amber-600">{report.lateDays}</td>
+                      <td className="px-4 py-4 text-center text-sm font-black text-rose-600">{report.absentDays}</td>
+                      <td className="px-4 py-4 text-center text-sm font-black text-sky-600">{report.excusedDays}</td>
+                      <td className="px-4 py-4 text-right">
+                        <Badge className={cn("text-[10px] font-black uppercase rounded-full px-2.5", getAttendanceRateBadge(report.attendanceRate))}>
                           {report.attendanceRate}%
                         </Badge>
                       </td>

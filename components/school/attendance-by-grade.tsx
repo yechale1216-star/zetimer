@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast"
 import { notifications } from "@/lib/utils/notifications"
 import { useSchoolSettings } from "@/hooks/use-school-settings"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { cn } from "@/lib/utils/utils"
 
 export function AttendanceByGrade() {
   const [summary, setSummary] = useState<any>(null)
@@ -316,49 +317,27 @@ export function AttendanceByGrade() {
   ].filter(d => d.value > 0)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-8 pb-32">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
         <div>
-          <h2 className="typography-page-title text-foreground">Attendance by Grade</h2>
-          <p className="typography-body text-muted-foreground">Monitor and analyze attendance performance across all grades.</p>
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            Analytics
+          </h1>
+          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+            Grade-Wise Participation
+          </p>
         </div>
-        <div className="flex flex-col items-start md:items-end gap-3 w-full md:w-auto">
+        <div className="flex gap-2 w-full md:w-auto">
           <Button 
             onClick={handleExport} 
             disabled={isExporting}
-            className="bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all"
+            variant="outline"
+            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
           >
             <Download className="w-4 h-4 mr-2" />
-            {isExporting ? "Exporting..." : "Export Report"}
+            {isExporting ? "CSV..." : "Export"}
           </Button>
-          {(settings?.attendanceMode === 'session' || settings?.attendanceMode === 'session_based') && (
-            <div className="flex gap-1.5 p-1 bg-white/50 dark:bg-slate-800/50 rounded-full border border-slate-200 dark:border-slate-700">
-              <Button 
-                variant={filters.session === "total" ? "default" : "ghost"} 
-                onClick={() => setFilters(prev => ({ ...prev, session: "total" }))}
-                size="sm"
-                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
-              >
-                Full Day
-              </Button>
-              <Button 
-                variant={filters.session === "morning" ? "default" : "ghost"} 
-                onClick={() => setFilters(prev => ({ ...prev, session: "morning" }))}
-                size="sm"
-                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
-              >
-                Morning
-              </Button>
-              <Button 
-                variant={filters.session === "afternoon" ? "default" : "ghost"} 
-                onClick={() => setFilters(prev => ({ ...prev, session: "afternoon" }))}
-                size="sm"
-                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
-              >
-                Afternoon
-              </Button>
-            </div>
-          )}
         </div>
       </div>
 
@@ -369,30 +348,24 @@ export function AttendanceByGrade() {
         hideSession={true}
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: "Total Students", value: summary?.totalStudents || 0, icon: Users, color: "blue" },
-          { label: "Present", value: summary?.present || 0, icon: UserCheck, color: "green" },
-          { label: "Late", value: summary?.late || 0, icon: Clock, color: "yellow" },
-          { label: "Excused", value: summary?.excused || 0, icon: AlertTriangle, color: "indigo" },
-          { label: "Absent", value: summary?.absent || 0, icon: UserX, color: "red" },
-          { label: "Overall Rate", value: `${summary?.attendanceRate || 0}%`, icon: TrendingUp, color: "purple", isRate: true },
+          { label: "Total Students", value: summary?.totalStudents || 0, icon: Users, color: "blue", bg: "bg-blue-500/10", text: "text-blue-600" },
+          { label: "Present", value: summary?.present || 0, icon: UserCheck, color: "green", bg: "bg-emerald-500/10", text: "text-emerald-600" },
+          { label: "Late", value: summary?.late || 0, icon: Clock, color: "yellow", bg: "bg-amber-500/10", text: "text-amber-600" },
+          { label: "Excused", value: summary?.excused || 0, icon: AlertTriangle, color: "indigo", bg: "bg-indigo-500/10", text: "text-indigo-600" },
+          { label: "Absent", value: summary?.absent || 0, icon: UserX, color: "red", bg: "bg-rose-500/10", text: "text-rose-600" },
+          { label: "Rate", value: `${summary?.attendanceRate || 0}%`, icon: TrendingUp, color: "purple", bg: "bg-violet-500/10", text: "text-violet-600", isRate: true },
         ].map((item, idx) => (
-          <Card key={idx} className="border-none shadow-sm bg-white/95 dark:bg-slate-900/90 rounded-2xl transform transition-all hover:scale-[1.02] cursor-default border border-slate-200 dark:border-slate-800">
-            <CardContent className="p-4">
-              <div className={`h-10 w-10 rounded-xl bg-${item.color}-500/15 flex items-center justify-center mb-3 shadow-sm border border-${item.color}-500/20`}>
-                <item.icon className={`h-5 w-5 text-${item.color}-600 dark:text-${item.color}-400`} />
-              </div>
-              <p className="typography-label text-[10px] text-muted-foreground uppercase mb-1">{item.label}</p>
-              <p className={`typography-section-title flex items-center min-h-[28px] ${item.isRate ? 'text-primary' : `text-${item.color}-600 dark:text-${item.color}-500`}`}>
-                {isLoading ? (
-                  <span className="inline-block w-12 h-6 bg-current opacity-20 animate-pulse rounded-md" />
-                ) : (
-                  item.value
-                )}
-              </p>
-            </CardContent>
-          </Card>
+          <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-[24px] shadow-sm active:scale-95 transition-all">
+            <div className={cn("w-10 h-10 flex items-center justify-center rounded-2xl mb-3", item.bg)}>
+              <item.icon className={cn("w-5 h-5", item.text)} />
+            </div>
+            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{item.label}</p>
+            <p className={cn("text-xl md:text-2xl font-black uppercase tracking-tight", item.text)}>
+              {isLoading ? "..." : item.value}
+            </p>
+          </div>
         ))}
       </div>
 

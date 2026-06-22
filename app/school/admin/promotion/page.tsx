@@ -56,6 +56,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { notifications } from '@/lib/utils/notifications'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
+import { cn } from '@/lib/utils/utils'
 
 import { apiUrl } from '@/lib/api-config'
 const API_URL = apiUrl;
@@ -441,28 +442,24 @@ export default function StudentPromotionPage() {
   const selectedCountForExpanded = expandedCohortId ? (selectedStudentIds[expandedCohortId]?.size || 0) : 0
 
   return (
-    <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-8 pb-32">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe mx-4 md:mx-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-xl">
-              <TrendingUp className="w-8 h-8 text-primary" />
-            </div>
-            Student Promotion
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            Promotion
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm md:text-base">
-            Granular cohort-based advancement with individual student control.
+          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+            Student Advancement
           </p>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-          <TabsList className="grid grid-cols-2 w-full md:w-[300px]">
-            <TabsTrigger value="promote" className="gap-2">
-              <TrendingUp className="w-4 h-4" />
+          <TabsList className="grid grid-cols-2 w-full md:w-[240px] bg-slate-100 dark:bg-slate-800 rounded-2xl h-11 p-1">
+            <TabsTrigger value="promote" className="rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
               Promote
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2">
-              <History className="w-4 h-4" />
+            <TabsTrigger value="history" className="rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
               History
             </TabsTrigger>
           </TabsList>
@@ -479,26 +476,32 @@ export default function StudentPromotionPage() {
             className="space-y-6"
           >
             {/* Promotion Type Toggle */}
-            <div className="flex justify-center">
-              <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl flex gap-1 shadow-inner border border-slate-200 dark:border-slate-700">
+            <div className="flex justify-center px-4">
+              <div className="bg-slate-100 dark:bg-slate-800/50 p-1.5 rounded-[24px] flex gap-1 w-full max-w-md shadow-inner">
                 <Button
                   variant={promotionMode === 'bulk' ? 'default' : 'ghost'}
                   onClick={() => {
                     setPromotionMode('bulk')
                     setExpandedCohortId(null)
                   }}
-                  className={`rounded-xl px-6 gap-2 ${promotionMode === 'bulk' ? 'shadow-md shadow-primary/20' : ''}`}
+                  className={cn(
+                    "flex-1 h-12 rounded-[20px] font-black text-[10px] uppercase tracking-widest transition-all",
+                    promotionMode === 'bulk' ? "bg-white dark:bg-slate-900 text-primary shadow-sm" : "text-slate-500"
+                  )}
                 >
-                  <Layers className="w-4 h-4" />
-                  Bulk Cohorts
+                  <Layers className="w-4 h-4 mr-2" />
+                  Bulk
                 </Button>
                 <Button
                   variant={promotionMode === 'selective' ? 'default' : 'ghost'}
                   onClick={() => setPromotionMode('selective')}
-                  className={`rounded-xl px-6 gap-2 ${promotionMode === 'selective' ? 'shadow-md shadow-primary/20' : ''}`}
+                  className={cn(
+                    "flex-1 h-12 rounded-[20px] font-black text-[10px] uppercase tracking-widest transition-all",
+                    promotionMode === 'selective' ? "bg-white dark:bg-slate-900 text-primary shadow-sm" : "text-slate-500"
+                  )}
                 >
-                  <UserCheck className="w-4 h-4" />
-                  Individual Pick
+                  <UserCheck className="w-4 h-4 mr-2" />
+                  Selective
                 </Button>
               </div>
             </div>
@@ -530,7 +533,7 @@ export default function StudentPromotionPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                           {isLoading ? (
                             Array(6).fill(0).map((_, i) => (
-                              <div key={i} className="h-32 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-2xl" />
+                              <div key={i} className="h-32 bg-slate-50 dark:bg-slate-800/50 animate-pulse rounded-[32px]" />
                             ))
                           ) : filteredCohorts.map((cohort) => {
                             const isSelected = promotionMode === 'bulk' 
@@ -538,52 +541,43 @@ export default function StudentPromotionPage() {
                               : (selectedStudentIds[cohort.id]?.size || 0) > 0
                             
                             return (
-                              <Card 
+                              <div 
                                 key={cohort.id} 
-                                className={`relative overflow-hidden group cursor-pointer transition-all duration-300 transform hover:scale-[1.02] border-border/50 bg-white dark:bg-slate-950 ${isSelected ? 'ring-2 ring-primary border-primary shadow-lg shadow-primary/10' : 'hover:ring-2 hover:ring-primary/20'}`}
+                                className={cn(
+                                  "relative p-5 bg-white dark:bg-slate-900 rounded-[32px] border transition-all active:scale-[0.98] cursor-pointer group",
+                                  isSelected ? "border-primary ring-1 ring-primary shadow-lg shadow-primary/10" : "border-slate-100 dark:border-slate-800"
+                                )}
                                 onClick={() => handleCohortClick(cohort)}
                               >
-                                <div className={`absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity ${isSelected ? 'opacity-100' : ''}`} />
-                                <CardHeader className="p-4 flex flex-col space-y-2 relative">
-                                  <div className="flex items-center justify-between">
-                                    <Badge variant="outline" className={`transition-colors font-bold ${isSelected ? 'bg-primary text-white border-primary' : 'bg-primary/5 text-primary border-primary/20'}`}>
-                                      {cohort.gradeName}
-                                    </Badge>
-                                    <div className="flex items-center gap-2">
-                                      {isSelected && (
-                                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                                          <CheckCircle2 className="w-5 h-5 text-primary" />
-                                        </motion.div>
-                                      )}
-                                      {promotionMode === 'selective' && (
-                                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                      )}
-                                    </div>
-                                  </div>
+                                <div className="flex items-start justify-between mb-2">
                                   <div className="flex flex-col">
-                                    <h3 className="font-black text-slate-800 dark:text-slate-100 text-lg">
-                                      Section {cohort.sectionName}
+                                    <span className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">{cohort.gradeName}</span>
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                      {cohort.sectionName}
                                     </h3>
-                                    {cohort.streamName && (
-                                      <span className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-widest flex items-center gap-1 mt-0.5">
-                                        <ShieldCheck className="w-3 h-3" /> {cohort.streamName}
-                                      </span>
-                                    )}
                                   </div>
-                                </CardHeader>
-                                <CardContent className="p-4 pt-0 space-y-3 relative">
-                                  <div className="flex items-center gap-2 text-2xl font-black text-slate-900 dark:text-white">
-                                    <Users className="w-5 h-5 text-muted-foreground" />
-                                    {cohort.count}
-                                    <span className="text-xs font-medium text-muted-foreground ml-1">Students</span>
+                                  <div className={cn("w-10 h-10 flex items-center justify-center rounded-2xl", isSelected ? "bg-primary text-white" : "bg-slate-50 dark:bg-slate-800 text-slate-400")}>
+                                     {isSelected ? <CheckCircle2 className="w-5 h-5" /> : <Layers className="w-5 h-5" />}
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between mt-4">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex -space-x-2">
+                                      {[1,2,3].map(i => (
+                                        <div key={i} className="w-6 h-6 rounded-full border-2 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                          <User className="w-3 h-3 text-slate-400" />
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{cohort.count} Students</span>
                                   </div>
                                   {promotionMode === 'selective' && isSelected && (
-                                    <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] uppercase font-black tracking-tighter">
-                                       {selectedStudentIds[cohort.id]?.size} selected
-                                    </Badge>
+                                     <span className="text-[10px] font-black text-primary uppercase tracking-widest">
+                                       {selectedStudentIds[cohort.id]?.size} Set
+                                     </span>
                                   )}
-                                </CardContent>
-                              </Card>
+                                </div>
+                              </div>
                             )
                           })}
                         </div>

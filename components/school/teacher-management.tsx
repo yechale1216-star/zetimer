@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { cn } from "@/lib/utils/utils"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -281,34 +282,32 @@ export function TeacherManagement() {
   return (
     <div className="space-y-8 pb-12">
       {/* Dynamic Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
         <div>
-          <h1 className="typography-page-title text-slate-900 dark:text-white">
-            Teacher Directory
+          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+            Faculty
           </h1>
-          <p className="typography-body text-slate-500 dark:text-slate-400 mt-1">
-            Manage your faculty members, profile records, and check their class assignments.
+          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+            Teacher Directory & Management
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 w-full md:w-auto">
           <Button 
             onClick={() => loadData()} 
             variant="outline" 
-            size="sm" 
-            className="rounded-xl border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80"
+            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            Sync
           </Button>
           <Button 
             onClick={exportTeacherListToCSV} 
             disabled={teachers.length === 0} 
-            size="sm"
             variant="outline"
-            className="rounded-xl border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80"
+            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
           >
             <Download className="w-4 h-4 mr-2" />
-            Export CSV
+            CSV
           </Button>
           <Button
             onClick={() => {
@@ -317,14 +316,26 @@ export function TeacherManagement() {
               setShowSuccess(false)
               setIsFormVisible(true)
             }}
-            size="sm"
-            className="h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow transition-all duration-200"
+            className="hidden md:flex h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest px-6 shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Register Teacher
+            Add Teacher
           </Button>
         </div>
       </div>
+
+      {/* Mobile Floating Add Button */}
+      <Button
+        onClick={() => {
+          setEditingTeacher(null)
+          setFormData({ full_name: "", email: "", password: "", phone: "+251", subject: "", qualification: "", experience_years: "" })
+          setShowSuccess(false)
+          setIsFormVisible(true)
+        }}
+        className="md:hidden fixed bottom-24 right-6 h-14 w-14 rounded-2xl bg-primary text-white shadow-2xl shadow-primary/40 z-40 flex items-center justify-center active:scale-95 transition-all outline-none"
+      >
+        <Plus className="w-7 h-7" />
+      </Button>
 
       {/* Register / Edit Dialog */}
       <Dialog open={isFormVisible} onOpenChange={(open) => { if (!open) { setIsFormVisible(false); setShowSuccess(false) } }}>
@@ -534,106 +545,78 @@ export function TeacherManagement() {
         </h2>
 
         {teachers.length === 0 ? (
-          <Card className="rounded-3xl border border-dashed border-slate-200/80 dark:border-slate-800/80 p-12 bg-white/40 dark:bg-slate-900/40 text-center">
-            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/60 flex items-center justify-center mx-auto mb-4 text-slate-400">
-              <User className="w-6 h-6" />
+          <div className="py-24 text-center bg-slate-50 dark:bg-slate-900/30 rounded-[40px] border border-dashed border-slate-200 dark:border-slate-800 mx-1">
+            <div className="w-20 h-20 bg-background rounded-[28px] shadow-sm flex items-center justify-center mx-auto mb-6">
+              <User className="w-8 h-8 text-slate-200" />
             </div>
-            <h3 className="typography-card-title text-slate-800 dark:text-slate-200">No teachers registered</h3>
-            <p className="typography-body text-slate-500 mt-1 max-w-sm mx-auto">Get started by creating your first teacher record in the registration form above.</p>
-          </Card>
+            <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No faculty registered</p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-1 md:px-0">
             {teachers.map((teacher) => {
               const bgGradient = getAvatarGradient(teacher.id)
               return (
-                <Card 
+                <div 
                   key={teacher.id} 
-                  className="group hover:border-blue-500/30 hover:shadow-md rounded-3xl border border-slate-200/50 dark:border-slate-800/50 bg-white/90 dark:bg-slate-900/90 shadow-sm overflow-hidden transition-all duration-300 flex flex-col justify-between"
+                  className="group relative overflow-hidden bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.98] transition-all hover:shadow-md h-[180px] flex flex-col justify-between"
+                  onClick={() => setSelectedTeacher(teacher)}
                 >
-                  <CardContent className="p-4 space-y-2.5">
-                    {/* Top line with Avatar and badges */}
-                    <div className="flex justify-between items-start gap-3">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-4">
                       {teacher.profile_photo ? (
                         <img
                           src={teacher.profile_photo}
                           alt={teacher.full_name}
-                          className="w-10 h-10 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform duration-300 ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-900"
+                          className="w-14 h-14 rounded-[20px] object-cover border-2 border-white dark:border-slate-800 shadow-sm"
                         />
                       ) : (
-                        <div className={`typography-label w-10 h-10 rounded-full bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform duration-300`}>
+                        <div className={`w-14 h-14 rounded-[20px] bg-gradient-to-br ${bgGradient} flex items-center justify-center text-white text-lg font-black shadow-inner`}>
                           {getInitials(teacher.full_name)}
                         </div>
                       )}
-                      <div className="flex flex-col items-end gap-1">
-                        <span className={`typography-label text-[9px] uppercase px-1.5 py-0.5 rounded-full ${ teacher.is_active !== false ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400" : "bg-rose-50 text-rose-600 dark:bg-rose-400/10 dark:text-rose-400" }`}>
-                          {teacher.is_active !== false ? "Active" : "Inactive"}
-                        </span>
-                        {teacher.experience_years && (
-                          <span className="typography-label text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                            <Briefcase className="w-2.5 h-2.5 text-slate-400" />
-                            {teacher.experience_years} yrs
-                          </span>
-                        )}
+                      <div className="min-w-0">
+                        <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 leading-none truncate uppercase tracking-tight">
+                          {teacher.full_name}
+                        </h3>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
+                          <span className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            teacher.is_active !== false ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                          )} />
+                          {teacher.subject || "No Subject"}
+                        </p>
                       </div>
                     </div>
-
-                    {/* Name & Primary Subject */}
-                    <div>
-                      <h3 className="typography-card-title text-slate-900 dark:text-slate-100 group-hover:text-blue-600 truncate transition-colors duration-200" title={teacher.full_name}>
-                        {teacher.full_name}
-                      </h3>
-                      {teacher.subject ? (
-                        <div className="typography-label inline-flex items-center gap-1 mt-0.5 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-400/10 px-2 py-0.5 rounded-full">
-                          <BookOpen className="w-2.5 h-2.5" />
-                          {teacher.subject}
-                        </div>
-                      ) : (
-                        <div className="text-slate-400 text-[10px] italic mt-0.5">No subject specified</div>
-                      )}
+                    <div className="flex gap-1.5">
+                       <button 
+                         onClick={(e) => { e.stopPropagation(); handleEdit(teacher); }}
+                         className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-primary transition-colors"
+                       >
+                         <Edit className="w-4 h-4" />
+                       </button>
+                       <button 
+                         onClick={(e) => { e.stopPropagation(); handleDelete(teacher.id); }}
+                         className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-rose-400 hover:text-rose-600 transition-colors"
+                       >
+                         <Trash2 className="w-4 h-4" />
+                       </button>
                     </div>
-
-                    {/* Meta Links */}
-                    <div className="typography-helper space-y-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-900/50 text-slate-500 dark:text-slate-400">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        <span className="truncate" title={teacher.email}>{teacher.email}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        <span>{teacher.phone || "No phone added"}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-
-                  {/* Actions Bar */}
-                  <div className="bg-slate-50/50 dark:bg-slate-900/30 border-t border-slate-100 dark:border-slate-900/50 px-4 py-2 flex gap-2 justify-end">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setSelectedTeacher(teacher)}
-                      className="typography-helper h-8 rounded-lg bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/20 hover:text-blue-600 dark:hover:text-blue-400 px-2.5 transition-colors duration-200"
-                    >
-                      <Eye className="w-4 h-4 mr-1.5" />
-                      View Profile
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleEdit(teacher)}
-                      className="h-8 rounded-lg bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 px-2.5 transition-colors duration-200"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleDelete(teacher.id)}
-                      className="h-8 rounded-lg bg-white dark:bg-slate-950 text-red-600 border-slate-200 dark:border-slate-800 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-700 hover:border-red-200 px-2.5 transition-colors duration-200"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
                   </div>
-                </Card>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800/50">
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest">Experience</span>
+                        <span className="text-xs font-bold text-foreground">{teacher.experience_years ? `${teacher.experience_years} Years` : "—"}</span>
+                      </div>
+                    </div>
+                    <div className="flex -space-x-1.5">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="w-7 h-7 rounded-full border-2 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-800" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
               )
             })}
           </div>

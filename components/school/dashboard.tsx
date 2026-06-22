@@ -499,11 +499,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     <div className="space-y-6 px-4 md:px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
         <div className="space-y-1.5 w-full md:w-auto">
-          <h2 className="typography-page-title text-4xl md:text-5xl font-semibold text-foreground leading-tight">
+          <h2 className="text-3xl md:text-5xl font-black text-foreground leading-[1.1] tracking-tight uppercase">
             {getGreeting()}, <span className="text-primary">{firstName}</span>
           </h2>
-          <p className="typography-label text-muted-foreground">
-            Here's what's happening with your school today.
+          <p className="text-xs md:text-sm font-bold text-muted-foreground/60 uppercase tracking-widest">
+            School Health Overview • {new Date().toLocaleDateString("en-ET", { timeZone: "Africa/Addis_Ababa", month: 'short', day: 'numeric' })}
           </p>
         </div>
         <div className="flex flex-col items-start md:items-end gap-3 w-full md:w-auto">
@@ -555,53 +555,51 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       {/* School Overview Stats - Reimagined as a single row card */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4">
         {[
           { label: "Total Students", value: stats.totalStudents, icon: Users, color: "slate", trend: null },
-          { label: "Present", value: stats.presentToday, icon: UserCheck, color: "green", trend: null },
-          { label: "Late", value: stats.lateToday, icon: Clock, color: "yellow", trend: null },
-          { label: "Absent", value: stats.absentToday, icon: UserX, color: "red", trend: null },
-          { label: "Excused", value: stats.excusedToday, icon: AlertTriangle, color: "blue", trend: null },
-          { label: "Attendance Rate", value: `${stats.attendanceRate}%`, icon: TrendingUp, color: "violet", isRate: true },
+          { label: "Present", value: stats.presentToday, icon: UserCheck, color: "emerald", trend: null },
+          { label: "Late", value: stats.lateToday, icon: Clock, color: "amber", trend: null },
+          { label: "Absent", value: stats.absentToday, icon: UserX, color: "rose", trend: null },
+          { label: "Excused", value: stats.excusedToday, icon: AlertTriangle, color: "sky", trend: null },
+          { label: "Attendance", value: `${stats.attendanceRate}%`, icon: TrendingUp, color: "indigo", isRate: true },
         ].map((item, idx) => (
-          <Card 
+          <div 
             key={idx} 
             className={cn(
-              "relative overflow-hidden border-none shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 active:scale-[0.98] group",
+              "relative overflow-hidden transition-all duration-300 active:scale-[0.98] group rounded-[24px] p-4 flex flex-col items-center justify-center text-center border shadow-sm",
               item.isRate 
-                ? "bg-gradient-to-br from-violet-600 to-indigo-700 text-white" 
-                : "bg-white/90 dark:bg-slate-900/90 backdrop-blur-md"
+                ? "bg-slate-900 dark:bg-primary text-white border-transparent" 
+                : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800"
             )}
           >
-            <CardContent className="p-4 flex flex-col items-center text-center">
-              <div className={cn(
-                "w-10 h-10 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110",
-                item.isRate 
-                  ? "bg-white/20 border border-white/20" 
-                  : `bg-${item.color}-100 dark:bg-${item.color}-900/30 text-${item.color}-600 dark:text-${item.color}-400 border border-${item.color}-200/50 dark:border-${item.color}-800/50`
+            <div className={cn(
+              "w-9 h-9 rounded-2xl flex items-center justify-center mb-2.5 transition-transform group-hover:scale-110",
+              item.isRate 
+                ? "bg-white/10" 
+                : `bg-${item.color}-500/10 text-${item.color}-600 dark:text-${item.color}-400`
+            )}>
+              <item.icon className="h-4 w-4" />
+            </div>
+            <div className="space-y-0.5">
+              <p className={cn(
+                "text-lg font-black tracking-tight leading-none mb-1",
+                item.isRate ? "text-white" : `text-foreground`
               )}>
-                <item.icon className="h-5 w-5" />
-              </div>
-              <div className="space-y-0.5">
-                <p className={cn(
-                  "text-[22px] font-bold tracking-tight flex items-center justify-center min-h-[33px]",
-                  item.isRate ? "text-white" : `text-${item.color}-600 dark:text-${item.color}-400`
-                )}>
-                  {isLoading ? (
-                    <span className="inline-block w-12 h-6 bg-current opacity-20 animate-pulse rounded-md" />
-                  ) : (
-                    item.value
-                  )}
-                </p>
-                <p className={cn(
-                  "text-[12px] uppercase font-bold tracking-widest leading-none",
-                  item.isRate ? "text-white/90" : "text-slate-500/80 dark:text-slate-400/80"
-                )}>
-                  {item.label}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                {isLoading ? (
+                  <span className="inline-block w-8 h-4 bg-current opacity-10 animate-pulse rounded" />
+                ) : (
+                  item.value
+                )}
+              </p>
+              <p className={cn(
+                "text-[9px] uppercase font-black tracking-widest leading-none",
+                item.isRate ? "text-white/60" : "text-muted-foreground/60"
+              )}>
+                {item.label}
+              </p>
+            </div>
+          </div>
         ))}
       </div>
 
@@ -706,9 +704,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center gap-2 px-2">
-          <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <h3 className="typography-card-title text-foreground">Recent Activity</h3>
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-primary" />
+            <h3 className="text-sm font-black text-foreground uppercase tracking-wider">Feed</h3>
+          </div>
+          <Badge variant="outline" className="text-[10px] font-black uppercase tracking-tight opacity-50 bg-slate-50 border-slate-100">
+            Today
+          </Badge>
         </div>
         <div className="space-y-3">
           {isLoading ? (
@@ -731,31 +734,30 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           ) : (
             recentActivity.map((activity, index) => (
-              <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 gap-4 sm:gap-0 shadow-sm transition-all hover:bg-white/80 dark:hover:bg-slate-800/80">
-                <div className="flex items-center space-x-4 w-full sm:w-auto">
-                  <div className="flex-shrink-0 h-10 w-10">
-                    <div className="typography-label h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
-                      {activity.grade.match(/\d+/)?.[0] || activity.grade.charAt(0)}
-                    </div>
+              <div key={index} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[24px] shadow-sm transition-all active:scale-[0.99] group">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black border border-primary/20">
+                    {activity.grade.match(/\d+/)?.[0] || '?' }
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="typography-label text-foreground truncate uppercase">
-                      {activity.grade} Attendance
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-foreground uppercase leading-none mb-1 truncate">
+                      {activity.grade}
                     </p>
-                    <p className="typography-label text-[10px] text-muted-foreground truncate uppercase opacity-70">
-                      Section {activity.section} {activity.stream ? `• ${activity.stream}` : ""} 
-                      {activity.session ? ` • ${activity.session}` : ""}
+                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-tight">
+                      Sec {activity.section} {activity.session ? `• ${activity.session}` : ""}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between sm:justify-end space-x-4 w-full sm:w-auto border-t sm:border-0 pt-3 sm:pt-0 dark:border-slate-700/50">
-                  <Badge variant="outline" className="typography-label bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 text-[10px] uppercase">
-                    {activity.count} Present
-                  </Badge>
-                  <div className="text-right flex-shrink-0">
-                    <p className="typography-label text-foreground uppercase">{formatDate(activity.date)}</p>
-                    <p className="typography-label text-[10px] text-muted-foreground opacity-60">{activity.time}</p>
-                  </div>
+                
+                <div className="flex flex-col items-end">
+                   <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase">
+                        {activity.count} Present
+                      </span>
+                   </div>
+                   <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-tighter">
+                     {activity.time}
+                   </p>
                 </div>
               </div>
             ))

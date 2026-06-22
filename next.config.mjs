@@ -3,7 +3,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  output: 'standalone',
+  output: 'export',
   images: {
     unoptimized: true,
   },

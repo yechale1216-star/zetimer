@@ -3,7 +3,10 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, LogOut, User, CheckSquare, BarChart2, BookOpen, MessageSquare, Menu } from 'lucide-react'
+import { 
+  LayoutDashboard, LogOut, User, CheckSquare, BarChart2, BookOpen, 
+  MessageSquare, X, ChevronRight 
+} from 'lucide-react'
 import { useAuth } from '@/lib/context/auth-context'
 import { useSchool } from '@/lib/context/school-context'
 import { AuthGuard } from '@/components/auth/auth-guard'
@@ -16,28 +19,7 @@ import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { LanguageProvider } from '@/lib/context/language-context'
 import { SocketProvider } from '@/components/providers/socket-provider'
 import { CallProvider } from '@/components/providers/call-provider'
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { clearMessageCache } from '@/lib/utils/message-cache'
-
-function NavLink({ href, icon, label, active, onClick }: { href: string; icon: React.ReactNode; label: string; active: boolean; onClick?: () => void }) {
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm font-semibold",
-        active 
-          ? "bg-primary text-primary-foreground shadow-md" 
-          : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-foreground"
-      )}
-    >
-      <div className={active ? "text-primary-foreground" : "text-slate-500 dark:text-slate-400 group-hover:text-foreground"}>
-        {icon}
-      </div>
-      {label}
-    </Link>
-  )
-}
 
 export default function TeacherLayout({
   children,
@@ -47,7 +29,10 @@ export default function TeacherLayout({
   const pathname = usePathname()
   const router = useRouter()
   const [mounted, setMounted] = React.useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
+  const [sidebarOpen, setSidebarOpen] = React.useState(false)
+  const [showBottomNav, setShowBottomNav] = React.useState(true)
+  const [lastScrollY, setLastScrollY] = React.useState(0)
+  
   const { user, logout } = useAuth()
   const { clearSchoolContext } = useSchool()
 
@@ -55,10 +40,20 @@ export default function TeacherLayout({
     setMounted(true)
   }, [])
 
+  const handleMainScroll = (e: React.UIEvent<HTMLElement>) => {
+    const currentScrollY = e.currentTarget.scrollTop
+    if (currentScrollY > lastScrollY && currentScrollY > 100) {
+      setShowBottomNav(false)
+    } else {
+      setShowBottomNav(true)
+    }
+    setLastScrollY(currentScrollY)
+  }
+
   const isActive = (path: string) => pathname === path
+  const isCommunicationPage = pathname?.includes('/communication')
 
   const handleLogout = () => {
-    console.log(`[TeacherLayout][LOGOUT] userId: ${user?.id} | role: ${user?.role}`)
     clearMessageCache().catch(() => {})
     clearSchoolContext()
     logout()
@@ -66,100 +61,155 @@ export default function TeacherLayout({
     router.push('/login')
   }
 
-  if (!mounted) {
-    return <PageSkeleton variant="dashboard" />
-  }
+  if (!mounted) return <PageSkeleton variant="dashboard" />
 
   const navItems = [
-    { href: "/school/teacher", icon: <LayoutDashboard className="w-4 h-4" />, label: "Dashboard" },
-    { href: "/school/teacher/communication", icon: <MessageSquare className="w-4 h-4" />, label: "Communication" },
-    { href: "/school/teacher/attendance", icon: <CheckSquare className="w-4 h-4" />, label: "Take Attendance" },
-    { href: "/school/teacher/classes", icon: <BookOpen className="w-4 h-4" />, label: "My Classes" },
-    { href: "/school/teacher/reports", icon: <BarChart2 className="w-4 h-4" />, label: "Attendance Reports" },
-    { href: "/school/teacher/profile", icon: <User className="w-4 h-4" />, label: "My Profile" },
+    { href: "/school/teacher", icon: <LayoutDashboard className="w-5 h-5" />, label: "Dashboard" },
+    { href: "/school/teacher/communication", icon: <MessageSquare className="w-5 h-5" />, label: "Messages" },
+    { href: "/school/teacher/attendance", icon: <CheckSquare className="w-5 h-5" />, label: "Attendance" },
+    { href: "/school/teacher/classes", icon: <BookOpen className="w-5 h-5" />, label: "Classes" },
+    { href: "/school/teacher/reports", icon: <BarChart2 className="w-5 h-5" />, label: "Reports" },
+    { href: "/school/teacher/profile", icon: <User className="w-5 h-5" />, label: "Profile" },
   ]
-
-  const SidebarContent = ({ onItemClick }: { onItemClick?: () => void }) => (
-    <div className="flex flex-col h-full">
-      <div className="p-6 border-b border-border flex items-center">
-        <Logo size="md" href="/school/teacher" />
-      </div>
-      <nav className="flex-1 p-4 pt-4 space-y-2 overflow-y-auto scrollbar-hide">
-        {navItems.map((item) => (
-          <NavLink 
-            key={item.href} 
-            href={item.href} 
-            icon={item.icon} 
-            label={item.label} 
-            active={isActive(item.href)} 
-            onClick={onItemClick}
-          />
-        ))}
-      </nav>
-
-      <div className="p-4 border-t border-border">
-        <div className="flex items-center gap-3 px-4 py-2 mb-2">
-          {user?.profile_photo ? (
-            <img
-              src={user.profile_photo}
-              alt={user.name}
-              className="h-8 w-8 rounded-full object-cover border border-primary/20"
-            />
-          ) : (
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs ring-1 ring-primary/20">
-              {user?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
-            </div>
-          )}
-          <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
-            <p className="text-xs text-muted-foreground truncate capitalize">{user?.role}</p>
-          </div>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-4 py-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition text-sm font-medium"
-        >
-          <LogOut className="w-4 h-4" />
-          Sign Out
-        </button>
-      </div>
-    </div>
-  )
 
   return (
     <AuthGuard allowedRoles={['teacher']}>
       <LanguageProvider>
         <SocketProvider>
           <CallProvider>
-            <div className="flex h-screen bg-background flex-col md:flex-row overflow-hidden">
+            <div className="flex h-screen bg-background dark:bg-slate-950 flex-col md:flex-row relative overflow-hidden">
+              
               {/* Desktop Sidebar */}
-              <aside className="w-64 border-r border-border bg-card hidden md:flex flex-col">
-                <SidebarContent />
+              <aside className="hidden md:flex w-64 border-r border-border bg-card/70 dark:bg-slate-900/70 backdrop-blur-xl flex-col relative z-20">
+                <div className="p-6 border-b border-border">
+                  <Logo size="md" href="/school/teacher" />
+                </div>
+                <nav className="flex-1 p-4 space-y-2 overflow-y-auto no-scrollbar">
+                  {navItems.map(item => (
+                    <NavLink 
+                      key={item.href} 
+                      href={item.href} 
+                      icon={item.icon} 
+                      label={item.label} 
+                      active={isActive(item.href)} 
+                    />
+                  ))}
+                </nav>
+                <div className="p-4 border-t border-border">
+                  <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2 rounded-lg hover:bg-secondary text-muted-foreground transition text-sm font-medium">
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                </div>
               </aside>
 
-              {/* Mobile Sidebar (Sheet) */}
-              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-                <SheetContent side="left" className="p-0 w-72">
-                  <SidebarContent onItemClick={() => setIsMobileMenuOpen(false)} />
-                </SheetContent>
-              </Sheet>
+              {/* Mobile Sidebar Content (Managed by TopNav/SidebarOpen) */}
+              {sidebarOpen && (
+                <div className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+              )}
+              <aside className={cn(
+                "md:hidden fixed inset-y-0 left-0 z-50 w-72 bg-card dark:bg-slate-900 border-r border-border flex flex-col shadow-2xl transition-transform duration-300 ease-in-out",
+                sidebarOpen ? "translate-x-0" : "-translate-x-full"
+              )}>
+                <div className="p-5 border-b border-border flex justify-between items-center">
+                   <Logo size="sm" href="/school/teacher" />
+                   <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
+                </div>
+                <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+                   {navItems.map(item => (
+                     <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}>
+                        <div className={cn(
+                          "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold mb-1",
+                          isActive(item.href) ? 'bg-primary/15 text-primary' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        )}>
+                          {item.icon}
+                          <span className="flex-1">{item.label}</span>
+                          {isActive(item.href) && <ChevronRight className="w-4 h-4" />}
+                        </div>
+                     </Link>
+                   ))}
+                </nav>
+                <div className="p-4 border-t border-border">
+                   <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl hover:bg-red-50 text-red-600 text-sm font-semibold">
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                   </button>
+                </div>
+              </aside>
 
-              {/* Main Content */}
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <TopNav 
-                  showMenuButton 
-                  onMenuClick={() => setIsMobileMenuOpen(true)} 
-                />
-                <main className="flex-1 flex flex-col overflow-y-auto bg-muted/30 min-h-0">
+              {/* Main Content Area */}
+              <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
+                <TopNav showMenuButton onMenuClick={() => setSidebarOpen(true)} />
+                <main 
+                  className={cn("flex-1 flex flex-col overflow-auto focus:outline-none relative", !isCommunicationPage && "pb-20 md:pb-0")}
+                  onScroll={handleMainScroll}
+                >
                   <div className="flex-1 flex flex-col h-full min-h-0">
                     {children}
                   </div>
                 </main>
+
+                {/* Mobile Bottom Navigation */}
+                {!isCommunicationPage && (
+                  <nav className={cn(
+                    "md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 bg-background/80 backdrop-blur-xl transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] pb-safe",
+                    !showBottomNav ? "translate-y-full" : "translate-y-0"
+                  )}>
+                    <div className="flex items-stretch justify-around h-16 px-2">
+                      <MobileTabLink href="/school/teacher" icon={<LayoutDashboard className="w-5 h-5" />} label="Home" active={isActive('/school/teacher')} />
+                      <MobileTabLink href="/school/teacher/communication" icon={<MessageSquare className="w-5 h-5" />} label="Chat" active={isActive('/school/teacher/communication')} />
+                      <MobileTabLink href="/school/teacher/attendance" icon={<CheckSquare className="w-5 h-5" />} label="Check" active={isActive('/school/teacher/attendance')} />
+                      <MobileTabLink href="/school/teacher/classes" icon={<BookOpen className="w-5 h-5" />} label="Classes" active={isActive('/school/teacher/classes')} />
+                      <MobileTabLink href="/school/teacher/profile" icon={<User className="w-5 h-5" />} label="Profile" active={isActive('/school/teacher/profile')} />
+                    </div>
+                  </nav>
+                )}
               </div>
             </div>
           </CallProvider>
         </SocketProvider>
       </LanguageProvider>
     </AuthGuard>
+  )
+}
+
+function NavLink({ href, icon, label, active }: { href: string, icon: React.ReactNode, label: string, active: boolean }) {
+  return (
+    <Link href={href}>
+      <div className={cn(
+        "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm font-semibold grow-0",
+        active ? "bg-primary/15 text-primary shadow-sm" : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+      )}>
+        <span className={active ? "text-primary" : "text-slate-500"}>{icon}</span>
+        <span>{label}</span>
+      </div>
+    </Link>
+  )
+}
+
+function MobileTabLink({ href, icon, label, active }: { href: string, icon: React.ReactNode, label: string, active: boolean }) {
+  return (
+    <Link href={href} className="flex-1 relative group active:scale-95 transition-transform duration-100">
+      <div className={cn(
+        "flex flex-col items-center justify-center gap-1 h-full transition-all duration-300",
+        active ? 'text-primary' : 'text-muted-foreground/60'
+      )}>
+        <div className={cn(
+          "relative p-1 rounded-xl transition-all duration-300",
+          active ? "bg-primary/10 scale-110" : ""
+        )}>
+          {icon}
+          {active && (
+            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full" />
+          )}
+        </div>
+        <span className={cn(
+          "text-[9px] font-black uppercase tracking-widest transition-all duration-300",
+          active ? "opacity-100 translate-y-0" : "opacity-40"
+        )}>
+          {label}
+        </span>
+      </div>
+    </Link>
   )
 }

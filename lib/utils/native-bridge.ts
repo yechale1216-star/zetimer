@@ -34,25 +34,30 @@ export const NativeBridge = {
 
   // Push Notifications Setup
   initPush: async () => {
+    // Disabled until google-services.json is provided
+    return;
     if (!Capacitor.isNativePlatform()) return;
 
-    let perm = await PushNotifications.checkPermissions();
-    if (perm.receive !== 'granted') {
-      perm = await PushNotifications.requestPermissions();
+    try {
+      let perm = await PushNotifications.checkPermissions();
+      if (perm.receive !== 'granted') {
+        perm = await PushNotifications.requestPermissions();
+      }
+
+      if (perm.receive === 'granted') {
+        await PushNotifications.register();
+      }
+
+      PushNotifications.addListener('registration', (token) => {
+        console.log('Push registration success, token: ' + token.value);
+      });
+
+      PushNotifications.addListener('registrationError', (error: any) => {
+         console.error('Error on registration: ' + JSON.stringify(error));
+      });
+    } catch (e) {
+      console.warn('Native Push Notification system could not be initialized:', e);
     }
-
-    if (perm.receive === 'granted') {
-      await PushNotifications.register();
-    }
-
-    PushNotifications.addListener('registration', (token) => {
-      console.log('Push registration success, token: ' + token.value);
-      // Here you would typically send the token to your backend
-    });
-
-    PushNotifications.addListener('registrationError', (error: any) => {
-       console.error('Error on registration: ' + JSON.stringify(error));
-    });
   },
 
   // Filesystem Exports (CSV/Reports)

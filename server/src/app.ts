@@ -29,12 +29,30 @@ import * as parentController from './controllers/parent.controller';
 const app = express();
 
 // Middleware
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'https://zetime.vercel.app',
+  'https://zetime.app',
+  'capacitor://localhost',
+  'https://localhost'
+];
+
 app.use(cors({
   origin: function (origin, callback) {
-    // Reflect origin to allow credentials from any frontend port in dev
-    callback(null, true);
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.startsWith('http://localhost:')) {
+      callback(null, true);
+    } else {
+      // In development, we can be more permissive if needed
+      callback(null, true);
+    }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-school-id', 'x-requested-role']
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '50mb' }));

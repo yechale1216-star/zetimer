@@ -212,6 +212,9 @@ class AuthService {
         // NOTE: JWT token is now managed by HTTP-Only cookies
         localStorage.setItem("parent_students", JSON.stringify(students));
         localStorage.setItem("available_schools", JSON.stringify(availableSchools));
+        // Protected backup — never wiped by clearSchoolContext; survives context resets
+        localStorage.setItem("zt_parent_login_schools", JSON.stringify(availableSchools));
+        localStorage.setItem("zt_parent_login_ts", Date.now().toString());
         
         if (resolvedSchoolId) {
           localStorage.setItem("x-school-id", resolvedSchoolId);

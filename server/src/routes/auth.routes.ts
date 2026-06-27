@@ -79,23 +79,23 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
 
     // Determine default/active school for initial token
     // Prioritize the schoolId set on the User record if it exists and is in memberships
-    let activeMembership = memberships.find(m => m.schoolId === user.schoolId && m.role === user.role) || memberships[0];
+    let activeMembership = memberships.find(m => m.id === user.schoolId && m.role === user.role) || memberships[0];
     
     // If user is super_admin, they might not have a school membership
     if (user.role === 'super_admin' && !activeMembership) {
       activeMembership = {
-        schoolId: 'global',
-        schoolName: 'Zetime Platform',
+        id: 'global',
+        name: 'Zetime Platform',
         role: 'super_admin'
       };
     }
 
-    let schoolName = activeMembership?.schoolName || 'My School';
+    let schoolName = activeMembership?.name || 'My School';
     let schoolLogo = activeMembership?.logo || '';
     let onboardingCompleted = false;
 
-    if (activeMembership && activeMembership.schoolId !== 'global') {
-      const school = await schoolService.getSchoolById(activeMembership.schoolId);
+    if (activeMembership && activeMembership.id !== 'global') {
+      const school = await schoolService.getSchoolById(activeMembership.id);
       if (school) {
         onboardingCompleted = school.onboardingCompleted ?? false;
         if (school.settings) {
@@ -108,7 +108,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       id: user.id,
       email: user.email,
       role: activeMembership?.role || user.role,
-      schoolId: activeMembership?.schoolId || '',
+      schoolId: activeMembership?.id || '',
       customSchoolId: activeMembership?.customSchoolId || '',
     });
 
@@ -128,7 +128,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
           email: user.email,
           name: user.full_name,
           role: activeMembership?.role || user.role,
-          schoolId: activeMembership?.schoolId || '',
+          schoolId: activeMembership?.id || '',
           customSchoolId: activeMembership?.customSchoolId || '',
         },
         schoolName,

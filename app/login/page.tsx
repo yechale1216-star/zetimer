@@ -9,32 +9,47 @@ function LoginContent() {
   const router = useRouter()
 
   const handleAuthSuccess = (userData?: any) => {
+    // 1. Capture current state
     const user = userData || authService.getCurrentUser()
+    const role = user?.role || 'parent';
     
-    // Check if multiple schools exist and redirect to select-school page
-    const availableStr = localStorage.getItem("available_schools")
-    const schools = availableStr ? JSON.parse(availableStr) : []
-    if (schools.length > 1) {
-      console.log(`[Login] Multiple schools found — redirecting to /auth/school-select`)
-      router.push('/auth/school-select')
-      return
+    // Get schools from userData first, then fallback to localStorage
+    let schools = userData?._availableSchools;
+    if (!schools) {
+      const availableStr = localStorage.getItem("available_schools")
+      schools = availableStr ? JSON.parse(availableStr) : []
     }
     
-    if (user?.role === 'admin' || user?.role === 'school_admin' || user?.role === 'school-admin') {
-      if (user?.onboardingCompleted === false) {
-        router.push('/onboarding')
+    console.log(`[LoginPage] handleAuthSuccess | role: ${role} | schools: ${schools?.length || 0}`)
+    
+    // 2. Perform redirection with a tiny delay to let AuthContext settle
+    const schoolList = Array.isArray(schools) ? schools : []
+    
+    setTimeout(() => {
+      if (schoolList.length > 1) {
+        console.log(`[Login] Redirecting to school selection (${schoolList.length} schools)`)
+        window.location.href = '/auth/school-select'
+        return
+      }
+      
+      console.log(`[Login] Single school found. Redirecting to dashboard for role: ${role}`)
+      
+      if (role === 'admin' || role === 'school_admin' || role === 'school-admin') {
+        if (user?.onboardingCompleted === false) {
+          router.push('/onboarding')
+        } else {
+          router.push('/school/admin')
+        }
+      } else if (role === 'teacher') {
+        router.push('/school/teacher')
+      } else if (role === 'parent') {
+        router.push('/parent/dashboard')
+      } else if (role === 'super_admin') {
+        router.push('/super-admin')
       } else {
         router.push('/school/admin')
       }
-    } else if (user?.role === 'teacher') {
-      router.push('/school/teacher')
-    } else if (user?.role === 'parent') {
-      router.push('/parent/dashboard')
-    } else if (user?.role === 'super_admin') {
-      router.push('/super-admin')
-    } else {
-      router.push('/school/admin')
-    }
+    }, 50)
   }
 
   return (

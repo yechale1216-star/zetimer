@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "30878856713",
+    "project_id": "zetime-16774",
+    "storage_bucket": "zetime-16774.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:30878856713:android:311ba03e9d0c3222002ad8",
+        "android_client_info": {
+          "package_name": "com.zetime.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtGsK9KTrzJMfecVRW2v5mvXZxP5lyzS4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

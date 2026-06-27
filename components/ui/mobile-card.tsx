@@ -33,11 +33,14 @@ export function MobileCard({
       whileTap={onClick ? { scale: 0.98 } : {}}
       onClick={onClick}
       className={cn(
-        "bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl p-4 shadow-sm transition-all active:bg-slate-50 dark:active:bg-slate-800/50 group select-none",
+        "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-white/[0.25] rounded-3xl p-5 shadow-xl transition-all active:scale-[0.97] group select-none relative overflow-hidden",
+        "dark:shadow-[0_20px_50px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.1)]",
         onClick && "cursor-pointer",
         className
       )}
     >
+      {/* Decorative Glow */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-[40px] -mr-16 -mt-16 pointer-events-none" />
       <div className="flex items-center gap-3">
         {/* Left Side: Avatar or Icon */}
         {(avatar || icon) && (

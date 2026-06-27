@@ -16,6 +16,12 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:stun.ekiga.net' },
+    { urls: 'stun:stun.ideasip.com' },
+    { urls: 'stun:stun.schlund.de' },
   ],
 };
 
@@ -147,9 +153,18 @@ export const useWebRTC = (options: WebRTCOptions) => {
     };
 
     pc.oniceconnectionstatechange = () => {
+      console.log(`[WebRTC] ICE Connection State for ${userId}: ${pc.iceConnectionState}`);
       if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
         cleanupUser(userId);
       }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log(`[WebRTC] Connection State for ${userId}: ${pc.connectionState}`);
+    };
+
+    pc.onicegatheringstatechange = () => {
+      console.log(`[WebRTC] ICE Gathering State for ${userId}: ${pc.iceGatheringState}`);
     };
 
     peerConnections.current.set(userId, pc);

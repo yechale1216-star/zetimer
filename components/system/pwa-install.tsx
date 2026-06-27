@@ -48,42 +48,52 @@ export function PWAInstall() {
     window.addEventListener("appinstalled", handleAppInstalled)
 
     if ("serviceWorker" in navigator) {
-      // Check if we're in a preview/development environment
       const isPreview =
         window.location.hostname.includes("vusercontent.net") || window.location.hostname.includes("localhost")
 
-      navigator.serviceWorker
-        .register("/sw.js")
-        .then((registration) => {
-          setSwSupported(true)
-          console.log("[PWA] Service Worker registered successfully")
-
-          // Check for updates periodically
-          setInterval(() => {
-            registration.update()
-          }, 60000) // Check every minute
-
-          // Listen for updates
-          registration.addEventListener("updatefound", () => {
-            const newWorker = registration.installing
-            if (newWorker) {
-              newWorker.addEventListener("statechange", () => {
-                if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                  // New service worker available - skip waiting automatically
-                  newWorker.postMessage({ type: "SKIP_WAITING" })
-                }
-              })
-            }
-          })
-        })
-        .catch((error) => {
-          if (isPreview) {
-            console.log("[PWA] Service Worker not available in preview environment")
-          } else {
-            console.error("[PWA] Service Worker registration failed:", error)
+      if (isPreview) {
+        // In dev mode, just ensure any legacy service workers are unregistered
+        // to avoid caching issues, without attempting to maintain a registration.
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister()
           }
-          setSwSupported(false)
-        })
+        }).catch(() => {})
+        setSwSupported(false)
+        console.log("[PWA] Service Worker registration bypassed on localhost")
+      } else {
+        navigator.serviceWorker
+          .register("/sw.js")
+          .then((registration) => {
+            setSwSupported(true)
+            console.log("[PWA] Service Worker registered successfully")
+
+            // Check for updates periodically
+            const updateInterval = setInterval(() => {
+              registration.update().catch(() => {
+                // Ignore update errors if the worker unregisters itself
+                clearInterval(updateInterval)
+              })
+            }, 60000) // Check every minute
+
+            // Listen for updates
+            registration.addEventListener("updatefound", () => {
+              const newWorker = registration.installing
+              if (newWorker) {
+                newWorker.addEventListener("statechange", () => {
+                  if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                    // New service worker available - skip waiting automatically
+                    newWorker.postMessage({ type: "SKIP_WAITING" })
+                  }
+                })
+              }
+            })
+          })
+          .catch((error) => {
+            console.error("[PWA] Service Worker registration failed:", error)
+            setSwSupported(false)
+          })
+      }
 
       // Listen for controller change (new SW activated)
       /* 

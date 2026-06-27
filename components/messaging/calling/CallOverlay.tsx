@@ -62,7 +62,33 @@ const VideoStream = React.memo(
     );
   }
 );
-VideoStream.displayName = 'VideoStream';
+// ── Stable audio element that attaches the stream via ref ────────────────────
+const AudioStream = React.memo(({ stream }: { stream: MediaStream | null }) => {
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (stream) {
+      el.srcObject = stream;
+      el.play().catch((e) => console.log('[AudioStream] auto-play blocked or failed:', e));
+    } else {
+      el.srcObject = null;
+    }
+  }, [stream]);
+
+  if (!stream) return null;
+
+  return (
+    <audio
+      ref={audioRef}
+      autoPlay
+      playsInline
+      className="hidden" // No UI needed for audio, just the element
+    />
+  );
+});
+AudioStream.displayName = 'AudioStream';
 
 // ── Main component ────────────────────────────────────────────────────────────
 export const CallOverlay: React.FC<CallOverlayProps> = ({
@@ -155,6 +181,15 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
       className="fixed inset-0 z-[110] bg-slate-950 flex flex-col overflow-hidden select-none"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
+      {/* Hidden audio outputs for all remote participants who don't have an active video stream */}
+      {participants.map(p => {
+        if (p.isLocal) return null;
+        const stream = remoteStreams[p.id];
+        const isShowingVideo = type === 'VIDEO' && hasRemoteVideo && p.id === firstRemote?.id;
+        if (isShowingVideo) return null;
+        return <AudioStream key={p.id} stream={stream} />;
+      })}
+
       {/* ── Background: remote video or gradient ─────────────────────── */}
       <div className="absolute inset-0 z-0">
         {type === 'VIDEO' && hasRemoteVideo ? (
@@ -197,11 +232,13 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
 
         <div className="flex flex-col items-center">
           {status === 'CONNECTED' && (
-            <span className="text-white/50 text-[10px] uppercase tracking-[0.25em] font-semibold">Encrypted</span>
+            <>
+              <span className="text-white/50 text-[10px] uppercase tracking-[0.25em] font-semibold">Encrypted</span>
+              <span className="text-white font-mono text-base font-bold">
+                {formatTime(callTime)}
+              </span>
+            </>
           )}
-          <span className="text-white font-mono text-base font-bold">
-            {status === 'CONNECTED' ? formatTime(callTime) : status === 'CONNECTING' ? 'Connecting...' : 'Calling...'}
-          </span>
         </div>
 
         <div className="h-11 w-11 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white">
@@ -218,14 +255,37 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
       {type === 'VOICE' && (
         <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-6 px-6">
           <div className="relative">
-            <motion.div
-              animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.4, 0.2] }}
-              transition={{ repeat: Infinity, duration: 3 }}
-              className="absolute inset-0 bg-primary/20 rounded-full blur-3xl"
-            />
-            <Avatar className="relative h-36 w-36 md:h-44 md:w-44 border-4 border-white/10 shadow-2xl">
+            {/* Professional Smooth Ripple Effect */}
+            <div className="absolute inset-0">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 1, opacity: 0.5 }}
+                  animate={{ scale: [1, 2.8], opacity: [0.5, 0] }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: [0.33, 1, 0.68, 1], // easeOutQuart
+                    delay: i * 1,
+                  }}
+                  className="absolute inset-0 rounded-full border border-green-500/30 bg-green-500/5 backdrop-blur-[2px]"
+                />
+              ))}
+            </div>
+
+            <Avatar className={cn(
+              "relative h-36 w-36 md:h-44 md:w-44 border-[3px] shadow-2xl transition-all duration-700 ease-in-out",
+              (status === 'CONNECTED' || status === 'RINGING' || status === 'CONNECTING')
+                ? "border-green-500 ring-[12px] ring-green-500/5 shadow-green-500/10"
+                : "border-white/15"
+            )}>
               <AvatarImage src={caller.avatar} />
-              <AvatarFallback className="text-6xl font-black bg-gradient-to-br from-primary/40 to-primary/10 text-white">
+              <AvatarFallback className={cn(
+                "text-6xl font-black transition-colors duration-700",
+                (status === 'CONNECTED' || status === 'RINGING' || status === 'CONNECTING')
+                  ? "bg-green-600 text-white"
+                  : "bg-slate-800 text-white"
+              )}>
                 {caller.name.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>

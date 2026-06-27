@@ -161,8 +161,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // SESSION CHANGE DETECTION:
     // If the sessionId in localStorage differs from what we have in React state,
     // a new user has logged in. Clear all previous in-memory state FIRST before
-    // loading the new session. This prevents even a single frame of stale data.
-    if (storedSessionId !== sessionId || options?.forceRefetch) {
+    // loading the new session. 
+    // EXCEPTION: If this is a fresh login, we skip clearing because the login process
+    // has already populated the new session state (available schools, etc.) and clearing 
+    // it now would cause a race condition (wiping the data just fetched).
+    const isSessionChange = storedSessionId !== sessionId || options?.forceRefetch
+    const isFreshLoginCheck = localStorage.getItem(FRESH_LOGIN_KEY) === "1"
+    // A school switch also writes a new token, which looks like a session change to
+    // validateSession. Don't wipe the school context in this case — it was just set intentionally.
+    const isSchoolSwitch = localStorage.getItem("_zt_school_switch") === "1"
+    if (isSchoolSwitch) {
+      localStorage.removeItem("_zt_school_switch")
+    }
+
+    if (isSessionChange && !isFreshLoginCheck && !isSchoolSwitch) {
       console.log(`[AuthContext][validateSession] Session changed/force-refetch (${sessionId} → ${storedSessionId}) — clearing stale state`)
       clearSchoolContextRef.current?.()
       setUser(null)

@@ -17,6 +17,9 @@ export const listParentSchools = async (phone: string) => {
     return { success: false, message: "No account found with this phone number." };
   }
 
+  // Ensure all legacy students are synced before listing schools
+  await syncLegacyStudents(user.id, cleanPhone);
+
   const schools = await getParentSchools(user.id);
   return { success: true, data: schools };
 };
@@ -26,28 +29,51 @@ export const listParentSchools = async (phone: string) => {
  * Used by /me/schools — server-side validated only.
  */
 export const getParentSchools = async (userId: string) => {
+  console.log(`[getParentSchools] Fetching schools for userId: ${userId}`);
   const links = await prisma.parentStudentLink.findMany({
     where: { parentId: userId },
     include: {
       school: {
         include: { settings: true }
-      }
+      },
+      student: true
     }
   });
+
+  console.log(`[getParentSchools] Found ${links.length} links in ParentStudentLink`);
 
   const schoolMap = new Map<string, any>();
-  links.forEach(l => {
-    if (l.school && l.schoolId && !schoolMap.has(l.schoolId)) {
-      schoolMap.set(l.schoolId, {
-        id: l.schoolId,
-        name: l.school.name || 'My School',
-        logo: (l.school as any).settings?.school_logo || '',
-        customSchoolId: l.school.schoolId || '',
-      });
-    }
-  });
+  for (const l of links) {
+    const schoolId = l.schoolId || l.student?.schoolId;
+    if (schoolId && !schoolMap.has(schoolId)) {
+      let schoolInfo = l.school;
+      
+      // Fallback: If school object missing from link, fetch it via schoolId
+      if (!schoolInfo && schoolId) {
+        schoolInfo = await prisma.school.findUnique({
+          where: { id: schoolId },
+          include: { settings: true }
+        });
+      }
 
-  return Array.from(schoolMap.values());
+      if (schoolInfo) {
+        console.log(`[getParentSchools] Mapping school: ${schoolInfo.name} (${schoolId})`);
+        schoolMap.set(schoolId, {
+          id: schoolId,
+          name: schoolInfo.name || 'My School',
+          logo: (schoolInfo as any).settings?.school_logo || '',
+          customSchoolId: schoolInfo.schoolId || '',
+          role: 'parent'
+        });
+      } else {
+        console.warn(`[getParentSchools] Could not find school metadata for schoolId: ${schoolId}`);
+      }
+    }
+  }
+
+  const schools = Array.from(schoolMap.values());
+  console.log(`[getParentSchools] Final school count: ${schools.length}`);
+  return schools;
 };
 
 /**
@@ -59,6 +85,32 @@ export const validateSchoolAccess = async (userId: string, schoolId: string): Pr
     where: { parentId: userId, schoolId }
   });
   return !!link;
+};
+
+/**
+ * Get all students a parent has in a specific school.
+ * Called after a school switch to refresh the student list.
+ */
+export const getParentStudentsForSchool = async (parentId: string, schoolId: string) => {
+  const links = await prisma.parentStudentLink.findMany({
+    where: { parentId, schoolId },
+    include: {
+      student: {
+        include: { grade: true, section: true, stream: true }
+      }
+    }
+  });
+
+  return links
+    .map((l: any) => l.student)
+    .filter(Boolean)
+    .map((s: any) => ({
+      ...s,
+      name: s.fullName,
+      grade: s.grade?.name || '',
+      section: s.section?.name || '',
+      stream: s.stream?.name || null,
+    }));
 };
 
 /**
@@ -82,7 +134,11 @@ export const loginParent = async (phone: string, password: string, schoolId?: st
     throw new Error("Invalid phone number or password.");
   }
 
-  // Retrieve ALL students via ParentStudentLink (global lookup)
+  // 1. Sync any legacy students (found via phone in Student table) into ParentStudentLink
+  console.log(`[loginParent] Syncing legacy students for phone: ${cleanPhone}`);
+  await syncLegacyStudents(user.id, cleanPhone);
+
+  // 2. Retrieve ALL students via ParentStudentLink (global lookup)
   const links = await prisma.parentStudentLink.findMany({
     where: { parentId: user.id },
     include: {
@@ -92,25 +148,8 @@ export const loginParent = async (phone: string, password: string, schoolId?: st
     }
   });
 
-  let students: any[] = links.map(l => l.student);
-
-  // Fallback: find students via parent_phone on Student model (legacy data)
-  if (students.length === 0) {
-    const legacyStudents = await prisma.student.findMany({
-      where: { parent_phone: cleanPhone },
-      include: { grade: true, section: true, stream: true }
-    });
-    students = legacyStudents;
-
-    // Sync legacy students into ParentStudentLink
-    for (const student of legacyStudents) {
-      await prisma.parentStudentLink.upsert({
-        where: { parentId_studentId: { parentId: user.id, studentId: student.id } },
-        update: { schoolId: student.schoolId },
-        create: { parentId: user.id, studentId: student.id, schoolId: student.schoolId }
-      });
-    }
-  }
+  const students: any[] = links.map(l => l.student).filter(Boolean);
+  console.log(`[loginParent] Discovered ${students.length} linked students`);
 
   if (students.length === 0) {
     throw new Error("No children profiles found associated with this account.");
@@ -126,6 +165,7 @@ export const loginParent = async (phone: string, password: string, schoolId?: st
 
   // Get all associated schools for context switching
   const availableSchools = await getParentSchools(user.id);
+  console.log(`[loginParent] Total available schools: ${availableSchools.length}`);
 
   // Generate a token for the parent
   let customSchoolId = '';
@@ -373,6 +413,74 @@ export const normalizePhoneNumber = (phone: string): string => {
   }
   
   return cleaned;
+};
+
+/**
+ * Synchronizes legacy student records (found by phone in Student table)
+ * with the ParentStudentLink model for a specific user.
+ * Uses multiple phone format variations.
+ */
+export const syncLegacyStudents = async (userId: string, phone: string) => {
+  const cleanPhone = normalizePhoneNumber(phone);
+  
+  // Create variations of the phone number to search for (Ethiopian context)
+  const variations = new Set<string>();
+  variations.add(cleanPhone);
+  
+  const rawNoPlus = cleanPhone.replace('+', '');
+  variations.add(rawNoPlus);
+
+  let suffix = '';
+  if (cleanPhone.startsWith('+251') && cleanPhone.length >= 13) {
+    suffix = cleanPhone.substring(cleanPhone.length - 9); // e.g., 911223344
+  } else if (cleanPhone.length >= 9) {
+    suffix = cleanPhone.substring(cleanPhone.length - 9);
+  }
+
+  // 1. Direct match with common variations
+  if (suffix) {
+    variations.add(suffix);
+    variations.add('0' + suffix);
+    variations.add('251' + suffix);
+  }
+
+  // 2. Fetch students using these variations
+  // We use multiple search strategies to find legacy records
+  console.log(`[syncLegacyStudents] Searching variations:`, Array.from(variations));
+  if (suffix) console.log(`[syncLegacyStudents] Suffix search: ${suffix}`);
+  
+  const legacyStudents = await prisma.student.findMany({
+    where: { 
+      OR: [
+        { parent_phone: { in: Array.from(variations) } },
+        // Aggressive suffix match to handle spaces (e.g. "09 11 22..." in DB)
+        ...(suffix ? [{ parent_phone: { contains: suffix } }] : [])
+      ]
+    }
+  });
+
+  console.log(`[syncLegacyStudents] Found ${legacyStudents.length} potential students in DB`);
+
+  // 3. Filter results in memory to ensure true phone match (cleaning DB phone numbers)
+  const matchedStudents = legacyStudents.filter(s => {
+    if (!s.parent_phone) return false;
+    const dbPhoneCleaned = s.parent_phone.replace(/[^\d+]/g, '');
+    const isMatch = variations.has(dbPhoneCleaned) || (suffix && dbPhoneCleaned.endsWith(suffix));
+    if (isMatch) console.log(`[syncLegacyStudents] Matched student: ${s.id} (${s.fullName}) at school: ${s.schoolId}`);
+    return isMatch;
+  });
+
+  console.log(`[syncLegacyStudents] Final matched count: ${matchedStudents.length}`);
+
+  for (const student of matchedStudents) {
+    await prisma.parentStudentLink.upsert({
+      where: { parentId_studentId: { parentId: userId, studentId: student.id } },
+      update: { schoolId: student.schoolId },
+      create: { parentId: userId, studentId: student.id, schoolId: student.schoolId }
+    });
+  }
+  
+  return matchedStudents;
 };
 
 /**

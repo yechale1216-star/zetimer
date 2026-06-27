@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Send, Paperclip, Smile, MoreVertical, Phone, Video, ChevronLeft, 
+import {
+  Send, Paperclip, Smile, MoreVertical, Phone, Video, ChevronLeft,
   Check, CheckCheck, Reply, Forward, Trash2, Heart, Search, X, Clock,
-  Pin, Copy, FileText, FileJson, FileType, Music, Play, ExternalLink, 
+  Pin, Copy, FileText, FileJson, FileType, Music, Play, ExternalLink,
   Download, Globe, FileArchive, Mic, MicOff, StopCircle, ImageIcon, File as FileIcon,
   Info, Bell
 } from 'lucide-react';
@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils/utils';
 // MessageWindowSkeleton removed — replaced with Telegram-style thin progress bar
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -86,7 +86,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
 }) => {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
-  const { initiateCall } = useCall();
+  const { initiateCall, status: callStatus } = useCall();
 
   const [inputValue, setInputValue] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -118,7 +118,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   }, []);
 
   const toggleSelect = (id: string) => {
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -131,22 +131,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
-    
+
     if (minutes < 1) return t("last_seen_just_now");
     if (minutes < 60) return t("last_seen_minutes_ago", { n: minutes });
-    
+
     if (days === 0 && now.getDate() === d.getDate()) {
       return t("last_seen_today_at", { t: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) });
     }
-    
+
     if (days === 1 || (days === 0 && now.getDate() !== d.getDate())) {
       return t("last_seen_yesterday_at", { t: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) });
     }
-    
+
     if (days < 7) {
       return t("last_seen_on", { d: d.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }) });
     }
-    
+
     return t("last_seen_on", { d: d.toLocaleDateString() });
   };
 
@@ -173,10 +173,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
     const currentScrollY = el.scrollTop;
     const lastScroll = parseInt(el.dataset.lastScroll || '0', 10);
     const diff = currentScrollY - lastScroll;
-    
+
     if (Math.abs(diff) > 5) {
-      window.dispatchEvent(new CustomEvent('chat-scroll', { 
-        detail: { direction: diff > 0 ? 'down' : 'up' } 
+      window.dispatchEvent(new CustomEvent('chat-scroll', {
+        detail: { direction: diff > 0 ? 'down' : 'up' }
       }));
     }
     el.dataset.lastScroll = currentScrollY.toString();
@@ -235,11 +235,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia(
-        recordMode === 'video' 
-          ? { audio: true, video: { width: { ideal: 400 }, height: { ideal: 400 }, facingMode: 'user' } } 
+        recordMode === 'video'
+          ? { audio: true, video: { width: { ideal: 400 }, height: { ideal: 400 }, facingMode: 'user' } }
           : { audio: true }
       );
-      
+
       if (recordMode === 'video') {
         setCameraStream(stream);
         if (videoPreviewRef.current) {
@@ -269,7 +269,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
     if (!mediaRecorderRef.current) return;
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     const mr = mediaRecorderRef.current;
-    
+
     const mimeType = recordMode === 'video' ? 'video/webm' : 'audio/webm';
     const ext = 'webm';
     const prefix = recordMode === 'video' ? 'video' : 'voice';
@@ -300,8 +300,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
             attachment: { url, name: file.name, type: file.type, size: file.size },
             replaceTempId: fileTempId,
           });
-        } catch { 
-          toast.error(`Failed to send ${recordMode} message`); 
+        } catch {
+          toast.error(`Failed to send ${recordMode} message`);
         }
       }
     };
@@ -428,8 +428,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
       <div className="flex-1 flex flex-col items-center justify-center bg-[#f8fafc] dark:bg-slate-950 p-8 text-center relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px]" />
-        
-        <motion.div 
+
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="relative z-10 flex flex-col items-center"
@@ -437,11 +437,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
           <div className="h-24 w-24 bg-primary/10 rounded-full flex items-center justify-center mb-6">
             <Logo size="xl" withText={false} href="" />
           </div>
-          
+
           <h1 className="text-2xl font-black tracking-tighter text-foreground mb-2 uppercase">
             {t("communication")}
           </h1>
-          
+
           <p className="text-sm text-muted-foreground/60 max-w-[240px] mx-auto leading-relaxed">
             Select a conversation to start chatting
           </p>
@@ -453,105 +453,117 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   return (
     <div className="flex-1 flex flex-col h-full bg-[#f0f2f5] dark:bg-slate-950 relative overflow-hidden">
       {/* Telegram-style Background Pattern */}
-      <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.08] pointer-events-none" 
-        style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/curls-run-wild.png")' }} 
+      <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.08] pointer-events-none"
+        style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/curls-run-wild.png")' }}
       />
 
-      {/* Chat Header */}
-      <header className="h-[64px] md:h-[72px] border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-4 z-40 sticky top-0 font-sans shadow-sm pt-safe">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {isMobile && onBack && (
-            <Button variant="ghost" size="icon" onClick={onBack} className="h-10 w-10 rounded-full -ml-2">
-              <ChevronLeft className="h-6 w-6" />
+      {/* Telegram-style Compact Chat Header - With Safe Area for Notch/Status Bar */}
+      <header className="h-[calc(88px+env(safe-area-inset-top))] md:h-[96px] border-b border-border/50 bg-background/95 backdrop-blur-md flex items-center justify-between px-3 z-40 sticky top-0 font-sans shadow-sm pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center gap-1 flex-1 min-w-0 h-full">
+          {onBack && (
+            <Button variant="ghost" size="icon" onClick={onBack} className="h-10 w-10 rounded-full transition-colors hover:bg-secondary mt-9">
+              <ChevronLeft className="h-6 w-6 text-foreground" />
             </Button>
           )}
-          
-          <div 
+
+          <div
             className={cn(
-              "flex items-center gap-3 flex-1 min-w-0 cursor-pointer transition-all hover:bg-secondary/40 p-1.5 rounded-2xl",
+              "flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer h-full pt-10 pb-1",
               activeConversation.isGroup ? "cursor-pointer" : "cursor-default"
             )}
             onClick={() => activeConversation.isGroup && onToggleInfo?.()}
           >
-            <div className="relative shrink-0">
-              <Avatar className="h-11 w-11 border-2 border-primary/10 overflow-hidden ring-2 ring-background">
-                <AvatarImage src={activeConversation?.avatar || undefined} />
-                <AvatarFallback className="bg-primary/5 text-primary text-sm font-black">
+            <div className="relative shrink-0 self-center">
+              {callStatus !== 'IDLE' && (
+                <div className="absolute inset-0 -z-10">
+                  <motion.div
+                    initial={{ scale: 1, opacity: 0.8 }}
+                    animate={{ scale: 2, opacity: 0 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+                    className="absolute inset-0 rounded-full bg-green-500/60"
+                  />
+                  <motion.div
+                    initial={{ scale: 1, opacity: 0.5 }}
+                    animate={{ scale: 2.5, opacity: 0 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeOut", delay: 0.6 }}
+                    className="absolute inset-0 rounded-full bg-green-500/40"
+                  />
+                  <motion.div
+                    initial={{ scale: 1, opacity: 0.3 }}
+                    animate={{ scale: 3, opacity: 0 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeOut", delay: 1.2 }}
+                    className="absolute inset-0 rounded-full bg-green-500/20"
+                  />
+                </div>
+              )}
+              <Avatar className={cn(
+                "h-10 w-10 border overflow-hidden shadow-sm transition-all duration-500",
+                callStatus !== 'IDLE' ? "border-green-500 ring-4 ring-green-500/20 scale-110" : "border-border/10"
+              )}>
+                <AvatarImage src={activeConversation?.avatar || undefined} className="object-cover" />
+                <AvatarFallback className={cn(
+                  "text-xs font-black transition-colors",
+                  callStatus !== 'IDLE' ? "bg-green-500 text-white" : "bg-primary/5 text-primary"
+                )}>
                   {activeConversation.name.slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              {activeConversation.isOnline && (
-                <span className="absolute bottom-0 right-0 h-3.5 w-3.5 bg-green-500 border-2 border-background rounded-full shadow-sm" />
+              {activeConversation.isOnline && callStatus === 'IDLE' && (
+                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 bg-green-500 border-2 border-background rounded-full shadow-sm" />
               )}
             </div>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-[16px] truncate tracking-tight">{activeConversation.name}</span>
-                {!activeConversation.isGroup && activeConversation.role && (
-                   <Badge variant="secondary" className="h-4 px-1.5 text-[9px] font-black uppercase tracking-tighter bg-primary/10 text-primary border-none">
-                     {t(activeConversation.role.toLowerCase())}
-                   </Badge>
-                )}
-              </div>
+            <div className="flex flex-col min-w-0 justify-center">
+              <span className="font-bold text-[15px] truncate tracking-tight text-foreground leading-tight">
+                {activeConversation.name}
+              </span>
               {activeConversation.isGroup ? (
-              <span className="text-[11px] font-medium text-muted-foreground/80 truncate">
-                {typingStatus || `${activeConversation.members?.length} members • ${activeConversation.groupType || 'Group'}`}
-              </span>
-            ) : typingStatus ? (
-              <span className="text-[11px] text-primary font-bold animate-pulse">{typingStatus}</span>
-            ) : activeConversation.isOnline ? (
-              <div className="flex items-center gap-1.5">
-                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                 <span className="text-[11px] text-green-600 font-bold uppercase tracking-widest">{t("online")}</span>
-              </div>
-            ) : (
-              <span className="text-[11px] font-medium text-muted-foreground/60">
-                {formatLastSeen(activeConversation.lastActive)}
-              </span>
-            )}
+                <span className="text-[11px] text-muted-foreground/80 truncate">
+                  {typingStatus || `${activeConversation.members?.length} members`}
+                </span>
+              ) : typingStatus ? (
+                <span className="text-[11px] text-primary font-bold animate-pulse">{typingStatus}</span>
+              ) : activeConversation.isOnline ? (
+                <span className="text-[11px] text-primary font-medium tracking-tight">online</span>
+              ) : (
+                <span className="text-[11px] text-muted-foreground/60">
+                  {formatLastSeen(activeConversation.lastActive)}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-muted-foreground hover:bg-secondary">
+        <div className="flex items-center gap-0.5 mt-9">
+          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-muted-foreground/80 hover:bg-secondary">
             <Search className="h-5 w-5" />
           </Button>
-          {!isStudent && !activeConversation.isGroup && (
-            <div className="flex items-center gap-1 mx-1 px-1 border-x border-border/50">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-10 w-10 rounded-full text-primary hover:bg-primary/10 transition-all active:scale-90"
-                onClick={() => initiateCall(activeConversation.realContactId || activeConversation.id, 'VOICE', activeConversation)}
-              >
-                <Phone className="h-5 w-5" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-10 w-10 rounded-full text-primary hover:bg-primary/10 transition-all active:scale-90"
-                onClick={() => initiateCall(activeConversation.realContactId || activeConversation.id, 'VIDEO', activeConversation)}
-              >
-                <Video className="h-5 w-5" />
-              </Button>
-            </div>
-          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-muted-foreground hover:bg-secondary">
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-muted-foreground/80 hover:bg-secondary">
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60 rounded-2xl border-border/50 shadow-2xl p-2 animate-in fade-in zoom-in-95 duration-200">
-              <DropdownMenuItem className="rounded-xl h-11 pointer-events-none opacity-50 gap-3">
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl border-border/50 shadow-2xl p-1.5 animate-in fade-in zoom-in-95 duration-200">
+              {!isStudent && !activeConversation.isGroup && (
+                <>
+                  <DropdownMenuItem className="rounded-xl h-10 gap-3" onClick={() => initiateCall(activeConversation.realContactId || activeConversation.id, 'VOICE', activeConversation)}>
+                    <Phone className="h-4 w-4 text-primary" /> {t("voice_call")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="rounded-xl h-10 gap-3" onClick={() => initiateCall(activeConversation.realContactId || activeConversation.id, 'VIDEO', activeConversation)}>
+                    <Video className="h-4 w-4 text-primary" /> {t("video_call")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-1 bg-border/40" />
+                </>
+              )}
+              <DropdownMenuItem className="rounded-xl h-10 gap-3">
                 <Info className="h-4 w-4" /> {activeConversation.isGroup ? 'Group Info' : t("view_profile")}
               </DropdownMenuItem>
-              <DropdownMenuItem className="rounded-xl h-11 gap-3">
+              <DropdownMenuItem className="rounded-xl h-10 gap-3">
                 <Bell className="h-4 w-4" /> {t("mute_notifications")}
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 bg-border/40" />
-              <DropdownMenuItem className="rounded-xl h-11 gap-3 text-destructive focus:bg-destructive/10 focus:text-destructive">
+              <DropdownMenuItem className="rounded-xl h-10 gap-3 text-destructive focus:bg-destructive/10 focus:text-destructive">
                 <Trash2 className="h-4 w-4" /> {activeConversation.isGroup ? 'Leave Group' : t("delete_chat")}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -589,9 +601,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
         {messages.map((message, index) => {
           const isNextSameSender = messages[index + 1]?.senderId === message.senderId;
           return (
-            <MessageBubble 
-              key={message.id} 
-              message={message} 
+            <MessageBubble
+              key={message.id}
+              message={message}
               isLastInGroup={!isNextSameSender}
               isSelectionMode={isSelectionMode}
               isSelected={selectedIds.includes(message.id)}
@@ -685,9 +697,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                     {(replyTarget || editTarget)?.content || "File"}
                   </p>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => { setReplyTarget(null); setEditTarget(null); if (editTarget) setInputValue(''); }}
                 >
@@ -822,15 +834,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
             {/* Text input */}
             <div className="bg-secondary/50 rounded-2xl flex-1 flex items-end p-1.5 focus-within:ring-1 focus-within:ring-primary/20 transition-all relative">
               <div className="relative">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className={cn("rounded-full h-9 w-9 text-muted-foreground hover:text-primary shrink-0", showEmojiPicker && "text-primary bg-primary/10")}
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 >
                   <Smile className="h-5 w-5" />
                 </Button>
-                
+
                 <AnimatePresence>
                   {showEmojiPicker && (
                     <>
@@ -921,14 +933,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                   {recordMode === 'video' ? <Video className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
                 </Button>
                 {!isRecording && (
-                   <Button 
-                     variant="ghost" 
-                     size="icon" 
-                     className="ml-1 h-9 w-9 text-muted-foreground/30 hover:text-primary"
-                     onClick={() => setRecordMode(m => m === 'audio' ? 'video' : 'audio')}
-                   >
-                     {recordMode === 'video' ? <Mic className="h-4 w-4" /> : <Video className="h-4 w-4" />}
-                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-1 h-9 w-9 text-muted-foreground/30 hover:text-primary"
+                    onClick={() => setRecordMode(m => m === 'audio' ? 'video' : 'audio')}
+                  >
+                    {recordMode === 'video' ? <Mic className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+                  </Button>
                 )}
               </div>
             )}
@@ -945,12 +957,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
               exit={{ scale: 0, opacity: 0 }}
               className="absolute bottom-24 right-4 w-40 h-40 rounded-full border-4 border-primary shadow-2xl overflow-hidden z-50 bg-black"
             >
-              <video 
-                ref={videoPreviewRef} 
-                autoPlay 
-                muted 
-                playsInline 
-                className="w-full h-full object-cover scale-x-[-1]" 
+              <video
+                ref={videoPreviewRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover scale-x-[-1]"
               />
               <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/50 px-2 py-0.5 rounded text-[10px] text-white font-mono">
                 REC
@@ -963,23 +975,23 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
       {/* Image Preview Modal */}
       <AnimatePresence>
         {previewImage && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 md:p-10 cursor-zoom-out"
             onClick={() => setPreviewImage(null)}
           >
-            <motion.img 
+            <motion.img
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
-              src={previewImage} 
-              alt="Preview" 
+              src={previewImage}
+              alt="Preview"
               className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
             />
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="absolute top-4 right-4 text-white hover:bg-white/10"
               onClick={() => setPreviewImage(null)}
             >
@@ -1045,17 +1057,17 @@ const CustomAudioPlayer = React.memo(({ url, isMe }: { url: string, isMe: boolea
       "flex items-center gap-3 py-2 px-3 rounded-2xl min-w-[200px] border border-white/10 shadow-sm",
       isMe ? "bg-primary-foreground/10 text-white" : "bg-secondary text-foreground"
     )}>
-      <audio 
-        ref={audioRef} 
-        src={url} 
+      <audio
+        ref={audioRef}
+        src={url}
         preload="metadata"
-        onTimeUpdate={handleTimeUpdate} 
+        onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={() => setIsPlaying(false)}
       />
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         className={cn(
           "h-10 w-10 rounded-full shrink-0 shadow-lg active:scale-95 transition-all",
           isMe ? "bg-white text-primary hover:bg-white/90" : "bg-primary text-white hover:bg-primary/90"
@@ -1066,10 +1078,10 @@ const CustomAudioPlayer = React.memo(({ url, isMe }: { url: string, isMe: boolea
       </Button>
       <div className="flex-1 flex flex-col gap-1.5 pr-2">
         <div className="h-1.5 bg-current/10 rounded-full overflow-hidden relative">
-          <motion.div 
+          <motion.div
             className="absolute top-0 left-0 h-full bg-current"
             initial={false}
-            animate={{ width: `${(currentTime/duration) * 100 || 0}%` }}
+            animate={{ width: `${(currentTime / duration) * 100 || 0}%` }}
           />
         </div>
         <div className="flex justify-between text-[10px] font-medium opacity-60">
@@ -1098,16 +1110,16 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
 
   if (isImage) {
     return (
-      <div 
+      <div
         className={cn(
           "overflow-hidden cursor-pointer hover:opacity-95 transition-opacity relative group",
           isCompact ? "rounded-lg" : "rounded-xl border border-border/10"
         )}
         onClick={() => onImageClick(file.url)}
       >
-        <img 
-          src={file.url} 
-          alt={file.name || "Image"} 
+        <img
+          src={file.url}
+          alt={file.name || "Image"}
           className={cn("w-full h-auto max-h-[400px] object-cover", status === 'sending' && "opacity-50")}
           loading="lazy"
         />
@@ -1116,7 +1128,7 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
         </div>
         {status === 'sending' && (
           <div className="absolute inset-0 flex items-center justify-center">
-             <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin shadow-lg" />
+            <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin shadow-lg" />
           </div>
         )}
       </div>
@@ -1132,38 +1144,38 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
     const [isMuted, setIsMuted] = useState(isCircular);
 
     return (
-      <div 
+      <div
         className={cn(
           "overflow-hidden relative bg-black cursor-pointer",
-          isCircular 
-            ? "rounded-full w-48 h-48 border-4 border-white/20 shadow-xl mx-auto my-2" 
+          isCircular
+            ? "rounded-full w-48 h-48 border-4 border-white/20 shadow-xl mx-auto my-2"
             : (isCompact ? "rounded-lg" : "rounded-xl border border-border/10")
         )}
         onClick={() => setIsMuted(!isMuted)}
       >
-        <video 
-          src={file.url} 
-          controls={!isCircular} 
-          autoPlay={isCircular} 
-          loop={isCircular} 
+        <video
+          src={file.url}
+          controls={!isCircular}
+          autoPlay={isCircular}
+          loop={isCircular}
           muted={isMuted}
           playsInline
           className={cn(
             "w-full h-full",
             isCircular ? "object-cover" : "max-h-[400px]"
-          )} 
+          )}
         />
         {isCircular && (
-           <>
-             <div className="absolute inset-0 border-[6px] border-black/10 rounded-full pointer-events-none" />
-             {isMuted && (
-               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                 <div className="bg-black/50 p-2 rounded-full">
-                   <MicOff className="h-6 w-6 text-white" />
-                 </div>
-               </div>
-             )}
-           </>
+          <>
+            <div className="absolute inset-0 border-[6px] border-black/10 rounded-full pointer-events-none" />
+            {isMuted && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="bg-black/50 p-2 rounded-full">
+                  <MicOff className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     );
@@ -1171,16 +1183,16 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
 
   return (
     <div className={cn(
-        "bg-background/40 dark:bg-slate-800/40 border border-border/10 flex items-center gap-4 hover:bg-background/60 transition-all cursor-pointer group backdrop-blur-sm shadow-sm",
-        isCompact ? "rounded-lg p-3" : "rounded-xl p-3"
-      )}
-         onClick={(e) => {
-           e.stopPropagation();
-           const viewerUrl = file.url.endsWith('.pdf') 
-             ? file.url 
-             : `https://docs.google.com/viewer?url=${encodeURIComponent(file.url)}`;
-           window.open(viewerUrl, '_blank');
-         }}>
+      "bg-background/40 dark:bg-slate-800/40 border border-border/10 flex items-center gap-4 hover:bg-background/60 transition-all cursor-pointer group backdrop-blur-sm shadow-sm",
+      isCompact ? "rounded-lg p-3" : "rounded-xl p-3"
+    )}
+      onClick={(e) => {
+        e.stopPropagation();
+        const viewerUrl = file.url.endsWith('.pdf')
+          ? file.url
+          : `https://docs.google.com/viewer?url=${encodeURIComponent(file.url)}`;
+        window.open(viewerUrl, '_blank');
+      }}>
       <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform relative">
         {status === 'sending' ? (
           <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -1200,9 +1212,9 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
           </p>
         </div>
       </div>
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         className="shrink-0 h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
         onClick={async (e) => {
           e.stopPropagation();
@@ -1260,7 +1272,7 @@ const LinkPreview = React.memo(({ url }: { url: string }) => {
   if (loading) return null;
 
   return (
-    <div 
+    <div
       className="mt-2 border-l-2 border-primary bg-primary/5 rounded-r-lg p-2 hover:bg-primary/10 transition-all cursor-pointer group max-w-sm"
       onClick={(e) => {
         e.stopPropagation();
@@ -1269,9 +1281,9 @@ const LinkPreview = React.memo(({ url }: { url: string }) => {
     >
       <div className="flex items-center gap-2 mb-0.5">
         <div className="h-3 w-3 shrink-0">
-          <img 
-            src={metadata?.favicon} 
-            alt="" 
+          <img
+            src={metadata?.favicon}
+            alt=""
             className="h-full w-full rounded-sm"
             onError={(e) => {
               (e.target as any).style.display = 'none';
@@ -1287,19 +1299,19 @@ const LinkPreview = React.memo(({ url }: { url: string }) => {
   );
 });
 
-const MessageBubble = React.memo(({ 
-  message, 
-  isLastInGroup, 
-  isSelectionMode, 
-  isSelected, 
-  onToggleSelect, 
+const MessageBubble = React.memo(({
+  message,
+  isLastInGroup,
+  isSelectionMode,
+  isSelected,
+  onToggleSelect,
   onEnterSelectionMode,
   t,
   isGroup,
   onAction,
   currentUser
-}: { 
-  message: Message, 
+}: {
+  message: Message,
   isLastInGroup: boolean,
   isSelectionMode: boolean,
   isSelected: boolean,
@@ -1312,13 +1324,13 @@ const MessageBubble = React.memo(({
 }) => {
   const isMe = message.isMe;
   const hasAttachments = message.attachments && message.attachments.length > 0;
-  
+
   // Telegram-style large emojis: check if content is only emojis
   const emojiOnlyRegex = /^(\s*(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}|\p{Emoji_Modifier})\s*)+$/u;
   const isEmojiOnly = Boolean(!hasAttachments && message.content && emojiOnlyRegex.test(message.content));
 
-  const isMediaOnly = Boolean((hasAttachments && 
-    (!message.content || message.content === 'Image' || message.content === 'Video' || message.content === 'File')) || 
+  const isMediaOnly = Boolean((hasAttachments &&
+    (!message.content || message.content === 'Image' || message.content === 'Video' || message.content === 'File')) ||
     message.type === 'VIDEO_MESSAGE' || message.type === 'VIDEO' || message.type === 'IMAGE' || isEmojiOnly);
 
   const handleCopy = () => {
@@ -1346,13 +1358,13 @@ const MessageBubble = React.memo(({
     >
       {!isMe && isGroup && isLastInGroup && (
         <div className="flex items-center gap-2 mb-1 px-1">
-           <Avatar className="h-5 w-5 border border-border/50">
-              <AvatarImage src={(message as any).senderAvatar} />
-              <AvatarFallback className="bg-primary/20 text-[8px] font-bold text-primary">
-                 {(message as any).senderName?.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-           </Avatar>
-           <span className="text-[10px] font-bold text-primary/80 uppercase">{(message as any).senderName}</span>
+          <Avatar className="h-5 w-5 border border-border/50">
+            <AvatarImage src={(message as any).senderAvatar} />
+            <AvatarFallback className="bg-primary/20 text-[8px] font-bold text-primary">
+              {(message as any).senderName?.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <span className="text-[10px] font-bold text-primary/80 uppercase">{(message as any).senderName}</span>
         </div>
       )}
       <div className={cn(
@@ -1361,204 +1373,204 @@ const MessageBubble = React.memo(({
       )}>
         <div className={cn(
           "relative transition-all shadow-sm overflow-hidden",
-        (message.type === 'VIDEO_MESSAGE' || isEmojiOnly)
-          ? "p-0 bg-transparent border-none shadow-none" 
-          : (isMediaOnly 
-              ? "p-1 rounded-xl bg-white dark:bg-slate-900 border border-border/40" 
+          (message.type === 'VIDEO_MESSAGE' || isEmojiOnly)
+            ? "p-0 bg-transparent border-none shadow-none"
+            : (isMediaOnly
+              ? "p-1 rounded-xl bg-white dark:bg-slate-900 border border-border/40"
               : cn(
-                  "pl-3 pr-12 py-2 rounded-2xl text-[15px]",
-                  isMe 
-                    ? "bg-primary text-primary-foreground rounded-br-none" 
-                    : "bg-white dark:bg-slate-900 border border-border/50 text-foreground rounded-bl-none"
-                )),
-        !isLastInGroup && !isMediaOnly && (isMe ? "rounded-br-sm" : "rounded-bl-sm")
-      )}>
-        <ContextMenu>
-          <ContextMenuTrigger>
-            <div className={cn(
-              "select-text whitespace-pre-wrap break-words w-full relative",
-              isMediaOnly ? "leading-[0]" : ""
-            )}>
-              {hasAttachments && (
-                <div className={cn(
-                  "flex flex-col gap-1",
-                  isMediaOnly ? "-m-1" : "mb-1 -mx-2 -mt-1"
-                )}>
-                  {message.attachments!.map((file, idx) => (
-                    <AttachmentRenderer 
-                      key={idx} 
-                      file={file} 
-                      onImageClick={(url) => (window as any).showImagePreview?.(url)} 
-                      isCompact={isMediaOnly}
-                      isMe={isMe}
-                      status={message.status}
-                    />
-                  ))}
-                </div>
-              )}
-              {message.content && (!isMediaOnly || isEmojiOnly) && message.content !== 'File' && (
-                <div className={cn(
-                  "pb-4",
-                  hasAttachments ? "mt-2" : "",
-                  isEmojiOnly ? "text-5xl pb-1" : ""
-                )}>
-                  {(() => {
-                    const urlRegex = /((https?:\/\/[^\s]+)|(www\.[^\s]+))/g;
-                    const parts = message.content.split(urlRegex);
-                    let firstLinkFound = false;
-                    
-                    const matches = Array.from(message.content.matchAll(urlRegex));
-                    if (matches.length === 0) return message.content;
+                "pl-3 pr-12 py-2 rounded-2xl text-[15px]",
+                isMe
+                  ? "bg-primary text-primary-foreground rounded-br-none"
+                  : "bg-white dark:bg-slate-900 border border-border/50 text-foreground rounded-bl-none"
+              )),
+          !isLastInGroup && !isMediaOnly && (isMe ? "rounded-br-sm" : "rounded-bl-sm")
+        )}>
+          <ContextMenu>
+            <ContextMenuTrigger>
+              <div className={cn(
+                "select-text whitespace-pre-wrap break-words w-full relative",
+                isMediaOnly ? "leading-[0]" : ""
+              )}>
+                {hasAttachments && (
+                  <div className={cn(
+                    "flex flex-col gap-1",
+                    isMediaOnly ? "-m-1" : "mb-1 -mx-2 -mt-1"
+                  )}>
+                    {message.attachments!.map((file, idx) => (
+                      <AttachmentRenderer
+                        key={idx}
+                        file={file}
+                        onImageClick={(url) => (window as any).showImagePreview?.(url)}
+                        isCompact={isMediaOnly}
+                        isMe={isMe}
+                        status={message.status}
+                      />
+                    ))}
+                  </div>
+                )}
+                {message.content && (!isMediaOnly || isEmojiOnly) && message.content !== 'File' && (
+                  <div className={cn(
+                    "pb-4",
+                    hasAttachments ? "mt-2" : "",
+                    isEmojiOnly ? "text-5xl pb-1" : ""
+                  )}>
+                    {(() => {
+                      const urlRegex = /((https?:\/\/[^\s]+)|(www\.[^\s]+))/g;
+                      const parts = message.content.split(urlRegex);
+                      let firstLinkFound = false;
 
-                    let lastIdx = 0;
-                    const result = [];
-                    matches.forEach((match, i) => {
-                      if (match.index! > lastIdx) {
-                        result.push(message.content.substring(lastIdx, match.index));
+                      const matches = Array.from(message.content.matchAll(urlRegex));
+                      if (matches.length === 0) return message.content;
+
+                      let lastIdx = 0;
+                      const result = [];
+                      matches.forEach((match, i) => {
+                        if (match.index! > lastIdx) {
+                          result.push(message.content.substring(lastIdx, match.index));
+                        }
+
+                        const url = match[0];
+                        const href = url.startsWith('http') ? url : `https://${url}`;
+                        const showPreview = !firstLinkFound;
+                        firstLinkFound = true;
+
+                        result.push(
+                          <React.Fragment key={`link-${i}`}>
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={cn(
+                                "underline decoration-2 underline-offset-2 hover:opacity-80 transition-opacity font-bold break-all",
+                                message.isMe ? "text-white" : "text-primary"
+                              )}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {url}
+                            </a>
+                            {showPreview && <LinkPreview url={href} />}
+                          </React.Fragment>
+                        );
+                        lastIdx = match.index! + url.length;
+                      });
+
+                      if (lastIdx < message.content.length) {
+                        result.push(message.content.substring(lastIdx));
                       }
-                      
-                      const url = match[0];
-                      const href = url.startsWith('http') ? url : `https://${url}`;
-                      const showPreview = !firstLinkFound;
-                      firstLinkFound = true;
 
-                      result.push(
-                        <React.Fragment key={`link-${i}`}>
-                          <a 
-                            href={href} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className={cn(
-                              "underline decoration-2 underline-offset-2 hover:opacity-80 transition-opacity font-bold break-all",
-                              message.isMe ? "text-white" : "text-primary"
-                            )}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {url}
-                          </a>
-                          {showPreview && <LinkPreview url={href} />}
-                        </React.Fragment>
-                      );
-                      lastIdx = match.index! + url.length;
-                    });
-                    
-                    if (lastIdx < message.content.length) {
-                      result.push(message.content.substring(lastIdx));
-                    }
-                    
-                    return result;
-                  })()}
-                </div>
+                      return result;
+                    })()}
+                  </div>
+                )}
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-56 rounded-xl border-none shadow-xl p-2">
+              <ContextMenuItem onClick={() => handleAction('copy')} className="rounded-lg h-10 gap-3">
+                <Copy className="h-4 w-4" />
+                {t("copy_text")}
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => handleAction('reply')} className="rounded-lg h-10 gap-3">
+                <Reply className="h-4 w-4" />
+                {t("reply")}
+              </ContextMenuItem>
+              {isMe && !message.isDeleted && (
+                <ContextMenuItem onClick={() => handleAction('edit_start')} className="rounded-lg h-10 gap-3">
+                  <MoreVertical className="h-4 w-4" />
+                  Edit Message
+                </ContextMenuItem>
               )}
-            </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent className="w-56 rounded-xl border-none shadow-xl p-2">
-             <ContextMenuItem onClick={() => handleAction('copy')} className="rounded-lg h-10 gap-3">
-               <Copy className="h-4 w-4" />
-               {t("copy_text")}
-             </ContextMenuItem>
-             <ContextMenuItem onClick={() => handleAction('reply')} className="rounded-lg h-10 gap-3">
-               <Reply className="h-4 w-4" />
-               {t("reply")}
-             </ContextMenuItem>
-             {isMe && !message.isDeleted && (
-               <ContextMenuItem onClick={() => handleAction('edit_start')} className="rounded-lg h-10 gap-3">
-                 <MoreVertical className="h-4 w-4" />
-                 Edit Message
-               </ContextMenuItem>
-             )}
-             <ContextMenuItem onClick={() => handleAction('pin')} className="rounded-lg h-10 gap-3">
-               <Pin className="h-4 w-4" />
-               Pin Message
-             </ContextMenuItem>
-             <ContextMenuItem onClick={() => handleAction('forward')} className="rounded-lg h-10 gap-3">
+              <ContextMenuItem onClick={() => handleAction('pin')} className="rounded-lg h-10 gap-3">
+                <Pin className="h-4 w-4" />
+                Pin Message
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => handleAction('forward')} className="rounded-lg h-10 gap-3">
                 <Forward className="h-4 w-4" />
                 {t("forward")}
-             </ContextMenuItem>
-             <ContextMenuSeparator className="my-1 bg-border/50" />
-             <ContextMenuItem onClick={() => handleAction('delete')} className="rounded-lg h-10 gap-3 text-destructive focus:text-destructive">
-               <Trash2 className="h-4 w-4" />
-               {t("delete")}
-             </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
+              </ContextMenuItem>
+              <ContextMenuSeparator className="my-1 bg-border/50" />
+              <ContextMenuItem onClick={() => handleAction('delete')} className="rounded-lg h-10 gap-3 text-destructive focus:text-destructive">
+                <Trash2 className="h-4 w-4" />
+                {t("delete")}
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
 
-        <div className={cn(
-          "flex items-center gap-1 text-[10px]",
-          isEmojiOnly 
-            ? "relative mt-1 self-end text-muted-foreground opacity-60" 
-            : "absolute bottom-1 right-2",
-          (isMediaOnly && !isEmojiOnly) 
-            ? "bg-black/30 backdrop-blur-md text-white px-2 py-0.5 rounded-full" 
-            : (isMe ? "text-primary-foreground/70" : "text-muted-foreground")
-        )}>
-          {message.editedAt && <span className="italic mr-1">edited</span>}
-          <span>{message.timestamp}</span>
-          {isMe && (
-            <span className="shrink-0">
-              {message.status === 'sending' ? (
-                <Clock className="h-3 w-3 animate-pulse" />
-              ) : message.status === 'read' ? (
-                <CheckCheck className="h-3 w-3 text-sky-400" />
-              ) : message.status === 'delivered' ? (
-                <CheckCheck className="h-3 w-3 opacity-70" />
-              ) : (
-                <Check className="h-3 w-3" />
-              )}
-            </span>
+          <div className={cn(
+            "flex items-center gap-1 text-[10px]",
+            isEmojiOnly
+              ? "relative mt-1 self-end text-muted-foreground opacity-60"
+              : "absolute bottom-1 right-2",
+            (isMediaOnly && !isEmojiOnly)
+              ? "bg-black/30 backdrop-blur-md text-white px-2 py-0.5 rounded-full"
+              : (isMe ? "text-primary-foreground/70" : "text-muted-foreground")
+          )}>
+            {message.editedAt && <span className="italic mr-1">edited</span>}
+            <span>{message.timestamp}</span>
+            {isMe && (
+              <span className="shrink-0">
+                {message.status === 'sending' ? (
+                  <Clock className="h-3 w-3 animate-pulse" />
+                ) : message.status === 'read' ? (
+                  <CheckCheck className="h-3 w-3 text-sky-400" />
+                ) : message.status === 'delivered' ? (
+                  <CheckCheck className="h-3 w-3 opacity-70" />
+                ) : (
+                  <Check className="h-3 w-3" />
+                )}
+              </span>
+            )}
+          </div>
+
+          {/* Reactions Display */}
+          {uniqReactions.length > 0 && (
+            <div className={cn(
+              "absolute -bottom-4 flex gap-1",
+              isMe ? "right-0" : "left-0"
+            )}>
+              {uniqReactions.map((emoji: any) => (
+                <button
+                  key={emoji}
+                  onClick={() => handleAction('react', { emoji })}
+                  className={cn(
+                    "bg-white dark:bg-slate-800 border border-border/50 rounded-full px-1.5 py-0.5 text-[10px] shadow-sm hover:scale-110 transition-transform flex items-center gap-1",
+                    reactions.some((r: any) => r.userId === currentUser?.id && r.emoji === emoji) ? "border-primary bg-primary/5" : ""
+                  )}
+                >
+                  <span>{emoji}</span>
+                  <span className="font-bold opacity-70">
+                    {reactions.filter((r: any) => r.emoji === emoji).length}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Telegram-style Corner Tail */}
+          {isLastInGroup && message.type !== 'VIDEO_MESSAGE' && !isEmojiOnly && (
+            <div className={cn(
+              "absolute bottom-0 w-3 h-3 overflow-hidden",
+              message.isMe ? "-right-2" : "-left-2"
+            )}>
+              <div className={cn(
+                "w-full h-full rotate-45 transform origin-bottom-left",
+                message.isMe ? "bg-primary" : "bg-white dark:bg-slate-900 border-l border-b border-border/50"
+              )} />
+            </div>
           )}
         </div>
-
-        {/* Reactions Display */}
-        {uniqReactions.length > 0 && (
-          <div className={cn(
-            "absolute -bottom-4 flex gap-1",
-            isMe ? "right-0" : "left-0"
-          )}>
-            {uniqReactions.map((emoji: any) => (
-              <button
-                key={emoji}
-                onClick={() => handleAction('react', { emoji })}
-                className={cn(
-                  "bg-white dark:bg-slate-800 border border-border/50 rounded-full px-1.5 py-0.5 text-[10px] shadow-sm hover:scale-110 transition-transform flex items-center gap-1",
-                  reactions.some((r: any) => r.userId === currentUser?.id && r.emoji === emoji) ? "border-primary bg-primary/5" : ""
-                )}
-              >
-                <span>{emoji}</span>
-                <span className="font-bold opacity-70">
-                  {reactions.filter((r: any) => r.emoji === emoji).length}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Telegram-style Corner Tail */}
-        {isLastInGroup && message.type !== 'VIDEO_MESSAGE' && !isEmojiOnly && (
-          <div className={cn(
-            "absolute bottom-0 w-3 h-3 overflow-hidden",
-            message.isMe ? "-right-2" : "-left-2"
-          )}>
-            <div className={cn(
-              "w-full h-full rotate-45 transform origin-bottom-left",
-              message.isMe ? "bg-primary" : "bg-white dark:bg-slate-900 border-l border-b border-border/50"
-            )} />
-          </div>
-        )}
       </div>
-    </div>
-  </motion.div>
+    </motion.div>
   );
 }, (prevProps, nextProps) => {
   // Deep comparison for memoization
   return prevProps.message.id === nextProps.message.id &&
-         prevProps.message.status === nextProps.message.status &&
-         prevProps.message.content === nextProps.message.content &&
-         prevProps.message.editedAt === nextProps.message.editedAt &&
-         prevProps.isSelected === nextProps.isSelected &&
-         prevProps.isSelectionMode === nextProps.isSelectionMode &&
-         prevProps.isLastInGroup === nextProps.isLastInGroup &&
-         (prevProps.message as any).reactions?.length === (nextProps.message as any).reactions?.length;
+    prevProps.message.status === nextProps.message.status &&
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.message.editedAt === nextProps.message.editedAt &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.isSelectionMode === nextProps.isSelectionMode &&
+    prevProps.isLastInGroup === nextProps.isLastInGroup &&
+    (prevProps.message as any).reactions?.length === (nextProps.message as any).reactions?.length;
 });
 
 const DateSeparator = ({ date }: { date: string }) => (
@@ -1568,3 +1580,4 @@ const DateSeparator = ({ date }: { date: string }) => (
     </div>
   </div>
 );
+

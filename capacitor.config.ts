@@ -4,6 +4,10 @@ const config: CapacitorConfig = {
   appId: 'com.zetime.app',
   appName: 'Zetime',
   webDir: 'out',
+  server: {
+    url: 'http://localhost:3000',
+    cleartext: true
+  },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,

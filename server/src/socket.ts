@@ -191,6 +191,15 @@ export const initSocket = (server: HttpServer) => {
       if (s) io.to(s).emit('ice_candidate', { from: data.from, candidate: data.candidate });
     });
 
+    socket.on('media_state_change', (data: any) => {
+      const s = userSockets.get(data.to);
+      if (s) io.to(s).emit('media_state_changed', { 
+        from: data.from, 
+        isCameraOff: data.isCameraOff, 
+        isMuted: data.isMuted 
+      });
+    });
+
     socket.on('reject_call', async (data: any) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;

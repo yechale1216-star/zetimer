@@ -69,7 +69,7 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
     .slice(0, 2) || "U"
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 shadow-sm pt-safe">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-sm pt-safe">
       <div className="w-full flex h-16 md:h-20 items-center px-4 md:px-8">
         {showMenuButton && (
           <Button

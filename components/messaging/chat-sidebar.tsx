@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Pin, Plus, Users, User, Settings, MoreVertical } from 'lucide-react';
+import { Search, Pin, Plus, Users, User, Settings, MoreVertical, ChevronLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils/utils';
@@ -57,56 +57,66 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = React.memo(({
     return conversations.filter((c) => {
       const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (c.phone && c.phone.replace(/\s+/g, '').includes(searchQuery.replace(/\s+/g, '')));
-      
+
       if (activeTab === 'All') return matchesSearch;
       if (activeTab === 'Staff') return matchesSearch && (c.role?.toLowerCase() === 'teacher' || c.role?.toLowerCase() === 'admin' || c.role?.toLowerCase() === 'staff');
       if (activeTab === 'Parents') return matchesSearch && c.role?.toLowerCase() === 'parent';
       if (activeTab === 'Unread') return matchesSearch && (c.unreadCount ?? 0) > 0;
       if (activeTab === 'Groups') return matchesSearch && c.isGroup;
-      
+
       return matchesSearch;
     });
   }, [conversations, searchQuery, activeTab]);
 
-  const onlineUsers = React.useMemo(() => 
+  const onlineUsers = React.useMemo(() =>
     conversations.filter(c => c.isOnline && !c.isGroup),
-  [conversations]);
+    [conversations]);
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden border-r border-border pt-safe">
-      {/* Sidebar Header */}
-      <div className="pt-2 md:pt-6 px-4 pb-2 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-secondary transition-colors">
-                  <MoreVertical className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 rounded-2xl p-2 shadow-xl border-border/50">
-                <DropdownMenuItem className="rounded-xl h-11 pointer-events-none opacity-50">
-                  <Settings className="mr-3 h-4 w-4" /> Settings
-                </DropdownMenuItem>
-                <DropdownMenuItem className="rounded-xl h-11" onClick={() => (window as any).openCreateGroup?.()}>
-                  <Users className="mr-3 h-4 w-4" /> New Group
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <h1 className="text-xl font-bold tracking-tight text-foreground/90">{t("messages")}</h1>
-          </div>
-          
-          <Button 
-            variant="ghost" 
-            size="icon" 
+      {/* Telegram-style Compact Sidebar Header - Forced Notch Clearance */}
+      <div className="h-[92px] pt-[32px] px-3 flex items-center justify-between border-b border-border/50 bg-background/95 backdrop-blur-md sticky top-0 z-40">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => (window as any).goBack?.() || window.history.back()}
+            className="h-10 w-10 rounded-full transition-colors hover:bg-secondary"
+          >
+            <ChevronLeft className="h-6 w-6 text-foreground" />
+          </Button>
+          <h1 className="text-[17px] font-bold tracking-tight text-foreground uppercase">{t("messages")}</h1>
+        </div>
+
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => (window as any).openCreateGroup?.()}
-            className="h-10 w-10 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-95"
+            className="h-10 w-10 rounded-full text-primary/80 hover:bg-primary/5 transition-all active:scale-95"
           >
             <Plus className="h-6 w-6" />
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-muted-foreground/80 hover:bg-secondary">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl p-1.5 shadow-2xl border-border/50">
+              <DropdownMenuItem className="rounded-xl h-10 pointer-events-none opacity-50 gap-3">
+                <Settings className="h-4 w-4" /> Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem className="rounded-xl h-10 gap-3" onClick={() => (window as any).openCreateGroup?.()}>
+                <Users className="h-4 w-4" /> New Group
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+      </div>
 
-        {/* Search Bar */}
+      <div className="p-3 space-y-4">
+        {/* Search Bar - Telegram Style */}
         <div className="relative group">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 group-focus-within:text-primary transition-colors" />
           <Input
@@ -132,8 +142,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = React.memo(({
         <div className="py-2 border-b border-border/50">
           <div className="flex items-center gap-4 overflow-x-auto px-4 py-2 scrollbar-hide">
             {onlineUsers.map(user => (
-              <button 
-                key={user.id} 
+              <button
+                key={user.id}
                 onClick={() => onSelectConversation(user.id)}
                 className="flex flex-col items-center gap-1.5 shrink-0 group"
               >
@@ -162,13 +172,13 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = React.memo(({
         ) : filteredConversations.length > 0 ? (
           <div className="px-2 py-3 space-y-1">
             {filteredConversations.map((chat) => (
-               <ConversationItem
-                 key={chat.id}
-                 chat={chat}
-                 isActive={activeConversationId === chat.id}
-                 onSelect={onSelectConversation}
-                 t={t}
-               />
+              <ConversationItem
+                key={chat.id}
+                chat={chat}
+                isActive={activeConversationId === chat.id}
+                onSelect={onSelectConversation}
+                t={t}
+              />
             ))}
           </div>
         ) : (
@@ -186,22 +196,22 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = React.memo(({
       {!isMobile && currentUser && (
         <div className="p-4 bg-secondary/20 border-t border-border/50">
           <div className="flex items-center gap-3">
-             <Avatar className="h-10 w-10 border border-border">
-               <AvatarImage src={currentUser.profile_photo} />
-               <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                 {currentUser.name?.slice(0, 2).toUpperCase()}
-               </AvatarFallback>
-             </Avatar>
-             <div className="flex-1 min-w-0">
-               <p className="text-sm font-bold truncate">{currentUser.name}</p>
-               <div className="flex items-center gap-1">
-                 <div className="h-1.5 w-1.5 bg-green-500 rounded-full" />
-                 <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Online</p>
-               </div>
-             </div>
-             <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 hover:bg-secondary">
-               <Settings className="h-4 w-4" />
-             </Button>
+            <Avatar className="h-10 w-10 border border-border">
+              <AvatarImage src={currentUser.profile_photo} />
+              <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                {currentUser.name?.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold truncate">{currentUser.name}</p>
+              <div className="flex items-center gap-1">
+                <div className="h-1.5 w-1.5 bg-green-500 rounded-full" />
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Online</p>
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 hover:bg-secondary">
+              <Settings className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       )}
@@ -209,16 +219,16 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = React.memo(({
   );
 });
 
-const ConversationItem = React.memo(({ 
-  chat, 
-  isActive, 
-  onSelect, 
-  t 
-}: { 
-  chat: Conversation; 
-  isActive: boolean; 
-  onSelect: (id: string) => void; 
-  t: any 
+const ConversationItem = React.memo(({
+  chat,
+  isActive,
+  onSelect,
+  t
+}: {
+  chat: Conversation;
+  isActive: boolean;
+  onSelect: (id: string) => void;
+  t: any
 }) => {
   return (
     <button
@@ -263,7 +273,7 @@ const ConversationItem = React.memo(({
             {chat.timestamp || chat.phone}
           </span>
         </div>
-        
+
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-col flex-1 min-w-0">
             <p className={cn(
@@ -302,14 +312,14 @@ const ConversationItem = React.memo(({
 });
 
 const FilterTab = React.memo(({ label, active, count, onClick }: { label: string; active: boolean; count?: number, onClick: () => void }) => (
-  <button 
+  <button
     onClick={onClick}
     className={cn(
-    "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap",
-    active 
-      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
-      : "bg-secondary text-muted-foreground hover:bg-secondary-foreground/10 active:scale-95"
-  )}>
+      "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap",
+      active
+        ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+        : "bg-secondary text-muted-foreground hover:bg-secondary-foreground/10 active:scale-95"
+    )}>
     {label}
     {count !== undefined && count > 0 && (
       <span className={cn(

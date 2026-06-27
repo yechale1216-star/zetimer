@@ -95,29 +95,40 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
       const result = await authService.loginParent(cleanPhone, parentPassword)
       if (result.success) {
         setLoginError(null)
-        notifications.success(t("welcome_back_parent"), t("login_success_parent"))
         
-        console.log(`[Login][PARENT] Success | userId: ${result.user?.id} | role: ${result.user?.role}`)
+        console.log(`[Login][PARENT] Success | userId: ${result.user?.id} | schools: ${result.availableSchools?.length}`)
 
         // Mark as fresh login so validateSession preserves the parent role
         localStorage.setItem("_zt_fresh_login", "1")
         localStorage.setItem("_zt_login_role", "parent")
 
-        // Populate school context
         if (result.availableSchools && result.availableSchools.length > 0) {
+          // Populate school context and localStorage FIRST — before any navigation
           setSchoolsFromLogin(result.availableSchools, result.user?.schoolId)
-          await validateSession()
           
-          if (result.availableSchools.length > 1) {
-            console.log(`[Login][PARENT] Multiple schools — redirecting to /auth/school-select`)
+          const schoolCount = result.availableSchools.length
+          
+          notifications.success(t("welcome_back_parent"), schoolCount > 1
+            ? `Found ${schoolCount} schools. Select one to continue.`
+            : t("login_success_parent")
+          )
+
+          if (schoolCount > 1) {
+            // DO NOT call validateSession here — it calls clearSchoolContext internally
+            // which wipes the available_schools we just stored. The school-select page
+            // has its own auth guard and will validate after school selection.
+            console.log(`[Login][PARENT] Multiple schools (${schoolCount}) — redirecting to /auth/school-select`)
             router.push("/auth/school-select")
-          } else {
-            console.log(`[Login][PARENT] Single school — redirecting to /parent/dashboard`)
-            router.push("/parent/dashboard")
+            return
           }
-        } else {
+
+          // Single school — validate then go to dashboard
           await validateSession()
-          console.log(`[Login][PARENT] No schools — redirecting to /parent/dashboard`)
+          console.log(`[Login][PARENT] Single school — redirecting to /parent/dashboard`)
+          router.push("/parent/dashboard")
+        } else {
+          notifications.success(t("welcome_back_parent"), t("login_success_parent"))
+          await validateSession()
           router.push("/parent/dashboard")
         }
       } else {

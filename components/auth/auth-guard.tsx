@@ -4,7 +4,6 @@ import React, { useEffect } from "react"
 import { useAuth } from "@/lib/context/auth-context"
 import { useSchool } from "@/lib/context/school-context"
 import { useRouter, usePathname } from "next/navigation"
-import { SessionTransition } from "@/components/auth/session-transition"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, RotateCw } from "lucide-react"
 import { ShieldAlert } from "lucide-react"
@@ -67,11 +66,10 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     }
   }, [user, sessionReady, allowedRoles, router, pathname, availableSchools])
 
-  // 1. SECURITY GATE: Show SessionTransition during any auth/session loading.
-  //    This BLOCKS rendering of any protected content until the session is fully verified.
-  //    This is the primary defence against stale-data flashes between user switches.
+  // 1. SESSION LOADING: Show a lightweight skeleton while auth/permissions settle.
+  //    The useEffect above handles redirects once sessionReady becomes true.
   if (!sessionReady) {
-    return <SessionTransition message="Securing your session..." />
+    return <PageSkeleton variant="dashboard" />
   }
 
   // 2. If token is invalid or missing, redirect is already running via useEffect

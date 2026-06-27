@@ -5,8 +5,38 @@ import { Device } from '@capacitor/device';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
 
+import { App } from '@capacitor/app';
+import { Network } from '@capacitor/network';
+import { notifications } from '@/lib/utils/notifications';
+
 export const NativeBridge = {
   isNative: () => Capacitor.isNativePlatform(),
+
+  // Deep Link Handling
+  initDeepLinks: (router: any) => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    App.addListener('appUrlOpen', (event: any) => {
+      // Example: https://zetime.app/parent/announcements -> /parent/announcements
+      const slug = event.url.split('.app').pop() || event.url.split('.com').pop();
+      if (slug) {
+        router.push(slug);
+      }
+    });
+  },
+
+  // Network Sensitivity
+  initNetworkListener: () => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    Network.addListener('networkStatusChange', status => {
+      if (!status.connected) {
+        notifications.warning("Offline Mode", "You are currently offline. Some features may be limited.");
+      } else {
+        notifications.success("Back Online", "Connection restored.");
+      }
+    });
+  },
 
   // Haptics (Vibrational Feedback)
   vibrate: async (style: ImpactStyle = ImpactStyle.Medium) => {
@@ -34,8 +64,6 @@ export const NativeBridge = {
 
   // Push Notifications Setup
   initPush: async () => {
-    // Disabled until google-services.json is provided
-    return;
     if (!Capacitor.isNativePlatform()) return;
 
     try {
@@ -60,11 +88,14 @@ export const NativeBridge = {
     }
   },
 
-  // Filesystem Exports (CSV/Reports)
-  saveAndShareFile: async (fileName: string, data: string, mimeType: string) => {
+  // Filesystem Exports (CSV/Reports/PDFs)
+  saveAndShareFile: async (fileName: string, data: string, mimeType: string, isBase64 = false) => {
     if (!Capacitor.isNativePlatform()) {
       // Browser fallback (standard download)
-      const blob = new Blob([data], { type: mimeType });
+      const blob = isBase64 
+        ? await (await fetch(`data:${mimeType};base64,${data}`)).blob()
+        : new Blob([data], { type: mimeType });
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -80,11 +111,10 @@ export const NativeBridge = {
         path: fileName,
         data: data,
         directory: Directory.Documents,
-        encoding: 'utf8' as any
+        encoding: isBase64 ? undefined : 'utf8' as any
       });
       
       console.log('File written: ', result.uri);
-      // You can add sharing logic here if needed
       return result.uri;
     } catch (e) {
       console.error('Error writing file', e);

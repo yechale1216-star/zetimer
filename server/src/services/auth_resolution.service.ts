@@ -1,8 +1,8 @@
 import prisma from '../config/db';
 
 export interface Membership {
-  schoolId: string;
-  schoolName: string;
+  id: string; // matches schoolId
+  name: string; // matches schoolName
   role: string;
   customSchoolId?: string;
   logo?: string;
@@ -23,8 +23,8 @@ export const getMemberships = async (userId: string): Promise<Membership[]> => {
 
   if (user && user.schoolId && user.role && user.role !== 'parent') {
     memberships.push({
-      schoolId: user.schoolId,
-      schoolName: user.school?.name || 'My School',
+      id: user.schoolId,
+      name: user.school?.name || 'My School',
       role: user.role,
       customSchoolId: user.school?.schoolId || '',
       logo: (user.school?.settings as any | null)?.school_logo || ''
@@ -39,10 +39,10 @@ export const getMemberships = async (userId: string): Promise<Membership[]> => {
   });
 
   for (const t of teacherRecords) {
-    if (t.schoolId && !memberships.some(m => m.schoolId === t.schoolId && m.role === 'teacher')) {
+    if (t.schoolId && !memberships.some(m => m.id === t.schoolId && m.role === 'teacher')) {
       memberships.push({
-        schoolId: t.schoolId,
-        schoolName: t.school?.name || 'My School',
+        id: t.schoolId,
+        name: t.school?.name || 'My School',
         role: 'teacher',
         customSchoolId: t.school?.schoolId || '',
         logo: (t.school?.settings as any | null)?.school_logo || ''
@@ -57,10 +57,10 @@ export const getMemberships = async (userId: string): Promise<Membership[]> => {
   });
 
   for (const l of parentLinks) {
-    if (l.schoolId && !memberships.some(m => m.schoolId === l.schoolId && m.role === 'parent')) {
+    if (l.schoolId && !memberships.some(m => m.id === l.schoolId && m.role === 'parent')) {
       memberships.push({
-        schoolId: l.schoolId,
-        schoolName: l.school?.name || 'My School',
+        id: l.schoolId,
+        name: l.school?.name || 'My School',
         role: 'parent',
         customSchoolId: l.school?.schoolId || '',
         logo: (l.school?.settings as any | null)?.school_logo || ''
@@ -72,8 +72,8 @@ export const getMemberships = async (userId: string): Promise<Membership[]> => {
   if (user?.role === 'super_admin') {
     if (!memberships.some(m => m.role === 'super_admin')) {
       memberships.push({
-        schoolId: 'global',
-        schoolName: 'Zetime Platform',
+        id: 'global',
+        name: 'Zetime Platform',
         role: 'super_admin'
       });
     }

@@ -411,8 +411,8 @@ export default function ParentDashboard() {
       )}
 
       {/* ─── TODAY'S ATTENDANCE SUMMARY CARD ──────────────────────────────── */}
-      <Card className="border-border/40 shadow-xl rounded-3xl bg-card/60 backdrop-blur-md overflow-hidden">
-        <CardContent className="p-6">
+      <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 transition-all overflow-hidden relative">
+        <CardContent className="p-6 relative z-10">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/60 rounded-2xl flex items-center justify-center text-emerald-700 dark:text-emerald-400 shadow-inner">
@@ -449,21 +449,21 @@ export default function ParentDashboard() {
               ) : todayStatus.isSessionBased ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Morning */}
-                  <div className="p-5 bg-muted/40 border-2 border-border/10 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-sm hover:border-sky-500/20 transition-all">
-                    <span className="typography-label text-[10px] text-muted-foreground uppercase tracking-widest">{t("morning_session")}</span>
+                  <div className="p-5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-white/5 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-none hover:border-primary/20 transition-all group">
+                    <span className="typography-label text-[10px] text-muted-foreground uppercase tracking-widest group-hover:text-primary transition-colors">{t("morning_session")}</span>
                     {todayStatus.morning ? getStatusBadge(todayStatus.morning) : <span className="typography-label text-muted-foreground/40 italic">-</span>}
                   </div>
 
                   {/* Afternoon */}
-                  <div className="p-5 bg-muted/40 border-2 border-border/10 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-sm hover:border-sky-500/20 transition-all">
-                    <span className="typography-label text-[10px] text-muted-foreground uppercase tracking-widest">{t("afternoon_session")}</span>
+                  <div className="p-5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-white/5 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-none hover:border-primary/20 transition-all group">
+                    <span className="typography-label text-[10px] text-muted-foreground uppercase tracking-widest group-hover:text-primary transition-colors">{t("afternoon_session")}</span>
                     {todayStatus.afternoon ? getStatusBadge(todayStatus.afternoon) : <span className="typography-label text-muted-foreground/40 italic">-</span>}
                   </div>
                 </div>
               ) : (
                 <div className="flex justify-center">
-                  <div className="p-6 bg-muted/40 border-2 border-border/10 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-sm max-w-xs w-full hover:border-emerald-500/20 transition-all">
-                    <span className="typography-label text-[10px] text-muted-foreground uppercase tracking-widest">{t("status_label")}</span>
+                  <div className="p-6 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-white/5 rounded-3xl flex flex-col justify-center items-center gap-3 shadow-sm max-w-xs w-full hover:border-primary/20 transition-all group">
+                    <span className="typography-label text-[10px] text-muted-foreground uppercase tracking-widest group-hover:text-primary transition-colors">{t("status_label")}</span>
                     {todayStatus.daily ? getStatusBadge(todayStatus.daily) : <span className="typography-label text-muted-foreground/40 italic">{t("unmarked")}</span>}
                   </div>
                 </div>
@@ -477,7 +477,7 @@ export default function ParentDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Attendance Rate Circular Progress Card */}
-        <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md flex flex-col justify-between">
+        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 overflow-hidden transition-all">
           <CardHeader className="pb-4">
             <CardTitle className="typography-card-title uppercase text-foreground/80">{t("attendance_rate")}</CardTitle>
             <CardDescription className="typography-label">{t("attendance_rate_desc")}</CardDescription>
@@ -526,7 +526,7 @@ export default function ParentDashboard() {
         </Card>
 
         {/* Attendance Metrics Numbers Card */}
-        <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md lg:col-span-2 flex flex-col justify-between">
+        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 overflow-hidden lg:col-span-2 transition-all">
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
             <div>
               <CardTitle className="typography-card-title uppercase text-foreground/80">{t("term_summary")}</CardTitle>
@@ -639,7 +639,7 @@ export default function ParentDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Left: Recent Absences & Late Alerts */}
-        <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md">
+        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 transition-all">
           <CardHeader className="flex flex-row items-center justify-between border-b border-border/20 pb-4">
             <div>
               <CardTitle className="typography-card-title uppercase text-foreground/80 flex items-center gap-2">
@@ -702,7 +702,7 @@ export default function ParentDashboard() {
         </Card>
 
         {/* Right: School Announcements Board */}
-        <Card className="border-border/40 shadow-lg rounded-3xl bg-card/60 backdrop-blur-md">
+        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 transition-all">
           <CardHeader className="flex flex-row items-center justify-between border-b border-border/20 pb-4">
             <div className="flex flex-col">
               <CardTitle className="typography-card-title uppercase text-foreground/80 flex items-center gap-2">

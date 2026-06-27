@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { mockDB } from "@/lib/db/mock-db"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const rows = mockDB.getAllTransactions().map((t) => {
@@ -37,5 +39,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Failed to create transaction" }, { status: 500 })
   }
 }
+
 
 

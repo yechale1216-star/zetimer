@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { appUrl } from "@/lib/api-config"
 
+export const dynamic = "force-dynamic"
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const txRef = searchParams.get('txRef')

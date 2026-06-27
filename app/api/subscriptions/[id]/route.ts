@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { mockDB } from "@/lib/db/mock-db"
 
+export const dynamic = "force-dynamic"
+
 function serialize(sub: NonNullable<ReturnType<typeof mockDB.getSubscription>>) {
   const price = mockDB.calculateForSubscription(sub)
   return {

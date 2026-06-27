@@ -3,6 +3,8 @@ import { mockDB } from "@/lib/db/mock-db"
 import { TIER_CONFIG, ADDON_CATALOG } from "@/lib/utils/pricing-utils"
 import type { TierPlan } from "@/lib/utils/subscription-types"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const overrides = mockDB.getTierBaseOverrides()
@@ -46,5 +48,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Failed to update pricing" }, { status: 500 })
   }
 }
+
 
 

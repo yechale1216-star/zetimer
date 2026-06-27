@@ -1,6 +1,8 @@
 import { neon } from "@neondatabase/serverless"
 import { type NextRequest, NextResponse } from "next/server"
 
+export const dynamic = "force-dynamic"
+
 const sql = neon(process.env.DATABASE_URL || "postgresql://dummy:dummy@localhost/dummy")
 
 async function verifySuperAdmin(userId: string): Promise<boolean> {
@@ -114,3 +116,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
+

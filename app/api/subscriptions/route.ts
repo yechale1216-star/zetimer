@@ -3,6 +3,8 @@ import { mockDB } from "@/lib/db/mock-db"
 import type { BillingPeriod, SubscriptionStatus, TierPlan } from "@/lib/utils/subscription-types"
 import type { Subscription } from "@/lib/db/mock-db"
 
+export const dynamic = "force-dynamic"
+
 function serializeSubscription(sub: Subscription) {
   const price = mockDB.calculateForSubscription(sub)
   return {
@@ -91,5 +93,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Failed to create subscription" }, { status: 500 })
   }
 }
+
 
 

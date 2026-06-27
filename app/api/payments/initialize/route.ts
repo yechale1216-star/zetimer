@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { mockDB } from "@/lib/db/mock-db"
 import { appUrl } from "@/lib/api-config"
 
+export const dynamic = "force-dynamic"
+
 // Use environment variables in production
 const CHAPA_SECRET_KEY = process.env.CHAPA_SECRET_KEY || "CHASECK_TEST_MOCK"
 
@@ -124,3 +126,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }
+

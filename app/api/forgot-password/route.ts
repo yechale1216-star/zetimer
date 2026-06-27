@@ -3,6 +3,8 @@ import crypto from "crypto"
 import { appUrl } from "@/lib/api-config"
 import { createServerSupabaseClient } from "@/lib/utils/supabase-server"
 
+export const dynamic = "force-dynamic"
+
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json()
@@ -122,4 +124,5 @@ Smart Attendance System
     })
   }
 }
+
 

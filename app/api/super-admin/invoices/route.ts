@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { mockDB } from "@/lib/db/mock-db"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const rows = mockDB.getAllInvoices().map((inv) => {
@@ -46,5 +48,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Failed to generate invoice" }, { status: 500 })
   }
 }
+
 
 

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = "force-dynamic"
+
 // Mock billing history data
 const mockBillingHistory: Record<string, any[]> = {
   '1': [

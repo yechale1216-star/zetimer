@@ -3,6 +3,8 @@ import { hash } from "bcryptjs"
 import { type NextRequest, NextResponse } from "next/server"
 import { getCurrentSuperAdmin, logAdminAction } from "@/lib/auth/super-admin-auth"
 
+export const dynamic = "force-dynamic"
+
 const sql = neon(process.env.DATABASE_URL || "postgresql://dummy:dummy@localhost/dummy")
 
 export async function GET(request: NextRequest) {
@@ -217,5 +219,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
+
 
 

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { mockDB } from "@/lib/db/mock-db"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const settings = mockDB.getTrialSettings()
@@ -25,3 +27,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 })
   }
 }
+

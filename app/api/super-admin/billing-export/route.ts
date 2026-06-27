@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { mockDB } from "@/lib/db/mock-db"
 
+export const dynamic = "force-dynamic"
+
 /** CSV export of all billing rows (super admin) */
 export async function GET() {
   try {
@@ -24,5 +26,6 @@ export async function GET() {
     return NextResponse.json({ success: false, error: "Export failed" }, { status: 500 })
   }
 }
+
 
 

@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import bcrypt from "bcryptjs"
 
+export const dynamic = "force-dynamic"
+
 export async function POST(request: NextRequest) {
   try {
     const { token, password } = await request.json()
@@ -61,4 +63,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "An error occurred processing your request" }, { status: 500 })
   }
 }
+
 

@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 
+export const dynamic = "force-dynamic"
+
 export async function POST(request: NextRequest) {
   try {
     const { email, token } = await request.json()
@@ -50,3 +52,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ valid: false, error: "An error occurred verifying the token" }, { status: 500 })
   }
 }
+

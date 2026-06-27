@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+export const dynamic = "force-dynamic"
+
 // Simple in-memory tracking for demo purposes
 // In production, this would be stored in a database or cache
 let dailyMessageCount = 0
@@ -223,3 +225,4 @@ export async function POST(request: NextRequest) {
     })
   }
 }
+

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { mockDB } from "@/lib/db/mock-db"
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const rows = mockDB.getAllBillingHistory().map((b) => {
@@ -15,5 +17,6 @@ export async function GET() {
     return NextResponse.json({ success: false, error: "Failed to load billing" }, { status: 500 })
   }
 }
+
 
 

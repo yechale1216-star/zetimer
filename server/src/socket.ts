@@ -2,7 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
-import { sendPushNotification } from './services/notification.service';
+import { sendPushNotification, sendCallNotification, sendCallCancellation, sendMessageNotification } from './services/notification.service';
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-long-enough';
@@ -143,15 +143,146 @@ export const initSocket = (server: HttpServer) => {
         io.to(data.conversationId).emit('new_message', { ...message, tempId: data.tempId });
         socket.emit('message_sent', { tempId: data.tempId, messageId: message.id });
         
-        // Push notification logic
+        // ── Push notification: only for OFFLINE users ──────────────────────────
+        // Online users already received the message via Socket.IO above.
+        // Sending a push to them too would create a duplicate notification.
         getConversationMemberIds(data.conversationId).then(async (memberIds) => {
-          const targets = memberIds.filter(id => id !== data.senderId);
-          const usersWithTokens = await prisma.user.findMany({ where: { id: { in: targets }, pushToken: { not: null } }, select: { pushToken: true } });
+          const offlineTargets = memberIds.filter(id => id !== data.senderId && !onlineUsers.has(id));
+          if (offlineTargets.length === 0) return;
+
+          const usersWithTokens = await prisma.user.findMany({
+            where: { id: { in: offlineTargets }, pushToken: { not: null } },
+            select: { id: true, pushToken: true }
+          });
+
+          const expiredIds: string[] = [];
           for (const u of usersWithTokens) {
-            if (u.pushToken) sendPushNotification(u.pushToken, `New from ${message.sender.full_name}`, data.content || 'Attachment', { type: 'message', conversationId: data.conversationId });
+            if (!u.pushToken) continue;
+            const result = await sendMessageNotification(u.pushToken, {
+              conversationId: data.conversationId,
+              senderId: message.sender.id,
+              senderName: message.sender.full_name,
+              senderAvatar: message.sender.profile_photo || '',
+              messagePreview: data.content || (data.attachment ? '📎 Attachment' : 'New message'),
+              messageType: data.type || 'TEXT',
+            });
+            if (result === 'EXPIRED_TOKEN') expiredIds.push(u.id);
+          }
+          // Clean up expired tokens automatically
+          if (expiredIds.length > 0) {
+            prisma.user.updateMany({ where: { id: { in: expiredIds } }, data: { pushToken: null } }).catch(() => {});
           }
         });
       } catch (error) { socket.emit('message_error', { message: 'Failed to send', tempId: data.tempId }); }
+    });
+
+    // ── Delete message ─────────────────────────────────────────────────────────
+    socket.on('delete_message', async (data: { messageId: string; conversationId: string; deleteForEveryone?: boolean }) => {
+      const tenant = socketData.get(socket.id);
+      if (!tenant) return;
+      try {
+        // Verify the message belongs to this school and the requester is the sender (or an admin)
+        const message = await prisma.message.findFirst({
+          where: { id: data.messageId, schoolId: tenant.schoolId },
+          select: { id: true, senderId: true, conversationId: true },
+        });
+        if (!message) return;
+
+        const isOwner = message.senderId === tenant.userId;
+        if (!isOwner) return; // Only sender can delete for now
+
+        await prisma.message.update({
+          where: { id: data.messageId },
+          data: { isDeleted: true, content: null },
+        });
+
+        io.to(data.conversationId).emit('message_deleted', {
+          messageId: data.messageId,
+          conversationId: data.conversationId,
+        });
+      } catch (err) {
+        console.error('[Socket] delete_message error:', err);
+      }
+    });
+
+    // ── Edit message ────────────────────────────────────────────────────────────
+    socket.on('edit_message', async (data: { messageId: string; conversationId: string; content: string }) => {
+      const tenant = socketData.get(socket.id);
+      if (!tenant) return;
+      try {
+        const message = await prisma.message.findFirst({
+          where: { id: data.messageId, schoolId: tenant.schoolId, senderId: tenant.userId },
+          select: { id: true, conversationId: true },
+        });
+        if (!message) return;
+
+        const updated = await prisma.message.update({
+          where: { id: data.messageId },
+          data: { content: data.content, editedAt: new Date() },
+        });
+
+        io.to(data.conversationId).emit('message_edited', {
+          messageId: data.messageId,
+          conversationId: data.conversationId,
+          content: data.content,
+          editedAt: updated.editedAt,
+        });
+      } catch (err) {
+        console.error('[Socket] edit_message error:', err);
+      }
+    });
+
+    // ── Pin / Unpin message ─────────────────────────────────────────────────────
+    socket.on('pin_message', async (data: { messageId: string; conversationId: string }) => {
+      const tenant = socketData.get(socket.id);
+      if (!tenant) return;
+      try {
+        // Verify user is a member of the conversation
+        const membership = await prisma.conversationMember.findFirst({
+          where: { conversationId: data.conversationId, userId: tenant.userId },
+          select: { id: true },
+        });
+        if (!membership) return;
+
+        // Toggle: unpin if already pinned, pin if not
+        const existing = await prisma.pinnedMessage.findUnique({
+          where: { conversationId_messageId: { conversationId: data.conversationId, messageId: data.messageId } },
+        });
+
+        if (existing) {
+          await prisma.pinnedMessage.delete({
+            where: { conversationId_messageId: { conversationId: data.conversationId, messageId: data.messageId } },
+          });
+          io.to(data.conversationId).emit('message_pinned', {
+            messageId: data.messageId,
+            conversationId: data.conversationId,
+            pinnedBy: tenant.userId,
+            isPinned: false,
+          });
+        } else {
+          const pinned = await prisma.pinnedMessage.create({
+            data: {
+              conversationId: data.conversationId,
+              messageId: data.messageId,
+              pinnedBy: tenant.userId,
+            },
+            include: {
+              message: { select: { id: true, content: true, type: true, sender: { select: { full_name: true } } } },
+            },
+          });
+          io.to(data.conversationId).emit('message_pinned', {
+            messageId: data.messageId,
+            conversationId: data.conversationId,
+            pinnedBy: tenant.userId,
+            isPinned: true,
+            messageContent: pinned.message.content,
+            senderName: pinned.message.sender.full_name,
+            messageType: pinned.message.type,
+          });
+        }
+      } catch (err) {
+        console.error('[Socket] pin_message error:', err);
+      }
     });
 
     socket.on('typing', (data: any) => socket.to(data.conversationId).emit('user_typing', data));
@@ -176,9 +307,20 @@ export const initSocket = (server: HttpServer) => {
       if (targetSocketId) io.to(targetSocketId).emit('incoming_call', data);
       
       if (targetUser.pushToken) {
-        sendPushNotification(targetUser.pushToken, `Incoming ${data.type} call`, `${data.profile.name} is calling...`, { type: 'incoming_call', from: data.from, callType: data.type, profile: JSON.stringify(data.profile) });
+        // High-priority silent data notification to wake Android app for Full Screen Intent
+        sendCallNotification(targetUser.pushToken, {
+          callId: data.callId || `call-${Date.now()}`,
+          callerName: data.profile.name,
+          callerAvatar: data.profile.avatar,
+          callType: data.type || 'VOICE',
+        });
       }
       (prisma as any).callSession?.create({ data: { schoolId: tenant.schoolId, type: data.type, status: 'RINGING', participants: { create: [{ userId: data.from, schoolId: tenant.schoolId }, { userId: data.to, schoolId: tenant.schoolId }] } } }).catch(() => {});
+    });
+
+    socket.on('call_ringing', (data: any) => {
+      const s = userSockets.get(data.to);
+      if (s) io.to(s).emit('call_ringing', { from: data.from });
     });
 
     socket.on('answer_call', (data: any) => {
@@ -205,8 +347,24 @@ export const initSocket = (server: HttpServer) => {
       if (!tenant) return;
       const s = userSockets.get(data.to);
       if (s) io.to(s).emit('call_rejected', { from: data.from });
+      
+      // Cancel native ringing if active
+      const targetUser = await prisma.user.findUnique({ where: { id: data.to }, select: { pushToken: true } });
+      if (targetUser?.pushToken) {
+        sendCallCancellation(targetUser.pushToken, data.callId || '');
+      }
+
       if (data.conversationId) {
-        const msg = await prisma.message.create({ data: { conversationId: data.conversationId, senderId: data.from, schoolId: tenant.schoolId, content: 'Missed Call', type: data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE' } });
+        const msg = await prisma.message.create({ 
+          data: { 
+            conversationId: data.conversationId, 
+            senderId: data.from, 
+            schoolId: tenant.schoolId, 
+            content: data.reason === 'MISSED' ? 'Missed Call' : 'Declined Call', 
+            type: data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE',
+            metadata: { reason: data.reason || 'DECLINED' }
+          } 
+        });
         io.to(data.conversationId).emit('new_message', msg);
       }
     });
@@ -216,8 +374,34 @@ export const initSocket = (server: HttpServer) => {
       if (!tenant) return;
       const s = userSockets.get(data.to);
       if (s) io.to(s).emit('call_ended', { from: data.from });
+
+      // Cancel native ringing if active
+      const targetUser = await prisma.user.findUnique({ where: { id: data.to }, select: { pushToken: true } });
+      if (targetUser?.pushToken) {
+        sendCallCancellation(targetUser.pushToken, data.callId || '');
+      }
+
       if (data.conversationId) {
-        const msg = await prisma.message.create({ data: { conversationId: data.conversationId, senderId: data.from, schoolId: tenant.schoolId, content: 'Call ended', type: 'CALL_VOICE' } });
+        let content = 'Call ended';
+        let msgType = data.type === 'VIDEO' ? 'CALL_VIDEO' : 'CALL_VOICE';
+        if (data.reason === 'CANCELLED') {
+           content = 'Canceled Call';
+           msgType = data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE';
+        } else if (data.reason === 'MISSED') {
+           content = 'Missed Call';
+           msgType = data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE';
+        }
+
+        const msg = await prisma.message.create({ 
+          data: { 
+            conversationId: data.conversationId, 
+            senderId: data.from, 
+            schoolId: tenant.schoolId, 
+            content, 
+            type: msgType,
+            metadata: { duration: data.duration, reason: data.reason }
+          } 
+        });
         io.to(data.conversationId).emit('new_message', msg);
       }
     });

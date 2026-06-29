@@ -1,16 +1,23 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChatLayout } from '@/components/messaging/chat-layout';
 import { ChatSidebar } from '@/components/messaging/chat-sidebar';
 import { ChatWindow } from '@/components/messaging/chat-window';
 import { CreateGroupModal } from '@/components/messaging/create-group-modal';
 import { GroupInfoPanel } from '@/components/messaging/group-info-panel';
+import { UserInfoPanel } from '@/components/messaging/user-info-panel';
+import { SavedMessagesPanel } from '@/components/messaging/saved-messages-panel';
+import { Bookmark, X } from 'lucide-react';
 import { useSocket } from '@/components/providers/socket-provider';
 import { authService } from '@/lib/auth/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/lib/context/language-context';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { notifications } from '@/lib/utils/notifications';
+import { updateAppBadge } from '@/lib/utils/app-badge';
 import { formatLocalizedTime } from '@/lib/utils/date-utils';
 import {
   cacheMessages,
@@ -50,6 +57,12 @@ export function MessagingCenter() {
   const [isLoadingSidebar, setIsLoadingSidebar] = useState(true);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+  const [showSavedMessages, setShowSavedMessages] = useState(false);
+  const [forwardDialogData, setForwardDialogData] = useState<{
+    messageIds?: string[];
+    singleMessage?: any;
+  } | null>(null);
+  const [pinnedByConversation, setPinnedByConversation] = useState<Record<string, any>>({}); // conversationId -> pinnedMessage info
 
   const { socket, isConnected } = useSocket();
   const [user, setUser] = useState<any>(null);
@@ -79,6 +92,33 @@ export function MessagingCenter() {
     // Register global bridge for sidebar to open group modal
     (window as any).openCreateGroup = () => setIsGroupModalOpen(true);
 
+    // ── Handle notification tap → auto-open the conversation ──────────────────
+    // Fired by SocketProvider when (a) user clicks an in-app notification or
+    // (b) the service worker posts a NOTIFICATION_CLICK message after a push tap.
+    const handleOpenConversation = (e: Event) => {
+      const { conversationId } = (e as CustomEvent).detail || {};
+      if (conversationId) {
+        setActiveConversationId(conversationId);
+      }
+    };
+    window.addEventListener('zetime:open_conversation', handleOpenConversation);
+
+    // ── Update sidebar badge without a full re-fetch ───────────────────────────
+    const handleNewMessageEvent = (e: Event) => {
+      const { conversationId, senderName, preview, timestamp } = (e as CustomEvent).detail || {};
+      if (!conversationId) return;
+      setConversations(prev => prev.map(conv => {
+        if (conv.id !== conversationId) return conv;
+        return {
+          ...conv,
+          lastMessage: preview || conv.lastMessage,
+          timestamp,
+          unreadCount: (conv.unreadCount || 0) + 1,
+        };
+      }));
+    };
+    window.addEventListener('zetime:new_message', handleNewMessageEvent);
+
     // ── Telegram-style: Load cached conversations from IndexedDB instantly ──
     getCachedConversations().then(cached => {
       if (cached && cached.length > 0) {
@@ -90,8 +130,21 @@ export function MessagingCenter() {
 
     return () => {
       delete (window as any).openCreateGroup;
+      window.removeEventListener('zetime:open_conversation', handleOpenConversation);
+      window.removeEventListener('zetime:new_message', handleNewMessageEvent);
     };
   }, []);
+
+  // ── Sync Launcher Icon Badge Count ───────────────────────────────────────────
+  useEffect(() => {
+    let totalUnreadChats = 0;
+    for (const c of conversations) {
+      totalUnreadChats += (c.unreadCount || 0);
+    }
+    // Update the capacitor app badge
+    updateAppBadge(totalUnreadChats).catch(() => {});
+  }, [conversations]);
+
 
 
   // ── Load sidebar data ────────────────────────────────────────────────────────
@@ -281,6 +334,7 @@ export function MessagingCenter() {
         reactions: m.reactions || [],
         isDeleted: m.isDeleted,
         editedAt: m.editedAt,
+        metadata: m.metadata || null,
       }));
 
       // Store messages keyed by conversationId — never mixed
@@ -502,6 +556,63 @@ export function MessagingCenter() {
     }
   };
 
+  const handleForwardTo = async (targetConvId: string) => {
+    if (!forwardDialogData || !user) return;
+    const { singleMessage, messageIds } = forwardDialogData;
+
+    const msgsToForward = [];
+    if (singleMessage) {
+      msgsToForward.push(singleMessage);
+    } else if (messageIds && activeConversationId) {
+      const allMsgs = messagesByConversation[activeConversationId] || [];
+      const selected = allMsgs.filter(m => messageIds.includes(m.id));
+      msgsToForward.push(...selected);
+    }
+
+    if (msgsToForward.length === 0) {
+      setForwardDialogData(null);
+      return;
+    }
+
+    try {
+      for (const msg of msgsToForward) {
+        if (targetConvId === 'saved-messages') {
+          // Forwarding directly to Saved Messages
+          await fetch(`${API_URL}/api/saved-messages/messages`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              content: msg.content,
+              type: msg.type || 'TEXT',
+              attachment: msg.attachments?.[0],
+              forwardedFromId: msg.id,
+            }),
+          });
+        } else {
+          // Forwarding to another normal active conversation via WebSocket
+          if (socket && isConnected) {
+            socket.emit('send_message', {
+              conversationId: targetConvId,
+              senderId: user.id,
+              content: msg.content,
+              type: msg.type || 'TEXT',
+              attachment: msg.attachments?.[0],
+            });
+          }
+        }
+      }
+      notifications.success("Success", `Forwarded ${msgsToForward.length} message(s)`);
+    } catch (err) {
+      toast({
+        title: t("error"),
+        description: "Failed to forward message(s)",
+        variant: 'destructive',
+      });
+    } finally {
+      setForwardDialogData(null);
+    }
+  };
+
   const handleAction = async (action: string, data: any) => {
     if (!socket || !isConnected) return;
     
@@ -509,17 +620,79 @@ export function MessagingCenter() {
       case 'edit':
         socket.emit('edit_message', { ...data, conversationId: activeConversationId });
         break;
-      case 'delete':
-        socket.emit('delete_message', { ...data, conversationId: activeConversationId });
+      case 'delete': {
+        // Optimistic local update: mark as deleted immediately
+        const delId = data.messageId;
+        setMessagesByConversation(prev => {
+          const msgs = prev[activeConversationId!];
+          if (!msgs) return prev;
+          return { ...prev, [activeConversationId!]: msgs.map(m => m.id === delId ? { ...m, isDeleted: true, content: null } : m) };
+        });
+        socket.emit('delete_message', { messageId: delId, conversationId: activeConversationId });
         break;
-      case 'pin':
-        socket.emit('pin_message', { ...data, conversationId: activeConversationId });
+      }
+      case 'pin': {
+        const messageId = data.messageId;
+        const isPinned = data.isPinned;
+        // Optimistic local update
+        setPinnedByConversation(prev => {
+          if (isPinned) {
+            // Unpin optimistically
+            const next = { ...prev };
+            if (next[activeConversationId!]?.messageId === messageId) delete next[activeConversationId!];
+            return next;
+          } else {
+            return { ...prev, [activeConversationId!]: { messageId, content: data.content, senderName: data.senderName, type: data.type } };
+          }
+        });
+        socket.emit('pin_message', { messageId, conversationId: activeConversationId });
         break;
+      }
       case 'react':
         socket.emit('toggle_reaction', { ...data, conversationId: activeConversationId, userId: user?.id });
-      case 'forward':
-        toast({ title: t("forward"), description: "Forwarding feature coming soon!" });
         break;
+      case 'forward':
+        setForwardDialogData({ singleMessage: data.message });
+        break;
+      case 'forward_selected':
+        setForwardDialogData({ messageIds: data.messageIds });
+        break;
+      case 'cancel_upload': {
+        const msgId = data.messageId;
+        setMessagesByConversation(prev => {
+          const msgs = prev[activeConversationId!];
+          if (!msgs) return prev;
+          return {
+            ...prev,
+            [activeConversationId!]: msgs.filter(m => m.id !== msgId)
+          };
+        });
+        break;
+      }
+      case 'upload_failed': {
+        const msgId = data.messageId;
+        setMessagesByConversation(prev => {
+          const msgs = prev[activeConversationId!];
+          if (!msgs) return prev;
+          return {
+            ...prev,
+            [activeConversationId!]: msgs.map(m => m.id === msgId ? { ...m, status: 'failed' } : m)
+          };
+        });
+        break;
+      }
+      case 'upload_retry_start': {
+        const msgId = data.messageId;
+        setMessagesByConversation(prev => {
+          const msgs = prev[activeConversationId!];
+          if (!msgs) return prev;
+          return {
+            ...prev,
+            [activeConversationId!]: msgs.map(m => m.id === msgId ? { ...m, status: 'sending' } : m)
+          };
+        });
+        break;
+      }
     }
   };
 
@@ -594,7 +767,8 @@ export function MessagingCenter() {
         type: message.type || 'TEXT',
         attachments: message.attachments,
         isMe: message.senderId === currentUser?.id,
-        tempId: message.tempId, // Capture tempId if present
+        tempId: message.tempId,
+        metadata: message.metadata || null,
       };
 
       // Append ONLY to the correct conversation bucket
@@ -706,6 +880,39 @@ export function MessagingCenter() {
       });
     };
 
+    const handleMessagePinned = (data: { messageId: string; conversationId: string; isPinned: boolean; messageContent?: string; senderName?: string; messageType?: string }) => {
+      setPinnedByConversation(prev => {
+        if (!data.isPinned) {
+          const next = { ...prev };
+          // Only remove if it's the message being unpinned
+          if (next[data.conversationId]?.messageId === data.messageId) {
+            delete next[data.conversationId];
+          }
+          return next;
+        }
+        return {
+          ...prev,
+          [data.conversationId]: {
+            messageId: data.messageId,
+            content: data.messageContent,
+            senderName: data.senderName,
+            type: data.messageType,
+          },
+        };
+      });
+      // Also update the isPinned flag on the message in state
+      setMessagesByConversation(prev => {
+        const msgs = prev[data.conversationId];
+        if (!msgs) return prev;
+        return {
+          ...prev,
+          [data.conversationId]: msgs.map(m =>
+            m.id === data.messageId ? { ...m, isPinned: data.isPinned } : m
+          ),
+        };
+      });
+    };
+
     const handleReactionUpdated = (data: { messageId: string, emoji: string, userId: string, action: 'added' | 'removed', conversationId: string }) => {
       setMessagesByConversation(prev => {
         const msgs = prev[data.conversationId];
@@ -811,6 +1018,7 @@ export function MessagingCenter() {
       });
     };
 
+    socket.on('message_pinned', handleMessagePinned);
     socket.on('new_message', handleNewMessage);
     socket.on('message_read', handleMessageRead);
     socket.on('message_sent', handleMessageSent);
@@ -827,6 +1035,7 @@ export function MessagingCenter() {
     socket.on('user_stop_typing', handleUserStopTyping);
 
     return () => {
+      socket.off('message_pinned', handleMessagePinned);
       socket.off('new_message', handleNewMessage);
       socket.off('message_read', handleMessageRead);
       socket.off('message_sent', handleMessageSent);
@@ -962,14 +1171,21 @@ export function MessagingCenter() {
   return (
     <div className="h-full relative overflow-hidden">
       <ChatLayout
-        showContentOnMobile={!!activeConversationId}
+        showContentOnMobile={!!activeConversationId || showSavedMessages}
         sidebar={
           <ChatSidebar
             conversations={conversations}
-            activeConversationId={activeConversationId || undefined}
+            activeConversationId={showSavedMessages ? 'saved-messages' : (activeConversationId || undefined)}
             onSelectConversation={id => {
+              setShowSavedMessages(false);
               const chat = conversations.find(c => c.id === id);
               handleSelectConversation(id, chat);
+            }}
+            onOpenSavedMessages={() => {
+              setShowSavedMessages(true);
+              setActiveConversationId(null);
+              setActiveConversationData(null);
+              setIsInfoPanelOpen(false);
             }}
             isLoading={isLoadingSidebar || !user}
             currentUser={user}
@@ -977,27 +1193,44 @@ export function MessagingCenter() {
         }
         content={
           <div className="flex h-full overflow-hidden">
-            <ChatWindow
-              activeConversation={activeConversationData}
-              messages={currentMessages}
-              typingStatus={activeConversationId ? typingUsers[activeConversationId] : undefined}
-              onSendMessage={handleSendMessage}
-              isLoading={isFetchingMessages}
-              onBack={() => {
-                setActiveConversationId(null);
-                setActiveConversationData(null);
-              }}
-              onToggleInfo={() => setIsInfoPanelOpen(!isInfoPanelOpen)}
-              onAction={handleAction}
-            />
-            {isInfoPanelOpen && activeConversationData?.isGroup && (
-              <GroupInfoPanel 
-                group={activeConversationData}
-                currentUser={user}
-                onClose={() => setIsInfoPanelOpen(false)}
-                onUpdateRole={handleUpdateRole}
-                onRemoveMember={handleRemoveMember}
+            {showSavedMessages ? (
+              <SavedMessagesPanel
+                onClose={() => setShowSavedMessages(false)}
               />
+            ) : (
+              <>
+                <ChatWindow
+                  activeConversation={activeConversationData}
+                  messages={currentMessages}
+                  typingStatus={activeConversationId ? typingUsers[activeConversationId] : undefined}
+                  onSendMessage={handleSendMessage}
+                  isLoading={isFetchingMessages}
+                  onBack={() => {
+                    setActiveConversationId(null);
+                    setActiveConversationData(null);
+                  }}
+                  onToggleInfo={() => setIsInfoPanelOpen(!isInfoPanelOpen)}
+                  onAction={handleAction}
+                  pinnedMessage={activeConversationId ? pinnedByConversation[activeConversationId] : undefined}
+                />
+                {isInfoPanelOpen && activeConversationData?.isGroup && (
+                  <GroupInfoPanel 
+                    group={activeConversationData}
+                    currentUser={user}
+                    onClose={() => setIsInfoPanelOpen(false)}
+                    onUpdateRole={handleUpdateRole}
+                    onRemoveMember={handleRemoveMember}
+                  />
+                )}
+                {isInfoPanelOpen && !activeConversationData?.isGroup && (
+                  <UserInfoPanel 
+                    user={activeConversationData}
+                    currentUser={user}
+                    onClose={() => setIsInfoPanelOpen(false)}
+                    onAction={handleAction}
+                  />
+                )}
+              </>
             )}
           </div>
         }
@@ -1012,6 +1245,73 @@ export function MessagingCenter() {
         }}
         currentUser={user}
       />
+
+      {/* Target Conversation Selector Modal for Forwarding */}
+      <AnimatePresence>
+        {forwardDialogData && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setForwardDialogData(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: 15, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 15, opacity: 0 }}
+              className="bg-background border border-border shadow-2xl rounded-3xl w-full max-w-md overflow-hidden relative z-10 flex flex-col max-h-[80vh]"
+            >
+              <div className="p-5 border-b border-border/50 flex items-center justify-between">
+                <span className="font-bold text-lg tracking-tight text-foreground">Forward Message</span>
+                <Button variant="ghost" size="icon" onClick={() => setForwardDialogData(null)} className="h-8 w-8 rounded-full">
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {/* Pinned Saved Messages option */}
+                <button
+                  onClick={() => handleForwardTo('saved-messages')}
+                  className="w-full flex items-center gap-3.5 p-3 rounded-2xl transition-colors hover:bg-emerald-600/10 hover:text-emerald-700 active:scale-[98] text-left group"
+                >
+                  <div className="h-11 w-11 rounded-full bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                    <Bookmark className="h-5 w-5 text-emerald-600 group-hover:text-white transition-colors" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm text-foreground group-hover:text-emerald-750 transition-colors">Saved Messages</p>
+                    <p className="text-xs text-muted-foreground/60">Forward to your private notes</p>
+                  </div>
+                </button>
+
+                <div className="h-px bg-border/40 mx-2 my-1" />
+
+                {conversations.map((conv) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => handleForwardTo(conv.id)}
+                    className="w-full flex items-center gap-3.5 p-3 rounded-2xl transition-colors hover:bg-secondary active:scale-[98] text-left"
+                  >
+                    <Avatar className="h-11 w-11 border border-border/20">
+                      <AvatarImage src={conv.avatar || undefined} />
+                      <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
+                        {conv.name?.slice(0, 2)?.toUpperCase() || 'CH'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm text-foreground truncate">{conv.name}</p>
+                      <p className="text-xs text-muted-foreground/60 truncate">
+                        {conv.isGroup ? `${conv.members?.length || 0} members` : conv.role || 'Chat'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

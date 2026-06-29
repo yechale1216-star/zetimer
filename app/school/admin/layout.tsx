@@ -106,6 +106,10 @@ export default function SchoolAdminLayout({
   }, [])
 
   React.useEffect(() => {
+    (window as any).goBack = () => router.push('/school/admin')
+  }, [router])
+
+  React.useEffect(() => {
     if (user?.role === 'admin' && user?.onboardingCompleted === false) {
       if (pathname !== "/onboarding") {
         router.replace('/onboarding')
@@ -224,7 +228,7 @@ export default function SchoolAdminLayout({
 
               {/* ── Main Content Area ── */}
               <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
-                <TopNav showMenuButton onMenuClick={() => setSidebarOpen(true)} />
+                {!isCommunicationPage && <TopNav showMenuButton onMenuClick={() => setSidebarOpen(true)} />}
 
                 <main
                   className={cn(

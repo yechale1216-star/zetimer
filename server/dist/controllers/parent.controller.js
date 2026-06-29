@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkParentsBatch = exports.setActiveSchool = exports.getMySchools = exports.updateProfile = exports.updateAnnouncement = exports.getAnnouncements = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.deleteNotification = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = exports.listParentSchools = void 0;
+exports.checkParentsBatch = exports.setActiveSchool = exports.getMySchools = exports.getMyStudents = exports.updateProfile = exports.updateAnnouncement = exports.getAnnouncements = exports.postAnnouncement = exports.updatePreferences = exports.getPreferences = exports.markAllAsRead = exports.deleteNotification = exports.markAsRead = exports.getNotifications = exports.updatePassword = exports.searchParent = exports.loginParent = exports.listParentSchools = void 0;
 const parentService = __importStar(require("../services/parent.service"));
 const db_1 = __importDefault(require("../config/db"));
 /**
@@ -327,6 +327,35 @@ const updateProfile = async (req, res, next) => {
 };
 exports.updateProfile = updateProfile;
 /**
+ * GET /api/parent/me/students?schoolId=...
+ * Returns all children the parent has in the specified school.
+ * schoolId comes from the x-school-id header (set during school switch).
+ */
+const getMyStudents = async (req, res, next) => {
+    try {
+        if (!req.user?.id)
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        // Prefer explicit query param, fall back to header, then JWT schoolId
+        const schoolId = req.query.schoolId
+            || req.headers['x-school-id']
+            || req.user.schoolId;
+        if (!schoolId) {
+            return res.status(400).json({ success: false, message: 'schoolId is required.' });
+        }
+        // Security: verify the parent actually has access to this school
+        const hasAccess = await parentService.validateSchoolAccess(req.user.id, schoolId);
+        if (!hasAccess) {
+            return res.status(403).json({ success: false, message: 'You do not have a child enrolled in this school.' });
+        }
+        const students = await parentService.getParentStudentsForSchool(req.user.id, schoolId);
+        res.status(200).json({ success: true, data: students });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getMyStudents = getMyStudents;
+/**
  * GET /api/parent/me/schools
  * Returns all schools this parent has children in — server validated.
  */
@@ -360,7 +389,23 @@ const setActiveSchool = async (req, res, next) => {
         // Return the school details for the frontend to update context
         const schools = await parentService.getParentSchools(req.user.id);
         const school = schools.find((s) => s.id === schoolId);
-        res.status(200).json({ success: true, data: school });
+        // Generate a fresh token with the NEW schoolId context
+        const { generateToken } = require('../utils/jwt');
+        const token = generateToken({
+            id: req.user.id,
+            email: req.user.email,
+            role: 'parent',
+            schoolId: schoolId,
+            customSchoolId: school?.customSchoolId || '',
+        });
+        // Update the attendance_token cookie to match
+        res.cookie('attendance_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+        });
+        res.status(200).json({ success: true, data: school, token });
     }
     catch (error) {
         next(error);

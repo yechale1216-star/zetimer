@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Pin, Plus, Users, User, Settings, MoreVertical, ChevronLeft } from 'lucide-react';
+import { Search, Pin, Plus, Users, User, Settings, MoreVertical, ChevronLeft, Bookmark } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils/utils';
@@ -37,6 +37,7 @@ interface ChatSidebarProps {
   conversations: Conversation[];
   activeConversationId?: string;
   onSelectConversation: (id: string) => void;
+  onOpenSavedMessages?: () => void;
   isLoading?: boolean;
   currentUser?: { name?: string; profile_photo?: string; id?: string } | null;
 }
@@ -45,6 +46,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = React.memo(({
   conversations,
   activeConversationId,
   onSelectConversation,
+  onOpenSavedMessages,
   isLoading,
   currentUser
 }) => {
@@ -68,9 +70,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = React.memo(({
     });
   }, [conversations, searchQuery, activeTab]);
 
-  const onlineUsers = React.useMemo(() =>
-    conversations.filter(c => c.isOnline && !c.isGroup),
-    [conversations]);
+
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden border-r border-border pt-safe">
@@ -137,57 +137,80 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = React.memo(({
         </div>
       </div>
 
-      {/* Online Users Row */}
-      {onlineUsers.length > 0 && activeTab === 'All' && !searchQuery && (
-        <div className="py-2 border-b border-border/50">
-          <div className="flex items-center gap-4 overflow-x-auto px-4 py-2 scrollbar-hide">
-            {onlineUsers.map(user => (
-              <button
-                key={user.id}
-                onClick={() => onSelectConversation(user.id)}
-                className="flex flex-col items-center gap-1.5 shrink-0 group"
-              >
-                <div className="relative">
-                  <Avatar className="h-14 w-14 border-2 border-primary/20 group-hover:border-primary transition-all p-0.5">
-                    <AvatarImage src={user.avatar} className="rounded-full" />
-                    <AvatarFallback className="bg-secondary text-primary font-bold">
-                      {user.name.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 bg-green-500 border-2 border-background rounded-full" />
-                </div>
-                <span className="text-[11px] font-medium text-muted-foreground truncate w-14 text-center group-hover:text-foreground">
-                  {user.name.split(' ')[0]}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+
 
       {/* Conversations List */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
         {isLoading ? (
           <ChatListSkeleton />
-        ) : filteredConversations.length > 0 ? (
-          <div className="px-2 py-3 space-y-1">
-            {filteredConversations.map((chat) => (
-              <ConversationItem
-                key={chat.id}
-                chat={chat}
-                isActive={activeConversationId === chat.id}
-                onSelect={onSelectConversation}
-                t={t}
-              />
-            ))}
-          </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-in fade-in slide-in-from-bottom-4">
-            <div className="h-16 w-16 bg-secondary/50 rounded-full flex items-center justify-center mb-4">
-              <Search className="h-8 w-8 text-muted-foreground/30" />
-            </div>
-            <p className="text-sm font-medium text-muted-foreground">{t("no_conv_found")}</p>
-            <p className="text-xs text-muted-foreground/50 mt-1">Try a different search term</p>
+          <div className="px-2 py-3 space-y-1">
+
+            {/* ── Pinned: Saved Messages ── */}
+            <button
+              onClick={onOpenSavedMessages}
+              className={cn(
+                "w-full flex items-center gap-3.5 p-3.5 rounded-2xl transition-all duration-200 relative group",
+                activeConversationId === 'saved-messages'
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                  : "hover:bg-secondary/60 active:scale-[0.98]"
+              )}
+            >
+              <div className="relative shrink-0">
+                <div className={cn(
+                  "h-14 w-14 rounded-full flex items-center justify-center border-2 transition-all",
+                  activeConversationId === 'saved-messages'
+                    ? "bg-white/20 border-white/30"
+                    : "bg-emerald-600/10 border-emerald-500/30 group-hover:border-emerald-500/60"
+                )}>
+                  <Bookmark className={cn(
+                    "h-6 w-6 transition-colors",
+                    activeConversationId === 'saved-messages' ? "text-white" : "text-emerald-600"
+                  )} />
+                </div>
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <div className="flex items-center justify-between mb-1">
+                  <span className={cn(
+                    "font-bold text-[16px] truncate tracking-tight",
+                    activeConversationId === 'saved-messages' ? "text-white" : "text-foreground/90"
+                  )}>Saved Messages</span>
+                  <Pin className={cn(
+                    "h-3 w-3 shrink-0 ml-1",
+                    activeConversationId === 'saved-messages' ? "text-white/50" : "text-muted-foreground/30"
+                  )} />
+                </div>
+                <p className={cn(
+                  "text-[13px] truncate",
+                  activeConversationId === 'saved-messages' ? "text-primary-foreground/70" : "text-muted-foreground/60"
+                )}>Forward messages here to save them</p>
+              </div>
+            </button>
+
+            {/* ── Separator ── */}
+            {filteredConversations.length > 0 && (
+              <div className="h-px bg-border/40 mx-2 my-1" />
+            )}
+
+            {filteredConversations.length > 0 ? (
+              filteredConversations.map((chat) => (
+                <ConversationItem
+                  key={chat.id}
+                  chat={chat}
+                  isActive={activeConversationId === chat.id}
+                  onSelect={onSelectConversation}
+                  t={t}
+                />
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in slide-in-from-bottom-4">
+                <div className="h-16 w-16 bg-secondary/50 rounded-full flex items-center justify-center mb-4">
+                  <Search className="h-8 w-8 text-muted-foreground/30" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground">{t("no_conv_found")}</p>
+                <p className="text-xs text-muted-foreground/50 mt-1">Try a different search term</p>
+              </div>
+            )}
           </div>
         )}
       </div>

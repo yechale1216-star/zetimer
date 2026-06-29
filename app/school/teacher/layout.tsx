@@ -40,6 +40,10 @@ export default function TeacherLayout({
     setMounted(true)
   }, [])
 
+  React.useEffect(() => {
+    (window as any).goBack = () => router.push('/school/teacher')
+  }, [router])
+
   const handleMainScroll = (e: React.UIEvent<HTMLElement>) => {
     const currentScrollY = e.currentTarget.scrollTop
     if (currentScrollY > lastScrollY && currentScrollY > 100) {
@@ -139,7 +143,7 @@ export default function TeacherLayout({
 
               {/* Main Content Area */}
               <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
-                <TopNav showMenuButton onMenuClick={() => setSidebarOpen(true)} />
+                {!isCommunicationPage && <TopNav showMenuButton onMenuClick={() => setSidebarOpen(true)} />}
                 <main 
                   className={cn("flex-1 flex flex-col overflow-auto focus:outline-none relative", !isCommunicationPage && "pb-20 md:pb-0")}
                   onScroll={handleMainScroll}

@@ -481,22 +481,25 @@ model ParentPreferences {
 }
 
 model Conversation {
-  id              String               @id @default(uuid())
-  name            String?
-  isGroup         Boolean              @default(false)
-  avatar          String?
-  description     String?
-  groupType       String?              // GRADE | PARENT | TEACHER | STAFF | ANNOUNCEMENT | CUSTOM
-  isAnnouncement  Boolean              @default(false)
-  createdBy       String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  schoolId        String?
-  school          School?              @relation(fields: [schoolId], references: [id])
-  members         ConversationMember[]
-  messages        Message[]
-  pinnedMessages  PinnedMessage[]
+  id                String               @id @default(uuid())
+  name              String?
+  isGroup           Boolean              @default(false)
+  avatar            String?
+  description       String?
+  groupType         String?              // GRADE | PARENT | TEACHER | STAFF | ANNOUNCEMENT | CUSTOM
+  isAnnouncement    Boolean              @default(false)
+  isSavedMessages   Boolean              @default(false)
+  savedMessagesFor  String?              // userId of the owner
+  createdBy         String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  schoolId          String?
+  school            School?              @relation(fields: [schoolId], references: [id])
+  members           ConversationMember[]
+  messages          Message[]
+  pinnedMessages    PinnedMessage[]
 
+  @@unique([savedMessagesFor, schoolId])
   @@index([schoolId])
 }
 

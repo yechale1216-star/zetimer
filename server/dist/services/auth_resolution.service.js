@@ -18,8 +18,8 @@ const getMemberships = async (userId) => {
     });
     if (user && user.schoolId && user.role && user.role !== 'parent') {
         memberships.push({
-            schoolId: user.schoolId,
-            schoolName: user.school?.name || 'My School',
+            id: user.schoolId,
+            name: user.school?.name || 'My School',
             role: user.role,
             customSchoolId: user.school?.schoolId || '',
             logo: user.school?.settings?.school_logo || ''
@@ -32,10 +32,10 @@ const getMemberships = async (userId) => {
         include: { school: { include: { settings: true } } }
     });
     for (const t of teacherRecords) {
-        if (t.schoolId && !memberships.some(m => m.schoolId === t.schoolId && m.role === 'teacher')) {
+        if (t.schoolId && !memberships.some(m => m.id === t.schoolId && m.role === 'teacher')) {
             memberships.push({
-                schoolId: t.schoolId,
-                schoolName: t.school?.name || 'My School',
+                id: t.schoolId,
+                name: t.school?.name || 'My School',
                 role: 'teacher',
                 customSchoolId: t.school?.schoolId || '',
                 logo: t.school?.settings?.school_logo || ''
@@ -48,10 +48,10 @@ const getMemberships = async (userId) => {
         include: { school: { include: { settings: true } } }
     });
     for (const l of parentLinks) {
-        if (l.schoolId && !memberships.some(m => m.schoolId === l.schoolId && m.role === 'parent')) {
+        if (l.schoolId && !memberships.some(m => m.id === l.schoolId && m.role === 'parent')) {
             memberships.push({
-                schoolId: l.schoolId,
-                schoolName: l.school?.name || 'My School',
+                id: l.schoolId,
+                name: l.school?.name || 'My School',
                 role: 'parent',
                 customSchoolId: l.school?.schoolId || '',
                 logo: l.school?.settings?.school_logo || ''
@@ -62,8 +62,8 @@ const getMemberships = async (userId) => {
     if (user?.role === 'super_admin') {
         if (!memberships.some(m => m.role === 'super_admin')) {
             memberships.push({
-                schoolId: 'global',
-                schoolName: 'Zetime Platform',
+                id: 'global',
+                name: 'Zetime Platform',
                 role: 'super_admin'
             });
         }

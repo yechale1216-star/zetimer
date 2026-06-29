@@ -1,8 +1,9 @@
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
+// Zetime Firebase Messaging Service Worker
+// Handles background push notifications for messages and calls
 
-// These will be replaced by the environment during build or used as defaults
-// The user should provide these in their Firebase project settings
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+
 const firebaseConfig = {
   apiKey: "AIzaSyCSIXAPFXbi5xj37eXTfVe5a2oHg_2j8mU",
   authDomain: "zetime-16774.firebaseapp.com",
@@ -10,62 +11,141 @@ const firebaseConfig = {
   storageBucket: "zetime-16774.firebasestorage.app",
   messagingSenderId: "30878856713",
   appId: "1:30878856713:web:b245fd0d02e65745002ad8",
-  measurementId: "G-0YL5XGWKGR"
 };
 
-if (firebaseConfig.apiKey) {
-  firebase.initializeApp(firebaseConfig);
-  const messaging = firebase.messaging();
+firebase.initializeApp(firebaseConfig);
+const messaging = firebase.messaging();
 
-  messaging.onBackgroundMessage((payload) => {
-    console.log('[firebase-messaging-sw.js] Received background message ', payload);
-    
-    const notificationTitle = payload.notification.title;
-    const isCall = payload.data && payload.data.type === 'call';
-    
-    const notificationOptions = {
-      body: payload.notification.body,
-      icon: '/icon-192.png', // Fixed path
-      badge: '/icon-192.png', // Added badge for status bar
-      data: payload.data,
-      tag: payload.data ? payload.data.tag || 'zetime-notif' : 'zetime-notif',
-      renotify: true,
-      requireInteraction: isCall, // Keep call notifications on screen until acted upon
-      vibrate: isCall ? [200, 100, 200, 100, 200, 100, 200] : [100],
-      actions: isCall ? [
-        { action: 'answer', title: 'Answer' },
-        { action: 'decline', title: 'Decline' }
-      ] : []
-    };
+// ── Background message handler ─────────────────────────────────────────────
+messaging.onBackgroundMessage((payload) => {
+  console.log('[SW] Background message received:', payload);
 
-    self.registration.showNotification(notificationTitle, notificationOptions);
+  const data = payload.data || {};
+  const type = data.type;
+
+  if (type === 'new_message') {
+    handleMessageNotification(data);
+  } else if (type === 'incoming_call') {
+    handleCallNotification(data, payload);
+  } else if (payload.notification) {
+    // Generic notification fallback
+    const { title, body } = payload.notification;
+    self.registration.showNotification(title || 'Zetime', {
+      body: body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'zetime-general',
+      data: data,
+    });
+  }
+});
+
+// ── Message notification ───────────────────────────────────────────────────
+function handleMessageNotification(data) {
+  const senderName   = data.senderName     || 'New Message';
+  const preview      = data.messagePreview || 'You have a new message';
+  const conversationId = data.conversationId;
+  const tag          = data.tag || `chat-${conversationId}`;
+  const avatar       = data.senderAvatar || '/icon-192.png';
+
+  self.registration.showNotification(senderName, {
+    body: preview,
+    icon: avatar,
+    badge: '/icon-192.png',
+    tag,                    // Same tag = stacked notifications per chat (Telegram-style)
+    renotify: true,         // Always play sound even for same tag
+    silent: false,
+    vibrate: [250, 150, 250],
+    data: {
+      url: '/messaging',
+      conversationId,
+      type: 'new_message',
+    },
+    actions: [
+      { action: 'open', title: '💬 Open Chat' },
+    ],
   });
 }
 
-// Handle notification clicks
+// ── Call notification ──────────────────────────────────────────────────────
+function handleCallNotification(data, payload) {
+  const callerName = data.callerName || 'Unknown';
+  const callType   = data.callType  || 'voice';
+
+  const title = `Incoming ${callType} call`;
+
+  self.registration.showNotification(title, {
+    body: callerName,
+    icon: data.callerAvatar || '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: 'incoming-call',
+    requireInteraction: true,  // Stay on screen until user acts
+    vibrate: [200, 100, 200, 100, 200],
+    silent: false,
+    data: {
+      url: '/messaging',
+      type: 'incoming_call',
+      callId: data.callId,
+    },
+    actions: [
+      { action: 'answer',  title: '✅ Answer'  },
+      { action: 'decline', title: '❌ Decline' },
+    ],
+  });
+}
+
+// ── Notification click handler ─────────────────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const data = event.notification.data;
-  let url = '/';
+  const data   = event.notification.data || {};
+  const action = event.action;
 
-  if (data && data.url) {
-    url = data.url;
-  } else if (data && data.type === 'call') {
-    url = '/video-call'; // Assuming there is a video call route
+  let url = data.url || '/messaging';
+
+  if (action === 'decline') {
+    // Just close — no navigation needed
+    return;
   }
 
+  // For all other clicks/actions: open or focus the app
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (var i = 0; i < windowClients.length; i++) {
-        var client = windowClients[i];
-        if (client.url === url && 'focus' in client) {
+      // Try to find an existing window and focus it
+      for (const client of windowClients) {
+        if ('focus' in client) {
+          // Post message to the app so it can navigate to the conversation
+          client.postMessage({
+            type: 'NOTIFICATION_CLICK',
+            conversationId: data.conversationId,
+            notifType: data.type,
+          });
           return client.focus();
         }
       }
-      if (clients.openWindow) {
-        return clients.openWindow(url);
-      }
+      // No existing window — open a new one
+      return clients.openWindow(url);
     })
   );
+});
+
+// ── Push event fallback (for browsers that bypass onBackgroundMessage) ─────
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch (e) {
+    return;
+  }
+
+  // If Firebase SDK already handled it via onBackgroundMessage, skip
+  // (detected by presence of "notification" key which Firebase sets after processing)
+  if (payload.notification) return;
+
+  const data = payload.data || {};
+  if (data.type === 'new_message') {
+    event.waitUntil(handleMessageNotification(data));
+  }
 });

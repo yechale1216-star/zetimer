@@ -58,17 +58,38 @@ const super_admin_routes_1 = __importDefault(require("./routes/super-admin.route
 const group_routes_1 = __importDefault(require("./routes/group.routes"));
 const announcement_routes_1 = __importDefault(require("./routes/announcement.routes"));
 const call_routes_1 = __importDefault(require("./routes/call.routes"));
+const notification_routes_1 = __importDefault(require("./routes/notification.routes"));
+const saved_messages_routes_1 = __importDefault(require("./routes/saved-messages.routes"));
 const tenant_middleware_1 = require("./middleware/tenant.middleware");
 const maintenance_middleware_1 = require("./middleware/maintenance.middleware");
 const parentController = __importStar(require("./controllers/parent.controller"));
 const app = (0, express_1.default)();
 // Middleware
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'https://zetime.vercel.app',
+    'https://zetime.app',
+    'capacitor://localhost',
+    'https://localhost'
+];
 app.use((0, cors_1.default)({
     origin: function (origin, callback) {
-        // Reflect origin to allow credentials from any frontend port in dev
-        callback(null, true);
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.startsWith('http://localhost:')) {
+            callback(null, true);
+        }
+        else {
+            // In development, we can be more permissive if needed
+            callback(null, true);
+        }
     },
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-school-id', 'x-requested-role']
 }));
 app.use((0, cookie_parser_1.default)());
 app.use(express_1.default.json({ limit: '50mb' }));
@@ -114,6 +135,8 @@ app.use('/api/groups', group_routes_1.default);
 app.use('/api/promotions', promotion_routes_1.default);
 app.use('/api/announcements', announcement_routes_1.default);
 app.use('/api/calls', call_routes_1.default);
+app.use('/api/notifications', notification_routes_1.default);
+app.use('/api/saved-messages', saved_messages_routes_1.default);
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);

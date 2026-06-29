@@ -216,8 +216,28 @@ router.post('/me/active-school', async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'You do not have an active role in this school.' });
         }
         const memberships = await getMemberships(req.user.id);
-        const school = memberships.find((m) => m.schoolId === schoolId);
-        res.status(200).json({ success: true, data: school });
+        // Membership uses `id` (not `schoolId`) — match against it correctly
+        const school = memberships.find((m) => m.id === schoolId);
+        if (!school) {
+            return res.status(404).json({ success: false, message: 'School membership not found.' });
+        }
+        // Generate a fresh token with the NEW school context
+        const { generateToken } = require('../utils/jwt');
+        const token = generateToken({
+            id: req.user.id,
+            email: req.user.email,
+            role: role, // Use the role resolved for this school
+            schoolId: schoolId,
+            customSchoolId: school.customSchoolId || '',
+        });
+        // Update the attendance_token cookie to match
+        res.cookie('attendance_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+        });
+        res.status(200).json({ success: true, data: school, token });
     }
     catch (error) {
         next(error);

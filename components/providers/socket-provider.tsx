@@ -32,8 +32,8 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
       // --- Register Push Token ---
       try {
-        const { requestPushNotificationPermission } = await import('@/lib/firebase-client');
-        const pushToken = await requestPushNotificationPermission();
+        const { registerPushNotifications } = await import('@/lib/utils/push-notifications');
+        const pushToken = await registerPushNotifications();
         if (pushToken) {
           s.emit('register_push_token', { token: pushToken });
         }
@@ -99,34 +99,47 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
     socketInstance.on('new_message', (message: any) => {
       const currentUser = authService.getCurrentUser();
-      
-      // Don't notify for our own messages
+
+      // Don't show notification for our own messages
       if (currentUser && message.senderId === currentUser.id) return;
 
-      // Dispatch event so NotificationPopover refreshes
+      // Dispatch a custom event so MessagingCenter and NotificationPopover
+      // can both react immediately without re-fetching.
+      window.dispatchEvent(new CustomEvent('zetime:new_message', {
+        detail: {
+          conversationId: message.conversationId,
+          senderId:       message.senderId,
+          senderName:     message.sender?.full_name || 'New Message',
+          senderAvatar:   message.sender?.profile_photo || '',
+          preview:        message.content || (message.type !== 'TEXT' ? '📎 Attachment' : 'New message'),
+          timestamp:      message.createdAt,
+        },
+      }));
+
+      // Also fire the generic badge update used by the header notification bell
       window.dispatchEvent(new Event('new_notification'));
-      
-      // Only notify if permissions are granted
+
+      // In-app browser notification (only when app is open and not focused on that chat)
       if ('Notification' in window && Notification.permission === 'granted') {
-        const title = message.senderName || message.sender?.full_name || 'New Message';
-        const body = message.content || (message.type !== 'TEXT' ? 'Sent an attachment' : 'New message');
-        const icon = message.senderAvatar || message.sender?.profile_photo || '/favicon.ico';
-        
+        const title  = message.sender?.full_name || 'New Message';
+        const body   = message.content || (message.type !== 'TEXT' ? '📎 Attachment' : 'New message');
+        const icon   = message.sender?.profile_photo || '/icon-192.png';
         try {
-          const notification = new Notification(title, {
+          const notif = new Notification(title, {
             body,
             icon,
             tag: `chat-${message.conversationId}`,
           });
-          
-          notification.onclick = () => {
+          notif.onclick = () => {
             window.focus();
-            notification.close();
-            // If they are on a different page, this brings the app to focus. 
-            // In a more complex app, we could navigate to /chat or the specific conversation.
+            notif.close();
+            // Navigate to the conversation
+            window.dispatchEvent(new CustomEvent('zetime:open_conversation', {
+              detail: { conversationId: message.conversationId },
+            }));
           };
         } catch (e) {
-          console.error('[Socket] Failed to show notification:', e);
+          console.warn('[Socket] In-app notification failed:', e);
         }
       }
     });
@@ -159,8 +172,23 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       // Register Firebase Service Worker
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/firebase-messaging-sw.js')
-          .then((reg) => console.log('[SocketProvider] Service Worker registered:', reg.scope))
+          .then((reg) => {
+            console.log('[SocketProvider] Service Worker registered:', reg.scope);
+          })
           .catch((err) => console.warn('[SocketProvider] SW registration failed:', err));
+
+        // ── Handle notification tap from service worker ──────────────────────
+        // When user taps a push notification (app was closed), the SW posts a
+        // NOTIFICATION_CLICK message here so we can navigate to the right chat.
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          const msg = event.data;
+          if (!msg) return;
+          if (msg.type === 'NOTIFICATION_CLICK' && msg.conversationId) {
+            window.dispatchEvent(new CustomEvent('zetime:open_conversation', {
+              detail: { conversationId: msg.conversationId },
+            }));
+          }
+        });
       }
     }
 

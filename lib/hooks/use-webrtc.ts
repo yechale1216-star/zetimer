@@ -82,8 +82,10 @@ export const useWebRTC = (options: WebRTCOptions) => {
   useEffect(() => { isCameraOffRef.current = isCameraOff; }, [isCameraOff]);
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
 
-  // Queue to buffer incoming ICE candidates until the remote session description is set
+  // Queues
   const queuedCandidates = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  const connectedAt = useRef<number | null>(null);
+  const isInitiator = useRef<boolean>(false);
 
   const cleanupUser = useCallback((userId: string) => {
     const pc = peerConnections.current.get(userId);
@@ -115,6 +117,8 @@ export const useWebRTC = (options: WebRTCOptions) => {
     setRemoteStreams({});
     setRemoteMediaStates({});
     setCallStatus('IDLE');
+    connectedAt.current = null;
+    isInitiator.current = false;
   }, [localStream]);
 
   const createPeerConnection = useCallback((userId: string) => {
@@ -175,6 +179,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
     setCallStatus('CONNECTING');
     setMediaError(null);
     callType.current = type;
+    isInitiator.current = true;
     try {
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
@@ -196,6 +201,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
           from: options.userId,
           profile,
           type,
+          callId: `call-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         });
       }
     } catch (error) {
@@ -209,6 +215,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
     setCallStatus('CONNECTING');
     setMediaError(null);
     callType.current = type;
+    isInitiator.current = false;
     try {
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
@@ -247,6 +254,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
         });
       }
       setCallStatus('CONNECTED');
+      connectedAt.current = Date.now();
     } catch (error) {
       console.error('Error answering call:', error);
       setMediaError(describeMediaError(error));
@@ -255,22 +263,35 @@ export const useWebRTC = (options: WebRTCOptions) => {
   }, [socket, options.userId, createPeerConnection, cleanupAll]);
 
   const endCall = useCallback(() => {
+    let duration = 0;
+    if (connectedAt.current) {
+      duration = Math.floor((Date.now() - connectedAt.current) / 1000);
+    }
+
+    const reason = !connectedAt.current ? (isInitiator.current ? 'CANCELLED' : 'MISSED') : 'ENDED';
+
     peerConnections.current.forEach((_, userId) => {
       if (socket) socket.emit('end_call', { 
         to: userId, 
         from: options.userId,
+        type: callType.current,
         conversationId: (window as any).activeConversationId,
+        duration,
+        reason
       });
     });
     cleanupAll();
   }, [socket, options.userId, cleanupAll]);
 
   // Emitted by the RECEIVER to notify the caller they were declined
-  const rejectCall = useCallback((callerId: string) => {
+  const rejectCall = useCallback((callerId: string, timeoutMissed: boolean = false) => {
     if (socket) {
       socket.emit('reject_call', {
         to: callerId,
         from: options.userId,
+        type: callType.current,
+        conversationId: (window as any).activeConversationId,
+        reason: timeoutMissed ? 'MISSED' : 'DECLINED'
       });
     }
     cleanupAll();
@@ -322,14 +343,67 @@ export const useWebRTC = (options: WebRTCOptions) => {
     }
   }, [localStream, socket, options.userId]);
 
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+
+  const flipCamera = useCallback(async () => {
+    if (!localStreamRef.current || callType.current !== 'VIDEO') return;
+    const currentStream = localStreamRef.current;
+    
+    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newFacingMode);
+    
+    try {
+      const newStream = await acquireStream(currentStream, {
+        audio: true,
+        video: { facingMode: newFacingMode }
+      });
+      
+      setLocalStream(newStream);
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const newAudioTrack = newStream.getAudioTracks()[0];
+      
+      if (isCameraOffRef.current && newVideoTrack) {
+         newVideoTrack.enabled = false;
+      }
+      if (isMutedRef.current && newAudioTrack) {
+         newAudioTrack.enabled = false;
+      }
+
+      peerConnections.current.forEach((pc) => {
+        const senders = pc.getSenders();
+        
+        const videoSender = senders.find(s => s.track?.kind === 'video');
+        if (videoSender && newVideoTrack) {
+          videoSender.replaceTrack(newVideoTrack).catch(e => console.error(e));
+        }
+        
+        const audioSender = senders.find(s => s.track?.kind === 'audio');
+        if (audioSender && newAudioTrack) {
+           audioSender.replaceTrack(newAudioTrack).catch(e => console.error(e));
+        }
+      });
+    } catch (err) {
+      console.error('Error flipping camera:', err);
+      if (err instanceof Error) {
+         setMediaError(describeMediaError(err));
+      }
+    }
+  }, [facingMode]);
+
   useEffect(() => {
     if (!socket) return;
 
     socket.on('incoming_call', (data) => {
       if (options.onIncomingCall) options.onIncomingCall(data);
       setCallStatus('RINGING');
+      socket.emit('call_ringing', { to: data.from, from: options.userId });
     });
 
+    const handleRinging = ({ from }: any) => {
+      console.log('Call is ringing on remote device:', from);
+      setCallStatus('RINGING');
+    };
 
     // Redefining signaling events for multi-peer
     const handleAnswer = async ({ from, answer }: any) => {
@@ -349,6 +423,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
         queuedCandidates.current.delete(from);
 
         setCallStatus('CONNECTED');
+        connectedAt.current = Date.now();
         if (options.onCallAccepted) options.onCallAccepted(from);
 
         // Emit media state immediately on connection
@@ -389,6 +464,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
       }));
     };
 
+    socket.on('call_ringing', handleRinging);
     socket.on('call_answered', handleAnswer);
     socket.on('ice_candidate', handleIceCandidate);
     socket.on('media_state_changed', handleMediaStateChanged);
@@ -410,6 +486,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
 
     return () => {
       socket.off('incoming_call');
+      socket.off('call_ringing', handleRinging);
       socket.off('call_answered', handleAnswer);
       socket.off('ice_candidate', handleIceCandidate);
       socket.off('media_state_changed', handleMediaStateChanged);
@@ -432,5 +509,6 @@ export const useWebRTC = (options: WebRTCOptions) => {
     rejectCall,
     toggleMute,
     toggleCamera,
+    flipCamera,
   };
 };

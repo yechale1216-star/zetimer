@@ -8,6 +8,15 @@ import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Network } from '@capacitor/network';
 import { notifications } from '@/lib/utils/notifications';
+import { registerPlugin } from '@capacitor/core';
+
+interface CallPlugin {
+  endCall: () => Promise<void>;
+  startRinging: (options: { callerName: string }) => Promise<void>;
+  addListener: (eventName: 'onCallAction', listenerFunc: (data: { action: string, callId: string }) => void) => Promise<any>;
+}
+
+const CallPlugin = registerPlugin<CallPlugin>('CallPlugin');
 
 export const NativeBridge = {
   isNative: () => Capacitor.isNativePlatform(),
@@ -119,5 +128,42 @@ export const NativeBridge = {
     } catch (e) {
       console.error('Error writing file', e);
     }
+  },
+
+  // Call System Integrations
+  endNativeCall: async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await CallPlugin.endCall();
+      } catch (e) {
+        console.warn('CallPlugin: endCall failed', e);
+      }
+    }
+  },
+
+  startNativeRinging: async (callerName: string) => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await CallPlugin.startRinging({ callerName });
+      } catch (e) {
+        console.warn('CallPlugin: startRinging failed', e);
+      }
+    }
+  },
+
+  addCallActionListener: (callback: (action: string, callId: string) => void) => {
+    if (Capacitor.isNativePlatform()) {
+      return CallPlugin.addListener('onCallAction', (data: { action: string, callId?: string, conversationId?: string }) => {
+        if (data.action === 'OPEN_CHAT' && data.conversationId && typeof window !== 'undefined') {
+          // Route message notification taps directly via the DOM event bus
+          window.dispatchEvent(new CustomEvent('zetime:open_conversation', {
+            detail: { conversationId: data.conversationId },
+          }));
+        } else {
+          callback(data.action, data.callId || '');
+        }
+      });
+    }
+    return null;
   }
 };

@@ -6,7 +6,7 @@ import {
   Check, CheckCheck, Reply, Forward, Trash2, Heart, Search, X, Clock,
   Pin, Copy, FileText, FileJson, FileType, Music, Play, ExternalLink,
   Download, Globe, FileArchive, Mic, MicOff, StopCircle, ImageIcon, File as FileIcon,
-  Info, Bell
+  Info, Bell, RotateCw, PhoneIncoming, PhoneMissed, PhoneOff, PhoneCall
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -43,7 +43,7 @@ interface Message {
   senderName: string;
   content: string;
   timestamp: string;
-  status: 'sending' | 'sent' | 'delivered' | 'read';
+  status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'VIDEO_MESSAGE' | 'CALL_VOICE' | 'CALL_VIDEO' | 'CALL_MISSED_VOICE' | 'CALL_MISSED_VIDEO';
   isMe: boolean;
   attachments?: {
@@ -72,6 +72,7 @@ interface ChatWindowProps {
   onToggleInfo?: () => void;
   onAction?: (action: string, data: any) => void;
   isLoading?: boolean;
+  pinnedMessage?: { messageId: string; content?: string; senderName?: string; type?: string } | null;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
@@ -83,6 +84,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   onToggleInfo,
   onAction,
   isLoading,
+  pinnedMessage,
 }) => {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
@@ -97,6 +99,72 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
   const [editTarget, setEditTarget] = useState<Message | null>(null);
+  const [deleteConfirmMessage, setDeleteConfirmMessage] = useState<Message | null>(null);
+  const [uploads, setUploads] = useState<Record<string, { progress: number; controller: AbortController; fileData?: { file: File; type: string; preview: string }; text?: string }>>({});
+
+  const handleCancelUpload = (tempId: string) => {
+    const upload = uploads[tempId];
+    if (upload) {
+      upload.controller.abort();
+      onAction?.('cancel_upload', { messageId: tempId });
+      setUploads(prev => {
+        const next = { ...prev };
+        delete next[tempId];
+        return next;
+      });
+    }
+  };
+
+  const retryUpload = async (tempId: string) => {
+    const upload = uploads[tempId];
+    if (!upload || !upload.fileData) return;
+
+    onAction?.('upload_retry_start', { messageId: tempId });
+
+    const controller = new AbortController();
+    setUploads(prev => ({
+      ...prev,
+      [tempId]: { ...prev[tempId], progress: 0, controller }
+    }));
+
+    try {
+      const attachmentUrl = await uploadFile(upload.fileData.file, (percent) => {
+        setUploads(prev => {
+          if (!prev[tempId]) return prev;
+          return { ...prev, [tempId]: { ...prev[tempId], progress: percent } };
+        });
+      }, controller.signal);
+
+      onSendMessage(upload.text || (upload.fileData.type === 'IMAGE' ? 'Image' : upload.fileData.type === 'VIDEO' ? 'Video' : 'File'), {
+        type: upload.fileData.type,
+        attachment: {
+          url: attachmentUrl,
+          name: upload.fileData.file.name,
+          type: upload.fileData.file.type,
+          size: upload.fileData.file.size
+        },
+        replaceTempId: tempId,
+      });
+
+      setUploads(prev => {
+        const next = { ...prev };
+        delete next[tempId];
+        return next;
+      });
+    } catch (error: any) {
+      if (error.message === 'Upload aborted') {
+        onAction?.('cancel_upload', { messageId: tempId });
+        setUploads(prev => {
+          const next = { ...prev };
+          delete next[tempId];
+          return next;
+        });
+      } else {
+        toast.error('Retry failed.');
+        onAction?.('upload_failed', { messageId: tempId });
+      }
+    }
+  };
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   // Recording
@@ -151,9 +219,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   };
 
   const deleteSelected = () => {
-    // Logic to delete selected messages
+    if (selectedIds.length === 0) return;
+    selectedIds.forEach(id => {
+      const msg = messages.find(m => m.id === id);
+      if (msg?.isMe) {
+        onAction?.('delete', { messageId: id });
+      }
+    });
     setSelectedIds([]);
     setIsSelectionMode(false);
+    toast.success(`${selectedIds.length} message(s) deleted`);
   };
 
   const isStudent = currentUser?.role === 'student';
@@ -283,6 +358,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
         const file = new File([blob], `${prefix}-${Date.now()}.${ext}`, { type: mimeType });
         const localUrl = URL.createObjectURL(blob);
         const fileTempId = `temp-${Date.now()}`;
+        const controller = new AbortController();
+
+        setUploads(prev => ({
+          ...prev,
+          [fileTempId]: { 
+            progress: 0, 
+            controller,
+            fileData: { file, type: recordMode === 'video' ? 'VIDEO_MESSAGE' : 'FILE', preview: localUrl },
+            text: recordMode === 'video' ? '📹 Video message' : '🎤 Voice message'
+          }
+        }));
 
         // 1. Show optimistic message with local preview
         onSendMessage(recordMode === 'video' ? '📹 Video message' : '🎤 Voice message', {
@@ -294,14 +380,36 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
 
         // 2. Upload and replace with real message
         try {
-          const url = await uploadFile(file);
+          const url = await uploadFile(file, (percent) => {
+            setUploads(prev => {
+              if (!prev[fileTempId]) return prev;
+              return { ...prev, [fileTempId]: { ...prev[fileTempId], progress: percent } };
+            });
+          }, controller.signal);
+
           onSendMessage(recordMode === 'video' ? '📹 Video message' : '🎤 Voice message', {
             type: recordMode === 'video' ? 'VIDEO_MESSAGE' : 'FILE',
             attachment: { url, name: file.name, type: file.type, size: file.size },
             replaceTempId: fileTempId,
           });
-        } catch {
-          toast.error(`Failed to send ${recordMode} message`);
+          
+          setUploads(prev => {
+            const next = { ...prev };
+            delete next[fileTempId];
+            return next;
+          });
+        } catch (err: any) {
+          if (err.message === 'Upload aborted') {
+            onAction?.('cancel_upload', { messageId: fileTempId });
+            setUploads(prev => {
+              const next = { ...prev };
+              delete next[fileTempId];
+              return next;
+            });
+          } else {
+            toast.error(`Failed to send ${recordMode} message`);
+            onAction?.('upload_failed', { messageId: fileTempId });
+          }
         }
       }
     };
@@ -310,18 +418,53 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
     setRecordingSeconds(0);
   };
 
-  const uploadFile = async (file: File): Promise<string> => {
+  const uploadFile = async (
+    file: File,
+    onProgress: (percent: number) => void,
+    abortSignal?: AbortSignal
+  ): Promise<string> => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random()}-${Date.now()}.${fileExt}`;
     const filePath = `chat-attachments/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('communication-attachments')
-      .upload(filePath, file);
+    const session = (await supabase.auth.getSession()).data.session;
+    const token = session?.access_token || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const apiKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co';
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/communication-attachments/${filePath}`;
 
-    if (uploadError) {
-      throw uploadError;
-    }
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', uploadUrl, true);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('apikey', apiKey);
+
+      // Track progress
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = (event.loaded / event.total) * 100;
+          onProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Upload network error'));
+      xhr.onabort = () => reject(new Error('Upload aborted'));
+
+      if (abortSignal) {
+        abortSignal.addEventListener('abort', () => xhr.abort());
+      }
+
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.send(file);
+    });
 
     // Use signed URL for privacy (10 years expiration)
     const { data, error: signError } = await supabase.storage
@@ -338,6 +481,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
 
     return data.signedUrl;
   };
+
+
 
   const handleSend = async () => {
     if (!inputValue.trim() && !attachedFile) return;
@@ -365,6 +510,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
 
     // Case 2: Has attachment
     const fileTempId = `temp-${Date.now()}`;
+    const controller = new AbortController();
+
+    setUploads(prev => ({
+      ...prev,
+      [fileTempId]: { 
+        progress: 0, 
+        controller,
+        fileData: currentFile,
+        text: currentInput
+      }
+    }));
 
     // 1. Show optimistic message with local preview immediately
     onSendMessage(currentInput || (currentFile.type === 'IMAGE' ? 'Image' : currentFile.type === 'VIDEO' ? 'Video' : 'File'), {
@@ -383,7 +539,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
 
     // 2. Upload in background then replace the optimistic message
     try {
-      const attachmentUrl = await uploadFile(currentFile.file);
+      const attachmentUrl = await uploadFile(currentFile.file, (percent) => {
+        setUploads(prev => {
+          if (!prev[fileTempId]) return prev;
+          return { ...prev, [fileTempId]: { ...prev[fileTempId], progress: percent } };
+        });
+      }, controller.signal);
+
       onSendMessage(currentInput || (currentFile.type === 'IMAGE' ? 'Image' : currentFile.type === 'VIDEO' ? 'Video' : 'File'), {
         type: currentFile.type,
         attachment: {
@@ -395,9 +557,31 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
         replyToId: replyTarget?.id,
         replaceTempId: fileTempId, // ← replace the local preview, not add a new message
       });
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to upload file. Please try again.');
+      
+      setUploads(prev => {
+        const next = { ...prev };
+        delete next[fileTempId];
+        return next;
+      });
+    } catch (error: any) {
+      if (error.message === 'Upload aborted') {
+        console.log('Upload canceled');
+        onAction?.('cancel_upload', { messageId: fileTempId });
+        setUploads(prev => {
+          const next = { ...prev };
+          delete next[fileTempId];
+          return next;
+        });
+      } else {
+        console.error('Error sending message:', error);
+        toast.error('Failed to upload file. Please try again.');
+      }
+    } finally {
+      setUploads(prev => {
+        const next = { ...prev };
+        delete next[fileTempId];
+        return next;
+      });
     }
   };
 
@@ -414,8 +598,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
         setInputValue(message.content);
         break;
       case 'copy':
-        navigator.clipboard.writeText(message.content);
-        toast.success("Copied to clipboard");
+        navigator.clipboard.writeText(message.content || '');
+        toast.success('Copied to clipboard');
+        break;
+      case 'delete_confirm':
+        setDeleteConfirmMessage(message);
+        break;
+      case 'select':
+        setIsSelectionMode(true);
+        setSelectedIds([message.id]);
+        break;
+      case 'retry_upload':
+        retryUpload(message.id);
         break;
       default:
         onAction?.(action, data);
@@ -467,11 +661,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
           )}
 
           <div
-            className={cn(
-              "flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer h-full pt-10 pb-1",
-              activeConversation.isGroup ? "cursor-pointer" : "cursor-default"
-            )}
-            onClick={() => activeConversation.isGroup && onToggleInfo?.()}
+            className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer h-full pt-10 pb-1"
+            onClick={() => onToggleInfo?.()}
           >
             <div className="relative shrink-0 self-center">
               {callStatus !== 'IDLE' && (
@@ -591,31 +782,130 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
         </div>
       )}
 
-      {/* Messages Area - always rendered immediately, never blocked by skeleton */}
+      {/* Pinned Message Banner */}
+      <AnimatePresence>
+        {pinnedMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="relative z-30 border-b border-border/40 bg-background/90 backdrop-blur-sm"
+          >
+            <button
+              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-secondary/50 transition-colors text-left group"
+              onClick={() => {
+                // Scroll to the pinned message
+                const el = document.getElementById(`msg-${pinnedMessage.messageId}`);
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+            >
+              <div className="shrink-0 w-0.5 h-8 bg-primary rounded-full" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
+                  <Pin className="h-3 w-3" /> Pinned Message
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {pinnedMessage.type === 'IMAGE' ? '📷 Photo'
+                    : pinnedMessage.type === 'VIDEO' ? '🎥 Video'
+                    : pinnedMessage.type === 'FILE' ? '📎 File'
+                    : pinnedMessage.content || 'Message'}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAction?.('pin', { messageId: pinnedMessage.messageId, isPinned: true });
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
       <div
         ref={scrollRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 scrollbar-hide"
       >
         <DateSeparator date={t("today")} />
-        {messages.map((message, index) => {
-          const isNextSameSender = messages[index + 1]?.senderId === message.senderId;
-          return (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              isLastInGroup={!isNextSameSender}
-              isSelectionMode={isSelectionMode}
-              isSelected={selectedIds.includes(message.id)}
-              onToggleSelect={() => toggleSelect(message.id)}
-              onEnterSelectionMode={() => setIsSelectionMode(true)}
-              t={t}
-              isGroup={activeConversation.isGroup}
-              onAction={handleBubbleAction}
-              currentUser={currentUser}
-            />
-          );
-        })}
+        {(() => {
+          const rendered: React.ReactNode[] = [];
+          let i = 0;
+          while (i < messages.length) {
+            const message = messages[i];
+            const isCallType = message.type === 'CALL_VOICE' || message.type === 'CALL_VIDEO' ||
+              message.type === 'CALL_MISSED_VOICE' || message.type === 'CALL_MISSED_VIDEO';
+
+            if (isCallType) {
+              const isMissed = message.type === 'CALL_MISSED_VOICE' || message.type === 'CALL_MISSED_VIDEO';
+              // Group consecutive missed calls from same sender
+              if (isMissed) {
+                let count = 1;
+                while (
+                  i + count < messages.length &&
+                  messages[i + count].type === message.type &&
+                  messages[i + count].senderId === message.senderId
+                ) count++;
+
+                rendered.push(
+                  <CallMessageBubble
+                    key={message.id}
+                    message={message}
+                    missedCount={count}
+                    onCallAgain={(type) => {
+                      const contactId = activeConversation.realContactId || activeConversation.id;
+                      initiateCall(contactId, type, activeConversation);
+                    }}
+                    onAction={handleBubbleAction}
+                  />
+                );
+                i += count;
+              } else {
+                rendered.push(
+                  <CallMessageBubble
+                    key={message.id}
+                    message={message}
+                    missedCount={1}
+                    onCallAgain={(type) => {
+                      const contactId = activeConversation.realContactId || activeConversation.id;
+                      initiateCall(contactId, type, activeConversation);
+                    }}
+                    onAction={handleBubbleAction}
+                  />
+                );
+                i++;
+              }
+            } else {
+              const isNextSameSender = messages[i + 1]?.senderId === message.senderId;
+              rendered.push(
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  isLastInGroup={!isNextSameSender}
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedIds.includes(message.id)}
+                  onToggleSelect={() => toggleSelect(message.id)}
+                  onEnterSelectionMode={() => setIsSelectionMode(true)}
+                  t={t}
+                  isGroup={activeConversation.isGroup}
+                  onAction={handleBubbleAction}
+                  currentUser={currentUser}
+                  uploadState={uploads[message.id]}
+                  onCancelUpload={handleCancelUpload}
+                />
+              );
+              i++;
+            }
+          }
+          return rendered;
+        })()}
         {/* Invisible anchor element always at the very bottom */}
         <div ref={messagesEndRef} className="h-0 w-full" />
       </div>
@@ -653,7 +943,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                 <span className="typography-label">{selectedIds.length} {t("selected")}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="text-primary">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-primary"
+                  onClick={() => {
+                    onAction?.('forward_selected', { messageIds: selectedIds });
+                    setIsSelectionMode(false);
+                    setSelectedIds([]);
+                  }}
+                >
                   <Forward className="h-5 w-5" />
                 </Button>
                 <Button variant="ghost" size="icon" className="text-destructive" onClick={deleteSelected}>
@@ -1002,7 +1301,235 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
       </AnimatePresence>
 
       <ImagePreviewListener onPreview={setPreviewImage} />
+
+      {/* Delete Confirmation Dialog */}
+      <AnimatePresence>
+        {deleteConfirmMessage && (
+          <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeleteConfirmMessage(null)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 20, opacity: 0 }}
+              className="relative z-10 bg-background rounded-3xl border border-border shadow-2xl w-full max-w-sm overflow-hidden"
+            >
+              <div className="p-5 border-b border-border/50">
+                <h3 className="font-bold text-base text-foreground">Delete Message?</h3>
+                <p className="text-xs text-muted-foreground mt-1">This message will be removed from the conversation.</p>
+              </div>
+              {deleteConfirmMessage.attachments && deleteConfirmMessage.attachments.length > 0 && (
+                <div className="px-5 pt-3">
+                  <p className="text-xs text-muted-foreground/60 italic">Also deletes attached file(s).</p>
+                </div>
+              )}
+              <div className="p-4 flex flex-col gap-2">
+                <Button
+                  variant="destructive"
+                  className="w-full rounded-2xl h-11 font-bold"
+                  onClick={() => {
+                    onAction?.('delete', { messageId: deleteConfirmMessage.id });
+                    setDeleteConfirmMessage(null);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full rounded-2xl h-11"
+                  onClick={() => setDeleteConfirmMessage(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+});
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function formatCallDuration(seconds: number): string {
+  if (!seconds || seconds <= 0) return '';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+// ─── CallMessageBubble ───────────────────────────────────────────────────────
+const CallMessageBubble = React.memo(({ message, missedCount, onCallAgain, onAction }: {
+  message: Message;
+  missedCount: number;
+  onCallAgain: (type: 'VOICE' | 'VIDEO') => void;
+  onAction?: (action: string, data: any) => void;
+}) => {
+  const isMe = message.isMe;
+  const isVideo = message.type === 'CALL_VIDEO' || message.type === 'CALL_MISSED_VIDEO';
+  const isMissed = message.type === 'CALL_MISSED_VOICE' || message.type === 'CALL_MISSED_VIDEO';
+  const metadata = (message as any).metadata as { duration?: number; reason?: string } | null;
+  const duration = metadata?.duration || 0;
+  const reason = metadata?.reason;
+
+  // Determine variant
+  let variant: 'completed' | 'missed' | 'cancelled' | 'declined' | 'failed';
+  if (reason === 'CANCELLED') variant = 'cancelled';
+  else if (reason === 'DECLINED') variant = 'declined';
+  else if (reason === 'FAILED') variant = 'failed';
+  else if (isMissed) variant = 'missed';
+  else variant = 'completed';
+
+  const isCompleted = variant === 'completed';
+  const isNegative = variant === 'missed' || variant === 'cancelled' || variant === 'declined' || variant === 'failed';
+
+  // Icon for the call direction
+  let Icon = isCompleted
+    ? (isMe ? PhoneCall : PhoneIncoming)
+    : isNegative
+      ? (isMe
+          ? (variant === 'cancelled' ? PhoneOff : PhoneMissed)
+          : PhoneMissed)
+      : PhoneCall;
+
+  // Label
+  let label = '';
+  if (isCompleted) {
+    label = isMe ? `Outgoing ${isVideo ? 'video' : 'voice'} call` : `Incoming ${isVideo ? 'video' : 'voice'} call`;
+  } else if (variant === 'cancelled') {
+    label = `Cancelled ${isVideo ? 'video' : 'voice'} call`;
+  } else if (variant === 'declined') {
+    label = `Declined ${isVideo ? 'video' : 'voice'} call`;
+  } else if (variant === 'failed') {
+    label = `Failed ${isVideo ? 'video' : 'voice'} call`;
+  } else {
+    // missed
+    if (missedCount > 1) {
+      label = `${missedCount} missed ${isVideo ? 'video' : 'voice'} calls`;
+    } else {
+      label = `Missed ${isVideo ? 'video' : 'voice'} call`;
+    }
+  }
+
+  // Color scheme
+  const iconColorClass = isCompleted
+    ? 'text-emerald-500'
+    : isNegative
+      ? 'text-rose-500'
+      : 'text-slate-400';
+
+  const dotColorClass = isCompleted ? 'bg-emerald-500' : isNegative ? 'bg-rose-500' : 'bg-slate-400';
+
+  const handleCallAgain = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCallAgain(isVideo ? 'VIDEO' : 'VOICE');
+  };
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <motion.div
+          initial={{ opacity: 0, y: 6, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="flex justify-center my-1"
+        >
+          <div
+            className="flex items-center gap-2.5 bg-background/80 dark:bg-slate-800/70 border border-border/40 rounded-2xl px-4 py-2.5 shadow-sm hover:shadow-md transition-all cursor-pointer max-w-[280px] backdrop-blur-sm group"
+            onClick={handleCallAgain}
+            title="Tap to call again"
+          >
+            {/* Icon bubble */}
+            <div className={cn(
+              "h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110",
+              isCompleted ? 'bg-emerald-500/10' : isNegative ? 'bg-rose-500/10' : 'bg-slate-100 dark:bg-slate-700'
+            )}>
+              {isVideo
+                ? <Video className={cn('h-4 w-4', iconColorClass)} />
+                : <Icon className={cn('h-4 w-4', iconColorClass)} />}
+            </div>
+
+            {/* Text body */}
+            <div className="flex flex-col min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[13px] font-semibold text-foreground leading-tight truncate">{label}</span>
+                {missedCount > 1 && (
+                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded-full px-1.5 py-px shrink-0">{missedCount}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {/* Colored direction dot */}
+                <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', dotColorClass)} />
+                <span className="text-[11px] text-muted-foreground/70 truncate">
+                  {isCompleted && duration > 0
+                    ? `Duration: ${formatCallDuration(duration)}`
+                    : isMe
+                      ? (isCompleted ? 'Answered' : 'Not answered')
+                      : (isMissed ? 'You missed' : isCompleted ? 'You answered' : variant === 'declined' ? 'You declined' : '')}
+                </span>
+              </div>
+            </div>
+
+            {/* Time + call-again chevron */}
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <span className="text-[10px] text-muted-foreground/60">{message.timestamp}</span>
+              <div className={cn(
+                'h-5 w-5 rounded-full flex items-center justify-center transition-all group-hover:opacity-100 opacity-0',
+                isVideo ? 'bg-sky-500/10' : 'bg-emerald-500/10'
+              )}>
+                {isVideo
+                  ? <Video className="h-3 w-3 text-sky-500" />
+                  : <Phone className="h-3 w-3 text-emerald-500" />}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </ContextMenuTrigger>
+
+      <ContextMenuContent className="w-52 rounded-2xl border-border/50 shadow-2xl p-1.5 animate-in fade-in zoom-in-95">
+        <ContextMenuItem
+          className="rounded-xl h-10 gap-3 font-medium"
+          onClick={() => onCallAgain(isVideo ? 'VIDEO' : 'VOICE')}
+        >
+          {isVideo ? <Video className="h-4 w-4 text-primary" /> : <Phone className="h-4 w-4 text-primary" />}
+          Call again
+        </ContextMenuItem>
+        <ContextMenuSeparator className="my-1 bg-border/40" />
+        <ContextMenuItem
+          className="rounded-xl h-10 gap-3"
+          onClick={() => {
+            const details = `${label}${duration > 0 ? ' · Duration: ' + formatCallDuration(duration) : ''} · ${message.timestamp}`;
+            navigator.clipboard.writeText(details);
+          }}
+        >
+          <Copy className="h-4 w-4" />
+          Copy call details
+        </ContextMenuItem>
+        <ContextMenuItem
+          className="rounded-xl h-10 gap-3"
+          onClick={() => onAction?.('forward', { message })}
+        >
+          <Forward className="h-4 w-4" />
+          Forward
+        </ContextMenuItem>
+        <ContextMenuSeparator className="my-1 bg-border/40" />
+        <ContextMenuItem
+          className="rounded-xl h-10 gap-3 text-destructive focus:bg-destructive/10 focus:text-destructive"
+          onClick={() => onAction?.('delete_confirm', { message })}
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 });
 
@@ -1093,11 +1620,57 @@ const CustomAudioPlayer = React.memo(({ url, isMe }: { url: string, isMe: boolea
   );
 });
 
-const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, status }: { file: any, onImageClick: (url: string) => void, isCompact?: boolean, isMe: boolean, status?: string }) => {
+const UploadProgressOverlay = ({
+  progress = 0,
+  onCancel,
+}: {
+  progress?: number;
+  onCancel?: () => void;
+}) => {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] transition-all z-20">
+      {/* Semi-transparent Telegram-style circle with X inside */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onCancel?.();
+        }}
+        className="w-12 h-12 rounded-full bg-black/55 shadow-lg flex items-center justify-center text-white hover:bg-black/75 transition-colors active:scale-95 group/cancel"
+      >
+        <X className="h-5 w-5 stroke-[2.5]" />
+      </button>
+
+      {/* Percentage badge */}
+      <div className="mt-2 bg-black/70 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-white tracking-widest shadow-md select-none">
+        {progress.toFixed(1)}%
+      </div>
+    </div>
+  );
+};
+
+const AttachmentRenderer = ({
+  file: rawFile,
+  onImageClick,
+  isCompact,
+  isMe,
+  status,
+  uploadState,
+  onCancelUpload,
+}: {
+  file: any;
+  onImageClick: (url: string) => void;
+  isCompact?: boolean;
+  isMe: boolean;
+  status?: string;
+  uploadState?: { progress: number };
+  onCancelUpload?: () => void;
+}) => {
   const file = rawFile.create ? rawFile.create : rawFile;
   const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.url);
   const isAudio = file.type?.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(file.url) || file.url.includes('voice-');
   const isVideo = (file.type?.startsWith('video/') || /\.(mp4|webm)$/i.test(file.url)) && !file.url.includes('voice-');
+  const isSending = status === 'sending';
+  const isUploading = isSending && uploadState && uploadState.progress < 100;
 
   const getFileIcon = (url: string) => {
     if (url.endsWith('.pdf')) return <FileText className="h-6 w-6 text-red-500" />;
@@ -1115,21 +1688,26 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
           "overflow-hidden cursor-pointer hover:opacity-95 transition-opacity relative group",
           isCompact ? "rounded-lg" : "rounded-xl border border-border/10"
         )}
-        onClick={() => onImageClick(file.url)}
+        onClick={() => {
+          if (!isSending) onImageClick(file.url);
+        }}
       >
         <img
           src={file.url}
           alt={file.name || "Image"}
-          className={cn("w-full h-auto max-h-[400px] object-cover", status === 'sending' && "opacity-50")}
+          className={cn("w-full h-auto max-h-[400px] object-cover", isSending && "opacity-60 blur-[1px]")}
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-          <Search className="text-white h-8 w-8" />
-        </div>
-        {status === 'sending' && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin shadow-lg" />
+        {!isSending && (
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+            <Search className="text-white h-8 w-8" />
           </div>
+        )}
+        {isUploading && (
+          <UploadProgressOverlay
+            progress={uploadState?.progress || 0}
+            onCancel={onCancelUpload}
+          />
         )}
       </div>
     );
@@ -1151,21 +1729,24 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
             ? "rounded-full w-48 h-48 border-4 border-white/20 shadow-xl mx-auto my-2"
             : (isCompact ? "rounded-lg" : "rounded-xl border border-border/10")
         )}
-        onClick={() => setIsMuted(!isMuted)}
+        onClick={() => {
+          if (!isSending) setIsMuted(!isMuted);
+        }}
       >
         <video
           src={file.url}
-          controls={!isCircular}
-          autoPlay={isCircular}
+          controls={!isCircular && !isSending}
+          autoPlay={isCircular && !isSending}
           loop={isCircular}
           muted={isMuted}
           playsInline
           className={cn(
             "w-full h-full",
-            isCircular ? "object-cover" : "max-h-[400px]"
+            isCircular ? "object-cover" : "max-h-[400px]",
+            isSending && "opacity-60 blur-[1px]"
           )}
         />
-        {isCircular && (
+        {isCircular && !isSending && (
           <>
             <div className="absolute inset-0 border-[6px] border-black/10 rounded-full pointer-events-none" />
             {isMuted && (
@@ -1177,16 +1758,23 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
             )}
           </>
         )}
+        {isUploading && (
+          <UploadProgressOverlay
+            progress={uploadState?.progress || 0}
+            onCancel={onCancelUpload}
+          />
+        )}
       </div>
     );
   }
 
   return (
     <div className={cn(
-      "bg-background/40 dark:bg-slate-800/40 border border-border/10 flex items-center gap-4 hover:bg-background/60 transition-all cursor-pointer group backdrop-blur-sm shadow-sm",
+      "bg-background/40 dark:bg-slate-800/40 border border-border/10 flex items-center gap-4 hover:bg-background/60 transition-all cursor-pointer group backdrop-blur-sm shadow-sm relative",
       isCompact ? "rounded-lg p-3" : "rounded-xl p-3"
     )}
       onClick={(e) => {
+        if (isSending) return;
         e.stopPropagation();
         const viewerUrl = file.url.endsWith('.pdf')
           ? file.url
@@ -1194,8 +1782,13 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
         window.open(viewerUrl, '_blank');
       }}>
       <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform relative">
-        {status === 'sending' ? (
-          <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        {isUploading ? (
+          <div className="relative flex items-center justify-center">
+            <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <span className="absolute text-[8px] font-bold text-primary">
+              {Math.min(Math.round(uploadState?.progress || 0), 99)}
+            </span>
+          </div>
         ) : (
           getFileIcon(file.url)
         )}
@@ -1203,41 +1796,71 @@ const AttachmentRenderer = ({ file: rawFile, onImageClick, isCompact, isMe, stat
       <div className="flex-1 min-w-0">
         <p className="typography-label truncate group-hover:text-primary transition-colors">{file.name || "Document"}</p>
         <div className="flex items-center gap-2 mt-0.5">
-          <p className="typography-label text-[10px] opacity-70 uppercase">
-            {file.url.split('.').pop() || 'FILE'}
-          </p>
-          <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-          <p className="text-[10px] opacity-70">
-            {file.size ? (file.size / 1024 / 1024).toFixed(2) + ' MB' : 'Download'}
-          </p>
+          {isUploading ? (
+            <div className="flex flex-col gap-1 w-full mt-1">
+              <div className="flex items-center justify-between text-[9px] font-bold text-primary">
+                <span>Uploading...</span>
+                <span>{(uploadState?.progress || 0).toFixed(1)}%</span>
+              </div>
+              <div className="h-1 bg-primary/10 rounded-full overflow-hidden w-28">
+                <div
+                  className="h-full bg-primary transition-all duration-150"
+                  style={{ width: `${uploadState?.progress || 0}%` }}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="typography-label text-[10px] opacity-70 uppercase">
+                {file.url.split('.').pop() || 'FILE'}
+              </p>
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+              <p className="text-[10px] opacity-70">
+                {file.size ? (file.size / 1024 / 1024).toFixed(2) + ' MB' : 'Download'}
+              </p>
+            </>
+          )}
         </div>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="shrink-0 h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
-        onClick={async (e) => {
-          e.stopPropagation();
-          try {
-            const response = await fetch(file.url);
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = file.name || 'document';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-          } catch (error) {
-            console.error('Download failed:', error);
-            // Fallback to simple open if fetch fails
-            window.open(file.url, '_blank');
-          }
-        }}
-      >
-        <Download className="h-4 w-4" />
-      </Button>
+      {isUploading ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCancelUpload?.();
+          }}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              const response = await fetch(file.url);
+              const blob = await response.blob();
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = file.name || 'document';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+            } catch (error) {
+              console.error('Download failed:', error);
+              window.open(file.url, '_blank');
+            }
+          }}
+        >
+          <Download className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 };
@@ -1309,7 +1932,9 @@ const MessageBubble = React.memo(({
   t,
   isGroup,
   onAction,
-  currentUser
+  currentUser,
+  uploadState,
+  onCancelUpload,
 }: {
   message: Message,
   isLastInGroup: boolean,
@@ -1320,7 +1945,9 @@ const MessageBubble = React.memo(({
   t: any,
   isGroup: boolean,
   onAction?: (action: string, data: any) => void,
-  currentUser: any
+  currentUser: any,
+  uploadState?: { progress: number },
+  onCancelUpload?: (tempId: string) => void
 }) => {
   const isMe = message.isMe;
   const hasAttachments = message.attachments && message.attachments.length > 0;
@@ -1346,12 +1973,13 @@ const MessageBubble = React.memo(({
 
   return (
     <motion.div
+      id={`msg-${message.id}`}
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       className={cn(
         "flex flex-col group relative transition-all",
         isMe ? "ml-auto items-end" : "mr-auto items-start",
-        isMediaOnly ? "max-w-[70%] md:max-w-[40%] w-full" : "max-w-[85%] md:max-w-[50%]",
+        isMediaOnly ? "max-w-[70%] md:max-w-[40%] w-full" : "max-w-[75%]",
         isLastInGroup && "mb-2",
         isSelectionMode && "cursor-pointer"
       )}
@@ -1384,13 +2012,26 @@ const MessageBubble = React.memo(({
                   : "bg-white dark:bg-slate-900 border border-border/50 text-foreground rounded-bl-none"
               )),
           !isLastInGroup && !isMediaOnly && (isMe ? "rounded-br-sm" : "rounded-bl-sm")
-        )}>
+        )}
+          style={{
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+          }}
+        >
           <ContextMenu>
             <ContextMenuTrigger>
-              <div className={cn(
-                "select-text whitespace-pre-wrap break-words w-full relative",
-                isMediaOnly ? "leading-[0]" : ""
-              )}>
+              <div
+                className={cn(
+                  "select-text w-full relative",
+                  isMediaOnly ? "leading-[0]" : ""
+                )}
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'anywhere',
+                  wordBreak: 'break-word',
+                }}
+              >
                 {hasAttachments && (
                   <div className={cn(
                     "flex flex-col gap-1",
@@ -1404,6 +2045,8 @@ const MessageBubble = React.memo(({
                         isCompact={isMediaOnly}
                         isMe={isMe}
                         status={message.status}
+                        uploadState={uploadState}
+                        onCancelUpload={() => onCancelUpload?.(message.id)}
                       />
                     ))}
                   </div>
@@ -1465,13 +2108,15 @@ const MessageBubble = React.memo(({
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent className="w-56 rounded-xl border-none shadow-xl p-2">
-              <ContextMenuItem onClick={() => handleAction('copy')} className="rounded-lg h-10 gap-3">
-                <Copy className="h-4 w-4" />
-                {t("copy_text")}
-              </ContextMenuItem>
-              <ContextMenuItem onClick={() => handleAction('reply')} className="rounded-lg h-10 gap-3">
+              {!message.isDeleted && (
+                <ContextMenuItem onClick={() => handleAction('copy')} className="rounded-lg h-10 gap-3">
+                  <Copy className="h-4 w-4" />
+                  {t('copy_text')}
+                </ContextMenuItem>
+              )}
+              <ContextMenuItem onClick={() => handleAction('reply')} className="rounded-lg h-10 gap-3" disabled={!!message.isDeleted}>
                 <Reply className="h-4 w-4" />
-                {t("reply")}
+                {t('reply')}
               </ContextMenuItem>
               {isMe && !message.isDeleted && (
                 <ContextMenuItem onClick={() => handleAction('edit_start')} className="rounded-lg h-10 gap-3">
@@ -1479,18 +2124,26 @@ const MessageBubble = React.memo(({
                   Edit Message
                 </ContextMenuItem>
               )}
-              <ContextMenuItem onClick={() => handleAction('pin')} className="rounded-lg h-10 gap-3">
+              <ContextMenuItem
+                onClick={() => handleAction('pin', { isPinned: !!(message as any).isPinned, content: message.content, senderName: (message as any).senderName })}
+                className="rounded-lg h-10 gap-3"
+              >
                 <Pin className="h-4 w-4" />
-                Pin Message
+                {(message as any).isPinned ? 'Unpin Message' : 'Pin Message'}
               </ContextMenuItem>
-              <ContextMenuItem onClick={() => handleAction('forward')} className="rounded-lg h-10 gap-3">
-                <Forward className="h-4 w-4" />
-                {t("forward")}
-              </ContextMenuItem>
+              {!message.isDeleted && (
+                <ContextMenuItem onClick={() => handleAction('forward')} className="rounded-lg h-10 gap-3">
+                  <Forward className="h-4 w-4" />
+                  {t('forward')}
+                </ContextMenuItem>
+              )}
               <ContextMenuSeparator className="my-1 bg-border/50" />
-              <ContextMenuItem onClick={() => handleAction('delete')} className="rounded-lg h-10 gap-3 text-destructive focus:text-destructive">
+              <ContextMenuItem
+                onClick={() => handleAction('delete_confirm')}
+                className="rounded-lg h-10 gap-3 text-destructive focus:text-destructive"
+              >
                 <Trash2 className="h-4 w-4" />
-                {t("delete")}
+                {t('delete')}
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
@@ -1508,7 +2161,14 @@ const MessageBubble = React.memo(({
             <span>{message.timestamp}</span>
             {isMe && (
               <span className="shrink-0">
-                {message.status === 'sending' ? (
+                {message.status === 'failed' ? (
+                  <Button 
+                    variant="destructive" size="icon" className="h-4 w-4 rounded-full ml-1"
+                    onClick={() => handleAction('retry_upload')}
+                  >
+                    <RotateCw className="h-2.5 w-2.5" />
+                  </Button>
+                ) : message.status === 'sending' ? (
                   <Clock className="h-3 w-3 animate-pulse" />
                 ) : message.status === 'read' ? (
                   <CheckCheck className="h-3 w-3 text-sky-400" />
@@ -1569,6 +2229,7 @@ const MessageBubble = React.memo(({
     prevProps.message.editedAt === nextProps.message.editedAt &&
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.isSelectionMode === nextProps.isSelectionMode &&
+    prevProps.uploadState?.progress === nextProps.uploadState?.progress &&
     prevProps.isLastInGroup === nextProps.isLastInGroup &&
     (prevProps.message as any).reactions?.length === (nextProps.message as any).reactions?.length;
 });

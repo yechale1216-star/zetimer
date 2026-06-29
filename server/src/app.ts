@@ -22,6 +22,7 @@ import groupRoutes from './routes/group.routes';
 import announcementRoutes from './routes/announcement.routes';
 import callRoutes from './routes/call.routes';
 import notificationRoutes from './routes/notification.routes';
+import savedMessagesRoutes from './routes/saved-messages.routes';
 import { tenantMiddleware, subscriptionGuard } from './middleware/tenant.middleware';
 import { maintenanceMiddleware } from './middleware/maintenance.middleware';
 import * as parentController from './controllers/parent.controller';
@@ -107,6 +108,7 @@ app.use('/api/promotions', promotionRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/saved-messages', savedMessagesRoutes);
 
 
 // Error handling middleware

@@ -6,6 +6,8 @@ import { IncomingCallModal } from '@/components/messaging/calling/IncomingCallMo
 import { CallOverlay } from '@/components/messaging/calling/CallOverlay';
 import { authService } from '@/lib/auth/auth';
 import { useToast } from '@/hooks/use-toast';
+import { NativeBridge } from '@/lib/utils/native-bridge';
+import { App } from '@capacitor/app';
 
 interface CallContextType {
   initiateCall: (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => void;
@@ -86,90 +88,142 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let timeout: NodeJS.Timeout;
     let audioCtx: AudioContext | null = null;
-    let oscillator: any = null;
     let gainNode: GainNode | null = null;
     let ringInterval: NodeJS.Timeout;
+    
+    // Track active oscillators for clean disposal
+    const activeOscillators: any[] = [];
 
-    if (webrtc.callStatus === 'RINGING' && incomingCallData) {
+    if (webrtc.callStatus === 'RINGING') {
+      const isIncoming = !!incomingCallData;
+
       // 1. Auto-missed call after 30 seconds
       timeout = setTimeout(() => {
-        handleReject();
+        handleReject(true);
       }, 30000);
 
-      // 2. Play synthetic ringing sound
+      // 2. Play synthetic calling/ringing sound
       try {
         const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
         audioCtx = new AudioContext();
         gainNode = audioCtx.createGain();
         gainNode.connect(audioCtx.destination);
         
-        const playRing = () => {
+        const playTone = () => {
           if (!audioCtx || !gainNode) return;
           
-          // Create a more professional "musical" dual-tone ring
-          const osc1 = audioCtx.createOscillator();
-          const osc2 = audioCtx.createOscillator();
-          const ringGain = audioCtx.createGain();
-          
-          osc1.type = 'triangle'; // Softer than sine
-          osc2.type = 'sine';
-          
-          // Classic European dual-tone (400Hz + 450Hz)
-          osc1.frequency.setValueAtTime(400, audioCtx.currentTime); 
-          osc2.frequency.setValueAtTime(450, audioCtx.currentTime);
-          
-          // Add a subtle "warble" or vibrato
-          const vibrato = audioCtx.createOscillator();
-          const vibratoGain = audioCtx.createGain();
-          vibrato.frequency.value = 5; // 5Hz vibrato
-          vibratoGain.gain.value = 5; // 5Hz deviation
-          vibrato.connect(vibratoGain);
-          vibratoGain.connect(osc1.frequency);
-          vibratoGain.connect(osc2.frequency);
-          
-          osc1.connect(ringGain);
-          osc2.connect(ringGain);
-          ringGain.connect(gainNode!);
-          
-          // Fade in/out to avoid clicks
-          const now = audioCtx.currentTime;
-          ringGain.gain.setValueAtTime(0, now);
-          ringGain.gain.linearRampToValueAtTime(0.15, now + 0.1);
-          ringGain.gain.setValueAtTime(0.15, now + 1.8);
-          ringGain.gain.linearRampToValueAtTime(0, now + 2.0);
-          
-          vibrato.start();
-          osc1.start();
-          osc2.start();
-          
-          // Stop after 2 seconds
-          setTimeout(() => {
-            try {
-              osc1.stop();
-              osc2.stop();
-              vibrato.stop();
-              osc1.disconnect();
-              osc2.disconnect();
-              vibrato.disconnect();
-              ringGain.disconnect();
-            } catch (e) {}
-          }, 2100);
+          if (!isIncoming) {
+            // --- CALLER: Outgoing dual-tone ringback (440Hz + 480Hz) ---
+            // Pattern: 1.5s tone, 3.0s pause. Repeats every 4.5 seconds.
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
+            const ringGain = audioCtx.createGain();
+            
+            osc1.type = 'sine';
+            osc2.type = 'sine';
+            
+            osc1.frequency.setValueAtTime(440, audioCtx.currentTime); 
+            osc2.frequency.setValueAtTime(480, audioCtx.currentTime);
+            
+            osc1.connect(ringGain);
+            osc2.connect(ringGain);
+            ringGain.connect(gainNode!);
+            
+            const now = audioCtx.currentTime;
+            ringGain.gain.setValueAtTime(0, now);
+            ringGain.gain.linearRampToValueAtTime(0.08, now + 0.1);
+            ringGain.gain.setValueAtTime(0.08, now + 1.5);
+            ringGain.gain.linearRampToValueAtTime(0, now + 1.6);
+            
+            osc1.start();
+            osc2.start();
+            activeOscillators.push(osc1, osc2);
+            
+            setTimeout(() => {
+              try {
+                osc1.stop();
+                osc2.stop();
+                osc1.disconnect();
+                osc2.disconnect();
+                ringGain.disconnect();
+                
+                const i1 = activeOscillators.indexOf(osc1);
+                if (i1 > -1) activeOscillators.splice(i1, 1);
+                const i2 = activeOscillators.indexOf(osc2);
+                if (i2 > -1) activeOscillators.splice(i2, 1);
+              } catch (e) {}
+            }, 1800);
+          } else {
+            // --- RECIPIENT: Rapid musical incoming call ringtone ---
+            // Pulse: 0.4s tone, 0.2s pause, 0.4s tone, 2.0s pause. Repeats every 3.2s.
+            const playPulse = (delay: number) => {
+              if (!audioCtx || !gainNode) return;
+              const osc1 = audioCtx.createOscillator();
+              const osc2 = audioCtx.createOscillator();
+              const ringGain = audioCtx.createGain();
+
+              osc1.type = 'triangle';
+              osc2.type = 'sine';
+
+              osc1.frequency.setValueAtTime(550, audioCtx.currentTime + delay);
+              osc2.frequency.setValueAtTime(750, audioCtx.currentTime + delay);
+
+              osc1.connect(ringGain);
+              osc2.connect(ringGain);
+              ringGain.connect(gainNode!);
+
+              const now = audioCtx.currentTime + delay;
+              ringGain.gain.setValueAtTime(0, now);
+              ringGain.gain.linearRampToValueAtTime(0.15, now + 0.05);
+              ringGain.gain.setValueAtTime(0.15, now + 0.4);
+              ringGain.gain.linearRampToValueAtTime(0, now + 0.45);
+
+              osc1.start(now);
+              osc2.start(now);
+              activeOscillators.push(osc1, osc2);
+
+              setTimeout(() => {
+                try {
+                  osc1.stop();
+                  osc2.stop();
+                  osc1.disconnect();
+                  osc2.disconnect();
+                  ringGain.disconnect();
+                  
+                  const i1 = activeOscillators.indexOf(osc1);
+                  if (i1 > -1) activeOscillators.splice(i1, 1);
+                  const i2 = activeOscillators.indexOf(osc2);
+                  if (i2 > -1) activeOscillators.splice(i2, 1);
+                } catch (e) {}
+              }, (delay + 0.6) * 1000);
+            };
+
+            playPulse(0);
+            playPulse(0.6);
+          }
         };
 
-        // Play immediately, then repeat every 4 seconds
-        playRing();
-        ringInterval = setInterval(playRing, 4000);
+        playTone();
+        ringInterval = setInterval(playTone, isIncoming ? 3200 : 4500);
       } catch (e) {
         console.warn('AudioContext not supported or blocked:', e);
       }
     }
 
     return () => {
+      // CLEAR NATIVE RINGING ON UNMOUNT OR STATE CHANGE
+      NativeBridge.endNativeCall();
       clearTimeout(timeout);
       clearInterval(ringInterval);
-      if (oscillator) {
-        try { oscillator.stop(); oscillator.disconnect(); } catch (e) {}
-      }
+      
+      activeOscillators.forEach((osc) => {
+        try {
+          osc.stop();
+          osc.disconnect();
+        } catch (e) {}
+      });
+      activeOscillators.length = 0;
+
       if (audioCtx) {
         audioCtx.close().catch(() => {});
       }
@@ -187,21 +241,63 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAccept = () => {
     if (incomingCallData) {
+      NativeBridge.endNativeCall();
       webrtc.answerCall(incomingCallData.from, incomingCallData.offer, incomingCallData.type);
       setIncomingCallData(null);
     }
   };
 
-  const handleReject = () => {
+  const handleReject = (isMissed: boolean = false) => {
+    NativeBridge.endNativeCall();
     // Emit reject_call to notify the caller before cleaning up
     if (incomingCallData) {
-      webrtc.rejectCall(incomingCallData.from);
+      webrtc.rejectCall(incomingCallData.from, isMissed);
     } else {
       webrtc.endCall();
     }
     setIncomingCallData(null);
     setParticipants(prev => prev.filter(p => p.isLocal));
   };
+
+  // ── Handle Native Intents (Answer from Lock Screen) ────────────────────────
+  useEffect(() => {
+    if (!NativeBridge.isNative()) return;
+
+    const checkIntent = async () => {
+      // Capacitor App.addListener('appRestoredResult') might be useful, 
+      // but usually we check for specific actions in MainActivity and bridge them.
+      // For now, ensure we stop ringing if the app is resumed/opened.
+      NativeBridge.endNativeCall();
+    };
+
+    const sub = App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        checkIntent();
+      }
+    });
+
+    return () => {
+      sub.then(s => s.remove());
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!NativeBridge.isNative()) return;
+
+    const sub = NativeBridge.addCallActionListener((action, callId) => {
+      console.log(`Native call action received: ${action} for ${callId}`);
+      if (action === 'ANSWER') {
+        handleAccept();
+      } else if (action === 'DECLINE') {
+        handleReject();
+      }
+    });
+
+    return () => {
+      // @ts-ignore
+      sub?.then(s => s.remove());
+    };
+  }, [handleAccept, handleReject]);
 
   const activeCaller = participants.find(p => !p.isLocal);
 
@@ -232,6 +328,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           onEndCall={webrtc.endCall}
           onToggleMute={webrtc.toggleMute}
           onToggleCamera={webrtc.toggleCamera}
+          onFlipCamera={webrtc.flipCamera}
         />
       )}
     </CallContext.Provider>

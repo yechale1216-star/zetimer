@@ -58,4 +58,7 @@ public class CallPlugin extends Plugin {
         }
         notifyListeners("onCallAction", ret);
     }
+    public void handleIncomingCall(com.getcapacitor.JSObject callObj) {
+        notifyListeners("onCallAction", callObj);
+    }
 }

@@ -81,7 +81,7 @@ public class MainActivity extends BridgeActivity {
 
             CallPlugin plugin = (CallPlugin) bridge.getPlugin("CallPlugin").getInstance();
             if (plugin != null) {
-                plugin.notifyListeners("onCallAction", callObj);
+                plugin.handleIncomingCall(callObj);
             }
         }
     }

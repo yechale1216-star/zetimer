@@ -11,6 +11,7 @@ import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.content.pm.ServiceInfo;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.VibrationEffect;
@@ -122,7 +123,11 @@ public class CallService extends Service {
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .build();
 
-        startForeground(1002, notification);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(1002, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL | ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
+        } else {
+            startForeground(1002, notification);
+        }
     }
 
     @Nullable

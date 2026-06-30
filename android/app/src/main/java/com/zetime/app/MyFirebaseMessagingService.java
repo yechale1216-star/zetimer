@@ -151,17 +151,21 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         String callerName  = data.get("callerName");
         String callerAvatar = data.get("callerAvatar");
         String callId      = data.get("callId");
+        String callerId    = data.get("callerId");
         String callType    = data.get("callType");
+        String serverUrl   = data.get("serverUrl");
 
         Intent intent = new Intent(this, CallService.class);
         intent.putExtra("ACTION", "START_CALL");
         intent.putExtra("callerName", callerName);
         intent.putExtra("callerAvatar", callerAvatar);
         intent.putExtra("callId", callId);
+        intent.putExtra("callerId", callerId);
         intent.putExtra("callType", callType);
+        intent.putExtra("serverUrl", serverUrl);
         ContextCompat.startForegroundService(this, intent);
 
-        showIncomingCallNotification(callerName, callId, callType);
+        showIncomingCallNotification(callerName, callId, callType, callerId, serverUrl);
     }
 
     private void handleCancelCall(Map<String, String> data) {
@@ -172,7 +176,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         if (nm != null) nm.cancel(NOTIF_ID_CALL);
     }
 
-    private void showIncomingCallNotification(String callerName, String callId, String callType) {
+    private void showIncomingCallNotification(String callerName, String callId, String callType, String callerId, String serverUrl) {
         NotificationManager nm = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
@@ -181,20 +185,25 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         Intent fullScreenIntent = new Intent(this, MainActivity.class);
         fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         fullScreenIntent.putExtra("callId", callId);
+        fullScreenIntent.putExtra("callerId", callerId);
         fullScreenIntent.putExtra("isIncomingCall", true);
         fullScreenIntent.putExtra("callerName", callerName);
         fullScreenIntent.putExtra("callType", callType);
+        fullScreenIntent.putExtra("serverUrl", serverUrl);
         PendingIntent fsPendingIntent = PendingIntent.getActivity(this, 0,
                 fullScreenIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         Intent answerIntent = new Intent(this, CallNotificationActionReceiver.class);
         answerIntent.setAction("ACTION_ANSWER");
         answerIntent.putExtra("callId", callId);
+        answerIntent.putExtra("callerId", callerId);
+        answerIntent.putExtra("callType", callType);
         PendingIntent answerPI = PendingIntent.getBroadcast(this, 1, answerIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         Intent declineIntent = new Intent(this, CallNotificationActionReceiver.class);
         declineIntent.setAction("ACTION_DECLINE");
         declineIntent.putExtra("callId", callId);
+        declineIntent.putExtra("serverUrl", serverUrl);
         PendingIntent declinePI = PendingIntent.getBroadcast(this, 2, declineIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_CALLS)
@@ -246,6 +255,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                 .build();
+        ch.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE), aa);
         nm.createNotificationChannel(ch);
         Log.d(TAG, "Call channel created");
     }

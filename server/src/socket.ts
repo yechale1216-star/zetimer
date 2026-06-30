@@ -26,6 +26,30 @@ function cleanupTempIds() {
   }
 }
 
+export const activeCalls = new Map<string, {
+  callId: string;
+  from: string;
+  to: string;
+  offer: any;
+  type: string;
+  profile: any;
+  timestamp: number;
+}>();
+
+export const userSockets = new Map<string, string>();
+export let ioInstance: SocketIOServer | null = null;
+export const getIO = () => ioInstance;
+
+// Clean up expired calls (older than 45 seconds)
+setInterval(() => {
+  const now = Date.now();
+  for (const [callId, call] of activeCalls.entries()) {
+    if (now - call.timestamp > 45000) {
+      activeCalls.delete(callId);
+    }
+  }
+}, 10000);
+
 export const initSocket = (server: HttpServer) => {
   const io = new SocketIOServer(server, {
     cors: { origin: '*', methods: ['GET', 'POST'] },
@@ -33,8 +57,7 @@ export const initSocket = (server: HttpServer) => {
     pingTimeout: 60000,
     transports: ['websocket'],
   });
-
-  const userSockets = new Map<string, string>();
+  ioInstance = io;
   const socketData = new Map<string, { userId: string; schoolId: string }>();
   const userSchoolMap = new Map<string, string>();
   const onlineUsers = new Set<string>();
@@ -81,6 +104,26 @@ export const initSocket = (server: HttpServer) => {
         const schoolOnline = Array.from(onlineUsers).filter(uid => userSchoolMap.get(uid) === schoolId);
         socket.emit('initial_online_users', schoolOnline);
         emitPresenceToSchoolMates('user_online', userId, schoolId, socket.id);
+
+        // --- Push Pending Incoming Calls ---
+        // If there is an active call for this user, deliver it via socket immediately!
+        for (const call of activeCalls.values()) {
+          if (call.to === userId) {
+            console.log(`[Socket] Pushing pending call ${call.callId} to user ${userId} who just connected.`);
+            socket.emit('incoming_call', {
+              from: call.from,
+              offer: call.offer,
+              type: call.type,
+              profile: call.profile,
+              callId: call.callId,
+            });
+            // Inform caller B is ringing
+            const callerSocketId = userSockets.get(call.from);
+            if (callerSocketId) {
+              io.to(callerSocketId).emit('call_ringing', { from: userId });
+            }
+          }
+        }
       } catch (error) { socket.emit('auth_error', { message: 'Authentication failed' }); }
     });
 
@@ -303,16 +346,32 @@ export const initSocket = (server: HttpServer) => {
       const targetUser = await prisma.user.findFirst({ where: { id: data.to, schoolId: tenant.schoolId, is_active: true }, select: { id: true, pushToken: true } });
       if (!targetUser) return;
 
+      const callId = data.callId || `call-${Date.now()}`;
+      
+      // Store in activeCalls so that if client is offline or reconnects, they can recover the call
+      activeCalls.set(callId, {
+        callId: callId,
+        from: data.from,
+        to: data.to,
+        offer: data.offer,
+        type: data.type || 'VOICE',
+        profile: data.profile,
+        timestamp: Date.now()
+      });
+
       const targetSocketId = userSockets.get(data.to);
       if (targetSocketId) io.to(targetSocketId).emit('incoming_call', data);
       
       if (targetUser.pushToken) {
         // High-priority silent data notification to wake Android app for Full Screen Intent
+        const serverUrl = process.env.NEXT_PUBLIC_API_URL || 'https://zetime-backend.onrender.com';
         sendCallNotification(targetUser.pushToken, {
-          callId: data.callId || `call-${Date.now()}`,
+          callId: callId,
+          callerId: data.from,
           callerName: data.profile.name,
           callerAvatar: data.profile.avatar,
           callType: data.type || 'VOICE',
+          serverUrl: serverUrl,
         });
       }
       (prisma as any).callSession?.create({ data: { schoolId: tenant.schoolId, type: data.type, status: 'RINGING', participants: { create: [{ userId: data.from, schoolId: tenant.schoolId }, { userId: data.to, schoolId: tenant.schoolId }] } } }).catch(() => {});
@@ -326,6 +385,16 @@ export const initSocket = (server: HttpServer) => {
     socket.on('answer_call', (data: any) => {
       const s = userSockets.get(data.to);
       if (s) io.to(s).emit('call_answered', { from: data.from, answer: data.answer });
+      // Remove call from active list on answer
+      if (data.callId) {
+        activeCalls.delete(data.callId);
+      } else {
+        for (const [id, call] of activeCalls.entries()) {
+          if ((call.from === data.from && call.to === data.to) || (call.from === data.to && call.to === data.from)) {
+            activeCalls.delete(id);
+          }
+        }
+      }
     });
 
     socket.on('ice_candidate', (data: any) => {
@@ -348,6 +417,17 @@ export const initSocket = (server: HttpServer) => {
       const s = userSockets.get(data.to);
       if (s) io.to(s).emit('call_rejected', { from: data.from });
       
+      // Clean up call memory state
+      if (data.callId) {
+        activeCalls.delete(data.callId);
+      } else {
+        for (const [id, call] of activeCalls.entries()) {
+          if ((call.from === data.from && call.to === data.to) || (call.from === data.to && call.to === data.from)) {
+            activeCalls.delete(id);
+          }
+        }
+      }
+
       // Cancel native ringing if active
       const targetUser = await prisma.user.findUnique({ where: { id: data.to }, select: { pushToken: true } });
       if (targetUser?.pushToken) {
@@ -374,6 +454,17 @@ export const initSocket = (server: HttpServer) => {
       if (!tenant) return;
       const s = userSockets.get(data.to);
       if (s) io.to(s).emit('call_ended', { from: data.from });
+
+      // Clean up call memory state
+      if (data.callId) {
+        activeCalls.delete(data.callId);
+      } else {
+        for (const [id, call] of activeCalls.entries()) {
+          if ((call.from === data.from && call.to === data.to) || (call.from === data.to && call.to === data.from)) {
+            activeCalls.delete(id);
+          }
+        }
+      }
 
       // Cancel native ringing if active
       const targetUser = await prisma.user.findUnique({ where: { id: data.to }, select: { pushToken: true } });

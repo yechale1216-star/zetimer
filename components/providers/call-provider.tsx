@@ -22,6 +22,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [incomingCallData, setIncomingCallData] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [callType, setCallType] = useState<'VOICE' | 'VIDEO'>('VOICE');
+  const [pendingAction, setPendingAction] = useState<{ action: string; callId: string; callerId?: string; callType?: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -259,27 +260,77 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setParticipants(prev => prev.filter(p => p.isLocal));
   };
 
-  // ── Handle Native Intents (Answer from Lock Screen) ────────────────────────
+  // ── Handle Pending Call Action from Native Bridge ──────────────────────────
+  const handlePendingCallAction = useCallback((action: string, callId: string, callerId?: string, callerName?: string, callType?: string) => {
+    console.log(`[CallProvider] Handling pending call action: ${action} for call ${callId}`);
+    
+    if (action === 'INCOMING_CALL') {
+      const activeCall = {
+        from: callerId || 'unknown',
+        callId,
+        type: callType === 'VIDEO' ? 'VIDEO' : 'VOICE',
+        profile: { name: callerName || 'Unknown', avatar: '' }
+      };
+      setIncomingCallData(activeCall);
+      setCallType(callType === 'VIDEO' ? 'VIDEO' : 'VOICE');
+      setParticipants(prev => [
+        ...prev.filter(p => p.isLocal),
+        { id: activeCall.from, name: activeCall.profile.name, avatar: activeCall.profile.avatar }
+      ]);
+    } else if (action === 'ANSWER') {
+      console.log('[CallProvider] Received ANSWER action. Setting pendingAction.');
+      setPendingAction({ action, callId, callerId, callType });
+    } else if (action === 'DECLINE') {
+      console.log('[CallProvider] Received DECLINE action.');
+      if (callerId) {
+        webrtc.rejectCall(callerId, false);
+      }
+      setIncomingCallData(null);
+      setParticipants(prev => prev.filter(p => p.isLocal));
+      NativeBridge.endNativeCall();
+    }
+  }, [webrtc]);
+
+  // Execute ANSWER when both incomingCallData and ANSWER pending action exist
+  useEffect(() => {
+    if (incomingCallData && pendingAction && pendingAction.action === 'ANSWER' && pendingAction.callId === incomingCallData.callId) {
+      console.log('[CallProvider] Executing deferred ANSWER action');
+      NativeBridge.endNativeCall();
+      webrtc.answerCall(incomingCallData.from, incomingCallData.offer, incomingCallData.type);
+      setIncomingCallData(null);
+      setPendingAction(null);
+    }
+  }, [incomingCallData, pendingAction, webrtc]);
+
+  // Poll/Check pending intents on resume or startup
   useEffect(() => {
     if (!NativeBridge.isNative()) return;
 
-    const checkIntent = async () => {
-      // Capacitor App.addListener('appRestoredResult') might be useful, 
-      // but usually we check for specific actions in MainActivity and bridge them.
-      // For now, ensure we stop ringing if the app is resumed/opened.
-      NativeBridge.endNativeCall();
+    const checkPending = async () => {
+      try {
+        const res = await NativeBridge.getPendingCall();
+        if (res && res.hasPending && res.action) {
+          handlePendingCallAction(res.action, res.callId || '', res.callerId, res.callerName, res.callType);
+        }
+      } catch (e) {
+        console.warn('[CallProvider] checkPending failed:', e);
+      }
     };
 
+    // Check immediately on load
+    checkPending();
+
+    // Also check when app comes to active
     const sub = App.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
-        checkIntent();
+        checkPending();
       }
     });
 
     return () => {
       sub.then(s => s.remove());
     };
-  }, []);
+  }, [handlePendingCallAction]);
 
   useEffect(() => {
     if (!NativeBridge.isNative()) return;

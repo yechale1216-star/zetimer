@@ -49,9 +49,39 @@ public class MainActivity extends BridgeActivity {
         } else if (intent.hasExtra("callAction")) {
             String action = intent.getStringExtra("callAction");
             String callId = intent.getStringExtra("callId");
+            String callerId = intent.getStringExtra("callerId");
+            String callType = intent.getStringExtra("callType");
+            
+            com.getcapacitor.JSObject callObj = new com.getcapacitor.JSObject();
+            callObj.put("action", action);
+            callObj.put("callId", callId);
+            callObj.put("callerId", callerId);
+            callObj.put("callType", callType);
+
+            CallPlugin.setPendingCall(callObj);
+
             CallPlugin plugin = (CallPlugin) bridge.getPlugin("CallPlugin").getInstance();
             if (plugin != null) {
                 plugin.handleCallAction(action, callId);
+            }
+        } else if (intent.getBooleanExtra("isIncomingCall", false) || intent.hasExtra("isIncomingCall")) {
+            String callId = intent.getStringExtra("callId");
+            String callerId = intent.getStringExtra("callerId");
+            String callerName = intent.getStringExtra("callerName");
+            String callType = intent.getStringExtra("callType");
+            
+            com.getcapacitor.JSObject callObj = new com.getcapacitor.JSObject();
+            callObj.put("action", "INCOMING_CALL");
+            callObj.put("callId", callId);
+            callObj.put("callerId", callerId);
+            callObj.put("callerName", callerName);
+            callObj.put("callType", callType);
+
+            CallPlugin.setPendingCall(callObj);
+
+            CallPlugin plugin = (CallPlugin) bridge.getPlugin("CallPlugin").getInstance();
+            if (plugin != null) {
+                plugin.notifyListeners("onCallAction", callObj);
             }
         }
     }

@@ -26,6 +26,7 @@ import savedMessagesRoutes from './routes/saved-messages.routes';
 import { tenantMiddleware, subscriptionGuard } from './middleware/tenant.middleware';
 import { maintenanceMiddleware } from './middleware/maintenance.middleware';
 import * as parentController from './controllers/parent.controller';
+import { activeCalls, userSockets, getIO } from './socket';
 
 const app = express();
 
@@ -80,6 +81,78 @@ const publicParentRouter = express.Router();
 publicParentRouter.get('/schools', parentController.listParentSchools);
 publicParentRouter.post('/login', parentController.loginParent);
 app.use('/api/parent', publicParentRouter);
+
+app.post('/api/calls/public-reject', async (req, res) => {
+  const { callId } = req.body;
+  if (!callId) {
+    return res.status(400).json({ error: 'Missing callId' });
+  }
+
+  console.log(`[PublicReject] Received request to reject call: ${callId}`);
+  if (activeCalls.has(callId)) {
+    const call = activeCalls.get(callId)!;
+    activeCalls.delete(callId);
+
+    // Notify the caller if online
+    const io = getIO();
+    if (io) {
+      const callerSocketId = userSockets.get(call.from);
+      if (callerSocketId) {
+        console.log(`[PublicReject] Emitting call_rejected to caller ${call.from}`);
+        io.to(callerSocketId).emit('call_rejected', { from: call.to });
+      }
+    }
+
+    try {
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      const callee = await prisma.user.findUnique({
+        where: { id: call.to },
+        select: { pushToken: true }
+      });
+      
+      if (callee?.pushToken) {
+        const { sendCallCancellation } = await import('./services/notification.service');
+        await sendCallCancellation(callee.pushToken, callId);
+      }
+
+      // Create a "Declined Call" message in the database conversation
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          isGroup: false,
+          members: {
+            every: {
+              userId: { in: [call.from, call.to] }
+            }
+          }
+        },
+        select: { id: true, schoolId: true }
+      });
+
+      if (conversation) {
+        const msg = await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            senderId: call.to, // the person who declined
+            schoolId: conversation.schoolId,
+            content: 'Declined Call',
+            type: call.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE',
+            metadata: { reason: 'DECLINED' }
+          }
+        });
+
+        if (io) {
+          io.to(conversation.id).emit('new_message', msg);
+        }
+      }
+    } catch (err) {
+      console.error('[PublicReject] Failed to log decline in DB:', err);
+    }
+  }
+
+  res.status(200).json({ success: true });
+});
 
 // Apply Tenant Isolation & Auth Middleware to all API routes
 app.use('/api', tenantMiddleware);

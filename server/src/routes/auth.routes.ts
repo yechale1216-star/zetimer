@@ -3,7 +3,7 @@ import * as userService from '../services/user.service';
 import * as schoolService from '../services/school.service';
 import * as onboardingService from '../services/onboarding.service';
 import { getMemberships } from '../services/auth_resolution.service';
-import { generateToken } from '../utils/jwt';
+import { generateToken, verifyToken } from '../utils/jwt';
 import { sendResetPasswordEmail } from '../utils/email';
 import { validateSignup } from '../middleware/validate';
 import prisma from '../config/db';
@@ -199,7 +199,23 @@ router.post('/signup', validateSignup, async (req: Request, res: Response, next:
 });
 
 // Logout
-router.post('/logout', (req: Request, res: Response) => {
+router.post('/logout', async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies?.attendance_token || req.headers.authorization?.split(' ')[1];
+    if (token) {
+      const decoded = verifyToken(token);
+      if (decoded && decoded.id) {
+        await prisma.user.update({
+          where: { id: decoded.id },
+          data: { pushToken: null }
+        });
+        console.log(`[Logout] Cleared FCM pushToken for user ${decoded.id}`);
+      }
+    }
+  } catch (err) {
+    console.error('[Logout] Failed to clear user pushToken:', err);
+  }
+
   res.clearCookie('attendance_token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

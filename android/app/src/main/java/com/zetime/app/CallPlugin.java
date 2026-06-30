@@ -8,6 +8,28 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 @CapacitorPlugin(name = "CallPlugin")
 public class CallPlugin extends Plugin {
+    private static com.getcapacitor.JSObject pendingCall = null;
+
+    public static void setPendingCall(com.getcapacitor.JSObject call) {
+        pendingCall = call;
+    }
+
+    @PluginMethod
+    public void getPendingCall(PluginCall call) {
+        com.getcapacitor.JSObject ret = new com.getcapacitor.JSObject();
+        if (pendingCall != null) {
+            ret.put("hasPending", true);
+            ret.put("action", pendingCall.getString("action"));
+            ret.put("callId", pendingCall.getString("callId"));
+            ret.put("callerId", pendingCall.getString("callerId"));
+            ret.put("callerName", pendingCall.getString("callerName"));
+            ret.put("callType", pendingCall.getString("callType"));
+            pendingCall = null;
+        } else {
+            ret.put("hasPending", false);
+        }
+        call.resolve(ret);
+    }
 
     @PluginMethod
     public void endCall(PluginCall call) {

@@ -13,7 +13,15 @@ import { registerPlugin } from '@capacitor/core';
 interface CallPlugin {
   endCall: () => Promise<void>;
   startRinging: (options: { callerName: string }) => Promise<void>;
-  addListener: (eventName: 'onCallAction', listenerFunc: (data: { action: string, callId: string }) => void) => Promise<any>;
+  getPendingCall: () => Promise<{
+    hasPending: boolean;
+    action?: string;
+    callId?: string;
+    callerId?: string;
+    callerName?: string;
+    callType?: string;
+  }>;
+  addListener: (eventName: 'onCallAction', listenerFunc: (data: { action: string, callId?: string, conversationId?: string }) => void) => Promise<any>;
 }
 
 const CallPlugin = registerPlugin<CallPlugin>('CallPlugin');
@@ -41,9 +49,8 @@ export const NativeBridge = {
     Network.addListener('networkStatusChange', status => {
       if (!status.connected) {
         notifications.warning("Offline Mode", "You are currently offline. Some features may be limited.");
-      } else {
-        notifications.success("Back Online", "Connection restored.");
       }
+      // "Back Online" is handled by the UI indicator instead of a toast
     });
   },
 
@@ -131,6 +138,17 @@ export const NativeBridge = {
   },
 
   // Call System Integrations
+  getPendingCall: async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        return await CallPlugin.getPendingCall();
+      } catch (e) {
+        console.warn('CallPlugin: getPendingCall failed', e);
+      }
+    }
+    return { hasPending: false };
+  },
+
   endNativeCall: async () => {
     if (Capacitor.isNativePlatform()) {
       try {

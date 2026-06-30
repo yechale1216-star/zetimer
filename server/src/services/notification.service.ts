@@ -173,9 +173,11 @@ export async function sendCallNotification(
   token: string,
   data: {
     callId: string;
+    callerId: string;
     callerName: string;
     callerAvatar?: string;
     callType: 'VOICE' | 'VIDEO';
+    serverUrl: string;
   }
 ) {
   const activeApp = app || (getApps().length > 0 ? getApps()[0] : undefined);
@@ -186,9 +188,11 @@ export async function sendCallNotification(
     data: {
       type: 'incoming_call',
       callId: data.callId,
+      callerId: data.callerId,
       callerName: data.callerName,
       callerAvatar: data.callerAvatar || '',
       callType: data.callType,
+      serverUrl: data.serverUrl,
     },
     token: token,
     android: {

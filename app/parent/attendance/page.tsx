@@ -543,7 +543,7 @@ export default function AttendanceHistory() {
             </div>
 
             {/* Quick breakdown metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:col-span-3">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-4 md:col-span-3">
               <div className="text-center space-y-0.5">
                 <p className="typography-label text-[10px] text-muted-foreground">{t("total_days")}</p>
                 <span className="typography-card-title text-foreground">{monthlyStats.total}</span>
@@ -666,10 +666,10 @@ export default function AttendanceHistory() {
                       {/* Status Icon */}
                       {dayStatus && (
                         <div className="mt-1 flex justify-center items-center opacity-90">
-                          {dayStatus === "present" && <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
-                          {dayStatus === "absent" && <XCircle className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
-                          {dayStatus === "late" && <Clock className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
-                          {dayStatus === "excused" && <AlertTriangle className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />}
+                          {dayStatus === "present" && <CheckCircle2 className="w-4 h-4 sm:w-6 sm:h-6 stroke-[2.5]" />}
+                          {dayStatus === "absent" && <XCircle className="w-4 h-4 sm:w-6 sm:h-6 stroke-[2.5]" />}
+                          {dayStatus === "late" && <Clock className="w-4 h-4 sm:w-6 sm:h-6 stroke-[2.5]" />}
+                          {dayStatus === "excused" && <AlertTriangle className="w-4 h-4 sm:w-6 sm:h-6 stroke-[2.5]" />}
                         </div>
                       )}
                     </div>

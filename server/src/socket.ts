@@ -36,7 +36,7 @@ export const activeCalls = new Map<string, {
   timestamp: number;
 }>();
 
-export const userSockets = new Map<string, string>();
+export const userSockets = new Map<string, Set<string>>();
 export let ioInstance: SocketIOServer | null = null;
 export const getIO = () => ioInstance;
 
@@ -86,8 +86,12 @@ export const initSocket = (server: HttpServer) => {
       });
       for (const { userId: mateId } of sharedConvMembers) {
         if (mateId === userId) continue;
-        const mateSocketId = userSockets.get(mateId);
-        if (mateSocketId && mateSocketId !== excludeSocketId) io.to(mateSocketId).emit(event, userId);
+        const mateSocketIds = userSockets.get(mateId);
+        if (mateSocketIds) {
+          for (const sId of mateSocketIds) {
+            if (sId !== excludeSocketId) io.to(sId).emit(event, userId);
+          }
+        }
       }
     } catch (err) { console.error(`[Socket] Failed to emit ${event}:`, err); }
   }
@@ -97,7 +101,14 @@ export const initSocket = (server: HttpServer) => {
       try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
         const { id: userId, schoolId } = decoded;
-        userSockets.set(userId, socket.id);
+        
+        let sockets = userSockets.get(userId);
+        if (!sockets) {
+          sockets = new Set();
+          userSockets.set(userId, sockets);
+        }
+        sockets.add(socket.id);
+
         socketData.set(socket.id, { userId, schoolId });
         userSchoolMap.set(userId, schoolId);
         onlineUsers.add(userId);
@@ -118,9 +129,11 @@ export const initSocket = (server: HttpServer) => {
               callId: call.callId,
             });
             // Inform caller B is ringing
-            const callerSocketId = userSockets.get(call.from);
-            if (callerSocketId) {
-              io.to(callerSocketId).emit('call_ringing', { from: userId });
+            const callerSocketIds = userSockets.get(call.from);
+            if (callerSocketIds) {
+              for (const sId of callerSocketIds) {
+                io.to(sId).emit('call_ringing', { from: userId });
+              }
             }
           }
         }
@@ -359,8 +372,12 @@ export const initSocket = (server: HttpServer) => {
         timestamp: Date.now()
       });
 
-      const targetSocketId = userSockets.get(data.to);
-      if (targetSocketId) io.to(targetSocketId).emit('incoming_call', data);
+      const targetSocketIds = userSockets.get(data.to);
+      if (targetSocketIds) {
+        for (const sId of targetSocketIds) {
+          io.to(sId).emit('incoming_call', data);
+        }
+      }
       
       if (targetUser.pushToken) {
         // High-priority silent data notification to wake Android app for Full Screen Intent
@@ -378,13 +395,32 @@ export const initSocket = (server: HttpServer) => {
     });
 
     socket.on('call_ringing', (data: any) => {
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('call_ringing', { from: data.from });
+      const sSet = userSockets.get(data.to);
+      if (sSet) {
+        for (const sId of sSet) {
+          io.to(sId).emit('call_ringing', { from: data.from });
+        }
+      }
     });
 
     socket.on('answer_call', (data: any) => {
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('call_answered', { from: data.from, answer: data.answer });
+      const sSet = userSockets.get(data.to);
+      if (sSet) {
+        for (const sId of sSet) {
+          io.to(sId).emit('call_answered', { from: data.from, answer: data.answer });
+        }
+      }
+
+      // Notify the remaining devices of the callee (data.from) to stop ringing
+      const calleeSocketIds = userSockets.get(data.from);
+      if (calleeSocketIds) {
+        for (const sId of calleeSocketIds) {
+          if (sId !== socket.id) {
+            io.to(sId).emit('call_cancelled', { callId: data.callId });
+          }
+        }
+      }
+
       // Remove call from active list on answer
       if (data.callId) {
         activeCalls.delete(data.callId);
@@ -398,24 +434,46 @@ export const initSocket = (server: HttpServer) => {
     });
 
     socket.on('ice_candidate', (data: any) => {
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('ice_candidate', { from: data.from, candidate: data.candidate });
+      const sSet = userSockets.get(data.to);
+      if (sSet) {
+        for (const sId of sSet) {
+          io.to(sId).emit('ice_candidate', { from: data.from, candidate: data.candidate });
+        }
+      }
     });
 
     socket.on('media_state_change', (data: any) => {
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('media_state_changed', { 
-        from: data.from, 
-        isCameraOff: data.isCameraOff, 
-        isMuted: data.isMuted 
-      });
+      const sSet = userSockets.get(data.to);
+      if (sSet) {
+        for (const sId of sSet) {
+          io.to(sId).emit('media_state_changed', { 
+            from: data.from, 
+            isCameraOff: data.isCameraOff, 
+            isMuted: data.isMuted 
+          });
+        }
+      }
     });
 
     socket.on('reject_call', async (data: any) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('call_rejected', { from: data.from });
+      const sSet = userSockets.get(data.to);
+      if (sSet) {
+        for (const sId of sSet) {
+          io.to(sId).emit('call_rejected', { from: data.from });
+        }
+      }
+
+      // Notify the remaining devices of the callee (data.from) to stop ringing
+      const calleeSocketIds = userSockets.get(data.from);
+      if (calleeSocketIds) {
+        for (const sId of calleeSocketIds) {
+          if (sId !== socket.id) {
+            io.to(sId).emit('call_cancelled', { callId: data.callId });
+          }
+        }
+      }
       
       // Clean up call memory state
       if (data.callId) {
@@ -452,8 +510,12 @@ export const initSocket = (server: HttpServer) => {
     socket.on('end_call', async (data: any) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('call_ended', { from: data.from });
+      const sSet = userSockets.get(data.to);
+      if (sSet) {
+        for (const sId of sSet) {
+          io.to(sId).emit('call_ended', { from: data.from });
+        }
+      }
 
       // Clean up call memory state
       if (data.callId) {
@@ -500,9 +562,15 @@ export const initSocket = (server: HttpServer) => {
     socket.on('disconnect', () => {
       const data = socketData.get(socket.id);
       if (data) {
-        userSockets.delete(data.userId);
-        onlineUsers.delete(data.userId);
-        emitPresenceToSchoolMates('user_offline', data.userId, data.schoolId, socket.id);
+        const sockets = userSockets.get(data.userId);
+        if (sockets) {
+          sockets.delete(socket.id);
+          if (sockets.size === 0) {
+            userSockets.delete(data.userId);
+            onlineUsers.delete(data.userId);
+            emitPresenceToSchoolMates('user_offline', data.userId, data.schoolId, socket.id);
+          }
+        }
       }
       socketData.delete(socket.id);
     });

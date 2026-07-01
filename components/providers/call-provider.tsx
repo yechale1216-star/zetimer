@@ -237,7 +237,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...prev.filter(p => p.isLocal),
       { id: toId, name: profile.name, avatar: profile.avatar }
     ]);
-    webrtc.startCall(toId, type, profile);
+    
+    const callerProfile = {
+      name: currentUser?.full_name || currentUser?.name || 'Unknown User',
+      avatar: currentUser?.profile_photo || currentUser?.avatar || ''
+    };
+    webrtc.startCall(toId, type, callerProfile);
   };
 
   const handleAccept = () => {

@@ -383,7 +383,7 @@ export default function ParentDashboard() {
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
         <div className="space-y-1.5 w-full md:w-auto">
-          <h2 className="typography-page-title text-4xl md:text-5xl font-semibold text-foreground leading-tight">
+          <h2 className="text-[22px] sm:text-3xl md:text-5xl font-semibold text-foreground leading-tight">
             {getGreeting()}, <span className="text-emerald-600 dark:text-emerald-400">{firstName}</span>
           </h2>
           <p className="typography-label text-muted-foreground">
@@ -420,7 +420,7 @@ export default function ParentDashboard() {
               </div>
               <div>
                 <p className="typography-label text-emerald-600 dark:text-emerald-400 uppercase mb-1">{t("today_attendance")}</p>
-                <h2 className="typography-page-title text-foreground min-h-[38px] flex items-center">
+                <h2 className="text-xl sm:text-2xl md:text-[32px] font-bold text-foreground min-h-[38px] flex items-center">
                   {isLoading || !selectedStudent ? (
                     <span className="inline-block w-48 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-md" />
                   ) : (
@@ -527,7 +527,7 @@ export default function ParentDashboard() {
 
         {/* Attendance Metrics Numbers Card */}
         <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 overflow-hidden lg:col-span-2 transition-all">
-          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
             <div>
               <CardTitle className="typography-card-title uppercase text-foreground/80">{t("term_summary")}</CardTitle>
               <CardDescription className="typography-label">Out of {dashboardStats.total} {t("total_days")} recorded</CardDescription>
@@ -620,11 +620,11 @@ export default function ParentDashboard() {
 
             </div>
 
-            <div className="typography-body mt-8 flex items-center justify-between border-t border-border/40 pt-5 px-1 text-foreground/70">
+            <div className="typography-body mt-8 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border-t border-border/40 pt-5 px-1 text-foreground/70">
               <span className="typography-label">{t("leave_request_prompt")}</span>
               <button
                 onClick={() => router.push("/parent/profile")}
-                className="typography-label text-emerald-600 dark:text-emerald-400 hover:underline underline-offset-4 flex items-center gap-2 group"
+                className="typography-label text-emerald-600 dark:text-emerald-400 hover:underline underline-offset-4 flex items-center gap-2 group text-left"
               >
                 <span>{t("contact_advisor")}</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -640,7 +640,7 @@ export default function ParentDashboard() {
 
         {/* Left: Recent Absences & Late Alerts */}
         <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 transition-all">
-          <CardHeader className="flex flex-row items-center justify-between border-b border-border/20 pb-4">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/20 pb-4">
             <div>
               <CardTitle className="typography-card-title uppercase text-foreground/80 flex items-center gap-2">
                 <Bell className="w-5 h-5 text-emerald-500" />
@@ -703,7 +703,7 @@ export default function ParentDashboard() {
 
         {/* Right: School Announcements Board */}
         <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800 transition-all">
-          <CardHeader className="flex flex-row items-center justify-between border-b border-border/20 pb-4">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/20 pb-4">
             <div className="flex flex-col">
               <CardTitle className="typography-card-title uppercase text-foreground/80 flex items-center gap-2">
                 <Megaphone className="w-5 h-5 text-emerald-500" />

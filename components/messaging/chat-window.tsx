@@ -1219,7 +1219,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                 </Button>
               </motion.div>
             ) : (
-              <div className="flex items-center">
+              <div className="flex items-center shrink-0">
                 <Button
                   onMouseDown={startRecording}
                   onTouchStart={(e) => { e.preventDefault(); startRecording(); }}

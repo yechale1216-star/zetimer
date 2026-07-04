@@ -123,25 +123,45 @@ export const getMessages = async (req: AuthenticatedRequest, res: Response) => {
 
 export const createConversation = async (req: AuthenticatedRequest, res: Response) => {
   const { name, isGroup, memberIds, avatar } = req.body;
-  const schoolId = req.user?.schoolId;
+
+  // Use x-school-id header as the authoritative school context.
+  // req.user.schoolId can fall back to the JWT's default school (which may be suspended/wrong)
+  // when tenantMiddleware cannot resolve the role for the /api/messages path.
+  const headerSchoolId = req.headers['x-school-id'] as string | undefined;
+  const schoolId = headerSchoolId || req.user?.schoolId;
 
   if (!schoolId) {
     return res.status(401).json({ error: 'Unauthorized: School ID missing' });
   }
 
   try {
-    // 1. Verify all members belong to the SAME school
-    const usersInSchool = await prisma.user.findMany({
+    // Verify all members are either:
+    // a) Staff/Teachers/Admins in this school (via User.schoolId)
+    // b) Parents linked to this school (via ParentStudentLink)
+    // This handles the case of a parent (whose User.schoolId = SchoolA) messaging
+    // a teacher in SchoolB (their child's school).
+    const staffInSchool = await prisma.user.findMany({
       where: {
         id: { in: memberIds },
         schoolId,
         is_active: true,
-        role: { in: ['admin', 'school_admin', 'teacher', 'parent'] }
       },
       select: { id: true }
     });
 
-    if (usersInSchool.length !== memberIds.length) {
+    const parentLinksInSchool = await prisma.parentStudentLink.findMany({
+      where: {
+        parentId: { in: memberIds },
+        schoolId,
+      },
+      select: { parentId: true }
+    });
+    const parentIds = new Set(parentLinksInSchool.map((l: any) => l.parentId));
+    const staffIds = new Set(staffInSchool.map((u: any) => u.id));
+
+    const validMemberIds: string[] = memberIds.filter((id: string) => staffIds.has(id) || parentIds.has(id));
+
+    if (validMemberIds.length !== memberIds.length) {
       return res.status(403).json({ 
         error: 'Forbidden: One or more users are not found in your school or are not authorized for communication' 
       });

@@ -6,9 +6,10 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, User, CheckSquare, BarChart2, BookOpen,
   Settings, LogOut, CreditCard, MessageSquare, Phone, TrendingUp, ShieldBan,
-  X, ChevronRight, Megaphone, HeadphonesIcon
+  X, ChevronRight, Megaphone, HeadphonesIcon, Sun, Moon
 } from 'lucide-react'
 import { cn } from "@/lib/utils/utils"
+import { useTheme } from "@/components/theme-provider"
 
 import { useAuth } from '@/lib/context/auth-context'
 import { useSchool } from '@/lib/context/school-context'
@@ -193,7 +194,9 @@ export default function SchoolAdminLayout({
                   ))}
                 </nav>
 
-                <div className="p-4 border-t border-border">
+                <div className="p-4 border-t border-border space-y-2">
+                  {/* Theme Toggle */}
+                  <ThemeToggleRow />
                   <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl hover:bg-red-50 text-red-600 transition text-sm font-semibold">
                     <LogOut className="w-4 h-4" />
                     Sign Out
@@ -272,6 +275,28 @@ function NavLink({ href, icon, label, active }: { href: string, icon: React.Reac
         <span>{label}</span>
       </div>
     </Link>
+  )
+}
+
+function ThemeToggleRow() {
+  const { theme, setTheme } = useTheme()
+  const isDark = theme === 'dark'
+  return (
+    <button
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      className="flex items-center justify-between w-full px-4 py-2.5 rounded-xl bg-muted/40 hover:bg-muted/70 transition text-sm font-semibold text-foreground"
+    >
+      <span className="flex items-center gap-2 text-muted-foreground">
+        {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        {isDark ? 'Dark Mode' : 'Light Mode'}
+      </span>
+      <div className="flex h-5 w-9 items-center rounded-full bg-primary/20 px-0.5 transition-all">
+        <div className={cn(
+          "h-4 w-4 rounded-full bg-primary shadow transition-transform duration-300",
+          isDark ? 'translate-x-4' : 'translate-x-0'
+        )} />
+      </div>
+    </button>
   )
 }
 

@@ -15,13 +15,17 @@ import {
   GraduationCap,
   MessageSquare,
   Megaphone,
-  ChevronRight
+  ChevronRight,
+  Sun,
+  Moon,
+  Globe
 } from "lucide-react"
 import { parentDb } from "@/lib/db/parent-db"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Logo } from "@/components/logo"
 import { TopNav } from "@/components/layout/top-nav"
+import { useTheme } from "@/components/theme-provider"
 
 import { LanguageProvider, useLanguage } from "@/lib/context/language-context"
 import { useSchool } from "@/lib/context/school-context"
@@ -271,7 +275,10 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
+        {/* Desktop sidebar bottom: theme + language + switch school + logout */}
         <div className="p-4 border-t border-border space-y-2">
+          <ThemeToggleRow />
+          <LangToggleRow />
           {availableSchools.length > 1 && (
             <button onClick={() => router.push("/auth/school-select")} className="w-full flex items-center justify-center gap-2 py-2 px-3 text-primary border border-primary/20 rounded-xl hover:bg-primary/5 transition-all font-semibold text-sm">
               <GraduationCap className="w-4 h-4" /><span>{t("switch_school")}</span>
@@ -302,7 +309,10 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
+        {/* Mobile sidebar bottom: theme + language + switch + logout */}
         <div className="shrink-0 p-4 border-t border-border space-y-2 pb-safe">
+          <ThemeToggleRow />
+          <LangToggleRow />
           {availableSchools.length > 1 && (
             <button onClick={() => { router.push("/auth/school-select"); setSidebarOpen(false) }} className="w-full flex items-center justify-center gap-2 py-2.5 border border-primary/20 text-primary rounded-xl font-semibold text-sm">
               <GraduationCap className="w-4 h-4" /><span>{t("switch_school")}</span>
@@ -421,5 +431,46 @@ function MobileTabLink({ href, icon, label, active, badge }: { href: string, ico
         </span>
       </div>
     </Link>
+  )
+}
+
+function ThemeToggleRow() {
+  const { theme, setTheme } = useTheme()
+  const isDark = theme === 'dark'
+  return (
+    <button
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      className="flex items-center justify-between w-full px-4 py-2.5 rounded-xl bg-muted/40 hover:bg-muted/70 transition text-sm font-semibold"
+    >
+      <span className="flex items-center gap-2 text-muted-foreground">
+        {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        {isDark ? 'Dark Mode' : 'Light Mode'}
+      </span>
+      <div className="flex h-5 w-9 items-center rounded-full bg-primary/20 px-0.5">
+        <div className={cn(
+          "h-4 w-4 rounded-full bg-primary shadow transition-transform duration-300",
+          isDark ? 'translate-x-4' : 'translate-x-0'
+        )} />
+      </div>
+    </button>
+  )
+}
+
+function LangToggleRow() {
+  const { language, setLanguage } = useLanguage()
+  const isAmharic = language === 'am'
+  return (
+    <button
+      onClick={() => setLanguage(isAmharic ? 'en' : 'am')}
+      className="flex items-center justify-between w-full px-4 py-2.5 rounded-xl bg-muted/40 hover:bg-muted/70 transition text-sm font-semibold"
+    >
+      <span className="flex items-center gap-2 text-muted-foreground">
+        <Globe className="w-4 h-4" />
+        {isAmharic ? 'አማርኛ' : 'English'}
+      </span>
+      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+        {isAmharic ? 'EN' : 'አማ'}
+      </span>
+    </button>
   )
 }

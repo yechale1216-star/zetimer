@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.featureGuard = exports.subscriptionGuard = exports.authorize = exports.tenantMiddleware = void 0;
+exports.featureGuard = exports.subscriptionGuard = exports.invalidateSchoolStatusCache = exports.authorize = exports.tenantMiddleware = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const auth_resolution_service_1 = require("../services/auth_resolution.service");
@@ -126,6 +126,14 @@ const authorize = (roles) => {
     };
 };
 exports.authorize = authorize;
+// ── Subscription status in-memory cache (90 s TTL) ──────────────────────────
+const _subStatusCache = new Map();
+const SUB_CACHE_TTL = 90 * 1000;
+/** Call this after a school is suspended/unsuspended to force next request to re-query */
+const invalidateSchoolStatusCache = (schoolId) => {
+    _subStatusCache.delete(schoolId);
+};
+exports.invalidateSchoolStatusCache = invalidateSchoolStatusCache;
 /**
  * Subscription Guard
  * Blocks all write requests (POST/PUT/PATCH/DELETE) for users whose school is SUSPENDED or EXPIRED.
@@ -139,19 +147,44 @@ const subscriptionGuard = async (req, res, next) => {
     const readMethods = ['GET', 'HEAD', 'OPTIONS'];
     if (readMethods.includes(req.method))
         return next();
-    const schoolId = req.user.schoolId;
+    // ── Whitelisted write endpoints ──────────────────────────────────────────
+    // These are identity/context operations that don't produce school-owned
+    // data. Parents MUST be able to switch schools even when one is suspended
+    // so they can still read historical data across all their children's schools.
+    const url = req.originalUrl.split('?')[0];
+    const writeWhitelist = [
+        '/api/parent/me/active-school', // parent school-switching
+        '/api/users/me/active-school', // generic school-switching
+        '/api/users/profile', // profile updates
+        '/api/parent/profile', // parent profile updates
+        '/api/parent/update-password', // password change
+        '/api/auth', // auth flows
+    ];
+    if (writeWhitelist.some(path => url.startsWith(path)))
+        return next();
+    // ── Determine the school to check ────────────────────────────────────────
+    // Priority: x-school-id header (the school the client is ACTIVELY using)
+    // over req.user.schoolId (which may be the JWT's default school, potentially suspended).
+    const headerSchoolId = req.headers['x-school-id'];
+    const schoolId = headerSchoolId || req.user.schoolId;
     if (!schoolId)
         return next();
     try {
-        const school = await db_1.default.school.findUnique({
-            where: { id: schoolId },
-            include: {
-                subscription: true
-            },
-        });
-        // Check status from both school (deprecated) and real subscription record
-        const status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
-        console.log(`[subscriptionGuard] Checking school ${school?.schoolId || 'unknown'}. Status: ${status}`);
+        // Check cache first to avoid DB hit on every write
+        const cached = _subStatusCache.get(schoolId);
+        let status;
+        if (cached && cached.expires > Date.now()) {
+            status = cached.status;
+        }
+        else {
+            const school = await db_1.default.school.findUnique({
+                where: { id: schoolId },
+                include: { subscription: true },
+            });
+            status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
+            _subStatusCache.set(schoolId, { status, expires: Date.now() + SUB_CACHE_TTL });
+        }
+        console.log(`[subscriptionGuard] Checking school ${schoolId}. Status: ${status}`);
         if (status === 'SUSPENDED' || status === 'EXPIRED') {
             console.log(`[subscriptionGuard] BLOCKING request to ${req.method} ${req.originalUrl} - School ${status}`);
             const message = status === 'SUSPENDED'

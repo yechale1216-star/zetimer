@@ -182,7 +182,11 @@ export const subscriptionGuard = async (req: AuthenticatedRequest, res: Response
   ];
   if (writeWhitelist.some(path => url.startsWith(path))) return next();
 
-  const schoolId = req.user.schoolId;
+  // ── Determine the school to check ────────────────────────────────────────
+  // Priority: x-school-id header (the school the client is ACTIVELY using)
+  // over req.user.schoolId (which may be the JWT's default school, potentially suspended).
+  const headerSchoolId = req.headers['x-school-id'] as string | undefined;
+  const schoolId = headerSchoolId || req.user.schoolId;
   if (!schoolId) return next();
 
   try {

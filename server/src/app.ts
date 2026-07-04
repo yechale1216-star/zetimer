@@ -96,12 +96,10 @@ app.post('/api/calls/public-reject', async (req, res) => {
     // Notify the caller if online
     const io = getIO();
     if (io) {
-      const callerSocketIds = userSockets.get(call.from);
-      if (callerSocketIds) {
+      const callerSocketId = userSockets.get(call.from);
+      if (callerSocketId) {
         console.log(`[PublicReject] Emitting call_rejected to caller ${call.from}`);
-        for (const sId of callerSocketIds) {
-          io.to(sId).emit('call_rejected', { from: call.to });
-        }
+        io.to(callerSocketId).emit('call_rejected', { from: call.to });
       }
     }
 
@@ -133,16 +131,14 @@ app.post('/api/calls/public-reject', async (req, res) => {
       });
 
       if (conversation) {
-        const reason = req.body.reason || 'DECLINED';
-        const content = reason === 'MISSED' ? 'Missed Call' : 'Declined Call';
         const msg = await prisma.message.create({
           data: {
             conversationId: conversation.id,
             senderId: call.to, // the person who declined
             schoolId: conversation.schoolId,
-            content,
+            content: 'Declined Call',
             type: call.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE',
-            metadata: { reason }
+            metadata: { reason: 'DECLINED' }
           }
         });
 

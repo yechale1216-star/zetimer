@@ -145,6 +145,15 @@ export const authorize = (roles: string[]) => {
   };
 };
 
+// ── Subscription status in-memory cache (90 s TTL) ──────────────────────────
+const _subStatusCache = new Map<string, { status: string; expires: number }>();
+const SUB_CACHE_TTL = 90 * 1000;
+
+/** Call this after a school is suspended/unsuspended to force next request to re-query */
+export const invalidateSchoolStatusCache = (schoolId: string) => {
+  _subStatusCache.delete(schoolId);
+};
+
 /**
  * Subscription Guard
  * Blocks all write requests (POST/PUT/PATCH/DELETE) for users whose school is SUSPENDED or EXPIRED.
@@ -158,27 +167,47 @@ export const subscriptionGuard = async (req: AuthenticatedRequest, res: Response
   const readMethods = ['GET', 'HEAD', 'OPTIONS'];
   if (readMethods.includes(req.method)) return next();
 
+  // ── Whitelisted write endpoints ──────────────────────────────────────────
+  // These are identity/context operations that don't produce school-owned
+  // data. Parents MUST be able to switch schools even when one is suspended
+  // so they can still read historical data across all their children's schools.
+  const url = req.originalUrl.split('?')[0];
+  const writeWhitelist = [
+    '/api/parent/me/active-school',  // parent school-switching
+    '/api/users/me/active-school',   // generic school-switching
+    '/api/users/profile',            // profile updates
+    '/api/parent/profile',           // parent profile updates
+    '/api/parent/update-password',   // password change
+    '/api/auth',                     // auth flows
+  ];
+  if (writeWhitelist.some(path => url.startsWith(path))) return next();
+
   const schoolId = req.user.schoolId;
   if (!schoolId) return next();
 
   try {
-    const school = await prisma.school.findUnique({
-      where: { id: schoolId },
-      include: { 
-        subscription: true 
-      },
-    });
+    // Check cache first to avoid DB hit on every write
+    const cached = _subStatusCache.get(schoolId);
+    let status: string;
 
-    // Check status from both school (deprecated) and real subscription record
-    const status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
-    
-    console.log(`[subscriptionGuard] Checking school ${school?.schoolId || 'unknown'}. Status: ${status}`);
+    if (cached && cached.expires > Date.now()) {
+      status = cached.status;
+    } else {
+      const school = await prisma.school.findUnique({
+        where: { id: schoolId },
+        include: { subscription: true },
+      });
+      status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
+      _subStatusCache.set(schoolId, { status, expires: Date.now() + SUB_CACHE_TTL });
+    }
+
+    console.log(`[subscriptionGuard] Checking school ${schoolId}. Status: ${status}`);
 
     if (status === 'SUSPENDED' || status === 'EXPIRED') {
       console.log(`[subscriptionGuard] BLOCKING request to ${req.method} ${req.originalUrl} - School ${status}`);
-      
-      const message = status === 'SUSPENDED' 
-        ? 'Your school account is suspended. Please contact support.' 
+
+      const message = status === 'SUSPENDED'
+        ? 'Your school account is suspended. Please contact support.'
         : 'Your school subscription or trial has expired. Please upgrade your plan to continue making changes.';
 
       return res.status(403).json({

@@ -8,6 +8,7 @@ import { authService } from '@/lib/auth/auth';
 import { useToast } from '@/hooks/use-toast';
 import { NativeBridge } from '@/lib/utils/native-bridge';
 import { App } from '@capacitor/app';
+import { useSuspension } from '@/lib/context/suspension-context';
 
 interface CallContextType {
   initiateCall: (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => void;
@@ -24,6 +25,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [callType, setCallType] = useState<'VOICE' | 'VIDEO'>('VOICE');
   const [pendingAction, setPendingAction] = useState<{ action: string; callId: string; callerId?: string; callType?: string } | null>(null);
   const { toast } = useToast();
+  const { isSuspended } = useSuspension();
 
   useEffect(() => {
     const user = authService.getCurrentUser();
@@ -34,13 +36,17 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const onIncomingCall = useCallback((data: any) => {
+    if (isSuspended) {
+      console.log('[CallProvider] Rejecting incoming call signal due to school suspension');
+      return;
+    }
     setIncomingCallData(data);
     setCallType(data.type);
     setParticipants(prev => [
       ...prev.filter(p => p.isLocal),
       { id: data.from, name: data.profile.name, avatar: data.profile.avatar }
     ]);
-  }, []);
+  }, [isSuspended]);
 
   const onCallAccepted = useCallback((userId: string) => {
     console.log('Call accepted by:', userId);
@@ -232,6 +238,14 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [webrtc.callStatus, incomingCallData]);
 
   const initiateCall = (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => {
+    if (isSuspended) {
+      toast({
+        title: 'Portal Read-Only',
+        description: 'Voice and video calls are disabled under school suspension.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setCallType(type);
     setParticipants(prev => [
       ...prev.filter(p => p.isLocal),

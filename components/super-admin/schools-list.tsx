@@ -18,6 +18,8 @@ interface School {
   subscriptionStatus: string
   onboardingStatus: 'PENDING' | 'ACTIVE' | 'SETUP_COMPLETE'
   createdAt: string
+  suspendedAt?: string | null
+  suspendReason?: string | null
 }
 
 interface SchoolsListProps {
@@ -30,6 +32,7 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [suspendingId, setSuspendingId] = useState<string | null>(null)
+  const [suspendReason, setSuspendReason] = useState('')
   const itemsPerPage = 10
 
   const fetchSchools = async () => {
@@ -53,7 +56,7 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
 
   useEffect(() => { fetchSchools() }, [])
 
-  const handleSuspendToggle = async (school: School) => {
+  const handleSuspendToggle = async (school: School, reason?: string) => {
     const isSuspended = school.subscriptionStatus === 'SUSPENDED'
     try {
       setSuspendingId(school.id)
@@ -63,14 +66,17 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
           'Authorization': `Bearer ${localStorage.getItem('attendance_token')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ suspend: !isSuspended }),
+        body: JSON.stringify({ suspend: !isSuspended, suspendReason: reason || undefined }),
       })
       const result = await res.json()
       if (result.success) {
         setSchools(prev => prev.map(s =>
-          s.id === school.id ? { ...s, subscriptionStatus: !isSuspended ? 'SUSPENDED' : 'ACTIVE' } : s
+          s.id === school.id
+            ? { ...s, subscriptionStatus: !isSuspended ? 'SUSPENDED' : 'ACTIVE', suspendedAt: !isSuspended ? new Date().toISOString() : null, suspendReason: !isSuspended ? (reason || null) : null }
+            : s
         ))
         notifications.success("Success", `School ${!isSuspended ? 'suspended' : 'unsuspended'} successfully`);
+        setSuspendReason('')
       } else {
         notifications.error("Error", result.message || "Failed to update school status");
       }
@@ -132,10 +138,37 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
                 : `${school.name} users will be blocked from all write operations. Existing data will remain readable.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {/* Reason input – only when suspending */}
+          {!isSuspended && (
+            <div className="px-1 pb-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                Reason <span className="text-muted-foreground font-normal normal-case">(optional)</span>
+              </label>
+              <textarea
+                className="w-full text-sm border border-border rounded-md px-3 py-2 bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                rows={2}
+                placeholder="e.g. Non-payment, policy violation…"
+                value={suspendReason}
+                onChange={e => setSuspendReason(e.target.value)}
+                maxLength={200}
+              />
+              {suspendReason && (
+                <p className="text-[10px] text-muted-foreground text-right mt-0.5">{suspendReason.length}/200</p>
+              )}
+              {school.suspendedAt && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Previously suspended on {new Date(school.suspendedAt).toLocaleDateString()}
+                  {school.suspendReason && ` · "${school.suspendReason}"`}
+                </p>
+              )}
+            </div>
+          )}
+
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setSuspendReason('')}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => handleSuspendToggle(school)}
+              onClick={() => handleSuspendToggle(school, suspendReason)}
               className={isSuspended ? 'bg-green-600 hover:bg-green-700' : 'bg-orange-600 hover:bg-orange-700'}
             >
               {isSuspended ? 'Yes, Unsuspend' : 'Yes, Suspend'}
@@ -170,7 +203,15 @@ export function SchoolsList({ searchQuery }: SchoolsListProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="typography-card-title">All Schools</CardTitle>
+        <CardTitle className="typography-card-title flex items-center justify-between">
+          All Schools
+          {schools.filter(s => s.subscriptionStatus === 'SUSPENDED').length > 0 && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 flex items-center gap-1">
+              <ShieldBan className="w-3 h-3" />
+              {schools.filter(s => s.subscriptionStatus === 'SUSPENDED').length} Suspended
+            </span>
+          )}
+        </CardTitle>
         <CardDescription>Total: {filteredSchools.length} schools</CardDescription>
       </CardHeader>
       <CardContent>

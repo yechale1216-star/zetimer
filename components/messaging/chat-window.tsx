@@ -6,7 +6,8 @@ import {
   Check, CheckCheck, Reply, Forward, Trash2, Heart, Search, X, Clock,
   Pin, Copy, FileText, FileJson, FileType, Music, Play, ExternalLink,
   Download, Globe, FileArchive, Mic, MicOff, StopCircle, ImageIcon, File as FileIcon,
-  Info, Bell, RotateCw, PhoneIncoming, PhoneMissed, PhoneOff, PhoneCall
+  Info, Bell, RotateCw, PhoneIncoming, PhoneMissed, PhoneOff, PhoneCall,
+  ArrowUpRight, ArrowDownLeft, PhoneOutgoing
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,6 +36,7 @@ import { supabase } from '@/lib/utils/supabase';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/context/language-context';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useSuspension } from '@/lib/context/suspension-context';
 import { Badge } from '@/components/ui/badge';
 
 interface Message {
@@ -89,6 +91,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const { initiateCall, status: callStatus } = useCall();
+  const { isSuspended } = useSuspension();
 
   const [inputValue, setInputValue] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -738,11 +741,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
             <DropdownMenuContent align="end" className="w-56 rounded-2xl border-border/50 shadow-2xl p-1.5 animate-in fade-in zoom-in-95 duration-200">
               {!isStudent && !activeConversation.isGroup && (
                 <>
-                  <DropdownMenuItem className="rounded-xl h-10 gap-3" onClick={() => initiateCall(activeConversation.realContactId || activeConversation.id, 'VOICE', activeConversation)}>
+                  <DropdownMenuItem
+                    className={`rounded-xl h-10 gap-3 ${isSuspended ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    onClick={() => !isSuspended && initiateCall(activeConversation.realContactId || activeConversation.id, 'VOICE', activeConversation)}
+                    title={isSuspended ? 'Voice calls are disabled while the school is suspended' : undefined}
+                  >
                     <Phone className="h-4 w-4 text-primary" /> {t("voice_call")}
+                    {isSuspended && <span className="ml-auto text-[10px] font-semibold text-orange-500 uppercase">Suspended</span>}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="rounded-xl h-10 gap-3" onClick={() => initiateCall(activeConversation.realContactId || activeConversation.id, 'VIDEO', activeConversation)}>
+                  <DropdownMenuItem
+                    className={`rounded-xl h-10 gap-3 ${isSuspended ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    onClick={() => !isSuspended && initiateCall(activeConversation.realContactId || activeConversation.id, 'VIDEO', activeConversation)}
+                    title={isSuspended ? 'Video calls are disabled while the school is suspended' : undefined}
+                  >
                     <Video className="h-4 w-4 text-primary" /> {t("video_call")}
+                    {isSuspended && <span className="ml-auto text-[10px] font-semibold text-orange-500 uppercase">Suspended</span>}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-1 bg-border/40" />
                 </>
@@ -860,6 +873,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                     message={message}
                     missedCount={count}
                     onCallAgain={(type) => {
+                      if (isSuspended) {
+                        toast.error('Portal Read-Only: Calls are disabled while the school is suspended.');
+                        return;
+                      }
                       const contactId = activeConversation.realContactId || activeConversation.id;
                       initiateCall(contactId, type, activeConversation);
                     }}
@@ -874,6 +891,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                     message={message}
                     missedCount={1}
                     onCallAgain={(type) => {
+                      if (isSuspended) {
+                        toast.error('Portal Read-Only: Calls are disabled while the school is suspended.');
+                        return;
+                      }
                       const contactId = activeConversation.realContactId || activeConversation.id;
                       initiateCall(contactId, type, activeConversation);
                     }}
@@ -965,9 +986,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
       </AnimatePresence>
 
       {/* Message Input */}
-      <div className="p-4 bg-background/80 backdrop-blur-md border-t border-border z-50 sticky bottom-0 pb-safe">
+      <div className="p-2 md:p-4 bg-background/80 backdrop-blur-md border-t border-border z-50 sticky bottom-0 pb-safe">
 
-        <div className="max-w-4xl mx-auto space-y-2">
+        <div className="max-w-4xl w-full mx-auto space-y-2">
 
           {/* Reply/Edit Preview */}
           <AnimatePresence>
@@ -1074,7 +1095,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
             )}
           </AnimatePresence>
 
-          <div className="flex items-end gap-2 relative">
+          <div className="flex items-end gap-1.5 md:gap-2 relative w-full">
             {/* Hidden file inputs */}
             <input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => handleFileSelect(e, 'IMAGE')} className="hidden" />
             <input type="file" ref={videoInputRef} accept="video/*" onChange={(e) => handleFileSelect(e, 'VIDEO')} className="hidden" />
@@ -1131,8 +1152,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
             </div>
 
             {/* Text input */}
-            <div className="bg-secondary/50 rounded-2xl flex-1 flex items-end p-1.5 focus-within:ring-1 focus-within:ring-primary/20 transition-all relative">
-              <div className="relative">
+            <div className="bg-secondary/50 rounded-2xl flex-1 flex items-end p-1.5 focus-within:ring-1 focus-within:ring-primary/20 transition-all relative min-w-0">
+              <div className="relative shrink-0">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1193,7 +1214,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                   }
                 }}
                 rows={1}
-                className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none py-2 px-3 text-[15px] resize-none max-h-32 scrollbar-hide disabled:opacity-50"
+                className="flex-1 w-full min-w-0 bg-transparent border-none focus:ring-0 focus:outline-none py-2 px-3 text-[15px] resize-none max-h-32 scrollbar-hide disabled:opacity-50"
               />
             </div>
 
@@ -1375,58 +1396,79 @@ const CallMessageBubble = React.memo(({ message, missedCount, onCallAgain, onAct
 }) => {
   const isMe = message.isMe;
   const isVideo = message.type === 'CALL_VIDEO' || message.type === 'CALL_MISSED_VIDEO';
-  const isMissed = message.type === 'CALL_MISSED_VOICE' || message.type === 'CALL_MISSED_VIDEO';
   const metadata = (message as any).metadata as { duration?: number; reason?: string } | null;
   const duration = metadata?.duration || 0;
-  const reason = metadata?.reason;
+  const reason = metadata?.reason?.toUpperCase();
 
-  // Determine variant
-  let variant: 'completed' | 'missed' | 'cancelled' | 'declined' | 'failed';
-  if (reason === 'CANCELLED') variant = 'cancelled';
-  else if (reason === 'DECLINED') variant = 'declined';
-  else if (reason === 'FAILED') variant = 'failed';
-  else if (isMissed) variant = 'missed';
-  else variant = 'completed';
-
-  const isCompleted = variant === 'completed';
-  const isNegative = variant === 'missed' || variant === 'cancelled' || variant === 'declined' || variant === 'failed';
-
-  // Icon for the call direction
-  let Icon = isCompleted
-    ? (isMe ? PhoneCall : PhoneIncoming)
-    : isNegative
-      ? (isMe
-          ? (variant === 'cancelled' ? PhoneOff : PhoneMissed)
-          : PhoneMissed)
-      : PhoneCall;
-
-  // Label
+  // Variant category
+  // Green: Completed call
+  // Red: Missed, Cancelled, Declined, Failed
+  // Gray: Ongoing or informational
+  let status: 'completed' | 'missed' | 'cancelled' | 'declined' | 'failed' | 'info' = 'info';
   let label = '';
-  if (isCompleted) {
-    label = isMe ? `Outgoing ${isVideo ? 'video' : 'voice'} call` : `Incoming ${isVideo ? 'video' : 'voice'} call`;
-  } else if (variant === 'cancelled') {
-    label = `Cancelled ${isVideo ? 'video' : 'voice'} call`;
-  } else if (variant === 'declined') {
-    label = `Declined ${isVideo ? 'video' : 'voice'} call`;
-  } else if (variant === 'failed') {
-    label = `Failed ${isVideo ? 'video' : 'voice'} call`;
-  } else {
-    // missed
-    if (missedCount > 1) {
-      label = `${missedCount} missed ${isVideo ? 'video' : 'voice'} calls`;
+  const typeLabel = isVideo ? "video call" : "voice call";
+
+  if (duration > 0) {
+    status = 'completed';
+    const formattedDuration = formatCallDuration(duration);
+    label = isMe 
+      ? `📞 Call ended — Duration: ${formattedDuration}` 
+      : `📞 Answered — Duration: ${formattedDuration}`;
+  } else if (reason === 'CANCELLED') {
+    if (isMe) {
+      status = 'cancelled';
+      label = "❌ Cancelled";
     } else {
-      label = `Missed ${isVideo ? 'video' : 'voice'} call`;
+      status = 'missed';
+      label = isVideo ? `❌ Missed video call` : `❌ Missed voice call`;
+      if (missedCount > 1) {
+        label = `❌ ${missedCount} missed ${typeLabel}s`;
+      }
+    }
+  } else if (reason === 'DECLINED' || reason === 'BUSY') {
+    if (isMe) {
+      status = 'declined';
+      label = reason === 'BUSY' ? '❌ Busy' : '❌ Declined';
+    } else {
+      status = 'declined';
+      label = isVideo ? "🚫 Declined video call" : "🚫 Declined voice call";
+    }
+  } else if (reason === 'MISSED' || reason === 'NO_ANSWER') {
+    if (isMe) {
+      status = 'missed';
+      label = "❌ No answer";
+    } else {
+      status = 'missed';
+      label = isVideo ? `❌ Missed video call` : `❌ Missed voice call`;
+      if (missedCount > 1) {
+        label = `❌ ${missedCount} missed ${typeLabel}s`;
+      }
+    }
+  } else if (reason === 'FAILED') {
+    status = 'failed';
+    label = "❌ Failed";
+  } else {
+    // Info/Ongoing
+    status = 'info';
+    if (isMe) {
+      label = isVideo ? "📹 Outgoing video call" : "📞 Outgoing voice call";
+    } else {
+      label = isVideo ? "📹 Incoming video call" : "📞 Incoming voice call";
     }
   }
 
-  // Color scheme
-  const iconColorClass = isCompleted
-    ? 'text-emerald-500'
-    : isNegative
-      ? 'text-rose-500'
-      : 'text-slate-400';
-
-  const dotColorClass = isCompleted ? 'bg-emerald-500' : isNegative ? 'bg-rose-500' : 'bg-slate-400';
+  // Set colors and icons
+  let circleBg = 'bg-slate-100 dark:bg-slate-800 text-gray-500';
+  let titleColor = 'text-foreground';
+  
+  if (status === 'completed') {
+    circleBg = 'bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-500';
+  } else if (status === 'info') {
+    circleBg = 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500';
+  } else {
+    titleColor = 'text-rose-500';
+    circleBg = 'bg-rose-500/10 dark:bg-rose-500/20 text-rose-500';
+  }
 
   const handleCallAgain = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1440,54 +1482,49 @@ const CallMessageBubble = React.memo(({ message, missedCount, onCallAgain, onAct
           initial={{ opacity: 0, y: 6, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="flex justify-center my-1"
+          className="flex justify-center my-1.5"
         >
           <div
-            className="flex items-center gap-2.5 bg-background/80 dark:bg-slate-800/70 border border-border/40 rounded-2xl px-4 py-2.5 shadow-sm hover:shadow-md transition-all cursor-pointer max-w-[280px] backdrop-blur-sm group"
+            className="flex items-center gap-3 bg-white/95 dark:bg-slate-900 border border-border/40 rounded-2xl px-4 py-2.5 shadow-sm hover:shadow-md transition-all cursor-pointer max-w-[300px] backdrop-blur-sm group select-none relative overflow-hidden"
             onClick={handleCallAgain}
             title="Tap to call again"
           >
-            {/* Icon bubble */}
+            {/* Circular status indicator */}
             <div className={cn(
-              "h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110",
-              isCompleted ? 'bg-emerald-500/10' : isNegative ? 'bg-rose-500/10' : 'bg-slate-100 dark:bg-slate-700'
+              "h-10 w-10 rounded-full flex items-center justify-center shrink-0 relative transition-transform group-hover:scale-105",
+              circleBg
             )}>
-              {isVideo
-                ? <Video className={cn('h-4 w-4', iconColorClass)} />
-                : <Icon className={cn('h-4 w-4', iconColorClass)} />}
+              {isVideo ? <Video className="h-5 w-5" /> : <Phone className="h-5 w-5" />}
+              
+              {/* Call indicator badge */}
+              {status !== 'failed' && (
+                <div className={cn(
+                  "absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-background flex items-center justify-center text-white shadow-sm",
+                  isMe ? "bg-blue-500" : "bg-teal-500"
+                )}>
+                  {isMe ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownLeft className="h-3 w-3" />}
+                </div>
+              )}
             </div>
 
-            {/* Text body */}
+            {/* Details body */}
             <div className="flex flex-col min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[13px] font-semibold text-foreground leading-tight truncate">{label}</span>
-                {missedCount > 1 && (
-                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded-full px-1.5 py-px shrink-0">{missedCount}</span>
-                )}
-              </div>
+              <span className={cn("text-[13px] font-bold leading-tight truncate tracking-tight", titleColor)}>
+                {label}
+              </span>
               <div className="flex items-center gap-1.5 mt-0.5">
-                {/* Colored direction dot */}
-                <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', dotColorClass)} />
-                <span className="text-[11px] text-muted-foreground/70 truncate">
-                  {isCompleted && duration > 0
-                    ? `Duration: ${formatCallDuration(duration)}`
-                    : isMe
-                      ? (isCompleted ? 'Answered' : 'Not answered')
-                      : (isMissed ? 'You missed' : isCompleted ? 'You answered' : variant === 'declined' ? 'You declined' : '')}
+                <span className="text-[10px] text-muted-foreground/60">
+                  {message.timestamp}
                 </span>
               </div>
             </div>
 
-            {/* Time + call-again chevron */}
-            <div className="flex flex-col items-end gap-1 shrink-0">
-              <span className="text-[10px] text-muted-foreground/60">{message.timestamp}</span>
+            {/* Tap to Call Again indicator */}
+            <div className="flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
               <div className={cn(
-                'h-5 w-5 rounded-full flex items-center justify-center transition-all group-hover:opacity-100 opacity-0',
-                isVideo ? 'bg-sky-500/10' : 'bg-emerald-500/10'
+                "h-6 w-6 rounded-full flex items-center justify-center bg-primary/10 text-primary"
               )}>
-                {isVideo
-                  ? <Video className="h-3 w-3 text-sky-500" />
-                  : <Phone className="h-3 w-3 text-emerald-500" />}
+                {isVideo ? <Video className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />}
               </div>
             </div>
           </div>
@@ -1506,8 +1543,10 @@ const CallMessageBubble = React.memo(({ message, missedCount, onCallAgain, onAct
         <ContextMenuItem
           className="rounded-xl h-10 gap-3"
           onClick={() => {
-            const details = `${label}${duration > 0 ? ' · Duration: ' + formatCallDuration(duration) : ''} · ${message.timestamp}`;
-            navigator.clipboard.writeText(details);
+            const cleanLabel = label.replace(/^[^\w\s\p{Alpha}]*/u, '').trim();
+            const textToCopy = `${cleanLabel} (${message.timestamp})`;
+            navigator.clipboard.writeText(textToCopy);
+            toast.success('Call details copied');
           }}
         >
           <Copy className="h-4 w-4" />

@@ -484,10 +484,10 @@ export const useWebRTC = (options: WebRTCOptions) => {
       cleanupAll();
     });
 
-    socket.on('call_cancelled', ({ callId }: any) => {
-      console.log('[WebRTC] Call cancelled on another device:', callId);
+    socket.on('call_blocked', ({ message }: any) => {
+      // Server rejected the call (e.g. school suspended)
+      setMediaError(message || 'Call is not allowed at this time.');
       cleanupAll();
-      if (options.onCallEnded) options.onCallEnded('cancelled');
     });
 
     return () => {
@@ -498,7 +498,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
       socket.off('media_state_changed', handleMediaStateChanged);
       socket.off('call_ended');
       socket.off('call_rejected');
-      socket.off('call_cancelled');
+      socket.off('call_blocked');
     };
   }, [socket, options, cleanupUser, cleanupAll]);
 

@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { authorize, AuthenticatedRequest } from '../middleware/tenant.middleware';
+import { authorize, AuthenticatedRequest, invalidateSchoolStatusCache } from '../middleware/tenant.middleware';
 import prisma from '../config/db';
 import * as schoolService from '../services/school.service';
 import * as onboardingService from '../services/onboarding.service';
@@ -202,11 +202,13 @@ router.get('/:id/details', authorize(['super_admin']), async (req: Request, res:
 // Suspend / Unsuspend a school (super admin only)
 router.patch('/:id/suspend', authorize(['super_admin']), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { suspend } = req.body;
+    const { suspend, suspendReason } = req.body;
     if (typeof suspend !== 'boolean') {
       return res.status(400).json({ success: false, message: '`suspend` must be a boolean' });
     }
-    const school = await schoolService.setSchoolSuspended(req.params.id, suspend);
+    const school = await schoolService.setSchoolSuspended(req.params.id, suspend, suspendReason);
+    // Immediately bust the status cache so the change takes effect on next request
+    invalidateSchoolStatusCache(req.params.id);
     res.status(200).json({ success: true, data: school, message: suspend ? 'School suspended' : 'School unsuspended' });
   } catch (error) { next(error); }
 });

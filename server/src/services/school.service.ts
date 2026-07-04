@@ -132,12 +132,20 @@ export const getSchoolDetails = async (id: string) => {
 };
 
 /** Suspend or unsuspend a school */
-export const setSchoolSuspended = async (id: string, suspend: boolean) => {
+export const setSchoolSuspended = async (
+  id: string,
+  suspend: boolean,
+  suspendReason?: string
+) => {
   return await prisma.$transaction(async (tx) => {
-    // 1. Update School record
+    // 1. Update School record — persist reason & timestamp
     const school = await tx.school.update({
       where: { id },
-      data: { subscriptionStatus: suspend ? 'SUSPENDED' : 'ACTIVE' },
+      data: {
+        subscriptionStatus: suspend ? 'SUSPENDED' : 'ACTIVE',
+        suspendedAt: suspend ? new Date() : null,
+        suspendReason: suspend ? (suspendReason || null) : null,
+      },
       include: { subscription: true }
     });
 
@@ -148,6 +156,21 @@ export const setSchoolSuspended = async (id: string, suspend: boolean) => {
         data: { status: suspend ? 'suspended' : 'active' }
       });
     }
+
+    // 3. Write audit log
+    await tx.auditLog.create({
+      data: {
+        schoolId: id,
+        action: suspend ? 'SCHOOL_SUSPENDED' : 'SCHOOL_UNSUSPENDED',
+        entity_type: 'School',
+        entity_id: id,
+        new_values: {
+          subscriptionStatus: suspend ? 'SUSPENDED' : 'ACTIVE',
+          suspendedAt: suspend ? new Date().toISOString() : null,
+          suspendReason: suspend ? (suspendReason || null) : null,
+        },
+      }
+    });
 
     return school;
   });

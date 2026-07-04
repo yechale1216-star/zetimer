@@ -20,26 +20,40 @@ export class NotificationService {
 
   async error(title: string, message: string): Promise<void> {
     let displayMessage = message;
+    let displayTitle = title;
+    let isSuspention = false;
     
     // Try to parse if it's a raw JSON string from a fetch error
     if (message && (message.trim().startsWith('{') || message.trim().startsWith('['))) {
       try {
         const parsed = JSON.parse(message);
         displayMessage = parsed.message || parsed.error || message;
+        if (parsed.code === 'SCHOOL_SUSPENDED' || (parsed.message && parsed.message.toLowerCase().includes('suspended'))) {
+          isSuspention = true;
+        }
       } catch (e) {
         // Fallback to original message
       }
     }
 
-    toast.error(`${title}: ${displayMessage}`, {
-      duration: 5000,
+    if (!isSuspention && displayMessage && displayMessage.toLowerCase().includes('suspended')) {
+      isSuspention = true;
+    }
+
+    if (isSuspention) {
+      displayTitle = "Portal Read-Only";
+      displayMessage = "Your school account is suspended. Write actions are disabled, but historical records remain fully visible. Please contact support.";
+    }
+
+    toast.error(`${displayTitle}: ${displayMessage}`, {
+      duration: 6000,
       style: {
-        backgroundColor: "#fee2e2",
-        color: "#991b1b",
-        border: "1px solid #fca5a5",
+        backgroundColor: "#fff7ed",
+        color: "#c2410c",
+        border: "1px solid #fdba74",
       },
     })
-    console.error(`[Error] ${title}: ${displayMessage}`)
+    console.error(`[Error] ${displayTitle}: ${displayMessage}`)
   }
 
   async warning(title: string, message: string): Promise<void> {

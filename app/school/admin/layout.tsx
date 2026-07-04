@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, User, CheckSquare, BarChart2, BookOpen,
   Settings, LogOut, CreditCard, MessageSquare, Phone, TrendingUp, ShieldBan,
-  X, ChevronRight, Megaphone
+  X, ChevronRight, Megaphone, HeadphonesIcon
 } from 'lucide-react'
 import { cn } from "@/lib/utils/utils"
 
@@ -20,42 +20,34 @@ import { SocketProvider } from '@/components/providers/socket-provider'
 import { CallProvider } from '@/components/providers/call-provider'
 import { Logo } from '@/components/logo'
 import { TopNav } from '@/components/layout/top-nav'
+import { SuspensionProvider, useSuspension } from '@/lib/context/suspension-context'
 
 import { apiUrl } from '@/lib/api-config'
 const API_URL = apiUrl;
 import { clearMessageCache } from '@/lib/utils/message-cache'
 
 function SuspendedBanner() {
-  const [isSuspended, setIsSuspended] = React.useState(false)
-  const { user } = useAuth()
-
-  React.useEffect(() => {
-    const check = async () => {
-      try {
-        const token = localStorage.getItem('attendance_token')
-        if (!user?.schoolId || user?.role === 'super_admin') return
-        const res = await fetch(`${API_URL}/api/schools/${user.schoolId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (!res.ok) return
-        const json = await res.json()
-        if (json.success && json.data?.subscriptionStatus === 'SUSPENDED') {
-          setIsSuspended(true)
-        }
-      } catch { }
-    }
-    check()
-  }, [user])
+  const { isSuspended, suspendedAt, suspendReason } = useSuspension()
 
   if (!isSuspended) return null
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-red-600 text-white text-sm font-medium z-50">
-      <ShieldBan className="w-4 h-4 flex-shrink-0" />
-      <span>
-        <strong>Account Suspended.</strong> You can view existing data but cannot create, edit, or delete anything.
-        Please contact support to restore access.
-      </span>
+    <div className="flex items-start gap-3 px-4 py-3 bg-red-600 text-white text-sm font-medium z-50">
+      <ShieldBan className="w-4 h-4 flex-shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <span className="font-bold">Account Suspended.</span>{' '}
+        <span>You can view existing data but cannot create, edit, or delete anything.</span>
+        {suspendedAt && (
+          <span className="block text-red-200 text-xs mt-0.5">
+            Suspended on {new Date(suspendedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            {suspendReason && ` · Reason: ${suspendReason}`}
+          </span>
+        )}
+      </div>
+      <Link href="/school/admin/support" className="flex-shrink-0 flex items-center gap-1 bg-white/20 hover:bg-white/30 transition px-2 py-1 rounded text-xs font-semibold whitespace-nowrap">
+        <HeadphonesIcon className="w-3 h-3" />
+        Contact Support
+      </Link>
     </div>
   )
 }
@@ -154,9 +146,10 @@ export default function SchoolAdminLayout({
 
   return (
     <AuthGuard allowedRoles={['admin', 'school_admin']}>
-      <SubscriptionProvider>
-        <SocketProvider>
-          <CallProvider>
+      <SuspensionProvider>
+        <SubscriptionProvider>
+          <SocketProvider>
+            <CallProvider>
             <div className="flex h-screen bg-background dark:bg-slate-950 flex-col md:flex-row relative overflow-hidden">
               {/* Premium Background Pattern */}
               <div className="absolute inset-0 pointer-events-none z-0">
@@ -261,8 +254,9 @@ export default function SchoolAdminLayout({
               </div>
             </div>
           </CallProvider>
-        </SocketProvider>
-      </SubscriptionProvider>
+          </SocketProvider>
+        </SubscriptionProvider>
+      </SuspensionProvider>
     </AuthGuard>
   )
 }

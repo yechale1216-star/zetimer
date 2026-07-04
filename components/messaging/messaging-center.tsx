@@ -381,11 +381,79 @@ export function MessagingCenter() {
 
       console.log(`[Messaging] Draining ${pending.length} offline message(s) from outbox...`);
 
+      const conversationIdMap: Record<string, string> = {};
+
       for (const msg of pending) {
+        let conversationId = msg.conversationId;
+
+        // If the conversation ID starts with "contact-", it means it's a contact conversation
+        // that hasn't been created on the backend yet because of offline state when the message was sent.
+        if (conversationId.startsWith('contact-')) {
+          if (conversationIdMap[conversationId]) {
+            conversationId = conversationIdMap[conversationId];
+          } else {
+            try {
+              const contactId = conversationId.split('contact-')[1];
+              const res = await fetch(`${API_URL}/api/messages/conversations`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                  isGroup: false,
+                  memberIds: [user.id, contactId],
+                }),
+              });
+
+              if (res.ok) {
+                const newConv = await res.json();
+                const realId = newConv.id;
+                conversationIdMap[msg.conversationId] = realId;
+                conversationId = realId;
+
+                // Sync the active conversation state if the user has it open
+                if (activeConversationIdRef.current === msg.conversationId) {
+                  setActiveConversationId(realId);
+                  setActiveConversationData((prev: any) => prev ? { ...prev, id: realId, isNewContact: false } : null);
+                }
+
+                // Update local conversations list
+                setConversations(prev =>
+                  prev.map(c =>
+                    c.id === msg.conversationId
+                      ? { ...c, id: realId, isNewContact: false }
+                      : c
+                  )
+                );
+
+                // Transfer locally cached messages in state
+                setMessagesByConversation(prev => {
+                  const updated = { ...prev };
+                  if (updated[msg.conversationId]) {
+                    updated[realId] = [...(updated[realId] || []), ...updated[msg.conversationId]];
+                    delete updated[msg.conversationId];
+                  }
+                  return updated;
+                });
+
+                // Update the IndexedDB cache for messages
+                const cachedMsgs = await getCachedMessages(msg.conversationId);
+                if (cachedMsgs) {
+                  await cacheMessages(realId, cachedMsgs);
+                }
+              } else {
+                console.error('[Messaging] Failed to create conversation on socket connect:', res.status);
+                continue; // Skip replaying this message yet
+              }
+            } catch (err) {
+              console.error('[Messaging] Error creating conversation during outbox sync:', err);
+              continue; // Skip
+            }
+          }
+        }
+
         // Re-emit the message via socket — the server's tempId dedup will
         // prevent double-inserts if the message was already persisted.
         socket.emit('send_message', {
-          conversationId: msg.conversationId,
+          conversationId,
           senderId: msg.senderId,
           content: msg.content,
           type: msg.type,
@@ -407,8 +475,26 @@ export function MessagingCenter() {
     async (id: string, chatData: any) => {
       if (!user) return;
 
-      // If new contact without a conversation → create one first
+      // If new contact without a conversation → open chat window INSTANTLY,
+      // then create the conversation on the server silently in the background.
       if (chatData?.isNewContact) {
+        // ── Step 1: Open the chat window immediately on first tap ──────────────
+        // Pre-seed the message list so the window renders with no delay.
+        setMessagesByConversation(prev => ({
+          ...prev,
+          [id]: prev[id] || []
+        }));
+        setActiveConversationId(id);
+        setActiveConversationData(chatData);
+
+        // If offline, stop here. Messages will be queued in the outbox
+        // and the conversation will be created as soon as connectivity resumes.
+        if (typeof window !== 'undefined' && !navigator.onLine) {
+          console.log('[Messaging] Offline — chat window open in offline mode for:', id);
+          return;
+        }
+
+        // ── Step 2: Create the conversation on the server in the background ───
         try {
           const res = await fetch(`${API_URL}/api/messages/conversations`, {
             method: 'POST',
@@ -421,32 +507,30 @@ export function MessagingCenter() {
 
           if (!res.ok) {
             const errorData = await res.json().catch(() => ({}));
-            if (errorData.code === 'SCHOOL_EXPIRED' || errorData.code === 'SCHOOL_SUSPENDED') {
+            if (errorData.code === 'SCHOOL_SUSPENDED') {
               toast({
-                title: t("error"),
-                description: t("plan_expired_error"),
+                title: "Portal Read-Only",
+                description: "Your school account is suspended. Write actions are disabled, but historical records remain fully visible.",
                 variant: 'destructive'
               });
+            } else if (errorData.code === 'SCHOOL_EXPIRED') {
+              toast({ title: t("error"), description: t("plan_expired_error"), variant: 'destructive' });
             } else if (errorData.code === 'FEATURE_RESTRICTED') {
-              toast({
-                title: t("error"),
-                description: t("feature_restricted_error"),
-                variant: 'destructive'
-              });
+              toast({ title: t("error"), description: t("feature_restricted_error"), variant: 'destructive' });
             } else {
-              toast({ 
-                title: t("error"), 
-                description: errorData.message || t("start_conv_error"), 
-                variant: 'destructive' 
-              });
+              toast({ title: t("error"), description: errorData.message || t("start_conv_error"), variant: 'destructive' });
             }
+            // Close the optimistic chat window on failure
+            setActiveConversationId(null);
+            setActiveConversationData(null);
             return;
           }
 
           const newConv = await res.json();
           const realId = newConv.id;
 
-          // Update sidebar entry with real conversation id
+          // ── Step 3: Seamlessly swap the temporary contact-* ID for the real one ──
+          // Update sidebar: replace temp ID with real conversation ID
           setConversations(prev =>
             prev.map(c =>
               c.id === id
@@ -455,21 +539,26 @@ export function MessagingCenter() {
             )
           );
 
+          // Migrate the message list from temp ID → real ID (preserves any
+          // optimistic messages the user may have already typed/sent)
+          setMessagesByConversation((prev: any) => {
+            const msgs = prev[id] || [];
+            const next: any = { ...prev, [realId]: msgs };
+            delete next[id];
+            return next;
+          });
+
+          // Switch active conversation to the real ID — no visible transition
           setActiveConversationId(realId);
           setActiveConversationData({ ...chatData, id: realId, isNewContact: false });
-
-          // Initialise empty message list so we don't flash old messages
-          setMessagesByConversation(prev => ({ ...prev, [realId]: [] }));
 
           if (socket && isConnected) {
             socket.emit('join_conversation', realId);
           }
         } catch (err) {
-          toast({ 
-            title: t("error"), 
-            description: t("start_conv_error"), 
-            variant: 'destructive' 
-          });
+          toast({ title: t("error"), description: t("start_conv_error"), variant: 'destructive' });
+          setActiveConversationId(null);
+          setActiveConversationData(null);
         }
         return;
       }
@@ -739,9 +828,16 @@ export function MessagingCenter() {
 
   useEffect(() => {
     if (activeConversationId) {
+      if (typeof window !== 'undefined') {
+        (window as any).activeConversationId = activeConversationId;
+      }
       const msgs = messagesByConversation[activeConversationId];
       if (msgs) {
         markMessagesAsRead(activeConversationId, msgs);
+      }
+    } else {
+      if (typeof window !== 'undefined') {
+        (window as any).activeConversationId = null;
       }
     }
   }, [activeConversationId, messagesByConversation, markMessagesAsRead]);
@@ -994,9 +1090,15 @@ export function MessagingCenter() {
           return updated;
         });
       }
+      let displayTitle = t("error");
+      let displayDescription = data.code === 'SCHOOL_EXPIRED' ? t("plan_expired_error") : data.message;
+      if (data.code === 'SCHOOL_SUSPENDED' || (data.message && data.message.toLowerCase().includes('suspended'))) {
+        displayTitle = "Portal Read-Only";
+        displayDescription = "Your school account is suspended. Write actions are disabled, but historical records remain fully visible.";
+      }
       toast({
-        title: t("error"),
-        description: data.code === 'SCHOOL_EXPIRED' ? t("plan_expired_error") : data.message,
+        title: displayTitle,
+        description: displayDescription,
         variant: 'destructive',
       });
     };
@@ -1121,13 +1223,16 @@ export function MessagingCenter() {
         const nowTs = Date.now();
         const updated = prev.map(c =>
           c.id === activeConversationId
-            ? { ...c, lastMessage: content, timestamp: formatLocalizedTime(new Date(), language), updatedAt: nowTs }
+            ? { ...c, lastMessage: content, timestamp: formatLocalizedTime(new Date(), language), updatedAt: nowTs, isNewContact: false }
             : c
         );
         const activeChats = updated.filter(c => !c.isNewContact).sort((a, b) => b.updatedAt - a.updatedAt);
         const directory = updated.filter(c => c.isNewContact);
         return [...activeChats, ...directory];
       });
+
+      // Persist optimistic message to IndexedDB cache so it compiles offline and survives reload
+      appendCachedMessage(activeConversationId, optimisticMessage).catch(() => {});
 
       // isOptimistic = local preview only, don't emit to socket yet
       if (options?.isOptimistic) return;

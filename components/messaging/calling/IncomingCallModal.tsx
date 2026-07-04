@@ -3,6 +3,7 @@
 import React from 'react';
 import { Phone, PhoneOff, Video, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils/utils';
 
@@ -46,40 +47,33 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] bg-gradient-to-b from-[#2e8af6] via-[#3b6df1] to-[#6d28d9] flex flex-col justify-between p-6 select-none overflow-hidden pb-safe pt-safe"
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
         >
-          {/* Top subtle identifier */}
-          <div className="flex justify-center pt-8">
-            <span className="text-white/60 text-xs font-semibold tracking-[0.2em] uppercase">
-              Incoming Call
-            </span>
-          </div>
+          {/* Backdrop Blur */}
+          <div className="absolute inset-0 bg-background/40 backdrop-blur-xl" />
 
-          {/* Center Caller Info Area */}
-          <div className="flex-1 flex flex-col items-center justify-center gap-6">
-            <div className="relative flex items-center justify-center">
-              {/* Expanding Concentric Pulsing Ripples */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ scale: 1, opacity: 0.6 }}
-                    animate={{ scale: [1, 2.3], opacity: [0.6, 0] }}
-                    transition={{
-                      duration: 2.5,
-                      repeat: Infinity,
-                      ease: [0.25, 0.46, 0.45, 0.94],
-                      delay: i * 0.8,
-                    }}
-                    className="absolute w-40 h-40 rounded-full border border-white/20 bg-white/5"
-                  />
-                ))}
-              </div>
+          {/* Modal Card */}
+          <div className="relative w-full max-w-sm overflow-hidden rounded-[2.5rem] bg-background/80 shadow-2xl border border-white/20 backdrop-blur-2xl px-8 py-12 text-center">
+            {/* Animated Ringing Effect */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <motion.div
+                animate={{
+                  scale: [1, 1.5],
+                  opacity: [0.3, 0],
+                }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 2,
+                  ease: "easeOut",
+                }}
+                className="absolute left-1/2 top-[35%] -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/20 rounded-full blur-2xl"
+              />
+            </div>
 
-              {/* Shaking Avatar on alert */}
+            <div className="relative z-10 flex flex-col items-center">
               <motion.div
                 animate={{
                   x: [0, -2, 2, -2, 2, 0],
@@ -87,61 +81,55 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
                 }}
                 transition={{
                   repeat: Infinity,
-                  duration: 2,
-                  ease: "easeInOut",
+                  duration: 0.2,
+                  ease: "linear",
                 }}
-                className="relative"
+                className="mb-6"
               >
-                <Avatar className="h-32 w-32 border-2 border-white/30 shadow-2xl">
-                  <AvatarImage src={caller.avatar || undefined} className="object-cover" />
-                  <AvatarFallback className="text-4xl font-extrabold bg-[#2b7bd5] text-white">
+                <Avatar className="h-28 w-28 border-4 border-background shadow-xl">
+                  <AvatarImage src={caller.avatar || undefined} />
+                  <AvatarFallback className="typography-page-title bg-primary/10 text-primary">
                     {caller.name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </motion.div>
-            </div>
 
-            <div className="text-center mt-2">
-              <h2 className="text-white text-3xl font-semibold tracking-wide drop-shadow-md">
-                {caller.name}
-              </h2>
-              <p className="text-white/80 text-[15px] font-medium mt-1.5 drop-shadow-sm tracking-wide">
-                {type === 'VIDEO' ? 'Zetime Video Call' : 'Zetime Voice Call'}
+              <h3 className="typography-page-title mb-1">{caller.name}</h3>
+              <p className="typography-label text-primary flex items-center gap-2 mb-12">
+                {type === 'VIDEO' ? (
+                  <><Video className="h-4 w-4" /> Incoming Video Call</>
+                ) : (
+                  <><Phone className="h-4 w-4" /> Incoming Voice Call</>
+                )}
               </p>
-            </div>
-          </div>
 
-          {/* Action buttons matching Screen 3 bottom style */}
-          <div className="w-full max-w-sm mx-auto px-4 pb-14 mt-auto">
-            <div className="flex items-center justify-around w-full">
-              {/* Decline Call Option */}
-              <div className="flex flex-col items-center gap-2">
-                <button
-                  onClick={onReject}
-                  className="h-16 w-16 rounded-full bg-[#e15241] hover:bg-[#c23f2f] text-white flex items-center justify-center transition-all active:scale-95 shadow-xl border border-white/5"
-                >
-                  <PhoneOff className="h-7 w-7 text-white stroke-[2]" />
-                </button>
-                <span className="text-white/95 text-[13px] font-medium tracking-wide drop-shadow-sm">
-                  Decline
-                </span>
-              </div>
+              <div className="flex items-center justify-center gap-10">
+                <div className="flex flex-col items-center gap-3">
+                  <Button
+                    onClick={onReject}
+                    variant="destructive"
+                    size="icon"
+                    className="h-16 w-16 rounded-full shadow-lg active:scale-90 transition-transform bg-red-500 hover:bg-red-600"
+                  >
+                    <PhoneOff className="h-8 w-8" />
+                  </Button>
+                  <span className="typography-label text-muted-foreground uppercase">Decline</span>
+                </div>
 
-              {/* Accept Call Option */}
-              <div className="flex flex-col items-center gap-2">
-                <button
-                  onClick={onAccept}
-                  className="h-16 w-16 rounded-full bg-[#2ec150] hover:bg-[#25a943] text-white flex items-center justify-center transition-all active:scale-95 shadow-xl border border-white/5"
-                >
-                  {type === 'VIDEO' ? (
-                    <Video className="h-7 w-7 text-white stroke-[2]" />
-                  ) : (
-                    <Phone className="h-7 w-7 text-white stroke-[2]" />
-                  )}
-                </button>
-                <span className="text-white/95 text-[13px] font-medium tracking-wide drop-shadow-sm">
-                  Accept
-                </span>
+                <div className="flex flex-col items-center gap-3">
+                  <Button
+                    onClick={onAccept}
+                    size="icon"
+                    className="h-16 w-16 rounded-full shadow-lg active:scale-90 transition-transform bg-green-500 hover:bg-green-600"
+                  >
+                    {type === 'VIDEO' ? (
+                      <Video className="h-8 w-8 text-white" />
+                    ) : (
+                      <Phone className="h-8 w-8 text-white" />
+                    )}
+                  </Button>
+                  <span className="typography-label text-muted-foreground uppercase">Accept</span>
+                </div>
               </div>
             </div>
           </div>

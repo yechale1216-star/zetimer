@@ -118,7 +118,7 @@ export function TeacherView() {
     <div className="space-y-6 pb-24 md:pb-6">
       <div className="px-1 md:px-0 pt-safe">
         <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1">{getGreeting()}</p>
-        <h2 className="text-3xl md:text-4xl font-black text-foreground uppercase tracking-tight leading-none">
+        <h2 className="text-xl md:text-4xl font-black text-foreground uppercase tracking-tight leading-none whitespace-nowrap overflow-hidden text-ellipsis">
           Hello, <span className="text-primary">{firstName}</span>
         </h2>
         <p className="text-sm font-bold text-muted-foreground/60 mt-2">Manage your classes & attendance</p>

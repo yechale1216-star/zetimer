@@ -499,7 +499,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     <div className="space-y-6 px-4 md:px-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
         <div className="space-y-1.5 w-full md:w-auto">
-          <h2 className="text-3xl md:text-5xl font-black text-foreground leading-[1.1] tracking-tight uppercase">
+          <h2 className="text-xl md:text-5xl font-black text-foreground leading-[1.1] tracking-tight uppercase whitespace-nowrap overflow-hidden text-ellipsis">
             {getGreeting()}, <span className="text-primary">{firstName}</span>
           </h2>
           <p className="text-xs md:text-sm font-bold text-muted-foreground/60 uppercase tracking-widest">

@@ -58,6 +58,8 @@ export default function TeacherLayout({
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
   const [showBottomNav, setShowBottomNav] = React.useState(true)
   const [lastScrollY, setLastScrollY] = React.useState(0)
+  const { theme, setTheme } = useTheme()
+  const isDark = theme === 'dark'
   
   const { user, logout } = useAuth()
   const { clearSchoolContext } = useSchool()
@@ -125,6 +127,25 @@ export default function TeacherLayout({
                       active={isActive(item.href)} 
                     />
                   ))}
+
+                  {/* Theme Toggle Button */}
+                  <button
+                    onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                    className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer group mt-2"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-slate-500 group-hover:text-foreground">
+                        {isDark ? <Moon className="w-5 h-5 animate-in fade-in zoom-in duration-200" /> : <Sun className="w-5 h-5 animate-in fade-in zoom-in duration-200" />}
+                      </span>
+                      <span>{isDark ? 'Dark Mode' : 'Light Mode'}</span>
+                    </div>
+                    <div className="flex h-5 w-9 items-center rounded-full bg-primary/20 px-0.5 pointer-events-none">
+                      <div className={cn(
+                        "h-4 w-4 rounded-full bg-primary shadow transition-transform duration-300",
+                        isDark ? 'translate-x-4' : 'translate-x-0'
+                      )} />
+                    </div>
+                  </button>
                 </nav>
                 <div className="p-4 border-t border-border">
                   <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2 rounded-lg hover:bg-secondary text-muted-foreground transition text-sm font-medium">
@@ -159,9 +180,25 @@ export default function TeacherLayout({
                         </div>
                      </Link>
                    ))}
+
+                   {/* Theme Toggle Button */}
+                   <button
+                     onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                     className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold mb-1 text-muted-foreground hover:bg-muted transition-all cursor-pointer group mt-1"
+                   >
+                     <div className="flex items-center gap-3">
+                       {isDark ? <Moon className="w-5 h-5 text-slate-500" /> : <Sun className="w-5 h-5 text-slate-500" />}
+                       <span className="flex-1 text-left">{isDark ? 'Dark Mode' : 'Light Mode'}</span>
+                     </div>
+                     <div className="flex h-5 w-9 items-center rounded-full bg-primary/20 px-0.5 pointer-events-none">
+                       <div className={cn(
+                         "h-4 w-4 rounded-full bg-primary shadow transition-transform duration-300",
+                         isDark ? 'translate-x-4' : 'translate-x-0'
+                       )} />
+                     </div>
+                   </button>
                 </nav>
                  <div className="shrink-0 p-3 border-t border-border space-y-1.5 pb-safe">
-                   <ThemeToggleRow />
                    <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 text-sm font-semibold">
                       <LogOut className="w-4 h-4" />
                       Sign Out
@@ -221,27 +258,7 @@ function NavLink({ href, icon, label, active }: { href: string, icon: React.Reac
   )
 }
 
-function ThemeToggleRow() {
-  const { theme, setTheme } = useTheme()
-  const isDark = theme === 'dark'
-  return (
-    <button
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className="flex items-center justify-between w-full px-4 py-2.5 rounded-xl bg-muted/40 hover:bg-muted/70 transition text-sm font-semibold text-foreground"
-    >
-      <span className="flex items-center gap-2 text-muted-foreground">
-        {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-        {isDark ? 'Dark Mode' : 'Light Mode'}
-      </span>
-      <div className="flex h-5 w-9 items-center rounded-full bg-primary/20 px-0.5">
-        <div className={cn(
-          "h-4 w-4 rounded-full bg-primary shadow transition-transform duration-300",
-          isDark ? 'translate-x-4' : 'translate-x-0'
-        )} />
-      </div>
-    </button>
-  )
-}
+
 
 function MobileTabLink({ href, icon, label, active }: { href: string, icon: React.ReactNode, label: string, active: boolean }) {
   return (

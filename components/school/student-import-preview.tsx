@@ -27,7 +27,7 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
+
 import { ValidationService } from "@/lib/utils/validation"
 import { database, Student } from "@/lib/db/database"
 import { notifications } from "@/lib/utils/notifications"
@@ -250,15 +250,17 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
 
       {/* Table Section */}
       <div className="relative border border-border/50 rounded-2xl overflow-hidden bg-background flex-1 min-h-0">
-        <ScrollArea className="h-full min-h-[400px]">
-          <Table>
-            <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-md z-10">
+
+        {/* Horizontal + Vertical scroll wrapper */}
+        <div className="overflow-x-auto overflow-y-auto max-h-[420px] md:max-h-[520px] scrollbar-hide">
+          <Table className="min-w-[640px]">
+            <TableHeader className="sticky top-0 bg-muted/90 backdrop-blur-md z-10">
               <TableRow className="border-border/50">
-                <TableHead className="w-[180px] text-xs font-bold uppercase tracking-wider">Student Name</TableHead>
-                <TableHead className="w-[100px] text-xs font-bold uppercase tracking-wider">Grade/Section</TableHead>
-                <TableHead className="w-[150px] text-xs font-bold uppercase tracking-wider">Parent Details</TableHead>
-                <TableHead className="w-[80px] text-xs font-bold uppercase tracking-wider">Status</TableHead>
-                <TableHead className="text-xs font-bold uppercase tracking-wider">Validation Details</TableHead>
+                <TableHead className="min-w-[160px] text-xs font-bold uppercase tracking-wider">Student Name</TableHead>
+                <TableHead className="min-w-[110px] text-xs font-bold uppercase tracking-wider">Grade/Section</TableHead>
+                <TableHead className="min-w-[160px] text-xs font-bold uppercase tracking-wider">Parent Details</TableHead>
+                <TableHead className="min-w-[80px] text-xs font-bold uppercase tracking-wider">Status</TableHead>
+                <TableHead className="min-w-[200px] text-xs font-bold uppercase tracking-wider">Validation Details</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -269,12 +271,12 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className={`group border-border/40 transition-colors ${!row.isValid ? "bg-rose-50/30 dark:bg-rose-900/20 hover:bg-rose-50/50 dark:hover:bg-rose-900/30" : "hover:bg-muted/30"}`}
+                    className={`group border-border/40 transition-colors ${!row.isValid ? "bg-rose-50/40 dark:bg-rose-900/20 hover:bg-rose-50/70 dark:hover:bg-rose-900/30" : "hover:bg-muted/30"}`}
                   >
-                    <TableCell className="py-3 font-medium text-sm">
+                    <TableCell className="py-3 font-medium text-sm whitespace-nowrap">
                       {row.name}
                     </TableCell>
-                    <TableCell className="py-3">
+                    <TableCell className="py-3 whitespace-nowrap">
                       <div className="flex flex-col gap-1">
                         <span className="text-sm font-semibold">{row.grade}</span>
                         <span className="text-[10px] text-muted-foreground uppercase">{row.section} / {row.stream || '-'}</span>
@@ -282,14 +284,14 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
                     </TableCell>
                     <TableCell className="py-3">
                       <div className="flex flex-col gap-1">
-                        <span className="text-sm font-medium">{row.parent_name}</span>
+                        <span className="text-sm font-medium whitespace-nowrap">{row.parent_name}</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">{row.parent_phone}</span>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">{row.parent_phone}</span>
                           {row.isNewParent && <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700">New</Badge>}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="py-3">
+                    <TableCell className="py-3 whitespace-nowrap">
                       {row.isValid ? (
                         <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700 gap-1 rounded-lg py-0.5 font-bold text-[10px]">
                           <CheckCircle2 className="w-3 h-3" />
@@ -304,9 +306,10 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
                     </TableCell>
                     <TableCell className="py-3">
                       {!row.isValid ? (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-col gap-1">
                           {row.errors.map((err, i) => (
-                            <span key={i} className="text-[11px] font-medium text-rose-600 dark:text-rose-400 bg-rose-100/50 dark:bg-rose-900/30 px-2 py-0.5 rounded-md border border-rose-200/50 dark:border-rose-700/50">
+                            <span key={i} className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-900/50 px-2 py-0.5 rounded-md border border-rose-300/60 dark:border-rose-700/60 whitespace-nowrap">
+                              <XCircle className="w-3 h-3 flex-shrink-0" />
                               {err}
                             </span>
                           ))}
@@ -331,8 +334,12 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
               )}
             </TableBody>
           </Table>
-        </ScrollArea>
+        </div>
+
+        {/* Scroll hint fade on right edge (mobile) */}
+        <div className="pointer-events-none absolute top-0 right-0 h-full w-8 bg-gradient-to-l from-background/80 to-transparent md:hidden" />
       </div>
+
     </div>
   )
 }

@@ -6,10 +6,9 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, User, CheckSquare, BarChart2, BookOpen,
   Settings, LogOut, CreditCard, MessageSquare, Phone, TrendingUp, ShieldBan,
-  X, ChevronRight, Megaphone, HeadphonesIcon, Sun, Moon
+  X, ChevronRight, Megaphone, HeadphonesIcon
 } from 'lucide-react'
 import { cn } from "@/lib/utils/utils"
-import { useTheme } from "@/components/theme-provider"
 
 import { useAuth } from '@/lib/context/auth-context'
 import { useSchool } from '@/lib/context/school-context'
@@ -192,11 +191,10 @@ export default function SchoolAdminLayout({
                       </div>
                     </Link>
                   ))}
+
                 </nav>
 
                 <div className="shrink-0 p-3 border-t border-border space-y-1.5">
-                  {/* Theme Toggle */}
-                  <ThemeToggleRow />
                   <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 transition text-sm font-semibold">
                     <LogOut className="w-4 h-4" />
                     Sign Out
@@ -213,6 +211,7 @@ export default function SchoolAdminLayout({
                   {allNavItems.map(item => (
                     <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} active={isActive(item.href)} />
                   ))}
+
                 </nav>
                 <div className="p-4 border-t border-border">
                   <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2 rounded-lg hover:bg-secondary text-muted-foreground transition text-sm font-medium">
@@ -278,27 +277,6 @@ function NavLink({ href, icon, label, active }: { href: string, icon: React.Reac
   )
 }
 
-function ThemeToggleRow() {
-  const { theme, setTheme } = useTheme()
-  const isDark = theme === 'dark'
-  return (
-    <button
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className="flex items-center justify-between w-full px-4 py-2.5 rounded-xl bg-muted/40 hover:bg-muted/70 transition text-sm font-semibold text-foreground"
-    >
-      <span className="flex items-center gap-2 text-muted-foreground">
-        {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-        {isDark ? 'Dark Mode' : 'Light Mode'}
-      </span>
-      <div className="flex h-5 w-9 items-center rounded-full bg-primary/20 px-0.5 transition-all">
-        <div className={cn(
-          "h-4 w-4 rounded-full bg-primary shadow transition-transform duration-300",
-          isDark ? 'translate-x-4' : 'translate-x-0'
-        )} />
-      </div>
-    </button>
-  )
-}
 
 function MobileTabLink({ href, icon, label, active, badge }: { href: string, icon: React.ReactNode, label: string, active: boolean, badge?: number }) {
   return (

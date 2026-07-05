@@ -162,9 +162,11 @@ async function sendCallNotification(token, data) {
         data: {
             type: 'incoming_call',
             callId: data.callId,
+            callerId: data.callerId,
             callerName: data.callerName,
             callerAvatar: data.callerAvatar || '',
             callType: data.callType,
+            serverUrl: data.serverUrl,
         },
         token: token,
         android: {

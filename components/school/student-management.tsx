@@ -1311,50 +1311,77 @@ export function StudentManagement() {
               </Table>
             </div>
 
-            {/* Mobile Card View */}
-            <div className="md:hidden">
-              <MobileCardList>
-                {filteredStudents.map((student) => (
-                  <MobileCard
-                    key={student.id}
-                    title={student.name || "Unknown"}
-                    subtitle={`${student.grade} • ${student.section} ${student.stream ? `• ${student.stream}` : ""}`}
-                    avatar={
-                      <div className="bg-primary/10 w-full h-full flex items-center justify-center text-primary font-black text-lg">
-                        {student.name?.charAt(0).toUpperCase()}
-                      </div>
-                    }
-                    onClick={() => setSelectedStudent(student)}
-                    status={
-                      <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-tight bg-background/50 border-border/50 h-4 py-0 opacity-70">
-                        {student.student_id}
-                      </Badge>
-                    }
-                    metadata={
-                      <>
-                        <div className="flex items-center gap-1.5">
-                          <Phone className="w-3 h-3 opacity-50" />
-                          <span>{student.parent_phone}</span>
+            {/* Mobile Compact Table View */}
+            <div className="md:hidden overflow-x-auto scrollbar-hide">
+              <table className="w-full min-w-[340px] text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-slate-800">
+                    <th className="px-3 py-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 w-[44%]">Student</th>
+                    <th className="px-2 py-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 w-[28%]">Class</th>
+                    <th className="px-2 py-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStudents.map((student) => (
+                    <tr
+                      key={student.id}
+                      onClick={() => setSelectedStudent(student)}
+                      className="border-b border-slate-100/60 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/20 active:bg-slate-100 dark:active:bg-slate-800/40 transition-colors cursor-pointer"
+                    >
+                      {/* Student Name + ID */}
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary font-black text-sm flex items-center justify-center flex-shrink-0 border border-primary/20">
+                            {student.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-black text-foreground truncate uppercase tracking-tight leading-tight">
+                              {student.name}
+                            </p>
+                            <code className="text-[9px] font-mono text-muted-foreground/70">
+                              {student.student_id}
+                            </code>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="ghost" size="icon" className="h-8 w-8 rounded-full"
+                      </td>
+
+                      {/* Grade / Section */}
+                      <td className="px-2 py-2.5">
+                        <p className="text-[11px] font-bold text-foreground uppercase leading-tight">{student.grade}</p>
+                        <p className="text-[10px] text-primary/70 font-bold uppercase">
+                          {student.section}{student.stream ? ` · ${student.stream}` : ""}
+                        </p>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-0.5">
+                          <Button
+                            size="icon"
+                            variant="ghost"
                             onClick={(e) => { e.stopPropagation(); handleEdit(student); }}
+                            className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary"
                           >
-                            <Edit className="w-3.5 h-3.5 text-primary" />
+                            <Edit className="w-3.5 h-3.5" />
                           </Button>
-                          <Button 
-                            variant="ghost" size="icon" className="h-8 w-8 rounded-full"
+                          <Button
+                            size="icon"
+                            variant="ghost"
                             onClick={(e) => { e.stopPropagation(); handleDelete(e, student); }}
+                            disabled={deletingId === student.id}
+                            className="h-8 w-8 rounded-lg hover:bg-red-500/10 hover:text-red-500"
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                            {deletingId === student.id
+                              ? <div className="h-3.5 w-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                              : <Trash2 className="w-3.5 h-3.5" />
+                            }
                           </Button>
                         </div>
-                      </>
-                    }
-                  />
-                ))}
-              </MobileCardList>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </>
         )}
@@ -1362,140 +1389,132 @@ export function StudentManagement() {
 
       {/* Student Profile Detail modal */}
       {selectedStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="relative w-full max-w-2xl bg-white/95 dark:bg-slate-950/95 border border-slate-200/50 dark:border-slate-900/50 rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
-            
-            {/* Elegant Header Banner */}
-            <div className="relative bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-8 text-white">
-              <Button 
-                variant="ghost" 
-                size="icon" 
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="relative w-full sm:max-w-lg bg-white dark:bg-slate-950 sm:rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300 max-h-[92vh] flex flex-col rounded-t-3xl">
+
+            {/* ── Compact Modern Header ── */}
+            <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-6 pt-6 pb-5">
+              {/* decorative accent line */}
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 rounded-t-3xl" />
+
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setSelectedStudent(null)}
-                className="absolute top-4 right-4 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                className="absolute top-4 right-4 text-white/60 hover:text-white hover:bg-white/10 rounded-full h-8 w-8 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </Button>
-              
-              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[32px] bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
-                <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center shadow-sm">
-                  <UploadCloud className="w-8 h-8 text-primary" />
+
+              <div className="flex items-center gap-4 pr-10">
+                {/* Avatar */}
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-900/40 flex-shrink-0">
+                  <span className="text-2xl font-black text-white">
+                    {selectedStudent.name?.charAt(0).toUpperCase()}
+                  </span>
                 </div>
-                <div className="text-center space-y-1">
-                  <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Upload Student Photo</p>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">JPG, PNG up to 5MB</p>
+
+                {/* Name + meta */}
+                <div className="min-w-0">
+                  <h2 className="text-xl font-black text-white truncate leading-tight">
+                    {selectedStudent.name}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-white/50 bg-white/10 px-2 py-0.5 rounded-full border border-white/10">
+                      Student Record
+                    </span>
+                    <code className="text-[11px] font-mono text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-2 py-0.5 rounded-full">
+                      {selectedStudent.student_id}
+                    </code>
+                  </div>
                 </div>
-                <div className="flex gap-3 w-full">
-                  <Button variant="outline" className="flex-1 h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest">
-                    Choose File
-                  </Button>
-                  {NativeBridge.isNative() && (
-                    <Button 
-                      onClick={handleTakePhoto}
-                      className="flex-1 h-11 rounded-2xl bg-primary text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20"
-                    >
-                      <Camera className="w-4 h-4 mr-2" />
-                      Take Photo
-                    </Button>
+              </div>
+
+              {/* Quick stat chips */}
+              <div className="flex gap-2 mt-4 flex-wrap">
+                {[
+                  { label: selectedStudent.grade || "—", sub: "Grade" },
+                  { label: selectedStudent.section || "—", sub: "Section" },
+                  { label: selectedStudent.gender || "—", sub: "Gender" },
+                  ...(selectedStudent.stream ? [{ label: selectedStudent.stream, sub: "Stream" }] : []),
+                ].map((chip) => (
+                  <div key={chip.sub} className="flex flex-col items-center bg-white/8 border border-white/10 rounded-xl px-3 py-2 min-w-[64px]">
+                    <span className="text-[11px] font-black text-white/90 leading-none">{chip.label}</span>
+                    <span className="text-[9px] font-bold uppercase text-white/40 tracking-widest mt-0.5">{chip.sub}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Scrollable Body ── */}
+            <div className="overflow-y-auto flex-1 bg-white dark:bg-slate-950 p-5 space-y-5">
+
+              {/* Student Details */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 px-1">Student Details</p>
+                <div className="rounded-2xl border border-slate-100 dark:border-slate-900 overflow-hidden divide-y divide-slate-100 dark:divide-slate-900">
+                  <div className="flex justify-between items-center px-4 py-3 bg-slate-50/60 dark:bg-slate-900/40">
+                    <span className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                      <Calendar className="w-4 h-4 opacity-60" />
+                      Date of Birth
+                    </span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      {selectedStudent.date_of_birth || "Not set"}
+                    </span>
+                  </div>
+                  {selectedStudent.address && (
+                    <div className="flex justify-between items-center px-4 py-3 bg-slate-50/60 dark:bg-slate-900/40">
+                      <span className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                        <GraduationCap className="w-4 h-4 opacity-60" />
+                        Address
+                      </span>
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-right max-w-[55%]">
+                        {selectedStudent.address}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
-              
-              <div className="flex flex-col sm:flex-row items-center gap-6 mt-4">
-                <div className="typography-page-title w-24 h-24 rounded-full bg-white text-emerald-800 flex items-center justify-center shadow-lg ring-4 ring-white/30">
-                  {selectedStudent.name?.charAt(0).toUpperCase()}
-                </div>
-                <div className="text-center sm:text-left space-y-1">
-                  <div className="flex flex-col sm:flex-row items-center gap-2">
-                    <h2 className="typography-page-title">{selectedStudent.name}</h2>
-                    <span className="typography-label text-[10px] uppercase px-2 py-0.5 bg-white/20 text-white border border-white/20 rounded-full">
-                      Student Record
-                    </span>
-                  </div>
-                  <p className="typography-body text-white/80 flex items-center justify-center sm:justify-start gap-1">
-                    <span className="typography-label text-white/90">ID:</span>
-                    <code className="typography-helper bg-white/10 px-1.5 py-0.5 rounded font-mono">{selectedStudent.student_id}</code>
-                  </p>
+
+              {/* Parent / Guardian */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 px-1">Parent / Guardian</p>
+                <div className="rounded-2xl border border-slate-100 dark:border-slate-900 overflow-hidden divide-y divide-slate-100 dark:divide-slate-900">
+                  {[
+                    { icon: <Users className="w-4 h-4 opacity-60" />, label: "Name", value: selectedStudent.parent_name },
+                    { icon: <Phone className="w-4 h-4 opacity-60" />, label: "Phone", value: selectedStudent.parent_phone },
+                    { icon: <Mail className="w-4 h-4 opacity-60" />, label: "Email", value: selectedStudent.parent_email || "No email added" },
+                    { icon: <ShieldCheck className="w-4 h-4 opacity-60" />, label: "Relationship", value: selectedStudent.relationshipType || "Guardian" },
+                  ].map((row) => (
+                    <div key={row.label} className="flex justify-between items-center px-4 py-3 bg-slate-50/60 dark:bg-slate-900/40">
+                      <span className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                        {row.icon}
+                        {row.label}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 text-right max-w-[55%] truncate">
+                        {row.value || "N/A"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
 
-            {/* Modal Body (Scrollable) */}
-            <div className="overflow-y-auto p-6 space-y-6 flex-1 bg-white dark:bg-slate-950">
-              {/* Professional Stats */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-900 flex flex-col items-center justify-center text-center">
-                  <GraduationCap className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mb-1" />
-                  <span className="typography-label text-[10px] uppercase text-slate-400 dark:text-slate-500">Class</span>
-                  <span className="typography-label text-slate-800 dark:text-slate-200 mt-0.5">
-                    {selectedStudent.grade || "N/A"}
-                  </span>
-                </div>
-                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-900 flex flex-col items-center justify-center text-center">
-                  <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mb-1" />
-                  <span className="typography-label text-[10px] uppercase text-slate-400 dark:text-slate-500">Section</span>
-                  <span className="typography-label text-slate-800 dark:text-slate-200 mt-0.5">
-                    {selectedStudent.section || "N/A"} {selectedStudent.stream ? `(${selectedStudent.stream})` : ""}
-                  </span>
-                </div>
-                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-900 flex flex-col items-center justify-center text-center">
-                  <ShieldCheck className="w-5 h-5 text-teal-600 dark:text-teal-400 mb-1" />
-                  <span className="typography-label text-[10px] uppercase text-slate-400 dark:text-slate-500">Gender</span>
-                  <span className="typography-label text-slate-800 dark:text-slate-200 mt-0.5">
-                    {selectedStudent.gender || "N/A"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Student Personal Info */}
-              <div className="space-y-3">
-                <h3 className="typography-label uppercase text-slate-400 dark:text-slate-500">Student Details</h3>
-                <div className="divide-y divide-slate-100 dark:divide-slate-900 border border-slate-100 dark:border-slate-900 rounded-2xl overflow-hidden bg-slate-50/30 dark:bg-slate-900/20">
-                  <div className="flex justify-between items-center p-4">
-                    <span className="typography-body text-slate-500 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-slate-400" />
-                      Date of Birth
-                    </span>
-                    <span className="typography-label text-slate-800 dark:text-slate-200">{selectedStudent.date_of_birth || "N/A"}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Parent / Guardian Information */}
-              <div className="space-y-3">
-                <h3 className="typography-label uppercase text-slate-400 dark:text-slate-500">Parent / Guardian Information</h3>
-                <div className="divide-y divide-slate-100 dark:divide-slate-900 border border-slate-100 dark:border-slate-900 rounded-2xl overflow-hidden bg-slate-50/30 dark:bg-slate-900/20">
-                  <div className="flex justify-between items-center p-4">
-                    <span className="typography-body text-slate-500 flex items-center gap-2">
-                      <Users className="w-4 h-4 text-slate-400" />
-                      Parent / Guardian Name
-                    </span>
-                    <span className="typography-label text-slate-800 dark:text-slate-200">{selectedStudent.parent_name || "N/A"}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4">
-                    <span className="typography-body text-slate-500 flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-slate-400" />
-                      Phone Number
-                    </span>
-                    <span className="typography-label text-slate-800 dark:text-slate-200">{selectedStudent.parent_phone || "N/A"}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4">
-                    <span className="typography-body text-slate-500 flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-slate-400" />
-                      Email Address
-                    </span>
-                    <span className="typography-label text-slate-800 dark:text-slate-200">{selectedStudent.parent_email || "No email added"}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="bg-slate-50 dark:bg-slate-950/80 border-t border-slate-150 dark:border-slate-900/80 px-6 py-4 flex justify-end">
-              <Button 
-                onClick={() => setSelectedStudent(null)}
-                className="typography-label rounded-xl px-6 bg-slate-800 hover:bg-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 text-white"
+            {/* ── Footer ── */}
+            <div className="border-t border-slate-100 dark:border-slate-900 px-5 py-4 flex gap-3 bg-white dark:bg-slate-950">
+              <Button
+                variant="outline"
+                onClick={() => { setSelectedStudent(null); handleEdit(selectedStudent); }}
+                className="flex-1 h-11 rounded-xl border-slate-200 dark:border-slate-800 font-bold text-sm"
               >
-                Close Profile
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Profile
+              </Button>
+              <Button
+                onClick={() => setSelectedStudent(null)}
+                className="flex-1 h-11 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-bold text-sm shadow-lg"
+              >
+                Close
               </Button>
             </div>
           </div>

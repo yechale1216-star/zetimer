@@ -218,7 +218,23 @@ router.post('/signup', validate_1.validateSignup, async (req, res, next) => {
     }
 });
 // Logout
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req, res) => {
+    try {
+        const token = req.cookies?.attendance_token || req.headers.authorization?.split(' ')[1];
+        if (token) {
+            const decoded = (0, jwt_1.verifyToken)(token);
+            if (decoded && decoded.id) {
+                await db_1.default.user.update({
+                    where: { id: decoded.id },
+                    data: { pushToken: null }
+                });
+                console.log(`[Logout] Cleared FCM pushToken for user ${decoded.id}`);
+            }
+        }
+    }
+    catch (err) {
+        console.error('[Logout] Failed to clear user pushToken:', err);
+    }
     res.clearCookie('attendance_token', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

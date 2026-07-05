@@ -240,11 +240,13 @@ router.get('/:id/details', (0, tenant_middleware_1.authorize)(['super_admin']), 
 // Suspend / Unsuspend a school (super admin only)
 router.patch('/:id/suspend', (0, tenant_middleware_1.authorize)(['super_admin']), async (req, res, next) => {
     try {
-        const { suspend } = req.body;
+        const { suspend, suspendReason } = req.body;
         if (typeof suspend !== 'boolean') {
             return res.status(400).json({ success: false, message: '`suspend` must be a boolean' });
         }
-        const school = await schoolService.setSchoolSuspended(req.params.id, suspend);
+        const school = await schoolService.setSchoolSuspended(req.params.id, suspend, suspendReason);
+        // Immediately bust the status cache so the change takes effect on next request
+        (0, tenant_middleware_1.invalidateSchoolStatusCache)(req.params.id);
         res.status(200).json({ success: true, data: school, message: suspend ? 'School suspended' : 'School unsuspended' });
     }
     catch (error) {

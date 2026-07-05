@@ -476,13 +476,6 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         )}
 
         <div className="mt-8 flex flex-col items-center gap-4">
-          <div className="typography-label flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-slate-500 dark:text-slate-500 uppercase font-bold">
-            <Link href="/about" className="hover:text-blue-700 dark:hover:text-blue-400 transition-colors uppercase">{t("about")}</Link>
-            <Link href="/pricing" className="hover:text-blue-700 dark:hover:text-blue-400 transition-colors uppercase">{t("pricing")}</Link>
-            <Link href="/privacy" className="hover:text-blue-700 dark:hover:text-blue-400 transition-colors uppercase">{t("privacy")}</Link>
-            <Link href="/terms" className="hover:text-blue-700 dark:hover:text-blue-400 transition-colors uppercase">{t("terms")}</Link>
-          </div>
-          
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 bg-slate-200/50 dark:bg-white/5 p-1.5 px-3 rounded-full border border-slate-300 dark:border-white/10">
                <span className="typography-label text-[10px] text-slate-600 dark:text-slate-500 uppercase font-bold">{t("theme")}</span>

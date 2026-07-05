@@ -130,12 +130,16 @@ const getSchoolDetails = async (id) => {
 };
 exports.getSchoolDetails = getSchoolDetails;
 /** Suspend or unsuspend a school */
-const setSchoolSuspended = async (id, suspend) => {
+const setSchoolSuspended = async (id, suspend, suspendReason) => {
     return await db_1.default.$transaction(async (tx) => {
-        // 1. Update School record
+        // 1. Update School record — persist reason & timestamp
         const school = await tx.school.update({
             where: { id },
-            data: { subscriptionStatus: suspend ? 'SUSPENDED' : 'ACTIVE' },
+            data: {
+                subscriptionStatus: suspend ? 'SUSPENDED' : 'ACTIVE',
+                suspendedAt: suspend ? new Date() : null,
+                suspendReason: suspend ? (suspendReason || null) : null,
+            },
             include: { subscription: true }
         });
         // 2. Sync Subscription status if it exists
@@ -145,6 +149,20 @@ const setSchoolSuspended = async (id, suspend) => {
                 data: { status: suspend ? 'suspended' : 'active' }
             });
         }
+        // 3. Write audit log
+        await tx.auditLog.create({
+            data: {
+                schoolId: id,
+                action: suspend ? 'SCHOOL_SUSPENDED' : 'SCHOOL_UNSUSPENDED',
+                entity_type: 'School',
+                entity_id: id,
+                new_values: {
+                    subscriptionStatus: suspend ? 'SUSPENDED' : 'ACTIVE',
+                    suspendedAt: suspend ? new Date().toISOString() : null,
+                    suspendReason: suspend ? (suspendReason || null) : null,
+                },
+            }
+        });
         return school;
     });
 };

@@ -119,22 +119,39 @@ const getMessages = async (req, res) => {
 exports.getMessages = getMessages;
 const createConversation = async (req, res) => {
     const { name, isGroup, memberIds, avatar } = req.body;
-    const schoolId = req.user?.schoolId;
+    // Use x-school-id header as the authoritative school context.
+    // req.user.schoolId can fall back to the JWT's default school (which may be suspended/wrong)
+    // when tenantMiddleware cannot resolve the role for the /api/messages path.
+    const headerSchoolId = req.headers['x-school-id'];
+    const schoolId = headerSchoolId || req.user?.schoolId;
     if (!schoolId) {
         return res.status(401).json({ error: 'Unauthorized: School ID missing' });
     }
     try {
-        // 1. Verify all members belong to the SAME school
-        const usersInSchool = await db_1.default.user.findMany({
+        // Verify all members are either:
+        // a) Staff/Teachers/Admins in this school (via User.schoolId)
+        // b) Parents linked to this school (via ParentStudentLink)
+        // This handles the case of a parent (whose User.schoolId = SchoolA) messaging
+        // a teacher in SchoolB (their child's school).
+        const staffInSchool = await db_1.default.user.findMany({
             where: {
                 id: { in: memberIds },
                 schoolId,
                 is_active: true,
-                role: { in: ['admin', 'school_admin', 'teacher', 'parent'] }
             },
             select: { id: true }
         });
-        if (usersInSchool.length !== memberIds.length) {
+        const parentLinksInSchool = await db_1.default.parentStudentLink.findMany({
+            where: {
+                parentId: { in: memberIds },
+                schoolId,
+            },
+            select: { parentId: true }
+        });
+        const parentIds = new Set(parentLinksInSchool.map((l) => l.parentId));
+        const staffIds = new Set(staffInSchool.map((u) => u.id));
+        const validMemberIds = memberIds.filter((id) => staffIds.has(id) || parentIds.has(id));
+        if (validMemberIds.length !== memberIds.length) {
             return res.status(403).json({
                 error: 'Forbidden: One or more users are not found in your school or are not authorized for communication'
             });

@@ -28,7 +28,9 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     // Notification channel IDs
     private static final String CHANNEL_CALLS    = "incoming_calls";
-    private static final String CHANNEL_MESSAGES = "messages";
+    private static final String CHANNEL_HIGH     = "high_priority";
+    private static final String CHANNEL_DEFAULT  = "default_priority";
+    private static final String CHANNEL_LOW      = "low_priority";
 
     // Notification ID ranges
     private static final int NOTIF_ID_CALL = 1001;
@@ -56,91 +58,180 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 handleCancelCall(data);
                 break;
             case "new_message":
-                Log.d(TAG, "Handling new message notification");
-                handleNewMessage(data);
+            case "late_arrival":
+            case "absent_arrival":
+            case "excused_arrival":
+            case "new_announcement":
+            case "system_update":
+            case "account_security":
+                Log.d(TAG, "Handling generic notification: " + type);
+                handleGenericNotification(data);
                 break;
             default:
                 Log.d(TAG, "Unknown FCM type: " + type);
+                handleGenericNotification(data);
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NEW MESSAGE NOTIFICATION
+    // GENERIC NOTIFICATION HANDLING
     // ─────────────────────────────────────────────────────────────────────────
 
-    private void handleNewMessage(Map<String, String> data) {
+    private void handleGenericNotification(Map<String, String> data) {
+        String type           = data.get("type");
+        String title          = data.get("title");
+        String body           = data.get("body");
+        String route          = data.get("route");
         String conversationId = data.get("conversationId");
-        String senderName     = data.get("senderName");
-        String senderAvatar   = data.get("senderAvatar");
-        String preview        = data.get("messagePreview");
-        String tag            = data.get("tag"); // "chat-<conversationId>"
+        String studentId      = data.get("studentId");
+        String schoolId       = data.get("schoolId");
+        String tag            = data.get("tag");
+        
+        if (title == null) title = "Zetime Alert";
+        if (body  == null) body  = "You have a new update";
+        if (type  == null) type  = "general";
 
-        if (senderName == null) senderName = "New Message";
-        if (preview    == null) preview    = "You have a new message";
+        // Suppress native system tray display if app is currently in foreground
+        if (MainActivity.isAppInForeground && MainActivity.getInstance() != null) {
+            Log.d(TAG, "App is in foreground. Suppressing system tray display and posting directly to JS.");
+            com.getcapacitor.JSObject notifData = new com.getcapacitor.JSObject();
+            for (Map.Entry<String, String> entry : data.entrySet()) {
+                notifData.put(entry.getKey(), entry.getValue());
+            }
+            MainActivity.getInstance().postForegroundNotification(notifData);
+            return;
+        }
 
         NotificationManager nm = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        createMessageChannel(nm);
+        createNotificationChannels(nm);
 
-        // Open app to the messaging screen on tap
+        // Determine priority, channel, and vibration
+        String channelId = CHANNEL_DEFAULT;
+        int importance = NotificationCompat.PRIORITY_DEFAULT;
+        long[] vibratePattern = new long[]{0, 200, 100, 200};
+        String category = NotificationCompat.CATEGORY_EVENT;
+
+        if ("new_message".equals(type) || "account_security".equals(type)) {
+            channelId = CHANNEL_HIGH;
+            importance = NotificationCompat.PRIORITY_HIGH;
+            vibratePattern = new long[]{0, 250, 150, 250};
+            category = "new_message".equals(type) ? NotificationCompat.CATEGORY_MESSAGE : NotificationCompat.CATEGORY_STATUS;
+        } else if ("system_update".equals(type)) {
+            channelId = CHANNEL_LOW;
+            importance = NotificationCompat.PRIORITY_LOW;
+            vibratePattern = null;
+            category = NotificationCompat.CATEGORY_STATUS;
+        }
+
+        // Open app to target route on tap
         Intent openIntent = new Intent(this, MainActivity.class);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        openIntent.putExtra("notifType", type);
+        openIntent.putExtra("route", route);
         openIntent.putExtra("openConversationId", conversationId);
-        openIntent.putExtra("notifType", "new_message");
+        openIntent.putExtra("studentId", studentId);
+        openIntent.putExtra("schoolId", schoolId);
+
+        int requestCode = (conversationId != null) ? conversationId.hashCode() 
+                        : (studentId != null) ? studentId.hashCode() 
+                        : (int) System.currentTimeMillis();
 
         PendingIntent pendingIntent = PendingIntent.getActivity(
-                this, (conversationId != null ? conversationId.hashCode() : 0),
+                this, Math.abs(requestCode),
                 openIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        // Sound config using generated R.raw.notification
+        Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.notification);
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_MESSAGES)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(senderName)
-                .setContentText(preview)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(preview))
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)   // Hide on lock screen
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(importance)
+                .setCategory(category)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // Visible on lock screen
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
-                .setSound(soundUri)
-                .setVibrate(new long[]{0, 250, 150, 250})
-                // Group notifications per conversation (Telegram-style stacking)
-                .setGroup(tag != null ? tag : "chat-default")
-                .setGroupSummary(false);
+                .setLights(0xFF00FF00, 3000, 3000); // Pulse LED
 
-        // Use conversationId hash as notification ID so same chat groups correctly
-        int notifId = conversationId != null ? Math.abs(conversationId.hashCode()) : (int) System.currentTimeMillis();
+        if (!CHANNEL_LOW.equals(channelId)) {
+            builder.setSound(soundUri);
+            if (vibratePattern != null) {
+                builder.setVibrate(vibratePattern);
+            }
+        } else {
+            builder.setSound(null);
+        }
+
+        // Handle badges if present
+        int unreadCount = 0;
+        if (data.containsKey("badge")) {
+            try { unreadCount = Integer.parseInt(data.get("badge")); } catch (Exception e) {}
+        }
+        if (unreadCount > 0) {
+            builder.setNumber(unreadCount);
+        }
+
+        // Stacking / Grouping
+        String groupKey = tag;
+        if (groupKey == null) {
+            if ("new_message".equals(type)) {
+                groupKey = "chat-" + (conversationId != null ? conversationId : "default");
+            } else if (type.contains("arrival") || type.contains("absent") || type.contains("excused")) {
+                groupKey = "attendance";
+            } else if ("new_announcement".equals(type)) {
+                groupKey = "announcements";
+            } else {
+                groupKey = "general";
+            }
+        }
+
+        builder.setGroup(groupKey);
+        builder.setGroupSummary(false);
+
+        int notifId = (conversationId != null) ? Math.abs(conversationId.hashCode()) 
+                    : (studentId != null) ? Math.abs(studentId.hashCode()) 
+                    : (int) System.currentTimeMillis();
+
         nm.notify(notifId, builder.build());
 
-        // Show a summary notification (required for grouped notifications on Android 7+)
-        showMessageSummary(nm, senderName, preview, tag);
+        // Group summary notification (required for stacking on Android 7+)
+        showGroupSummary(nm, groupKey, type, channelId, unreadCount);
     }
 
-    /** Shows a grouped summary notification — the outer "shell" of the grouped messages. */
-    private void showMessageSummary(NotificationManager nm, String senderName, String preview, String group) {
-        if (group == null) group = "chat-default";
-
+    private void showGroupSummary(NotificationManager nm, String groupKey, String type, String channelId, int unreadCount) {
         Intent openIntent = new Intent(this, MainActivity.class);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent pi = PendingIntent.getActivity(this, 9999,
+        PendingIntent pi = PendingIntent.getActivity(this, Math.abs(groupKey.hashCode()),
                 openIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        NotificationCompat.Builder summary = new NotificationCompat.Builder(this, CHANNEL_MESSAGES)
+        String summaryText = "Zetime Notifications";
+        if (groupKey.startsWith("chat-")) {
+            summaryText = "Zetime Chat Messages";
+        } else if ("attendance".equals(groupKey)) {
+            summaryText = "Zetime Attendance Updates";
+        } else if ("announcements".equals(groupKey)) {
+            summaryText = "Zetime Announcements";
+        }
+
+        NotificationCompat.Builder summary = new NotificationCompat.Builder(this, channelId)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setStyle(new NotificationCompat.InboxStyle()
-                        .setSummaryText("Zetime Messages"))
+                .setStyle(new NotificationCompat.InboxStyle().setSummaryText(summaryText))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                .setGroup(group)
+                .setGroup(groupKey)
                 .setGroupSummary(true)
                 .setAutoCancel(true)
                 .setContentIntent(pi);
 
-        nm.notify(group.hashCode(), summary.build());
+        if (unreadCount > 0) {
+            summary.setNumber(unreadCount);
+        }
+
+        nm.notify(Math.abs(groupKey.hashCode()), summary.build());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -189,7 +280,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         NotificationManager nm = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        createCallChannel(nm);
+        createNotificationChannels(nm);
 
         Intent fullScreenIntent = new Intent(this, MainActivity.class);
         fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -232,47 +323,66 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // NOTIFICATION CHANNELS
+    // NOTIFICATION CHANNELS Setup
     // ─────────────────────────────────────────────────────────────────────────
 
-    private void createMessageChannel(NotificationManager nm) {
+    private void createNotificationChannels(NotificationManager nm) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
 
-        NotificationChannel ch = new NotificationChannel(
-                CHANNEL_MESSAGES, "Messages", NotificationManager.IMPORTANCE_HIGH);
-        ch.setDescription("Incoming chat message notifications");
-        ch.enableVibration(true);
-        ch.setVibrationPattern(new long[]{0, 250, 150, 250});
-        ch.setShowBadge(true);
         AudioAttributes aa = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build();
-        ch.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), aa);
-        nm.createNotificationChannel(ch);
-    }
+        
+        Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.notification);
 
-    private void createCallChannel(NotificationManager nm) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        // 1. High Priority Channel
+        NotificationChannel highCh = new NotificationChannel(
+                CHANNEL_HIGH, "High Priority Alert", NotificationManager.IMPORTANCE_HIGH);
+        highCh.setDescription("Voice/video calls, chat messages, and security alerts.");
+        highCh.enableVibration(true);
+        highCh.setVibrationPattern(new long[]{0, 250, 150, 250});
+        highCh.setShowBadge(true);
+        highCh.setSound(soundUri, aa);
+        nm.createNotificationChannel(highCh);
 
-        NotificationChannel ch = new NotificationChannel(
+        // 2. Default Priority Channel
+        NotificationChannel defaultCh = new NotificationChannel(
+                CHANNEL_DEFAULT, "Default Notification", NotificationManager.IMPORTANCE_DEFAULT);
+        defaultCh.setDescription("Attendance alerts and announcements.");
+        defaultCh.enableVibration(true);
+        defaultCh.setVibrationPattern(new long[]{0, 200, 100, 200});
+        defaultCh.setShowBadge(true);
+        defaultCh.setSound(soundUri, aa);
+        nm.createNotificationChannel(defaultCh);
+
+        // 3. Low Priority Channel
+        NotificationChannel lowCh = new NotificationChannel(
+                CHANNEL_LOW, "Low Priority Update", NotificationManager.IMPORTANCE_LOW);
+        lowCh.setDescription("System updates and minor alerts.");
+        lowCh.enableVibration(false);
+        lowCh.setShowBadge(true);
+        lowCh.setSound(null, null);
+        nm.createNotificationChannel(lowCh);
+
+        // 4. Calls Channel (existing)
+        NotificationChannel callCh = new NotificationChannel(
                 CHANNEL_CALLS, "Incoming Calls", NotificationManager.IMPORTANCE_HIGH);
-        ch.setDescription("Incoming voice and video call notifications");
-        ch.enableVibration(true);
-        ch.setVibrationPattern(new long[]{0, 1000, 500, 1000});
-        AudioAttributes aa = new AudioAttributes.Builder()
+        callCh.setDescription("Incoming voice and video call notifications");
+        callCh.enableVibration(true);
+        callCh.setVibrationPattern(new long[]{0, 1000, 500, 1000});
+        AudioAttributes callAa = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                 .build();
-        ch.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE), aa);
-        nm.createNotificationChannel(ch);
-        Log.d(TAG, "Call channel created");
+        callCh.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE), callAa);
+        nm.createNotificationChannel(callCh);
+        Log.d(TAG, "Notification channels verified");
     }
 
     @Override
     public void onNewToken(@NonNull String token) {
         super.onNewToken(token);
         Log.d(TAG, "FCM token refreshed: " + token);
-        // Token will be re-registered next time the app authenticates via socket
     }
 }

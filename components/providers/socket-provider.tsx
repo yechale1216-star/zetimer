@@ -119,29 +119,15 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       // Also fire the generic badge update used by the header notification bell
       window.dispatchEvent(new Event('new_notification'));
 
-      // In-app browser notification (only when app is open and not focused on that chat)
-      if ('Notification' in window && Notification.permission === 'granted') {
-        const title  = message.sender?.full_name || 'New Message';
-        const body   = message.content || (message.type !== 'TEXT' ? '📎 Attachment' : 'New message');
-        const icon   = message.sender?.profile_photo || '/icon-192.png';
-        try {
-          const notif = new Notification(title, {
-            body,
-            icon,
-            tag: `chat-${message.conversationId}`,
-          });
-          notif.onclick = () => {
-            window.focus();
-            notif.close();
-            // Navigate to the conversation
-            window.dispatchEvent(new CustomEvent('zetime:open_conversation', {
-              detail: { conversationId: message.conversationId },
-            }));
-          };
-        } catch (e) {
-          console.warn('[Socket] In-app notification failed:', e);
+      // Fire custom in-app notification banner (Telegram style)
+      window.dispatchEvent(new CustomEvent('zetime:in_app_notification', {
+        detail: {
+          type: 'new_message',
+          title: message.sender?.full_name || 'New Message',
+          body: message.content || (message.type !== 'TEXT' ? '📎 Attachment' : 'New message'),
+          conversationId: message.conversationId
         }
-      }
+      }));
     });
 
     setSocket(socketInstance);

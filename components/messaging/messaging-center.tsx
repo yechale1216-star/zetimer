@@ -87,6 +87,14 @@ export function MessagingCenter() {
   }, [isConnected]);
 
   useEffect(() => {
+    if (activeConversationId) {
+      localStorage.setItem('zetime:active_chat_id', activeConversationId);
+    } else {
+      localStorage.removeItem('zetime:active_chat_id');
+    }
+  }, [activeConversationId]);
+
+  useEffect(() => {
     setUser(authService.getCurrentUser());
     
     // Register global bridge for sidebar to open group modal

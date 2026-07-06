@@ -243,3 +243,82 @@ export async function sendCallCancellation(token: string, callId: string) {
     console.error('[NotificationService] Error sending call cancellation:', error);
   }
 }
+
+/**
+ * Sends a structured, category-specific push notification to a user device.
+ * Data-only payload ensures our Android native service handles channels, vibrate, and custom sound resources.
+ */
+export async function sendCategoryNotification(
+  token: string,
+  payload: {
+    type: 'late_arrival' | 'absent_arrival' | 'excused_arrival' | 'new_announcement' | 'system_update' | 'account_security' | string;
+    title: string;
+    body: string;
+    route?: string;
+    studentId?: string;
+    schoolId?: string;
+    badge?: number;
+    tag?: string;
+  }
+): Promise<string | undefined> {
+  const activeApp = app || (getApps().length > 0 ? getApps()[0] : undefined);
+  if (!activeApp) return;
+
+  const dataPayload: Record<string, string> = {
+    type: payload.type,
+    title: payload.title,
+    body: payload.body,
+    timestamp: Date.now().toString(),
+  };
+
+  if (payload.route) dataPayload.route = payload.route;
+  if (payload.studentId) dataPayload.studentId = payload.studentId;
+  if (payload.schoolId) dataPayload.schoolId = payload.schoolId;
+  if (payload.badge !== undefined) dataPayload.badge = payload.badge.toString();
+  if (payload.tag) dataPayload.tag = payload.tag;
+
+  const message: Message = {
+    data: dataPayload,
+    token,
+    android: {
+      priority: 'high',
+      ttl: 86400000,
+    },
+    apns: {
+      payload: {
+        aps: { 
+          contentAvailable: true, 
+          sound: 'default',
+          badge: payload.badge 
+        },
+      },
+      headers: {
+        'apns-priority': '10',
+        'apns-push-type': 'background',
+      },
+    },
+    webpush: {
+      headers: { Urgency: 'high' },
+      notification: {
+        title: payload.title,
+        body: payload.body,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: payload.tag || payload.type,
+        renotify: true,
+      },
+    },
+  };
+
+  try {
+    const messaging = getMessaging(activeApp);
+    const response = await messaging.send(message);
+    return response;
+  } catch (error: any) {
+    if (error.code === 'messaging/registration-token-not-registered') {
+      console.warn('[NotificationService] Category token expired');
+      return 'EXPIRED_TOKEN';
+    }
+    console.error('[NotificationService] Error sending category notification:', error);
+  }
+}

@@ -323,7 +323,7 @@ export const updatePreferences = async (phone: string, schoolId: string, data: a
 };
 
 export const postAnnouncement = async (schoolId: string, data: any) => {
-  return await prisma.parentNotification.create({
+  const result = await prisma.parentNotification.create({
     data: {
       schoolId,
       studentId: data.studentId || null,
@@ -333,6 +333,54 @@ export const postAnnouncement = async (schoolId: string, data: any) => {
       isRead: false
     }
   });
+
+  try {
+    const parentLinks = await prisma.parentStudentLink.findMany({
+      where: {
+        schoolId,
+        ...(data.studentId ? { studentId: data.studentId } : {})
+      },
+      include: {
+        parent: true
+      }
+    });
+
+    const { sendCategoryNotification } = require('./notification.service');
+    const uniqueParents = Array.from(
+      new Map(
+        parentLinks
+          .filter(l => l.parent !== null)
+          .map(l => [l.parentId, l.parent])
+      ).values()
+    );
+
+    for (const parent of uniqueParents) {
+      if (parent && parent.pushToken && parent.phone) {
+        // Check parent preferences
+        const prefs = await prisma.parentPreferences.findUnique({
+          where: { parentPhone_schoolId: { parentPhone: parent.phone, schoolId } }
+        });
+        if (prefs && !prefs.pushNotifications) {
+          continue; // Guard: parent disabled push alerts
+        }
+
+        await sendCategoryNotification(parent.pushToken, {
+          type: 'new_announcement',
+          title: data.title || 'New Announcement',
+          body: data.message || 'There is a new announcement from school.',
+          route: '/parent/announcements',
+          schoolId,
+          tag: 'announcements'
+        }).catch((err: any) => {
+          console.error(`Failed to send announcement push to parent ${parent.id}:`, err);
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Failed to dispatch announcement push notifications:', e);
+  }
+
+  return result;
 };
 
 export const updateAnnouncement = async (id: string, schoolId: string, data: any) => {

@@ -154,7 +154,7 @@ function ViewDetailsModal({ subscription, onClose }: ViewDetailsModalProps) {
 
           <div className="flex flex-col gap-2 pt-4">
             <Button asChild variant="default" className="w-full">
-              <Link href={`/super-admin/subscriptions/${subscription.id}`}>Open Full Record</Link>
+              <Link href={`/super-admin/subscriptions/detail?id=${subscription.id}`}>Open Full Record</Link>
             </Button>
             <Button onClick={onClose} variant="ghost" className="w-full">
               Close
@@ -314,7 +314,7 @@ export function SubscriptionsList({ searchQuery, statusFilter }: SubscriptionsLi
                             <Eye className="w-4 h-4" />
                           </Button>
                           <Button size="sm" variant="ghost" className="h-8 w-8 p-0" asChild title="Edit in detail view">
-                            <Link href={`/super-admin/subscriptions/${sub.id}`}>
+                            <Link href={`/super-admin/subscriptions/detail?id=${sub.id}`}>
                               <Edit className="w-4 h-4" />
                             </Link>
                           </Button>

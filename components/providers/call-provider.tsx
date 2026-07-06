@@ -329,7 +329,20 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const res = await NativeBridge.getPendingCall();
         if (res && res.hasPending && res.action) {
-          handlePendingCallAction(res.action, res.callId || '', res.callerId, res.callerName, res.callType);
+          if (res.action === 'NAVIGATE') {
+            console.log('[CallProvider] Found pending navigation action:', res);
+            window.dispatchEvent(new CustomEvent('zetime:navigate', {
+              detail: {
+                type: res.type,
+                route: res.route,
+                conversationId: res.conversationId,
+                studentId: res.studentId,
+                schoolId: res.schoolId
+              }
+            }));
+          } else {
+            handlePendingCallAction(res.action, res.callId || '', res.callerId, res.callerName, res.callType);
+          }
         }
       } catch (e) {
         console.warn('[CallProvider] checkPending failed:', e);

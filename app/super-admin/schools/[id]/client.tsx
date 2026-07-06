@@ -23,11 +23,21 @@ export default function SchoolDetailClient() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
+
+  // In a Capacitor static export, dynamic routes always resolve to the
+  // placeholder segment. Redirect to the list so the user isn't stuck.
+  useEffect(() => {
+    if (!id || id === "placeholder") {
+      router.replace("/super-admin/schools")
+    }
+  }, [id])
+
   const [school, setSchool] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [suspending, setSuspending] = useState(false)
 
   const fetchSchool = async () => {
+    if (!id || id === "placeholder") return
     try {
       setLoading(true)
       const token = localStorage.getItem("attendance_token")

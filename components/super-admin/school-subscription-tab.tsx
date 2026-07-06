@@ -129,7 +129,7 @@ export function SchoolSubscriptionTab({ schoolId }: Props) {
               <CardDescription>Most recent transactions and charges.</CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/super-admin/subscriptions/${sub.id}`}>
+              <Link href={`/super-admin/subscriptions/detail?id=${sub.id}`}>
                 Full details
                 <ArrowUpRight className="w-4 h-4 ml-2" />
               </Link>

@@ -8,8 +8,16 @@ import androidx.core.splashscreen.SplashScreen;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    public static boolean isAppInForeground = false;
+    private static MainActivity instance = null;
+
+    public static MainActivity getInstance() {
+        return instance;
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        instance = this;
         SplashScreen.installSplashScreen(this);
         super.onCreate(savedInstanceState);
         
@@ -30,9 +38,28 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        isAppInForeground = true;
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isAppInForeground = false;
+    }
+
+    @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         handleIntent(intent);
+    }
+
+    public void postForegroundNotification(com.getcapacitor.JSObject data) {
+        CallPlugin plugin = (CallPlugin) bridge.getPlugin("CallPlugin").getInstance();
+        if (plugin != null) {
+            plugin.notifyForegroundNotification(data);
+        }
     }
 
     private void handleIntent(Intent intent) {
@@ -40,11 +67,20 @@ public class MainActivity extends BridgeActivity {
 
         String notifType = intent.getStringExtra("notifType");
 
-        if ("new_message".equals(notifType)) {
-            String conversationId = intent.getStringExtra("openConversationId");
+        if (notifType != null && !notifType.isEmpty()) {
+            com.getcapacitor.JSObject routeObj = new com.getcapacitor.JSObject();
+            routeObj.put("action", "NAVIGATE");
+            routeObj.put("type", notifType);
+            routeObj.put("route", intent.getStringExtra("route"));
+            routeObj.put("conversationId", intent.getStringExtra("openConversationId"));
+            routeObj.put("studentId", intent.getStringExtra("studentId"));
+            routeObj.put("schoolId", intent.getStringExtra("schoolId"));
+
+            CallPlugin.setPendingCall(routeObj);
+
             CallPlugin plugin = (CallPlugin) bridge.getPlugin("CallPlugin").getInstance();
-            if (plugin != null && conversationId != null) {
-                plugin.handleCallAction("OPEN_CHAT", conversationId);
+            if (plugin != null) {
+                plugin.handleNavigationAction(routeObj);
             }
         } else if (intent.hasExtra("callAction")) {
             String action = intent.getStringExtra("callAction");

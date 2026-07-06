@@ -59,6 +59,7 @@ export const markAttendance = async (data: any, schoolId: string) => {
   if (status && (status.toLowerCase() === 'absent' || status.toLowerCase() === 'late')) {
     try {
       const type = status.toLowerCase() === 'absent' ? 'absent' : 'late';
+      const typePush = status.toLowerCase() === 'absent' ? 'absent_arrival' : 'late_arrival';
       const title = status.toLowerCase() === 'absent' ? 'Absent Alert' : 'Late Arrival Alert';
       const sessionStr = session ? ` (${session} session)` : '';
       const message = `${student.fullName} has been marked ${status}${sessionStr} on ${dateStr}.`;
@@ -73,8 +74,39 @@ export const markAttendance = async (data: any, schoolId: string) => {
           isRead: false
         }
       });
+
+      // Send fcm push notification to linked parents
+      const { sendCategoryNotification } = require('./notification.service');
+      const parentLinks = await prisma.parentStudentLink.findMany({
+        where: { studentId: student.id },
+        include: { parent: true }
+      });
+
+      for (const link of parentLinks) {
+        if (link.parent && link.parent.pushToken && link.parent.phone) {
+          // Check preferences
+          const prefs = await prisma.parentPreferences.findUnique({
+            where: { parentPhone_schoolId: { parentPhone: link.parent.phone, schoolId } }
+          });
+          if (prefs && !prefs.pushNotifications) {
+            continue; // Guard: parent disabled push alerts
+          }
+
+          await sendCategoryNotification(link.parent.pushToken, {
+            type: typePush,
+            title,
+            body: message,
+            route: `/parent/attendance`,
+            studentId: student.id,
+            schoolId,
+            tag: `attendance-${student.id}`
+          }).catch((err: any) => {
+            console.error(`Failed to dispatch push to parent ${link.parentId}:`, err);
+          });
+        }
+      }
     } catch (notificationError) {
-      console.error("Failed to create parent notification:", notificationError);
+      console.error("Failed to create parent notification or send push:", notificationError);
     }
   }
 

@@ -3,6 +3,15 @@ import type { Metadata, Viewport } from "next"
 import localFont from "next/font/local"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
+import { ThemeProvider } from "@/components/theme-provider"
+import { LanguageProvider } from "@/lib/context/language-context"
+import { SchoolProvider } from "@/lib/context/school-context"
+import { AuthProvider } from "@/lib/context/auth-context"
+import { Toaster as SonnerToaster } from "sonner"
+import { PWAClientWrapper } from "@/components/system/pwa-client-wrapper"
+import { FetchInterceptor } from "@/components/providers/fetch-interceptor"
+import { CapacitorInitializer } from "@/components/capacitor-initializer"
+import { InAppNotificationProvider } from "@/components/providers/in-app-notification-provider"
 
 const inter = localFont({
   src: "../public/fonts/inter.woff2",
@@ -52,16 +61,6 @@ export const viewport: Viewport = {
   themeColor: "#2563eb",
 }
 
-import { ThemeProvider } from "@/components/theme-provider"
-import { LanguageProvider } from "@/lib/context/language-context"
-import { SchoolProvider } from "@/lib/context/school-context"
-import { AuthProvider } from "@/lib/context/auth-context"
-
-import { Toaster as SonnerToaster } from "sonner"
-import { PWAClientWrapper } from "@/components/system/pwa-client-wrapper"
-import { FetchInterceptor } from "@/components/providers/fetch-interceptor"
-import { CapacitorInitializer } from "@/components/capacitor-initializer"
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -70,7 +69,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* ... head tags ... */}
+        {/* head tags */}
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
         <ThemeProvider
@@ -83,7 +82,9 @@ export default function RootLayout({
               <AuthProvider>
                 <CapacitorInitializer />
                 <SchoolProvider>
-                  {children}
+                  <InAppNotificationProvider>
+                    {children}
+                  </InAppNotificationProvider>
                   <Toaster />
                   <SonnerToaster position="top-right" richColors />
                   <PWAClientWrapper />

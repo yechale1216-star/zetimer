@@ -16,12 +16,20 @@ interface CallPlugin {
   getPendingCall: () => Promise<{
     hasPending: boolean;
     action?: string;
+    type?: string;
+    route?: string;
+    conversationId?: string;
+    studentId?: string;
+    schoolId?: string;
     callId?: string;
     callerId?: string;
     callerName?: string;
     callType?: string;
   }>;
-  addListener: (eventName: 'onCallAction', listenerFunc: (data: { action: string, callId?: string, conversationId?: string }) => void) => Promise<any>;
+  addListener: (
+    eventName: 'onCallAction' | 'onForegroundNotification',
+    listenerFunc: (data: any) => void
+  ) => Promise<any>;
 }
 
 const CallPlugin = registerPlugin<CallPlugin>('CallPlugin');
@@ -171,8 +179,18 @@ export const NativeBridge = {
 
   addCallActionListener: (callback: (action: string, callId: string) => void) => {
     if (Capacitor.isNativePlatform()) {
-      return CallPlugin.addListener('onCallAction', (data: { action: string, callId?: string, conversationId?: string }) => {
-        if (data.action === 'OPEN_CHAT' && data.conversationId && typeof window !== 'undefined') {
+      return CallPlugin.addListener('onCallAction', (data: any) => {
+        if (data.action === 'NAVIGATE') {
+          window.dispatchEvent(new CustomEvent('zetime:navigate', {
+            detail: {
+              type: data.type,
+              route: data.route,
+              conversationId: data.conversationId,
+              studentId: data.studentId,
+              schoolId: data.schoolId
+            }
+          }));
+        } else if (data.action === 'OPEN_CHAT' && data.conversationId && typeof window !== 'undefined') {
           // Route message notification taps directly via the DOM event bus
           window.dispatchEvent(new CustomEvent('zetime:open_conversation', {
             detail: { conversationId: data.conversationId },
@@ -180,6 +198,15 @@ export const NativeBridge = {
         } else {
           callback(data.action, data.callId || '');
         }
+      });
+    }
+    return null;
+  },
+
+  addForegroundNotificationListener: (callback: (data: any) => void) => {
+    if (Capacitor.isNativePlatform()) {
+      return CallPlugin.addListener('onForegroundNotification', (data: any) => {
+        callback(data);
       });
     }
     return null;

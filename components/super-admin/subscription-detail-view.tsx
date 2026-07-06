@@ -21,7 +21,16 @@ export function SubscriptionDetailView() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
+  // In a Capacitor static export, dynamic routes always resolve to the
+  // placeholder segment. Redirect to the list so the user isn't stuck.
+  useEffect(() => {
+    if (!id || id === "placeholder") {
+      router.replace("/super-admin/subscriptions")
+    }
+  }, [id])
+
   const load = async () => {
+    if (!id || id === "placeholder") return
     setLoading(true)
     try {
       const res = await fetch(`/api/subscriptions/${id}`)

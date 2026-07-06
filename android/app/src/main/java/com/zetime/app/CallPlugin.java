@@ -20,10 +20,18 @@ public class CallPlugin extends Plugin {
         if (pendingCall != null) {
             ret.put("hasPending", true);
             ret.put("action", pendingCall.getString("action"));
+            ret.put("type", pendingCall.getString("type"));
+            ret.put("route", pendingCall.getString("route"));
+            ret.put("conversationId", pendingCall.getString("conversationId"));
+            ret.put("studentId", pendingCall.getString("studentId"));
+            ret.put("schoolId", pendingCall.getString("schoolId"));
+            
+            // For backward compatibility on existing call receiver:
             ret.put("callId", pendingCall.getString("callId"));
             ret.put("callerId", pendingCall.getString("callerId"));
             ret.put("callerName", pendingCall.getString("callerName"));
             ret.put("callType", pendingCall.getString("callType"));
+            
             pendingCall = null;
         } else {
             ret.put("hasPending", false);
@@ -48,6 +56,7 @@ public class CallPlugin extends Plugin {
         getContext().startService(intent);
         call.resolve();
     }
+
     public void handleCallAction(String action, String payload) {
         com.getcapacitor.JSObject ret = new com.getcapacitor.JSObject();
         ret.put("action", action);
@@ -58,6 +67,15 @@ public class CallPlugin extends Plugin {
         }
         notifyListeners("onCallAction", ret);
     }
+
+    public void handleNavigationAction(com.getcapacitor.JSObject routeObj) {
+        notifyListeners("onCallAction", routeObj);
+    }
+
+    public void notifyForegroundNotification(com.getcapacitor.JSObject notifData) {
+        notifyListeners("onForegroundNotification", notifData);
+    }
+
     public void handleIncomingCall(com.getcapacitor.JSObject callObj) {
         notifyListeners("onCallAction", callObj);
     }

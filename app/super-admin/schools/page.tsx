@@ -158,7 +158,7 @@ export default function SchoolsPage() {
                       <td className="py-4">
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="sm" asChild className="h-8 gap-1">
-                            <Link href={`/super-admin/schools/${s.id}`}><Eye className="w-3.5 h-3.5" /></Link>
+                            <Link href={`/super-admin/schools/detail?id=${s.id}`}><Eye className="w-3.5 h-3.5" /></Link>
                           </Button>
                           <Button
                             variant="ghost"

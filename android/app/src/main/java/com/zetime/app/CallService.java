@@ -7,6 +7,8 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -20,34 +22,54 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+
 import com.zetime.app.R;
 
 public class CallService extends Service {
     private static final String TAG = "CallService";
     private static final String CHANNEL_ID = "active_calls";
+    private static final int NOTIF_ID = 1002;
+
     private MediaPlayer mediaPlayer;
     private Vibrator vibrator;
     private PowerManager.WakeLock wakeLock;
 
+    // Extras stored for building the foreground notification action buttons
+    private String pendingCallerName;
+    private String pendingCallId;
+    private String pendingCallerId;
+    private String pendingCallType;
+    private String pendingServerUrl;
+
     @Override
     public void onCreate() {
         super.onCreate();
-        vibrator = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
-        PowerManager powerManager = (PowerManager) this.getSystemService(Context.POWER_SERVICE);
+        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         if (powerManager != null) {
-            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Zetime:CallWakeLock");
+            // SCREEN_BRIGHT_WAKE_LOCK wakes the display when a call arrives with locked screen
+            wakeLock = powerManager.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
+                    "Zetime:CallWakeLock"
+            );
         }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) return START_NOT_STICKY;
-        
+
         String action = intent.getStringExtra("ACTION");
         if ("START_CALL".equals(action)) {
-            Log.d(TAG, "Starting call ringing for: " + intent.getStringExtra("callerName"));
+            pendingCallerName = intent.getStringExtra("callerName");
+            pendingCallId     = intent.getStringExtra("callId");
+            pendingCallerId   = intent.getStringExtra("callerId");
+            pendingCallType   = intent.getStringExtra("callType");
+            pendingServerUrl  = intent.getStringExtra("serverUrl");
+
+            Log.d(TAG, "Starting call ringing for: " + pendingCallerName);
             startRinging();
-            showForegroundNotification(intent.getStringExtra("callerName"));
+            showForegroundNotification();
         } else if ("STOP_CALL".equals(action)) {
             Log.d(TAG, "Stopping call ringing");
             stopRinging();
@@ -59,78 +81,150 @@ public class CallService extends Service {
 
     private void startRinging() {
         try {
+            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
             if (mediaPlayer == null) {
                 Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-                mediaPlayer = MediaPlayer.create(this, ringtoneUri);
-                if (mediaPlayer != null) {
-                    mediaPlayer.setLooping(true);
-                    mediaPlayer.start();
-                }
-            }
+                mediaPlayer = new MediaPlayer();
+                mediaPlayer.setDataSource(this, ringtoneUri);
 
-            if (vibrator != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator.vibrate(VibrationEffect.createWaveform(new long[]{0, 1000, 500}, 0));
+                // Use STREAM_RING so the ringtone respects the ring volume but plays
+                // even when the notification stream is muted (phone-call behavior)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build());
                 } else {
-                    vibrator.vibrate(new long[]{0, 1000, 500}, 0);
+                    mediaPlayer.setAudioStreamType(AudioManager.STREAM_RING);
                 }
-            }
 
-            if (wakeLock != null && !wakeLock.isHeld()) {
-                wakeLock.acquire(30000); // 30 seconds timeout
+                mediaPlayer.setLooping(true);
+                mediaPlayer.prepare();
+                mediaPlayer.start();
             }
         } catch (Exception e) {
             Log.e(TAG, "Error starting ringtone", e);
         }
+
+        // Vibrate regardless of ringer mode (mirrors phone-call behavior)
+        try {
+            if (vibrator != null) {
+                long[] pattern = new long[]{0, 1000, 600, 1000, 600};
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
+                } else {
+                    vibrator.vibrate(pattern, 0);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting vibration", e);
+        }
+
+        // Wake the screen
+        try {
+            if (wakeLock != null && !wakeLock.isHeld()) {
+                wakeLock.acquire(45_000L); // hold up to 45 seconds
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error acquiring wake lock", e);
+        }
     }
 
     private void stopRinging() {
-        if (mediaPlayer != null) {
-            try {
+        try {
+            if (mediaPlayer != null) {
                 mediaPlayer.stop();
                 mediaPlayer.release();
-            } catch (Exception e) {
-                Log.e(TAG, "Error stopping media player", e);
+                mediaPlayer = null;
             }
-            mediaPlayer = null;
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping media player", e);
         }
-        if (vibrator != null) {
-            vibrator.cancel();
+        try {
+            if (vibrator != null) vibrator.cancel();
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping vibration", e);
         }
-        if (wakeLock != null && wakeLock.isHeld()) {
-            wakeLock.release();
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+        } catch (Exception e) {
+            Log.e(TAG, "Error releasing wake lock", e);
         }
     }
 
-    private void showForegroundNotification(String callerName) {
-        NotificationManager notificationManager = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (notificationManager == null) return;
+    private void showForegroundNotification() {
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null) return;
 
+        // Create the persistent foreground service channel (low importance — no sound/vibrate,
+        // that is handled by the separate HUN notification from MyFirebaseMessagingService)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Active Calls", NotificationManager.IMPORTANCE_LOW);
-            notificationManager.createNotificationChannel(channel);
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID, "Active Calls", NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription("Keeps the call service alive");
+            nm.createNotificationChannel(channel);
         }
 
-        Intent notificationIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
+        // Full-screen intent to open the call UI when user taps
+        Intent openIntent = new Intent(this, MainActivity.class);
+        openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        openIntent.putExtra("isIncomingCall", true);
+        openIntent.putExtra("callId",    pendingCallId);
+        openIntent.putExtra("callerId",  pendingCallerId);
+        openIntent.putExtra("callerName", pendingCallerName);
+        openIntent.putExtra("callType",  pendingCallType);
+        openIntent.putExtra("serverUrl", pendingServerUrl);
+        PendingIntent openPI = PendingIntent.getActivity(this, 0, openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        // Answer action
+        Intent answerIntent = new Intent(this, CallNotificationActionReceiver.class);
+        answerIntent.setAction("ACTION_ANSWER");
+        answerIntent.putExtra("callId",    pendingCallId);
+        answerIntent.putExtra("callerId",  pendingCallerId);
+        answerIntent.putExtra("callType",  pendingCallType);
+        answerIntent.putExtra("serverUrl", pendingServerUrl);
+        PendingIntent answerPI = PendingIntent.getBroadcast(this, 10, answerIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        // Decline action
+        Intent declineIntent = new Intent(this, CallNotificationActionReceiver.class);
+        declineIntent.setAction("ACTION_DECLINE");
+        declineIntent.putExtra("callId",    pendingCallId);
+        declineIntent.putExtra("serverUrl", pendingServerUrl);
+        PendingIntent declinePI = PendingIntent.getBroadcast(this, 11, declineIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        String callerLabel = pendingCallerName != null ? pendingCallerName : "Unknown";
+        String callTypeLabel = "VIDEO".equalsIgnoreCase(pendingCallType) ? "Video" : "Voice";
 
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Zetime Call")
-                .setContentText("Call from " + (callerName != null ? callerName : "Unknown"))
+                .setContentTitle("Incoming " + callTypeLabel + " Call")
+                .setContentText(callerLabel)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentIntent(pendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setContentIntent(openPI)
+                .setFullScreenIntent(openPI, true)
+                .addAction(R.mipmap.ic_launcher, "Decline", declinePI)
+                .addAction(R.mipmap.ic_launcher, "Answer",  answerPI)
                 .build();
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(1002, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL | ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
+                startForeground(NOTIF_ID, notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL |
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
             } else {
-                startForeground(1002, notification);
+                startForeground(NOTIF_ID, notification);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Failed to start foreground, but ringing will continue in background", e);
+            Log.e(TAG, "Failed to start foreground notification", e);
+            // Still proceed — ringing continues via MediaPlayer + Vibrator
         }
     }
 

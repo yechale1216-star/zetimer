@@ -295,24 +295,28 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         Intent answerIntent = new Intent(this, CallNotificationActionReceiver.class);
         answerIntent.setAction("ACTION_ANSWER");
-        answerIntent.putExtra("callId", callId);
-        answerIntent.putExtra("callerId", callerId);
-        answerIntent.putExtra("callType", callType);
+        answerIntent.putExtra("callId",    callId);
+        answerIntent.putExtra("callerId",  callerId);
+        answerIntent.putExtra("callType",  callType);
+        answerIntent.putExtra("callerName", callerName);
+        answerIntent.putExtra("serverUrl", serverUrl);
         PendingIntent answerPI = PendingIntent.getBroadcast(this, 1, answerIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         Intent declineIntent = new Intent(this, CallNotificationActionReceiver.class);
         declineIntent.setAction("ACTION_DECLINE");
-        declineIntent.putExtra("callId", callId);
+        declineIntent.putExtra("callId",    callId);
         declineIntent.putExtra("serverUrl", serverUrl);
         PendingIntent declinePI = PendingIntent.getBroadcast(this, 2, declineIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        String callTypeLabel = "VIDEO".equalsIgnoreCase(callType) ? "Video" : "Voice";
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_CALLS)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("Incoming " + (callType != null ? callType.toLowerCase() : "voice") + " call")
+                .setContentTitle("Incoming " + callTypeLabel + " Call")
                 .setContentText(callerName)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
-                .setAutoCancel(true)
+                .setAutoCancel(false)
                 .setOngoing(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setFullScreenIntent(fsPendingIntent, true)

@@ -178,10 +178,11 @@ export async function sendMessageNotification(
 }
 
 /**
- * Sends a high-priority FCM notification to trigger an incoming call UI.
- * Includes a notification block so Google Play Services wakes the device
- * and shows it on the lock screen even when the app is killed.
- * onMessageReceived handles the foreground case (custom call screen with Answer/Decline).
+ * Sends a DATA-ONLY high-priority FCM call notification.
+ * Must NOT include a notification block — if it does, Google Play Services
+ * renders a basic banner and skips onMessageReceived entirely, so our Java code
+ * (which adds Answer/Decline buttons, vibration, and fullScreenIntent) never runs.
+ * High-priority data messages reliably wake the app even when backgrounded.
  */
 export async function sendCallNotification(
   token: string,
@@ -197,13 +198,9 @@ export async function sendCallNotification(
   const activeApp = app || (getApps().length > 0 ? getApps()[0] : undefined);
   if (!activeApp) return;
 
-  const callTypeLabel = data.callType === 'VIDEO' ? 'Video' : 'Voice';
-
   const message: Message = {
-    notification: {
-      title: `Incoming ${callTypeLabel} Call`,
-      body: data.callerName,
-    },
+    // DATA-ONLY: no notification block — ensures onMessageReceived fires so Java
+    // can show the full HUN with Answer/Decline action buttons + vibration + fullScreenIntent
     data: {
       type: 'incoming_call',
       notifType: 'incoming_call',
@@ -217,13 +214,8 @@ export async function sendCallNotification(
     },
     token: token,
     android: {
-      priority: 'high',
-      ttl: 30000,
-      notification: {
-        channelId: 'incoming_calls',
-        sound: 'default',
-        visibility: 'public',
-      },
+      priority: 'high',  // critical: wakes the device even when screen is off
+      ttl: 30000,        // 30-second max age — stale calls must not ring
     },
     apns: {
       payload: {
@@ -232,7 +224,7 @@ export async function sendCallNotification(
           priority: 10,
         },
       },
-    }
+    },
   };
 
   try {

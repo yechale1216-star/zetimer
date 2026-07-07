@@ -38,19 +38,19 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
         isAppInForeground = true;
     }
 
     @Override
-    protected void onPause() {
+    public void onPause() {
         super.onPause();
         isAppInForeground = false;
     }
 
     @Override
-    protected void onNewIntent(Intent intent) {
+    public void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         handleIntent(intent);
     }

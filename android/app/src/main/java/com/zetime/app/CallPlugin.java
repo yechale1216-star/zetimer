@@ -57,6 +57,15 @@ public class CallPlugin extends Plugin {
         call.resolve();
     }
 
+    @PluginMethod
+    public void saveAuthToken(PluginCall call) {
+        String token = call.getString("token");
+        if (token != null) {
+            MainActivity.saveAuthTokenToPrefs(getContext(), token);
+        }
+        call.resolve();
+    }
+
     public void handleCallAction(String action, String payload) {
         com.getcapacitor.JSObject ret = new com.getcapacitor.JSObject();
         ret.put("action", action);

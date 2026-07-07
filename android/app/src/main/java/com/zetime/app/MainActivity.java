@@ -62,6 +62,17 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    /**
+     * Saves the JWT auth token to SharedPreferences so onNewToken in
+     * MyFirebaseMessagingService can include it when syncing refreshed FCM tokens.
+     * Called from the Capacitor JS layer via a window message evaluated on the bridge.
+     */
+    public static void saveAuthTokenToPrefs(android.content.Context ctx, String token) {
+        android.content.SharedPreferences prefs = ctx.getSharedPreferences("zetime_prefs", android.content.Context.MODE_PRIVATE);
+        prefs.edit().putString("auth_token", token).apply();
+        android.util.Log.d("MainActivity", "Auth token persisted to SharedPreferences");
+    }
+
     private void handleIntent(Intent intent) {
         if (intent == null) return;
 
@@ -78,9 +89,14 @@ public class MainActivity extends BridgeActivity {
 
             CallPlugin.setPendingCall(routeObj);
 
-            CallPlugin plugin = (CallPlugin) bridge.getPlugin("CallPlugin").getInstance();
-            if (plugin != null) {
-                plugin.handleNavigationAction(routeObj);
+            if (bridge != null) {
+                com.getcapacitor.PluginHandle handle = bridge.getPlugin("CallPlugin");
+                if (handle != null) {
+                    CallPlugin plugin = (CallPlugin) handle.getInstance();
+                    if (plugin != null) {
+                        plugin.handleNavigationAction(routeObj);
+                    }
+                }
             }
         } else if (intent.hasExtra("callAction")) {
             String action = intent.getStringExtra("callAction");
@@ -96,9 +112,14 @@ public class MainActivity extends BridgeActivity {
 
             CallPlugin.setPendingCall(callObj);
 
-            CallPlugin plugin = (CallPlugin) bridge.getPlugin("CallPlugin").getInstance();
-            if (plugin != null) {
-                plugin.handleCallAction(action, callId);
+            if (bridge != null) {
+                com.getcapacitor.PluginHandle handle = bridge.getPlugin("CallPlugin");
+                if (handle != null) {
+                    CallPlugin plugin = (CallPlugin) handle.getInstance();
+                    if (plugin != null) {
+                        plugin.handleCallAction(action, callId);
+                    }
+                }
             }
         } else if (intent.getBooleanExtra("isIncomingCall", false) || intent.hasExtra("isIncomingCall")) {
             String callId = intent.getStringExtra("callId");
@@ -115,9 +136,14 @@ public class MainActivity extends BridgeActivity {
 
             CallPlugin.setPendingCall(callObj);
 
-            CallPlugin plugin = (CallPlugin) bridge.getPlugin("CallPlugin").getInstance();
-            if (plugin != null) {
-                plugin.handleIncomingCall(callObj);
+            if (bridge != null) {
+                com.getcapacitor.PluginHandle handle = bridge.getPlugin("CallPlugin");
+                if (handle != null) {
+                    CallPlugin plugin = (CallPlugin) handle.getInstance();
+                    if (plugin != null) {
+                        plugin.handleIncomingCall(callObj);
+                    }
+                }
             }
         }
     }

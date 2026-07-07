@@ -13,6 +13,7 @@ import { registerPlugin } from '@capacitor/core';
 interface CallPlugin {
   endCall: () => Promise<void>;
   startRinging: (options: { callerName: string }) => Promise<void>;
+  saveAuthToken: (options: { token: string }) => Promise<void>;
   getPendingCall: () => Promise<{
     hasPending: boolean;
     action?: string;
@@ -37,12 +38,22 @@ const CallPlugin = registerPlugin<CallPlugin>('CallPlugin');
 export const NativeBridge = {
   isNative: () => Capacitor.isNativePlatform(),
 
+  // Saves JWT token to native SharedPreferences
+  saveAuthToken: async (token: string) => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await CallPlugin.saveAuthToken({ token });
+      } catch (e) {
+        console.warn('[NativeBridge] saveAuthToken failed', e);
+      }
+    }
+  },
+
   // Deep Link Handling
   initDeepLinks: (router: any) => {
     if (!Capacitor.isNativePlatform()) return;
     
     App.addListener('appUrlOpen', (event: any) => {
-      // Example: https://zetime.app/parent/announcements -> /parent/announcements
       const slug = event.url.split('.app').pop() || event.url.split('.com').pop();
       if (slug) {
         router.push(slug);
@@ -58,7 +69,6 @@ export const NativeBridge = {
       if (!status.connected) {
         notifications.warning("Offline Mode", "You are currently offline. Some features may be limited.");
       }
-      // "Back Online" is handled by the UI indicator instead of a toast
     });
   },
 
@@ -87,6 +97,8 @@ export const NativeBridge = {
   },
 
   // Push Notifications Setup
+  // CRITICAL: This registers for FCM and SAVES the token to the backend.
+  // Without saving the token, the server has no way to send targeted push notifications.
   initPush: async () => {
     if (!Capacitor.isNativePlatform()) return;
 
@@ -96,26 +108,98 @@ export const NativeBridge = {
         perm = await PushNotifications.requestPermissions();
       }
 
-      if (perm.receive === 'granted') {
-        await PushNotifications.register();
+      if (perm.receive !== 'granted') {
+        console.warn('[NativeBridge] Push permission denied by user');
+        return;
       }
 
-      PushNotifications.addListener('registration', (token) => {
-        console.log('Push registration success, token: ' + token.value);
+      await PushNotifications.register();
+
+      // ── Token Handler ────────────────────────────────────────────────────
+      // Called on first launch and whenever FCM refreshes the token.
+      // We MUST send this to the backend or no server-side push will ever work.
+      PushNotifications.addListener('registration', async (token) => {
+        console.log('[NativeBridge] FCM token received:', token.value);
+        try {
+          const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://zetime-backend.onrender.com';
+          const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('attendance_token') : null;
+          
+          if (authToken) {
+            // Also sync the token to Java so background FCM receiver can use it on refresh
+            await NativeBridge.saveAuthToken(authToken);
+          }
+          
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+          }
+          
+          const res = await fetch(`${API_URL}/api/auth/push-token`, {
+            method: 'POST',
+            headers,
+            credentials: 'include',
+            body: JSON.stringify({ token: token.value }),
+          });
+          if (res.ok) {
+            console.log('[NativeBridge] ✅ FCM token saved to server');
+          } else {
+            const text = await res.text().catch(() => '');
+            console.warn('[NativeBridge] Server rejected FCM token:', res.status, text);
+          }
+        } catch (e) {
+          console.error('[NativeBridge] Failed to POST FCM token to server:', e);
+        }
       });
 
       PushNotifications.addListener('registrationError', (error: any) => {
-         console.error('Error on registration: ' + JSON.stringify(error));
+        console.error('[NativeBridge] FCM registration error:', JSON.stringify(error));
       });
+
+      // ── Foreground Push (Capacitor fallback) ─────────────────────────────
+      // When the app is open, Capacitor intercepts the push before Android shows it.
+      // We fire the in-app banner manually here.
+      PushNotifications.addListener('pushNotificationReceived', (notification: any) => {
+        console.log('[NativeBridge] Push received in foreground:', notification);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('zetime:in_app_notification', {
+            detail: {
+              type: notification.data?.type || 'general',
+              title: notification.title || 'Zetime',
+              body: notification.body || '',
+              route: notification.data?.route,
+              conversationId: notification.data?.conversationId,
+              studentId: notification.data?.studentId,
+              schoolId: notification.data?.schoolId,
+            }
+          }));
+        }
+      });
+
+      // ── Notification Tap (background → app open) ──────────────────────
+      PushNotifications.addListener('pushNotificationActionPerformed', (action: any) => {
+        console.log('[NativeBridge] Notification tapped:', action);
+        const data = action.notification?.data;
+        if (data && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('zetime:navigate', {
+            detail: {
+              type: data.type,
+              route: data.route,
+              conversationId: data.conversationId,
+              studentId: data.studentId,
+              schoolId: data.schoolId,
+            }
+          }));
+        }
+      });
+
     } catch (e) {
-      console.warn('Native Push Notification system could not be initialized:', e);
+      console.warn('[NativeBridge] Push notification system could not be initialized:', e);
     }
   },
 
   // Filesystem Exports (CSV/Reports/PDFs)
   saveAndShareFile: async (fileName: string, data: string, mimeType: string, isBase64 = false) => {
     if (!Capacitor.isNativePlatform()) {
-      // Browser fallback (standard download)
       const blob = isBase64 
         ? await (await fetch(`data:${mimeType};base64,${data}`)).blob()
         : new Blob([data], { type: mimeType });
@@ -137,7 +221,6 @@ export const NativeBridge = {
         directory: Directory.Documents,
         encoding: isBase64 ? undefined : 'utf8' as any
       });
-      
       console.log('File written: ', result.uri);
       return result.uri;
     } catch (e) {
@@ -191,7 +274,6 @@ export const NativeBridge = {
             }
           }));
         } else if (data.action === 'OPEN_CHAT' && data.conversationId && typeof window !== 'undefined') {
-          // Route message notification taps directly via the DOM event bus
           window.dispatchEvent(new CustomEvent('zetime:open_conversation', {
             detail: { conversationId: data.conversationId },
           }));

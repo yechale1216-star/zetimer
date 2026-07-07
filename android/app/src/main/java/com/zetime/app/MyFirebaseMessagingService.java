@@ -384,5 +384,38 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     public void onNewToken(@NonNull String token) {
         super.onNewToken(token);
         Log.d(TAG, "FCM token refreshed: " + token);
+
+        // Persist the new token to the backend so server-side pushes keep working
+        // We do this on a background thread to avoid blocking the main thread
+        new Thread(() -> {
+            try {
+                String apiUrl = "https://zetime-backend.onrender.com/api/auth/push-token";
+                
+                java.net.URL url = new java.net.URL(apiUrl);
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
+
+                // Read the stored auth token from SharedPreferences (saved on login)
+                android.content.SharedPreferences prefs = getSharedPreferences("zetime_prefs", android.content.Context.MODE_PRIVATE);
+                String authToken = prefs.getString("auth_token", null);
+                if (authToken != null && !authToken.isEmpty()) {
+                    conn.setRequestProperty("Authorization", "Bearer " + authToken);
+                }
+
+                String jsonBody = "{\"token\":\"" + token + "\"}";
+                byte[] bytes = jsonBody.getBytes("UTF-8");
+                conn.getOutputStream().write(bytes);
+
+                int responseCode = conn.getResponseCode();
+                Log.d(TAG, "FCM token refresh POST response: " + responseCode);
+                conn.disconnect();
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to save refreshed FCM token to server: " + e.getMessage());
+            }
+        }).start();
     }
 }

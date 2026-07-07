@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation'
 import { NativeBridge } from '@/lib/utils/native-bridge'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { Capacitor } from '@capacitor/core'
+import { useAuth } from '@/lib/context/auth-context'
 
 export function CapacitorInitializer() {
   const router = useRouter()
+  const { user } = useAuth()
 
   useEffect(() => {
     const handleNavigateEvent = (e: Event) => {
@@ -35,10 +37,21 @@ export function CapacitorInitializer() {
     if (Capacitor.isNativePlatform()) {
       console.log('Zetime: Native Platform Detected. Initializing Bridge...')
       
-      // Initialize Native Features
-      NativeBridge.initPush().catch(err => {
-        console.warn('Push initialization failed:', err)
-      })
+      // If user is authenticated, ensure the token is synced to native SharedPreferences as well
+      const syncTokenAndFeatures = async () => {
+        const token = localStorage.getItem('attendance_token');
+        if (token) {
+          console.log('[CapacitorInitializer] Syncing auth token to native side...');
+          await NativeBridge.saveAuthToken(token);
+        }
+        
+        console.log('[CapacitorInitializer] Running NativeBridge.initPush...');
+        await NativeBridge.initPush();
+      };
+
+      syncTokenAndFeatures().catch(err => {
+        console.warn('Authentication/Push initialization failed:', err)
+      });
 
       // Deep Linking & Network Monitoring
       NativeBridge.initDeepLinks(router)
@@ -75,7 +88,7 @@ export function CapacitorInitializer() {
         }
       };
     }
-  }, [router])
+  }, [router, user?.id])
 
   return null
 }

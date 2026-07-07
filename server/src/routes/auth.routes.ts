@@ -290,4 +290,36 @@ router.post('/reset-password', async (req: Request, res: Response, next: NextFun
   }
 });
 
+// POST /api/auth/push-token — save or refresh the FCM push token for the authenticated user
+// Called by NativeBridge every time the app starts or the FCM token rotates.
+router.post('/push-token', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token } = req.body;
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ success: false, message: 'token is required' });
+    }
+
+    // Resolve authenticated user from cookie or Authorization header
+    const rawToken = req.cookies?.attendance_token || req.headers.authorization?.split(' ')[1];
+    if (!rawToken) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const decoded = verifyToken(rawToken);
+    if (!decoded || !decoded.id) {
+      return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+
+    await prisma.user.update({
+      where: { id: decoded.id },
+      data: { pushToken: token },
+    });
+
+    console.log(`[PushToken] Saved FCM token for user ${decoded.id}`);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

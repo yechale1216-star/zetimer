@@ -92,9 +92,9 @@ export async function sendPushNotification(
 }
 
 /**
- * Sends a rich data-only FCM message for a new chat message.
- * Data-only ensures our Android native handler builds the notification
- * with full grouping, sound, preview, and chat-open action.
+ * Sends a rich FCM message for a new chat message.
+ * Includes both notification and data blocks so Android shows it on the
+ * lock screen / notification tray even when the app is backgrounded or killed.
  */
 export async function sendMessageNotification(
   token: string,
@@ -115,8 +115,14 @@ export async function sendMessageNotification(
     : payload.messagePreview;
 
   const message: Message = {
+    // notification block ensures delivery on lock screen / killed app via Google Play Services
+    notification: {
+      title: payload.senderName,
+      body: preview,
+    },
     data: {
       type: 'new_message',
+      notifType: 'new_message',
       conversationId: payload.conversationId,
       senderId: payload.senderId,
       senderName: payload.senderName,
@@ -130,6 +136,11 @@ export async function sendMessageNotification(
     android: {
       priority: 'high',
       ttl: 86400000,
+      notification: {
+        channelId: 'high_priority',
+        sound: 'notification',
+        visibility: 'public',
+      },
     },
     apns: {
       payload: {
@@ -137,7 +148,7 @@ export async function sendMessageNotification(
       },
       headers: {
         'apns-priority': '10',
-        'apns-push-type': 'background',
+        'apns-push-type': 'alert',
       },
     },
     webpush: {
@@ -167,7 +178,10 @@ export async function sendMessageNotification(
 }
 
 /**
- * Sends a high-priority data-only notification to trigger a full-screen call UI.
+ * Sends a high-priority FCM notification to trigger an incoming call UI.
+ * Includes a notification block so Google Play Services wakes the device
+ * and shows it on the lock screen even when the app is killed.
+ * onMessageReceived handles the foreground case (custom call screen with Answer/Decline).
  */
 export async function sendCallNotification(
   token: string,
@@ -183,23 +197,34 @@ export async function sendCallNotification(
   const activeApp = app || (getApps().length > 0 ? getApps()[0] : undefined);
   if (!activeApp) return;
 
+  const callTypeLabel = data.callType === 'VIDEO' ? 'Video' : 'Voice';
+
   const message: Message = {
-    // SILENT DATA-ONLY MESSAGE
+    notification: {
+      title: `Incoming ${callTypeLabel} Call`,
+      body: data.callerName,
+    },
     data: {
       type: 'incoming_call',
+      notifType: 'incoming_call',
       callId: data.callId,
       callerId: data.callerId,
       callerName: data.callerName,
       callerAvatar: data.callerAvatar || '',
       callType: data.callType,
       serverUrl: data.serverUrl,
+      isIncomingCall: 'true',
     },
     token: token,
     android: {
       priority: 'high',
-      ttl: 30000, 
+      ttl: 30000,
+      notification: {
+        channelId: 'incoming_calls',
+        sound: 'default',
+        visibility: 'public',
+      },
     },
-    // Required for some delivery contexts
     apns: {
       payload: {
         aps: {
@@ -220,6 +245,7 @@ export async function sendCallNotification(
 
 /**
  * Sends a notification to cancel an ongoing call ring.
+ * Data-only is intentional here — no system tray entry needed, just wake the app.
  */
 export async function sendCallCancellation(token: string, callId: string) {
   const activeApp = app || (getApps().length > 0 ? getApps()[0] : undefined);
@@ -245,8 +271,11 @@ export async function sendCallCancellation(token: string, callId: string) {
 }
 
 /**
- * Sends a structured, category-specific push notification to a user device.
- * Data-only payload ensures our Android native service handles channels, vibrate, and custom sound resources.
+ * Sends a structured, category-specific push notification.
+ * Includes BOTH notification and data blocks:
+ *   - notification block → Google Play Services shows it natively on lock screen / killed app
+ *   - data block         → carries routing info for deep-linking when the user taps
+ *   - android.notification.channelId → uses our custom channels (sound, vibration, priority)
  */
 export async function sendCategoryNotification(
   token: string,
@@ -266,6 +295,8 @@ export async function sendCategoryNotification(
 
   const dataPayload: Record<string, string> = {
     type: payload.type,
+    // Duplicate as notifType so MainActivity.handleIntent works for both tap paths
+    notifType: payload.type,
     title: payload.title,
     body: payload.body,
     timestamp: Date.now().toString(),
@@ -277,12 +308,29 @@ export async function sendCategoryNotification(
   if (payload.badge !== undefined) dataPayload.badge = payload.badge.toString();
   if (payload.tag) dataPayload.tag = payload.tag;
 
+  // Map notification type to Android channel ID (must match MyFirebaseMessagingService channels)
+  let channelId = 'default_priority';
+  if (payload.type === 'new_message' || payload.type === 'account_security') {
+    channelId = 'high_priority';
+  } else if (payload.type === 'system_update') {
+    channelId = 'low_priority';
+  }
+
   const message: Message = {
+    notification: {
+      title: payload.title,
+      body: payload.body,
+    },
     data: dataPayload,
     token,
     android: {
       priority: 'high',
       ttl: 86400000,
+      notification: {
+        channelId,
+        sound: channelId === 'low_priority' ? undefined : 'notification',
+        visibility: 'public',
+      },
     },
     apns: {
       payload: {
@@ -294,7 +342,7 @@ export async function sendCategoryNotification(
       },
       headers: {
         'apns-priority': '10',
-        'apns-push-type': 'background',
+        'apns-push-type': 'alert',
       },
     },
     webpush: {

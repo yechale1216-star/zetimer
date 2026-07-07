@@ -76,14 +76,30 @@ public class MainActivity extends BridgeActivity {
     private void handleIntent(Intent intent) {
         if (intent == null) return;
 
+        // Support both key names:
+        //   "notifType"  → set by our MyFirebaseMessagingService when app was in background (custom notification)
+        //   "type"       → set by Google Play Services FCM tap when app was killed / screen locked
         String notifType = intent.getStringExtra("notifType");
+        if (notifType == null || notifType.isEmpty()) {
+            notifType = intent.getStringExtra("type");
+        }
 
-        if (notifType != null && !notifType.isEmpty()) {
+        // Support both conversationId key names for the same reason
+        String conversationId = intent.getStringExtra("openConversationId");
+        if (conversationId == null || conversationId.isEmpty()) {
+            conversationId = intent.getStringExtra("conversationId");
+        }
+
+        // Support isIncomingCall from both native Java (boolean extra) and FCM data (string "true")
+        boolean isIncomingCall = intent.getBooleanExtra("isIncomingCall", false)
+                || "true".equals(intent.getStringExtra("isIncomingCall"));
+
+        if (notifType != null && !notifType.isEmpty() && !"incoming_call".equals(notifType)) {
             com.getcapacitor.JSObject routeObj = new com.getcapacitor.JSObject();
             routeObj.put("action", "NAVIGATE");
             routeObj.put("type", notifType);
             routeObj.put("route", intent.getStringExtra("route"));
-            routeObj.put("conversationId", intent.getStringExtra("openConversationId"));
+            routeObj.put("conversationId", conversationId);
             routeObj.put("studentId", intent.getStringExtra("studentId"));
             routeObj.put("schoolId", intent.getStringExtra("schoolId"));
 
@@ -103,7 +119,7 @@ public class MainActivity extends BridgeActivity {
             String callId = intent.getStringExtra("callId");
             String callerId = intent.getStringExtra("callerId");
             String callType = intent.getStringExtra("callType");
-            
+
             com.getcapacitor.JSObject callObj = new com.getcapacitor.JSObject();
             callObj.put("action", action);
             callObj.put("callId", callId);
@@ -121,18 +137,20 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
             }
-        } else if (intent.getBooleanExtra("isIncomingCall", false) || intent.hasExtra("isIncomingCall")) {
-            String callId = intent.getStringExtra("callId");
-            String callerId = intent.getStringExtra("callerId");
+        } else if (isIncomingCall || "incoming_call".equals(notifType)) {
+            String callId    = intent.getStringExtra("callId");
+            String callerId  = intent.getStringExtra("callerId");
             String callerName = intent.getStringExtra("callerName");
-            String callType = intent.getStringExtra("callType");
-            
+            String callType  = intent.getStringExtra("callType");
+            String serverUrl = intent.getStringExtra("serverUrl");
+
             com.getcapacitor.JSObject callObj = new com.getcapacitor.JSObject();
             callObj.put("action", "INCOMING_CALL");
             callObj.put("callId", callId);
             callObj.put("callerId", callerId);
             callObj.put("callerName", callerName);
             callObj.put("callType", callType);
+            if (serverUrl != null) callObj.put("serverUrl", serverUrl);
 
             CallPlugin.setPendingCall(callObj);
 

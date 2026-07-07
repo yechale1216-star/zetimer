@@ -83,13 +83,15 @@ export const markAttendance = async (data: any, schoolId: string) => {
       });
 
       for (const link of parentLinks) {
-        if (link.parent && link.parent.pushToken && link.parent.phone) {
-          // Check preferences
-          const prefs = await prisma.parentPreferences.findUnique({
-            where: { parentPhone_schoolId: { parentPhone: link.parent.phone, schoolId } }
-          });
-          if (prefs && !prefs.pushNotifications) {
-            continue; // Guard: parent disabled push alerts
+        if (link.parent && link.parent.pushToken) {
+          // Check preferences only if phone is set
+          if (link.parent.phone) {
+            const prefs = await prisma.parentPreferences.findUnique({
+              where: { parentPhone_schoolId: { parentPhone: link.parent.phone, schoolId } }
+            });
+            if (prefs && !prefs.pushNotifications) {
+              continue; // Guard: parent disabled push alerts
+            }
           }
 
           await sendCategoryNotification(link.parent.pushToken, {

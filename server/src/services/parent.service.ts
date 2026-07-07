@@ -355,13 +355,15 @@ export const postAnnouncement = async (schoolId: string, data: any) => {
     );
 
     for (const parent of uniqueParents) {
-      if (parent && parent.pushToken && parent.phone) {
-        // Check parent preferences
-        const prefs = await prisma.parentPreferences.findUnique({
-          where: { parentPhone_schoolId: { parentPhone: parent.phone, schoolId } }
-        });
-        if (prefs && !prefs.pushNotifications) {
-          continue; // Guard: parent disabled push alerts
+      if (parent && parent.pushToken) {
+        // Check parent preferences only if phone is set
+        if (parent.phone) {
+          const prefs = await prisma.parentPreferences.findUnique({
+            where: { parentPhone_schoolId: { parentPhone: parent.phone, schoolId } }
+          });
+          if (prefs && !prefs.pushNotifications) {
+            continue; // Guard: parent disabled push alerts
+          }
         }
 
         await sendCategoryNotification(parent.pushToken, {

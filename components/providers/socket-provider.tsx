@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { io as ClientIO, Socket } from 'socket.io-client';
 import { socketUrl } from '@/lib/api-config';
 import { authService } from '@/lib/auth/auth';
+import { Capacitor } from '@capacitor/core';
 
 type SocketContextType = {
   socket: Socket | null;
@@ -151,30 +152,33 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       window.addEventListener('online', handleOnline);
       window.addEventListener('offline', handleOffline);
 
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission().catch(err => console.warn('[SocketProvider] Notification permission error:', err));
-      }
+      // Only prompt for web notification permission and register the service worker for web platforms
+      if (!Capacitor.isNativePlatform()) {
+        if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission().catch(err => console.warn('[SocketProvider] Notification permission error:', err));
+        }
 
-      // Register Firebase Service Worker
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/firebase-messaging-sw.js')
-          .then((reg) => {
-            console.log('[SocketProvider] Service Worker registered:', reg.scope);
-          })
-          .catch((err) => console.warn('[SocketProvider] SW registration failed:', err));
+        // Register Firebase Service Worker
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/firebase-messaging-sw.js')
+            .then((reg) => {
+              console.log('[SocketProvider] Service Worker registered:', reg.scope);
+            })
+            .catch((err) => console.warn('[SocketProvider] SW registration failed:', err));
 
-        // ── Handle notification tap from service worker ──────────────────────
-        // When user taps a push notification (app was closed), the SW posts a
-        // NOTIFICATION_CLICK message here so we can navigate to the right chat.
-        navigator.serviceWorker.addEventListener('message', (event) => {
-          const msg = event.data;
-          if (!msg) return;
-          if (msg.type === 'NOTIFICATION_CLICK' && msg.conversationId) {
-            window.dispatchEvent(new CustomEvent('zetime:open_conversation', {
-              detail: { conversationId: msg.conversationId },
-            }));
-          }
-        });
+          // ── Handle notification tap from service worker ──────────────────────
+          // When user taps a push notification (app was closed), the SW posts a
+          // NOTIFICATION_CLICK message here so we can navigate to the right chat.
+          navigator.serviceWorker.addEventListener('message', (event) => {
+            const msg = event.data;
+            if (!msg) return;
+            if (msg.type === 'NOTIFICATION_CLICK' && msg.conversationId) {
+              window.dispatchEvent(new CustomEvent('zetime:open_conversation', {
+                detail: { conversationId: msg.conversationId },
+              }));
+            }
+          });
+        }
       }
     }
 

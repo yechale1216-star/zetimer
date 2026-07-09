@@ -35,6 +35,20 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     // Notification ID ranges
     private static final int NOTIF_ID_CALL = 1001;
 
+    private boolean isAppInForeground() {
+        if (MainActivity.isAppInForeground) {
+            return true;
+        }
+        try {
+            android.app.ActivityManager.RunningAppProcessInfo appProcessInfo = new android.app.ActivityManager.RunningAppProcessInfo();
+            android.app.ActivityManager.getMyMemoryState(appProcessInfo);
+            return (appProcessInfo.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+                    || appProcessInfo.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
@@ -51,6 +65,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         switch (type) {
             case "incoming_call":
                 Log.d(TAG, "Handling incoming call");
+                if (isAppInForeground()) {
+                    Log.d(TAG, "App is in foreground. Suppressing native incoming call notification and ringing.");
+                    break;
+                }
                 handleIncomingCall(data);
                 break;
             case "cancel_call":
@@ -92,7 +110,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         if (type  == null) type  = "general";
 
         // Suppress native system tray display if app is currently in foreground
-        if (MainActivity.isAppInForeground && MainActivity.getInstance() != null) {
+        if (isAppInForeground() && MainActivity.getInstance() != null) {
             Log.d(TAG, "App is in foreground. Suppressing system tray display and posting directly to JS.");
             com.getcapacitor.JSObject notifData = new com.getcapacitor.JSObject();
             for (Map.Entry<String, String> entry : data.entrySet()) {

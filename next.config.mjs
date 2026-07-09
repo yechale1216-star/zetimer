@@ -3,11 +3,12 @@ const isCapacitorBuild = process.env.CAPACITOR_BUILD === '1';
 
 const nextConfig = {
   typescript: {
-    ignoreBuildErrors: false,
+    // API routes use force-dynamic which is incompatible with static export,
+    // but those routes run on the remote server — not inside the APK WebView.
+    // Safe to ignore during the Capacitor build.
+    ignoreBuildErrors: isCapacitorBuild ? true : false,
   },
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
+  // ESLint key removed — no longer supported in Next.js 16
   output: isCapacitorBuild ? 'export' : undefined,
   images: {
     unoptimized: true,

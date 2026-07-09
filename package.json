@@ -7,6 +7,7 @@
   },
   "scripts": {
     "build": "next build",
+    "build:android": "node scripts/capacitor-build.js && npx cap sync android",
     "dev": "next dev --turbo",
     "dev:stable": "next dev --webpack",
     "fix": "powershell ./scripts/fix-turbo.ps1",

@@ -4,7 +4,8 @@ import { requestPushNotificationPermission as requestWebToken } from '../firebas
 
 export async function registerPushNotifications() {
   if (!Capacitor.isNativePlatform()) {
-    return await requestWebToken();
+    console.log('[Push] Web FCM is disabled for production.');
+    return null;
   }
 
   return new Promise<string | null>((resolve) => {

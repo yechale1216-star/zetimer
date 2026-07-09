@@ -8,7 +8,7 @@ import androidx.core.splashscreen.SplashScreen;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
-    public static boolean isAppInForeground = false;
+    public static volatile boolean isAppInForeground = false;
     private static MainActivity instance = null;
 
     public static MainActivity getInstance() {
@@ -44,8 +44,14 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    public void onPause() {
-        super.onPause();
+    public void onStart() {
+        super.onStart();
+        isAppInForeground = true;
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
         isAppInForeground = false;
     }
 

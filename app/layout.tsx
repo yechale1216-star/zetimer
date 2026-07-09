@@ -12,6 +12,8 @@ import { PWAClientWrapper } from "@/components/system/pwa-client-wrapper"
 import { FetchInterceptor } from "@/components/providers/fetch-interceptor"
 import { CapacitorInitializer } from "@/components/capacitor-initializer"
 import { InAppNotificationProvider } from "@/components/providers/in-app-notification-provider"
+import { SocketProvider } from "@/components/providers/socket-provider"
+import { CallProvider } from "@/components/providers/call-provider"
 
 const inter = localFont({
   src: "../public/fonts/inter.woff2",
@@ -82,9 +84,13 @@ export default function RootLayout({
               <AuthProvider>
                 <CapacitorInitializer />
                 <SchoolProvider>
-                  <InAppNotificationProvider>
-                    {children}
-                  </InAppNotificationProvider>
+                  <SocketProvider>
+                    <CallProvider>
+                      <InAppNotificationProvider>
+                        {children}
+                      </InAppNotificationProvider>
+                    </CallProvider>
+                  </SocketProvider>
                   <Toaster />
                   <SonnerToaster position="top-right" richColors />
                   <PWAClientWrapper />

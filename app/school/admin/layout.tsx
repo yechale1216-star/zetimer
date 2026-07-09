@@ -16,8 +16,7 @@ import { AuthGuard } from '@/components/auth/auth-guard'
 import { useRouter } from 'next/navigation'
 import { notifications } from '@/lib/utils/notifications'
 import { SubscriptionProvider } from '@/lib/context/subscription-context'
-import { SocketProvider } from '@/components/providers/socket-provider'
-import { CallProvider } from '@/components/providers/call-provider'
+
 import { Logo } from '@/components/logo'
 import { TopNav } from '@/components/layout/top-nav'
 import { SuspensionProvider, useSuspension } from '@/lib/context/suspension-context'
@@ -148,8 +147,6 @@ export default function SchoolAdminLayout({
     <AuthGuard allowedRoles={['admin', 'school_admin']}>
       <SuspensionProvider>
         <SubscriptionProvider>
-          <SocketProvider>
-            <CallProvider>
             <div className="flex h-screen bg-background dark:bg-slate-950 flex-col md:flex-row relative overflow-hidden">
               {/* Premium Background Pattern */}
               <div className="absolute inset-0 pointer-events-none z-0">
@@ -255,8 +252,6 @@ export default function SchoolAdminLayout({
                 )}
               </div>
             </div>
-          </CallProvider>
-          </SocketProvider>
         </SubscriptionProvider>
       </SuspensionProvider>
     </AuthGuard>

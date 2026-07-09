@@ -183,7 +183,11 @@ export const useWebRTC = (options: WebRTCOptions) => {
     try {
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
         video: type === 'VIDEO' ? { facingMode: 'user' } : false,
       });
       setLocalStream(stream);
@@ -219,7 +223,11 @@ export const useWebRTC = (options: WebRTCOptions) => {
     try {
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
         video: type === 'VIDEO' ? { facingMode: 'user' } : false,
       });
       setLocalStream(stream);
@@ -354,7 +362,11 @@ export const useWebRTC = (options: WebRTCOptions) => {
     
     try {
       const newStream = await acquireStream(currentStream, {
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
         video: { facingMode: newFacingMode }
       });
       

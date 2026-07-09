@@ -33,18 +33,13 @@ import { useAuth } from "@/lib/context/auth-context"
 import { AuthGuard } from "@/components/auth/auth-guard"
 import { clearMessageCache } from "@/lib/utils/message-cache"
 import { cn } from "@/lib/utils/utils"
-import { SocketProvider } from "@/components/providers/socket-provider"
-import { CallProvider } from "@/components/providers/call-provider"
+
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard allowedRoles={["parent"]}>
       <LanguageProvider>
-        <SocketProvider>
-          <CallProvider>
-            <ParentLayoutInner>{children}</ParentLayoutInner>
-          </CallProvider>
-        </SocketProvider>
+        <ParentLayoutInner>{children}</ParentLayoutInner>
       </LanguageProvider>
     </AuthGuard>
   )

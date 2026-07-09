@@ -5,6 +5,7 @@ import { io as ClientIO, Socket } from 'socket.io-client';
 import { socketUrl } from '@/lib/api-config';
 import { authService } from '@/lib/auth/auth';
 import { Capacitor } from '@capacitor/core';
+import { useAuth } from '@/lib/context/auth-context';
 
 type SocketContextType = {
   socket: Socket | null;
@@ -25,6 +26,16 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const { user } = useAuth();
+
+  // Disconnect and reconnect socket on auth user changes to re-evaluate token
+  useEffect(() => {
+    if (socketRef.current) {
+      console.log('[SocketProvider] Auth user changed — reconnecting socket...');
+      socketRef.current.disconnect();
+      socketRef.current.connect();
+    }
+  }, [user]);
 
   const authenticate = useCallback(async (s: Socket) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('attendance_token') : null;

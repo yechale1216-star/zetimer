@@ -18,8 +18,7 @@ import { Logo } from '@/components/logo'
 import { TopNav } from '@/components/layout/top-nav'
 import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { LanguageProvider } from '@/lib/context/language-context'
-import { SocketProvider } from '@/components/providers/socket-provider'
-import { CallProvider } from '@/components/providers/call-provider'
+
 import { clearMessageCache } from '@/lib/utils/message-cache'
 import { SuspensionProvider, useSuspension } from '@/lib/context/suspension-context'
 
@@ -108,8 +107,6 @@ export default function TeacherLayout({
     <AuthGuard allowedRoles={['teacher']}>
       <SuspensionProvider>
         <LanguageProvider>
-          <SocketProvider>
-            <CallProvider>
             <div className="flex h-screen bg-background dark:bg-slate-950 flex-col md:flex-row relative overflow-hidden">
               
               {/* Desktop Sidebar */}
@@ -236,8 +233,6 @@ export default function TeacherLayout({
                 )}
               </div>
             </div>
-            </CallProvider>
-          </SocketProvider>
         </LanguageProvider>
       </SuspensionProvider>
     </AuthGuard>

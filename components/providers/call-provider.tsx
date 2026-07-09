@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { NativeBridge } from '@/lib/utils/native-bridge';
 import { App } from '@capacitor/app';
 import { useSuspension } from '@/lib/context/suspension-context';
+import { useAuth } from '@/lib/context/auth-context';
 
 interface CallContextType {
   initiateCall: (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => void;
@@ -19,7 +20,7 @@ interface CallContextType {
 const CallContext = createContext<CallContextType | undefined>(undefined);
 
 export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const { user: currentUser } = useAuth();
   const [incomingCallData, setIncomingCallData] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [callType, setCallType] = useState<'VOICE' | 'VIDEO'>('VOICE');
@@ -28,12 +29,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { isSuspended } = useSuspension();
 
   useEffect(() => {
-    const user = authService.getCurrentUser();
-    setCurrentUser(user);
-    if (user) {
-      setParticipants([{ id: user.id || 'local', name: 'You', avatar: '', isLocal: true }]);
+    if (currentUser) {
+      setParticipants(prev => {
+        const local = { id: currentUser.id || 'local', name: 'You', avatar: currentUser.profile_photo || '', isLocal: true };
+        return [local, ...prev.filter(p => !p.isLocal)];
+      });
+    } else {
+      setParticipants([]);
     }
-  }, []);
+  }, [currentUser]);
 
   const onIncomingCall = useCallback((data: any) => {
     if (isSuspended) {
@@ -253,8 +257,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ]);
     
     const callerProfile = {
-      name: currentUser?.full_name || currentUser?.name || 'Unknown User',
-      avatar: currentUser?.profile_photo || currentUser?.avatar || ''
+      name: currentUser?.name || 'Unknown User',
+      avatar: currentUser?.profile_photo || ''
     };
     webrtc.startCall(toId, type, callerProfile);
   };

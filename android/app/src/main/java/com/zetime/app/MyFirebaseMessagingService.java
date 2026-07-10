@@ -72,7 +72,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         switch (type) {
             case "incoming_call":
-                Log.d(TAG, "Handling incoming call");
+                Log.d(TAG, "Handling incoming call notification. App in foreground: " + isAppInForeground());
                 if (isAppInForeground()) {
                     Log.d(TAG, "App is in foreground. Showing CallManager banner overlay.");
                     String callerName = data.get("callerName");
@@ -80,14 +80,31 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                     String callerId    = data.get("callerId");
                     String callType    = data.get("callType");
                     String serverUrl   = data.get("serverUrl");
-                    CallManager.getInstance().showBanner(
-                        MainActivity.getInstance(),
-                        callerName != null ? callerName : "Unknown Caller",
-                        callId,
-                        callerId,
-                        callType,
-                        serverUrl
-                    );
+
+                    // 1. Try to show the native floating banner
+                    MainActivity mainActivity = MainActivity.getInstance();
+                    if (mainActivity != null && !mainActivity.isFinishing()) {
+                        CallManager.getInstance().showBanner(
+                            mainActivity,
+                            callerName != null ? callerName : "Unknown Caller",
+                            callId,
+                            callerId,
+                            callType,
+                            serverUrl
+                        );
+                    } else {
+                        Log.w(TAG, "MainActivity is null or finishing — cannot show native banner.");
+                    }
+
+                    // 2. ALWAYS also notify the JS layer so the web modal can act as a
+                    //    safety-net fallback if the native banner fails or the user misses it.
+                    if (mainActivity != null && !mainActivity.isFinishing()) {
+                        com.getcapacitor.JSObject notifData = new com.getcapacitor.JSObject();
+                        for (Map.Entry<String, String> entry : data.entrySet()) {
+                            notifData.put(entry.getKey(), entry.getValue());
+                        }
+                        mainActivity.postForegroundNotification(notifData);
+                    }
                     break;
                 }
                 handleIncomingCall(data);

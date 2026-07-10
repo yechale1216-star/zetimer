@@ -113,6 +113,12 @@ class AuthService {
         // Store token in localStorage as fallback/auth header for cross-origin environments
         if (token) {
           localStorage.setItem("attendance_token", token)
+          try {
+            const { NativeBridge } = await import("@/lib/utils/native-bridge")
+            await NativeBridge.saveAuthToken(token)
+          } catch (e) {
+            // Non-fatal — only applies on native platform
+          }
         }
         // NOTE: JWT token is now managed by HTTP-Only cookies
         
@@ -208,6 +214,12 @@ class AuthService {
         // Store token in localStorage as fallback/auth header for cross-origin environments
         if (data.token) {
           localStorage.setItem("attendance_token", data.token);
+          try {
+            const { NativeBridge } = await import("@/lib/utils/native-bridge")
+            await NativeBridge.saveAuthToken(data.token)
+          } catch (e) {
+            // Non-fatal — only applies on native platform
+          }
         }
         // NOTE: JWT token is now managed by HTTP-Only cookies
         localStorage.setItem("parent_students", JSON.stringify(students));

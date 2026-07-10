@@ -209,6 +209,21 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
 
     public void notifyForegroundNotification(com.getcapacitor.JSObject notifData) {
         notifyListeners("onForegroundNotification", notifData);
+
+        // If this is an incoming call FCM notification, also fire onCallAction so
+        // CallProvider's addCallActionListener can show the web fallback modal.
+        String type = notifData.getString("type");
+        if ("incoming_call".equals(type)) {
+            com.getcapacitor.JSObject callAction = new com.getcapacitor.JSObject();
+            callAction.put("action", "INCOMING_CALL");
+            callAction.put("callId",     notifData.getString("callId"));
+            callAction.put("callerId",   notifData.getString("callerId"));
+            callAction.put("callerName", notifData.getString("callerName"));
+            callAction.put("callType",   notifData.getString("callType"));
+            callAction.put("serverUrl",  notifData.getString("serverUrl"));
+            notifyListeners("onCallAction", callAction);
+            Log.d(TAG, "notifyForegroundNotification: fired onCallAction/INCOMING_CALL as fallback");
+        }
     }
 
     public void handleIncomingCall(com.getcapacitor.JSObject callObj) {

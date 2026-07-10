@@ -201,6 +201,12 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
       // up correctly when the page hard-reloads after the school switch.
       if (result.token) {
         localStorage.setItem("attendance_token", result.token)
+        try {
+          const { NativeBridge } = await import("@/lib/utils/native-bridge")
+          await NativeBridge.saveAuthToken(result.token)
+        } catch (e) {
+          // Non-fatal — only applies on native platform
+        }
       }
 
       // Fetch the students that belong to THIS school and update the list

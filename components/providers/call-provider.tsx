@@ -26,6 +26,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [callType, setCallType] = useState<'VOICE' | 'VIDEO'>('VOICE');
   const [pendingAction, setPendingAction] = useState<{ action: string; callId: string; callerId?: string; callType?: string } | null>(null);
   const [isWaitingForOffer, setIsWaitingForOffer] = useState(false);
+  // Fallback: show web modal if native banner has not appeared within 3 seconds
+  const [nativeBannerFailed, setNativeBannerFailed] = useState(false);
   const { toast } = useToast();
   const { isSuspended } = useSuspension();
 
@@ -46,24 +48,36 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     console.log('[CallProvider] Received incoming call from socket. Offer present:', !!data.offer);
-    
+
+    setIncomingCallData(data);
+    setCallType(data.type);
+    setParticipants(prev => [
+      ...prev.filter(p => p.isLocal),
+      { id: data.from, name: data.profile?.name || 'Unknown', avatar: data.profile?.avatar || '' }
+    ]);
+
     if (NativeBridge.isNative()) {
       console.log('[CallProvider] Showing Telegram-style foreground call banner');
+      setNativeBannerFailed(false);
       NativeBridge.showCallBanner(
         data.profile?.name || 'Unknown User',
         data.callId,
         data.from,
         data.type,
         data.serverUrl || ''
-      );
+      ).catch(() => {
+        // Banner failed — fall back to web modal immediately
+        setNativeBannerFailed(true);
+      });
+      // Safety timeout: if the native banner never fires a visible UI within 3s,
+      // fall back to the web-based IncomingCallModal so the user sees something.
+      const t = setTimeout(() => {
+        setNativeBannerFailed(true);
+      }, 3000);
+      // Clearing the timeout is handled by the cleanup of whatever triggered this call.
+      // We store the timeout reference so we can cancel it if the user answers quickly.
+      (data as any).__bannerTimeout = t;
     }
-
-    setIncomingCallData(data);
-    setCallType(data.type);
-    setParticipants(prev => [
-      ...prev.filter(p => p.isLocal),
-      { id: data.from, name: data.profile.name, avatar: data.profile.avatar }
-    ]);
   }, [isSuspended]);
 
   const onCallAccepted = useCallback((userId: string) => {
@@ -282,6 +296,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAccept = useCallback(() => {
     if (incomingCallData) {
+      // Cancel the banner fallback timeout
+      if ((incomingCallData as any).__bannerTimeout) {
+        clearTimeout((incomingCallData as any).__bannerTimeout);
+      }
+      setNativeBannerFailed(false);
       NativeBridge.dismissCallBanner();
       if (!incomingCallData.offer) {
         console.log('[CallProvider] User accepted call but offer not received yet. Setting isWaitingForOffer to true.');
@@ -297,6 +316,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [incomingCallData, webrtc]);
 
   const handleReject = useCallback((isMissed: boolean = false) => {
+    // Cancel the banner fallback timeout
+    if (incomingCallData && (incomingCallData as any).__bannerTimeout) {
+      clearTimeout((incomingCallData as any).__bannerTimeout);
+    }
+    setNativeBannerFailed(false);
     NativeBridge.dismissCallBanner();
     NativeBridge.endNativeCall();
     setIsWaitingForOffer(false);
@@ -353,11 +377,23 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [webrtc]);
 
-  // Execute ANSWER when both incomingCallData and ANSWER pending action exist
+  // Execute ANSWER only when BOTH incomingCallData AND its offer are present.
+  // Without an offer, setRemoteDescription will throw and tear down the call.
   useEffect(() => {
-    if (incomingCallData && pendingAction && pendingAction.action === 'ANSWER' && pendingAction.callId === incomingCallData.callId) {
-      console.log('[CallProvider] Executing deferred ANSWER action');
+    if (
+      incomingCallData &&
+      incomingCallData.offer &&          // ← CRITICAL: must have the WebRTC offer
+      pendingAction &&
+      pendingAction.action === 'ANSWER' &&
+      pendingAction.callId === incomingCallData.callId
+    ) {
+      console.log('[CallProvider] Executing deferred ANSWER action (offer available)');
+      // Cancel the native-banner fallback timeout if it is still pending
+      if ((incomingCallData as any).__bannerTimeout) {
+        clearTimeout((incomingCallData as any).__bannerTimeout);
+      }
       NativeBridge.endNativeCall();
+      setNativeBannerFailed(false);
       webrtc.answerCall(incomingCallData.from, incomingCallData.offer, incomingCallData.type);
       setIncomingCallData(null);
       setPendingAction(null);
@@ -429,13 +465,20 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const activeCaller = participants.find(p => !p.isLocal);
 
+  // Show the web IncomingCallModal when:
+  //   1. Not on a native platform (always show web modal on web), OR
+  //   2. On native but the native banner failed to appear within the timeout
+  const showWebIncomingModal = !!incomingCallData && (
+    !NativeBridge.isNative() || nativeBannerFailed
+  );
+
   return (
     <CallContext.Provider value={{ initiateCall, endCall: webrtc.endCall, status: webrtc.callStatus }}>
       {children}
-      
+
       {/* Global Modals */}
       <IncomingCallModal
-        isOpen={!!incomingCallData && !NativeBridge.isNative()}
+        isOpen={showWebIncomingModal}
         caller={activeCaller || { name: 'Unknown' }}
         type={callType}
         isConnecting={isWaitingForOffer}

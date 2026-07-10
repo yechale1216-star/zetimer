@@ -96,10 +96,10 @@ app.post('/api/calls/public-reject', async (req, res) => {
     // Notify the caller if online
     const io = getIO();
     if (io) {
-      const callerSocketId = userSockets.get(call.from);
-      if (callerSocketId) {
+      const callerSocketIds = userSockets.get(call.from);
+      if (callerSocketIds && callerSocketIds.size > 0) {
         console.log(`[PublicReject] Emitting call_rejected to caller ${call.from}`);
-        io.to(callerSocketId).emit('call_rejected', { from: call.to });
+        io.to(Array.from(callerSocketIds)).emit('call_rejected', { from: call.to });
       }
     }
 

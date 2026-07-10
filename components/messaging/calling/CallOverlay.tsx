@@ -33,6 +33,7 @@ interface CallOverlayProps {
   onToggleMute: () => void;
   onToggleCamera: () => void;
   onFlipCamera?: () => void;
+  connectionQuality?: 'GOOD' | 'POOR' | 'BAD';
 }
 
 // ── Stable video element that attaches the stream via ref ────────────────────
@@ -163,6 +164,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
   onToggleMute,
   onToggleCamera,
   onFlipCamera,
+  connectionQuality = 'GOOD',
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [callTime, setCallTime] = useState(0);
@@ -327,8 +329,15 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
               {status === 'CONNECTED' ? (
                 <>
                   <span className="text-white/40 text-[10px] uppercase tracking-[0.25em] font-semibold flex items-center gap-1.5">
-                    <SignalHigh className="h-3 w-3 text-green-400" />
-                    Encrypted
+                    <SignalHigh className={cn(
+                      "h-3 w-3",
+                      connectionQuality === 'BAD' ? "text-red-500 animate-pulse" :
+                      connectionQuality === 'POOR' ? "text-yellow-400" :
+                      "text-green-450"
+                    )} />
+                    {connectionQuality === 'BAD' ? 'Bad Call' :
+                     connectionQuality === 'POOR' ? 'Weak Connection' :
+                     'Encrypted'}
                   </span>
                   <span className="text-white font-mono text-base font-bold">{formatTime(callTime)}</span>
                 </>

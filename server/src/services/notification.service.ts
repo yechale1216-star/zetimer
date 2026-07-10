@@ -229,7 +229,19 @@ export async function sendCallNotification(
 
   try {
     const messaging = getMessaging(activeApp);
-    return await messaging.send(message);
+    const sendWithRetry = async (msg: Message, retries = 3, delay = 500): Promise<string> => {
+      try {
+        return await messaging.send(msg);
+      } catch (err: any) {
+        if (retries > 0 && (err.code === 'messaging/internal-error' || err.code === 'messaging/server-unavailable' || err.code === 'messaging/unknown-error')) {
+          console.warn(`[NotificationService] FCM transient failure (${err.code}). Retrying call token in ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay));
+          return sendWithRetry(msg, retries - 1, delay * 2);
+        }
+        throw err;
+      }
+    };
+    return await sendWithRetry(message);
   } catch (error) {
     console.error('[NotificationService] Error sending call notification:', error);
   }

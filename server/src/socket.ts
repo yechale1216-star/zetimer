@@ -11,10 +11,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-
 const schoolStatusCache = new Map<string, { status: string; expires: number }>();
 const SCHOOL_CACHE_TTL = 5 * 60 * 1000;
 
-/**
- * Returns true if the school is suspended.
- * Uses the per-socket schoolStatusCache with a 5-min TTL.
- */
 async function isSchoolSuspended(schoolId: string): Promise<boolean> {
   if (!schoolId) return false;
   const cached = schoolStatusCache.get(schoolId);
@@ -30,7 +26,7 @@ async function isSchoolSuspended(schoolId: string): Promise<boolean> {
     schoolStatusCache.set(schoolId, { status, expires: Date.now() + SCHOOL_CACHE_TTL });
     return status === 'SUSPENDED';
   } catch {
-    return false; // fail-open on DB error (guard at HTTP layer is authoritative)
+    return false;
   }
 }
 
@@ -49,6 +45,8 @@ function cleanupTempIds() {
   }
 }
 
+// ── Active calls store ────────────────────────────────────────────────────────
+// Stores pending/ringing calls. Keyed by callId.
 export const activeCalls = new Map<string, {
   callId: string;
   from: string;
@@ -57,20 +55,43 @@ export const activeCalls = new Map<string, {
   type: string;
   profile: any;
   timestamp: number;
+  timeoutHandle?: NodeJS.Timeout;
 }>();
 
-export const userSockets = new Map<string, string>();
+// ── Multi-device user socket map ──────────────────────────────────────────────
+// Maps userId → Set<socketId> so we can reach ALL logged-in devices.
+export const userSockets = new Map<string, Set<string>>();
 export let ioInstance: SocketIOServer | null = null;
 export const getIO = () => ioInstance;
+
+/** Helper: emit to ALL sockets of a user */
+function emitToUser(io: SocketIOServer, userId: string, event: string, data: any) {
+  const sids = userSockets.get(userId);
+  if (!sids) return;
+  for (const sid of sids) {
+    io.to(sid).emit(event, data);
+  }
+}
+
+/** Helper: emit to ALL other sockets of the same user (exclude one socket) */
+function emitToUserExcept(io: SocketIOServer, userId: string, excludeSocketId: string, event: string, data: any) {
+  const sids = userSockets.get(userId);
+  if (!sids) return;
+  for (const sid of sids) {
+    if (sid !== excludeSocketId) io.to(sid).emit(event, data);
+  }
+}
 
 // Clean up expired calls (older than 45 seconds)
 setInterval(() => {
   const now = Date.now();
   for (const [callId, call] of activeCalls.entries()) {
     if (now - call.timestamp > 45000) {
+      if (call.timeoutHandle) clearTimeout(call.timeoutHandle);
       activeCalls.delete(callId);
     }
   }
+  cleanupTempIds();
 }, 10000);
 
 export const initSocket = (server: HttpServer) => {
@@ -109,27 +130,38 @@ export const initSocket = (server: HttpServer) => {
       });
       for (const { userId: mateId } of sharedConvMembers) {
         if (mateId === userId) continue;
-        const mateSocketId = userSockets.get(mateId);
-        if (mateSocketId && mateSocketId !== excludeSocketId) io.to(mateSocketId).emit(event, userId);
+        const sids = userSockets.get(mateId);
+        if (sids) {
+          for (const sid of sids) {
+            if (sid !== excludeSocketId) io.to(sid).emit(event, userId);
+          }
+        }
       }
     } catch (err) { console.error(`[Socket] Failed to emit ${event}:`, err); }
   }
 
   io.on('connection', (socket) => {
+    // ── Authentication ──────────────────────────────────────────────────────
     socket.on('authenticate', async ({ token }: { token: string }) => {
       try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
         const { id: userId, schoolId } = decoded;
-        userSockets.set(userId, socket.id);
+
+        // Register this socket for the user (multi-device support)
+        if (!userSockets.has(userId)) {
+          userSockets.set(userId, new Set());
+        }
+        userSockets.get(userId)!.add(socket.id);
+
         socketData.set(socket.id, { userId, schoolId });
         userSchoolMap.set(userId, schoolId);
         onlineUsers.add(userId);
+
         const schoolOnline = Array.from(onlineUsers).filter(uid => userSchoolMap.get(uid) === schoolId);
         socket.emit('initial_online_users', schoolOnline);
         emitPresenceToSchoolMates('user_online', userId, schoolId, socket.id);
 
-        // --- Push Pending Incoming Calls ---
-        // If there is an active call for this user, deliver it via socket immediately!
+        // Re-deliver any pending incoming call for this user
         for (const call of activeCalls.values()) {
           if (call.to === userId) {
             console.log(`[Socket] Pushing pending call ${call.callId} to user ${userId} who just connected.`);
@@ -140,11 +172,8 @@ export const initSocket = (server: HttpServer) => {
               profile: call.profile,
               callId: call.callId,
             });
-            // Inform caller B is ringing
-            const callerSocketId = userSockets.get(call.from);
-            if (callerSocketId) {
-              io.to(callerSocketId).emit('call_ringing', { from: userId });
-            }
+            // Inform caller their target is now ringing
+            emitToUser(io, call.from, 'call_ringing', { from: userId });
           }
         }
       } catch (error) { socket.emit('auth_error', { message: 'Authentication failed' }); }
@@ -174,7 +203,6 @@ export const initSocket = (server: HttpServer) => {
       const tenant = socketData.get(socket.id);
       if (!tenant || tenant.userId !== data.senderId) return;
 
-      // 1. Resolve conversation schoolId from DB to get the true school context of the chat
       let targetSchoolId = tenant.schoolId;
       if (data.conversationId) {
         const conv = await prisma.conversation.findUnique({
@@ -186,15 +214,11 @@ export const initSocket = (server: HttpServer) => {
         }
       }
 
-      // 2. Resolve sender's actual database profile in case socket cache is stale
       const senderInfo = await prisma.user.findUnique({
         where: { id: data.senderId },
         select: { schoolId: true, role: true }
       });
 
-      // 3. Block if the conversation's school is suspended.
-      // For staff/teachers/admins, also block if their default school is suspended.
-      // Parents are exempt from default school suspension block because they can have kids at multiple schools.
       const isConvSuspended = await isSchoolSuspended(targetSchoolId || '');
       const isSenderSuspended = (senderInfo && senderInfo.role !== 'parent')
         ? await isSchoolSuspended(senderInfo.schoolId || '')
@@ -215,11 +239,9 @@ export const initSocket = (server: HttpServer) => {
           }
         }
 
-        // Build attachment JSON — strip local blob URLs so only real URLs reach the DB
         let attachmentsJson: any = undefined;
         if (data.attachment) {
           const { isLocal, ...cleanAttachment } = data.attachment;
-          // Only persist if it has a real (non-blob) URL
           if (cleanAttachment.url && !cleanAttachment.url.startsWith('blob:')) {
             attachmentsJson = [cleanAttachment];
           }
@@ -240,10 +262,7 @@ export const initSocket = (server: HttpServer) => {
         if (data.tempId) recentTempIds.set(`${tenant.schoolId}:${data.tempId}`, { messageId: message.id, expires: Date.now() + TEMPID_TTL });
         io.to(data.conversationId).emit('new_message', { ...message, tempId: data.tempId });
         socket.emit('message_sent', { tempId: data.tempId, messageId: message.id });
-        
-        // ── Push notification: only for OFFLINE users ──────────────────────────
-        // Online users already received the message via Socket.IO above.
-        // Sending a push to them too would create a duplicate notification.
+
         getConversationMemberIds(data.conversationId).then(async (memberIds) => {
           const offlineTargets = memberIds.filter(id => id !== data.senderId && !onlineUsers.has(id));
           if (offlineTargets.length === 0) return;
@@ -266,7 +285,6 @@ export const initSocket = (server: HttpServer) => {
             });
             if (result === 'EXPIRED_TOKEN') expiredIds.push(u.id);
           }
-          // Clean up expired tokens automatically
           if (expiredIds.length > 0) {
             prisma.user.updateMany({ where: { id: { in: expiredIds } }, data: { pushToken: null } }).catch(() => {});
           }
@@ -274,7 +292,7 @@ export const initSocket = (server: HttpServer) => {
       } catch (error) { socket.emit('message_error', { message: 'Failed to send', tempId: data.tempId }); }
     });
 
-    // ── Delete message ─────────────────────────────────────────────────────────
+    // ── Delete message ─────────────────────────────────────────────────────
     socket.on('delete_message', async (data: { messageId: string; conversationId: string; deleteForEveryone?: boolean }) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
@@ -283,15 +301,12 @@ export const initSocket = (server: HttpServer) => {
         return;
       }
       try {
-        // Verify the message belongs to this school and the requester is the sender (or an admin)
         const message = await prisma.message.findFirst({
           where: { id: data.messageId, schoolId: tenant.schoolId },
           select: { id: true, senderId: true, conversationId: true },
         });
         if (!message) return;
-
-        const isOwner = message.senderId === tenant.userId;
-        if (!isOwner) return; // Only sender can delete for now
+        if (message.senderId !== tenant.userId) return;
 
         await prisma.message.update({
           where: { id: data.messageId },
@@ -307,7 +322,7 @@ export const initSocket = (server: HttpServer) => {
       }
     });
 
-    // ── Edit message ────────────────────────────────────────────────────────────
+    // ── Edit message ──────────────────────────────────────────────────────
     socket.on('edit_message', async (data: { messageId: string; conversationId: string; content: string }) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
@@ -338,7 +353,7 @@ export const initSocket = (server: HttpServer) => {
       }
     });
 
-    // ── Pin / Unpin message ─────────────────────────────────────────────────────
+    // ── Pin / Unpin message ───────────────────────────────────────────────
     socket.on('pin_message', async (data: { messageId: string; conversationId: string }) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
@@ -347,14 +362,12 @@ export const initSocket = (server: HttpServer) => {
         return;
       }
       try {
-        // Verify user is a member of the conversation
         const membership = await prisma.conversationMember.findFirst({
           where: { conversationId: data.conversationId, userId: tenant.userId },
           select: { id: true },
         });
         if (!membership) return;
 
-        // Toggle: unpin if already pinned, pin if not
         const existing = await prisma.pinnedMessage.findUnique({
           where: { conversationId_messageId: { conversationId: data.conversationId, messageId: data.messageId } },
         });
@@ -407,24 +420,22 @@ export const initSocket = (server: HttpServer) => {
       } catch (err) {}
     });
 
+    // ── CALL: Initiate ────────────────────────────────────────────────────
     socket.on('call_user', async (data: any) => {
       const tenant = socketData.get(socket.id);
       if (!tenant || tenant.userId !== data.from) return;
 
-      // Resolve caller's database schoolId and role
       const callerInfo = await prisma.user.findUnique({
         where: { id: data.from },
-        select: { schoolId: true, role: true }
+        select: { schoolId: true, role: true, full_name: true }
       });
 
-      // Find targets across all schools since parent client-side select is context-free
       const targetUser = await prisma.user.findFirst({
         where: { id: data.to, is_active: true },
         select: { id: true, schoolId: true, role: true, pushToken: true }
       });
       if (!targetUser) return;
 
-      // Determine call school context (associated with the staff/teacher)
       let callSchoolId = tenant.schoolId;
       if (callerInfo && callerInfo.role !== 'parent') {
         callSchoolId = callerInfo.schoolId || '';
@@ -443,32 +454,50 @@ export const initSocket = (server: HttpServer) => {
         return;
       }
 
-      const callId = data.callId || `call-${Date.now()}`;
-      
-      // Store in activeCalls so that if client is offline or reconnects, they can recover the call
+      const callId = data.callId || `call-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Server-side timeout: auto-cancel after 45 seconds if unanswered
+      const timeoutHandle = setTimeout(() => {
+        const call = activeCalls.get(callId);
+        if (call) {
+          activeCalls.delete(callId);
+          // Notify caller of missed call
+          emitToUser(io, call.from, 'call_missed', { callId, reason: 'NO_ANSWER' });
+          // Notify callee to stop ringing
+          emitToUser(io, call.to, 'call_ended', { from: call.from, callId, reason: 'MISSED' });
+        }
+      }, 45000);
+
       activeCalls.set(callId, {
-        callId: callId,
+        callId,
         from: data.from,
         to: data.to,
         offer: data.offer,
         type: data.type || 'VOICE',
         profile: data.profile,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        timeoutHandle,
       });
 
-      const targetSocketId = userSockets.get(data.to);
-      if (targetSocketId) io.to(targetSocketId).emit('incoming_call', data);
-      
+      // Emit to ALL sockets of the target user (multi-device ring)
+      emitToUser(io, data.to, 'incoming_call', {
+        from: data.from,
+        offer: data.offer,
+        type: data.type || 'VOICE',
+        profile: data.profile,
+        callId,
+      });
+
+      // Send FCM push notification (wakes device when backgrounded/locked)
       if (targetUser.pushToken) {
-        // High-priority silent data notification to wake Android app for Full Screen Intent
         const serverUrl = process.env.NEXT_PUBLIC_API_URL || 'https://zetime-backend.onrender.com';
         sendCallNotification(targetUser.pushToken, {
-          callId: callId,
+          callId,
           callerId: data.from,
-          callerName: data.profile.name,
-          callerAvatar: data.profile.avatar,
-          callType: data.type || 'VOICE',
-          serverUrl: serverUrl,
+          callerName: data.profile?.name || callerInfo?.full_name || 'Unknown',
+          callerAvatar: data.profile?.avatar || '',
+          callType: (data.type || 'VOICE') as 'VOICE' | 'VIDEO',
+          serverUrl,
         });
       }
 
@@ -491,26 +520,24 @@ export const initSocket = (server: HttpServer) => {
     });
 
     socket.on('call_ringing', (data: any) => {
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('call_ringing', { from: data.from });
+      // Callee notifies caller that the call is ringing
+      emitToUser(io, data.to, 'call_ringing', { from: data.from });
     });
 
+    // ── CALL: Answer ──────────────────────────────────────────────────────
     socket.on('answer_call', async (data: any) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
 
-      // Resolve the actual answering database user
       const answererInfo = await prisma.user.findUnique({
         where: { id: data.from },
         select: { schoolId: true, role: true }
       });
-      // Resolve the caller database user
       const callerInfo = await prisma.user.findUnique({
         where: { id: data.to },
         select: { schoolId: true, role: true }
       });
 
-      // Determine the school context of the call
       let callSchoolId = tenant.schoolId;
       if (answererInfo && answererInfo.role !== 'parent') {
         callSchoolId = answererInfo.schoolId || '';
@@ -520,7 +547,6 @@ export const initSocket = (server: HttpServer) => {
         callSchoolId = answererInfo.schoolId || '';
       }
 
-      // Suspended school members cannot pick up calls
       if (await isSchoolSuspended(callSchoolId || '')) {
         socket.emit('call_blocked', {
           code: 'SCHOOL_SUSPENDED',
@@ -529,14 +555,22 @@ export const initSocket = (server: HttpServer) => {
         });
         return;
       }
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('call_answered', { from: data.from, answer: data.answer });
-      // Remove call from active list on answer
-      if (data.callId) {
+
+      // Emit answer to the caller
+      emitToUser(io, data.to, 'call_answered', { from: data.from, answer: data.answer });
+
+      // Stop ringing on all OTHER devices of the answerer (multi-device sync)
+      emitToUserExcept(io, data.from, socket.id, 'call_stop_ringing', { callId: data.callId });
+
+      // Clean up call state
+      const callEntry = data.callId ? activeCalls.get(data.callId) : null;
+      if (data.callId && callEntry) {
+        if (callEntry.timeoutHandle) clearTimeout(callEntry.timeoutHandle);
         activeCalls.delete(data.callId);
       } else {
         for (const [id, call] of activeCalls.entries()) {
           if ((call.from === data.from && call.to === data.to) || (call.from === data.to && call.to === data.from)) {
+            if (call.timeoutHandle) clearTimeout(call.timeoutHandle);
             activeCalls.delete(id);
           }
         }
@@ -544,75 +578,95 @@ export const initSocket = (server: HttpServer) => {
     });
 
     socket.on('ice_candidate', (data: any) => {
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('ice_candidate', { from: data.from, candidate: data.candidate });
+      emitToUser(io, data.to, 'ice_candidate', { from: data.from, candidate: data.candidate });
+    });
+
+    // ── ICE Restart ───────────────────────────────────────────────────────
+    // Relay ICE restart offer from one peer to the other
+    socket.on('ice_restart', (data: any) => {
+      emitToUser(io, data.to, 'ice_restart', { from: data.from, offer: data.offer });
+    });
+
+    socket.on('ice_restart_answer', (data: any) => {
+      emitToUser(io, data.to, 'ice_restart_answer', { from: data.from, answer: data.answer });
     });
 
     socket.on('media_state_change', (data: any) => {
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('media_state_changed', { 
-        from: data.from, 
-        isCameraOff: data.isCameraOff, 
-        isMuted: data.isMuted 
+      emitToUser(io, data.to, 'media_state_changed', {
+        from: data.from,
+        isCameraOff: data.isCameraOff,
+        isMuted: data.isMuted
       });
     });
 
+    // ── CALL: Reject ──────────────────────────────────────────────────────
     socket.on('reject_call', async (data: any) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('call_rejected', { from: data.from });
-      
-      // Clean up call memory state
+
+      // Notify caller
+      emitToUser(io, data.to, 'call_rejected', { from: data.from });
+
+      // Stop ringing on all devices of the callee (they explicitly rejected)
+      emitToUserExcept(io, data.from, socket.id, 'call_stop_ringing', { callId: data.callId });
+
+      // Clean up call state
       if (data.callId) {
+        const call = activeCalls.get(data.callId);
+        if (call?.timeoutHandle) clearTimeout(call.timeoutHandle);
         activeCalls.delete(data.callId);
       } else {
         for (const [id, call] of activeCalls.entries()) {
           if ((call.from === data.from && call.to === data.to) || (call.from === data.to && call.to === data.from)) {
+            if (call.timeoutHandle) clearTimeout(call.timeoutHandle);
             activeCalls.delete(id);
           }
         }
       }
 
-      // Cancel native ringing if active
+      // Cancel native ringing on target's devices
       const targetUser = await prisma.user.findUnique({ where: { id: data.to }, select: { pushToken: true } });
       if (targetUser?.pushToken) {
         sendCallCancellation(targetUser.pushToken, data.callId || '');
       }
 
       if (data.conversationId) {
-        const msg = await prisma.message.create({ 
-          data: { 
-            conversationId: data.conversationId, 
-            senderId: data.from, 
-            schoolId: tenant.schoolId, 
-            content: data.reason === 'MISSED' ? 'Missed Call' : 'Declined Call', 
+        const msg = await prisma.message.create({
+          data: {
+            conversationId: data.conversationId,
+            senderId: data.from,
+            schoolId: tenant.schoolId,
+            content: data.reason === 'MISSED' ? 'Missed Call' : 'Declined Call',
             type: data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE',
             metadata: { reason: data.reason || 'DECLINED' }
-          } 
+          }
         });
         io.to(data.conversationId).emit('new_message', msg);
       }
     });
 
+    // ── CALL: End ─────────────────────────────────────────────────────────
     socket.on('end_call', async (data: any) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
-      const s = userSockets.get(data.to);
-      if (s) io.to(s).emit('call_ended', { from: data.from });
 
-      // Clean up call memory state
+      emitToUser(io, data.to, 'call_ended', { from: data.from });
+
+      // Clean up call state
       if (data.callId) {
+        const call = activeCalls.get(data.callId);
+        if (call?.timeoutHandle) clearTimeout(call.timeoutHandle);
         activeCalls.delete(data.callId);
       } else {
         for (const [id, call] of activeCalls.entries()) {
           if ((call.from === data.from && call.to === data.to) || (call.from === data.to && call.to === data.from)) {
+            if (call.timeoutHandle) clearTimeout(call.timeoutHandle);
             activeCalls.delete(id);
           }
         }
       }
 
-      // Cancel native ringing if active
+      // Cancel native ringing if still active
       const targetUser = await prisma.user.findUnique({ where: { id: data.to }, select: { pushToken: true } });
       if (targetUser?.pushToken) {
         sendCallCancellation(targetUser.pushToken, data.callId || '');
@@ -622,33 +676,44 @@ export const initSocket = (server: HttpServer) => {
         let content = 'Call ended';
         let msgType = data.type === 'VIDEO' ? 'CALL_VIDEO' : 'CALL_VOICE';
         if (data.reason === 'CANCELLED') {
-           content = 'Canceled Call';
-           msgType = data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE';
+          content = 'Canceled Call';
+          msgType = data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE';
         } else if (data.reason === 'MISSED') {
-           content = 'Missed Call';
-           msgType = data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE';
+          content = 'Missed Call';
+          msgType = data.type === 'VIDEO' ? 'CALL_MISSED_VIDEO' : 'CALL_MISSED_VOICE';
         }
 
-        const msg = await prisma.message.create({ 
-          data: { 
-            conversationId: data.conversationId, 
-            senderId: data.from, 
-            schoolId: tenant.schoolId, 
-            content, 
+        const msg = await prisma.message.create({
+          data: {
+            conversationId: data.conversationId,
+            senderId: data.from,
+            schoolId: tenant.schoolId,
+            content,
             type: msgType,
             metadata: { duration: data.duration, reason: data.reason }
-          } 
+          }
         });
         io.to(data.conversationId).emit('new_message', msg);
       }
     });
 
+    // ── Disconnect ────────────────────────────────────────────────────────
     socket.on('disconnect', () => {
       const data = socketData.get(socket.id);
       if (data) {
-        userSockets.delete(data.userId);
-        onlineUsers.delete(data.userId);
-        emitPresenceToSchoolMates('user_offline', data.userId, data.schoolId, socket.id);
+        const { userId, schoolId } = data;
+
+        // Remove only this socket from the user's socket set
+        const sids = userSockets.get(userId);
+        if (sids) {
+          sids.delete(socket.id);
+          if (sids.size === 0) {
+            // User fully offline — all devices disconnected
+            userSockets.delete(userId);
+            onlineUsers.delete(userId);
+            emitPresenceToSchoolMates('user_offline', userId, schoolId, socket.id);
+          }
+        }
       }
       socketData.delete(socket.id);
     });

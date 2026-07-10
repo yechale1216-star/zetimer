@@ -305,7 +305,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         this.stopService(intent);
 
         NotificationManager nm = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm != null) nm.cancel(NOTIF_ID_CALL);
+        if (nm != null) {
+            nm.cancel(NOTIF_ID_CALL);
+            nm.cancel(1002);
+        }
 
         // Dismiss the foreground banner if showing (for foreground calls)
         CallManager.getInstance().handleCallCanceled();

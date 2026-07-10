@@ -70,9 +70,14 @@ export const useWebRTC = (options: WebRTCOptions) => {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [connectionQuality, setConnectionQuality] = useState<'GOOD' | 'POOR' | 'BAD'>('GOOD');
   
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const callType = useRef<'VOICE' | 'VIDEO'>('VOICE');
+  const callIdRef = useRef<string | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
+  const iceRestartTimer = useRef<NodeJS.Timeout | null>(null);
+
   // Keep a ref to localStream so acquireStream always sees the latest value
   const localStreamRef = useRef<MediaStream | null>(null);
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
@@ -111,16 +116,43 @@ export const useWebRTC = (options: WebRTCOptions) => {
     peerConnections.current.forEach((pc) => pc.close());
     peerConnections.current.clear();
     queuedCandidates.current.clear();
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
+    const activeStream = localStreamRef.current;
+    if (activeStream) {
+      activeStream.getTracks().forEach(track => track.stop());
       setLocalStream(null);
+    }
+    if (iceRestartTimer.current) {
+      clearTimeout(iceRestartTimer.current);
+      iceRestartTimer.current = null;
     }
     setRemoteStreams({});
     setRemoteMediaStates({});
     setCallStatus('IDLE');
+    setConnectionQuality('GOOD');
     connectedAt.current = null;
     isInitiator.current = false;
-  }, [localStream]);
+    callIdRef.current = null;
+    conversationIdRef.current = null;
+  }, []);
+
+  const initiateIceRestart = useCallback(async (targetUserId: string) => {
+    const pc = peerConnections.current.get(targetUserId);
+    if (!pc) return;
+    try {
+      console.log(`[WebRTC] Initiating ICE restart for user ${targetUserId}...`);
+      const offer = await pc.createOffer({ iceRestart: true });
+      await pc.setLocalDescription(offer);
+      if (socket) {
+        socket.emit('ice_restart', {
+          to: targetUserId,
+          from: options.userId,
+          offer,
+        });
+      }
+    } catch (err) {
+      console.error('[WebRTC] ICE restart offer creation failed:', err);
+    }
+  }, [socket, options.userId]);
 
   const createPeerConnection = useCallback((userId: string) => {
     const pc = new RTCPeerConnection(ICE_SERVERS);
@@ -159,7 +191,32 @@ export const useWebRTC = (options: WebRTCOptions) => {
 
     pc.oniceconnectionstatechange = () => {
       console.log(`[WebRTC] ICE Connection State for ${userId}: ${pc.iceConnectionState}`);
-      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
+      if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+        if (isInitiator.current && !iceRestartTimer.current) {
+          console.warn(`[WebRTC] ICE state ${pc.iceConnectionState}. Triggering ICE restart...`);
+          initiateIceRestart(userId);
+          iceRestartTimer.current = setTimeout(() => {
+            console.error('[WebRTC] ICE restart timed out after 10s. Cleaning up call.');
+            cleanupUser(userId);
+            cleanupAll();
+            if (options.onCallEnded) options.onCallEnded(userId);
+          }, 10000);
+        } else if (!isInitiator.current && !iceRestartTimer.current) {
+          // Receiver: wait 10s for initiator to trigger ICE restart offer
+          iceRestartTimer.current = setTimeout(() => {
+            console.error('[WebRTC] Initiator did not trigger ICE restart. Cleaning up call.');
+            cleanupUser(userId);
+            cleanupAll();
+            if (options.onCallEnded) options.onCallEnded(userId);
+          }, 10000);
+        }
+      } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        if (iceRestartTimer.current) {
+          console.log('[WebRTC] ICE connection restored. Clearing restart timer.');
+          clearTimeout(iceRestartTimer.current);
+          iceRestartTimer.current = null;
+        }
+      } else if (pc.iceConnectionState === 'closed') {
         cleanupUser(userId);
       }
     };
@@ -174,13 +231,16 @@ export const useWebRTC = (options: WebRTCOptions) => {
 
     peerConnections.current.set(userId, pc);
     return pc;
-  }, [socket, options, cleanupUser]);
+  }, [socket, options, cleanupUser, cleanupAll, initiateIceRestart]);
 
   const startCall = useCallback(async (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => {
     setCallStatus('CONNECTING');
     setMediaError(null);
     callType.current = type;
     isInitiator.current = true;
+    const generatedCallId = `call-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    callIdRef.current = generatedCallId;
+    conversationIdRef.current = (window as any).activeConversationId;
     try {
       if (NativeBridge.isNative()) {
         await NativeBridge.requestPermissions();
@@ -209,7 +269,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
           from: options.userId,
           profile,
           type,
-          callId: `call-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          callId: generatedCallId,
         });
       }
     } catch (error) {
@@ -219,11 +279,13 @@ export const useWebRTC = (options: WebRTCOptions) => {
     }
   }, [options.userId, socket, createPeerConnection, cleanupAll]);
 
-  const answerCall = useCallback(async (fromId: string, offer: any, type: 'VOICE' | 'VIDEO') => {
+  const answerCall = useCallback(async (fromId: string, offer: any, type: 'VOICE' | 'VIDEO', callId?: string, conversationId?: string) => {
     setCallStatus('CONNECTING');
     setMediaError(null);
     callType.current = type;
     isInitiator.current = false;
+    if (callId) callIdRef.current = callId;
+    if (conversationId) conversationIdRef.current = conversationId;
     try {
       if (NativeBridge.isNative()) {
         await NativeBridge.requestPermissions();
@@ -259,7 +321,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
       await pc.setLocalDescription(answer);
 
       if (socket) {
-        socket.emit('answer_call', { to: fromId, from: options.userId, answer });
+        socket.emit('answer_call', { to: fromId, from: options.userId, answer, callId: callIdRef.current });
         // Emit media state immediately on connection
         socket.emit('media_state_change', {
           to: fromId,
@@ -290,7 +352,8 @@ export const useWebRTC = (options: WebRTCOptions) => {
         to: userId, 
         from: options.userId,
         type: callType.current,
-        conversationId: (window as any).activeConversationId,
+        callId: callIdRef.current,
+        conversationId: conversationIdRef.current || (window as any).activeConversationId,
         duration,
         reason
       });
@@ -299,13 +362,15 @@ export const useWebRTC = (options: WebRTCOptions) => {
   }, [socket, options.userId, cleanupAll]);
 
   // Emitted by the RECEIVER to notify the caller they were declined
-  const rejectCall = useCallback((callerId: string, timeoutMissed: boolean = false) => {
+  const rejectCall = useCallback((callerId: string, timeoutMissed: boolean = false, optionalCallId?: string) => {
+    const targetCallId = optionalCallId || callIdRef.current;
     if (socket) {
       socket.emit('reject_call', {
         to: callerId,
         from: options.userId,
         type: callType.current,
-        conversationId: (window as any).activeConversationId,
+        callId: targetCallId,
+        conversationId: conversationIdRef.current || (window as any).activeConversationId,
         reason: timeoutMissed ? 'MISSED' : 'DECLINED'
       });
     }
@@ -483,10 +548,45 @@ export const useWebRTC = (options: WebRTCOptions) => {
       }));
     };
 
+    const handleIceRestart = async ({ from, offer }: any) => {
+      const pc = peerConnections.current.get(from);
+      if (pc) {
+        console.log(`[WebRTC] Received ICE restart offer from ${from}`);
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          if (socket) {
+            socket.emit('ice_restart_answer', {
+              to: from,
+              from: options.userId,
+              answer,
+            });
+          }
+        } catch (err) {
+          console.error('[WebRTC] Failed to handle ICE restart offer:', err);
+        }
+      }
+    };
+
+    const handleIceRestartAnswer = async ({ from, answer }: any) => {
+      const pc = peerConnections.current.get(from);
+      if (pc) {
+        console.log(`[WebRTC] Received ICE restart answer from ${from}`);
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        } catch (err) {
+          console.error('[WebRTC] Failed to set ICE restart answer:', err);
+        }
+      }
+    };
+
     socket.on('call_ringing', handleRinging);
     socket.on('call_answered', handleAnswer);
     socket.on('ice_candidate', handleIceCandidate);
     socket.on('media_state_changed', handleMediaStateChanged);
+    socket.on('ice_restart', handleIceRestart);
+    socket.on('ice_restart_answer', handleIceRestartAnswer);
     
     socket.on('call_ended', ({ from }: any) => {
       cleanupUser(from);
@@ -515,11 +615,48 @@ export const useWebRTC = (options: WebRTCOptions) => {
       socket.off('call_answered', handleAnswer);
       socket.off('ice_candidate', handleIceCandidate);
       socket.off('media_state_changed', handleMediaStateChanged);
+      socket.off('ice_restart', handleIceRestart);
+      socket.off('ice_restart_answer', handleIceRestartAnswer);
       socket.off('call_ended');
       socket.off('call_rejected');
       socket.off('call_blocked');
     };
   }, [socket, options, cleanupUser, cleanupAll]);
+
+  // Monitor connection quality
+  useEffect(() => {
+    if (callStatus !== 'CONNECTED') {
+      setConnectionQuality('GOOD');
+      return;
+    }
+    const interval = setInterval(async () => {
+      peerConnections.current.forEach(async (pc) => {
+        try {
+          const stats = await pc.getStats();
+          let currentRtt = 0;
+          let packetsLost = 0;
+          stats.forEach((report) => {
+            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+              currentRtt = report.currentRoundTripTime || 0;
+            }
+            if (report.type === 'inbound-rtp') {
+              packetsLost = report.packetsLost || 0;
+            }
+          });
+          if (currentRtt > 0.4 || packetsLost > 20) {
+            setConnectionQuality('BAD');
+          } else if (currentRtt > 0.2 || packetsLost > 5) {
+            setConnectionQuality('POOR');
+          } else {
+            setConnectionQuality('GOOD');
+          }
+        } catch (err) {
+          console.error('[WebRTC] Error getting stats:', err);
+        }
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [callStatus]);
 
   return {
     localStream,
@@ -529,6 +666,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
     isCameraOff,
     mediaError,
     remoteMediaStates,
+    connectionQuality,
     startCall,
     answerCall,
     endCall,

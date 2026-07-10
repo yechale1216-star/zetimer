@@ -195,6 +195,7 @@ public class CallService extends Service {
         answerIntent.putExtra("callId",    pendingCallId);
         answerIntent.putExtra("callerId",  pendingCallerId);
         answerIntent.putExtra("callType",  pendingCallType);
+        answerIntent.putExtra("callerName", pendingCallerName);
         answerIntent.putExtra("serverUrl", pendingServerUrl);
         PendingIntent answerPI = PendingIntent.getBroadcast(this, 10, answerIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);

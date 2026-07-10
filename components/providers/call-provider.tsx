@@ -10,6 +10,7 @@ import { NativeBridge } from '@/lib/utils/native-bridge';
 import { App } from '@capacitor/app';
 import { useSuspension } from '@/lib/context/suspension-context';
 import { useAuth } from '@/lib/context/auth-context';
+import { useSocket } from '@/components/providers/socket-provider';
 
 interface CallContextType {
   initiateCall: (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => void;
@@ -21,6 +22,7 @@ const CallContext = createContext<CallContextType | undefined>(undefined);
 
 export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user: currentUser } = useAuth();
+  const { socket } = useSocket();
   const [incomingCallData, setIncomingCallData] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [callType, setCallType] = useState<'VOICE' | 'VIDEO'>('VOICE');
@@ -290,7 +292,13 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       console.log('[CallProvider] Answering call immediately.');
       NativeBridge.endNativeCall();
-      webrtc.answerCall(incomingCallData.from, incomingCallData.offer, incomingCallData.type);
+      webrtc.answerCall(
+        incomingCallData.from,
+        incomingCallData.offer,
+        incomingCallData.type,
+        incomingCallData.callId,
+        incomingCallData.conversationId
+      );
       setIncomingCallData(null);
       setIsWaitingForOffer(false);
     }
@@ -302,7 +310,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsWaitingForOffer(false);
     // Emit reject_call to notify the caller before cleaning up
     if (incomingCallData) {
-      webrtc.rejectCall(incomingCallData.from, isMissed);
+      webrtc.rejectCall(incomingCallData.from, isMissed, incomingCallData.callId);
     } else {
       webrtc.endCall();
     }
@@ -315,7 +323,13 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (incomingCallData && incomingCallData.offer && isWaitingForOffer) {
       console.log('[CallProvider] Offer received while waiting. Answering call now.');
       NativeBridge.endNativeCall();
-      webrtc.answerCall(incomingCallData.from, incomingCallData.offer, incomingCallData.type);
+      webrtc.answerCall(
+        incomingCallData.from,
+        incomingCallData.offer,
+        incomingCallData.type,
+        incomingCallData.callId,
+        incomingCallData.conversationId
+      );
       setIncomingCallData(null);
       setIsWaitingForOffer(false);
     }
@@ -358,11 +372,37 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (incomingCallData && pendingAction && pendingAction.action === 'ANSWER' && pendingAction.callId === incomingCallData.callId) {
       console.log('[CallProvider] Executing deferred ANSWER action');
       NativeBridge.endNativeCall();
-      webrtc.answerCall(incomingCallData.from, incomingCallData.offer, incomingCallData.type);
+      webrtc.answerCall(
+        incomingCallData.from,
+        incomingCallData.offer,
+        incomingCallData.type,
+        incomingCallData.callId,
+        incomingCallData.conversationId
+      );
       setIncomingCallData(null);
       setPendingAction(null);
     }
   }, [incomingCallData, pendingAction, webrtc]);
+
+  // Listen for call_stop_ringing from multi-device synchronization
+  useEffect(() => {
+    if (!socket) return;
+    const handleStopRinging = ({ callId }: { callId: string }) => {
+      console.log(`[CallProvider] call_stop_ringing received: ${callId}`);
+      if (incomingCallData && incomingCallData.callId === callId) {
+        setIncomingCallData(null);
+        setParticipants(prev => prev.filter(p => p.isLocal));
+      }
+      setPendingAction(null);
+      NativeBridge.dismissCallBanner();
+      NativeBridge.endNativeCall();
+    };
+
+    socket.on('call_stop_ringing', handleStopRinging);
+    return () => {
+      socket.off('call_stop_ringing', handleStopRinging);
+    };
+  }, [socket, incomingCallData]);
 
   // Poll/Check pending intents on resume or startup
   useEffect(() => {
@@ -458,6 +498,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           onToggleMute={webrtc.toggleMute}
           onToggleCamera={webrtc.toggleCamera}
           onFlipCamera={webrtc.flipCamera}
+          connectionQuality={webrtc.connectionQuality}
         />
       )}
     </CallContext.Provider>

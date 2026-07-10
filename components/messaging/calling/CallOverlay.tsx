@@ -463,7 +463,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
       )}
 
       {/* ── Voice spacer ────────────────────────────────────────────── */}
-      {type === 'VOICE' && <div className="flex-1 min-h-0" />}
+      {type === 'VOICE' && <div className="flex-1" />}
 
       {/* ── Controls ────────────────────────────────────────────────── */}
       <AnimatePresence>
@@ -472,14 +472,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
             initial={type === 'VIDEO' ? { opacity: 0, y: 20 } : {}}
             animate={{ opacity: 1, y: 0 }}
             exit={type === 'VIDEO' ? { opacity: 0, y: 20 } : {}}
-            className={cn(
-              'relative z-20 px-6 pt-2',
-              // On voice calls use a safe bottom padding that respects nav-bar insets.
-              // We do NOT use mt-auto here — instead the flex-1 spacer above pushes this down.
-              type === 'VOICE'
-                ? 'pb-8'
-                : 'pb-10'
-            )}
+            className="relative z-20 pb-10 pt-2 px-6 mt-auto"
           >
             {type === 'VIDEO' ? (
               <div className="flex items-end justify-between w-full max-w-sm mx-auto">

@@ -59,20 +59,12 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         if (data.isEmpty()) return;
 
-        // ── SECURITY: Never show notifications to a signed-out user ──────────
-        // The server may still hold a stale push token (e.g., offline logout).
-        // Guard here so no banner, ringtone, or notification ever surfaces.
-        if (!isUserSignedIn()) {
-            Log.d(TAG, "onMessageReceived: user not signed in — suppressing notification");
-            return;
-        }
-
         String type = data.get("type");
         if (type == null) return;
 
         switch (type) {
             case "incoming_call":
-                Log.d(TAG, "Handling incoming call notification. App in foreground: " + isAppInForeground());
+                Log.d(TAG, "Handling incoming call");
                 if (isAppInForeground()) {
                     Log.d(TAG, "App is in foreground. Showing CallManager banner overlay.");
                     String callerName = data.get("callerName");
@@ -80,31 +72,14 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                     String callerId    = data.get("callerId");
                     String callType    = data.get("callType");
                     String serverUrl   = data.get("serverUrl");
-
-                    // 1. Try to show the native floating banner
-                    MainActivity mainActivity = MainActivity.getInstance();
-                    if (mainActivity != null && !mainActivity.isFinishing()) {
-                        CallManager.getInstance().showBanner(
-                            mainActivity,
-                            callerName != null ? callerName : "Unknown Caller",
-                            callId,
-                            callerId,
-                            callType,
-                            serverUrl
-                        );
-                    } else {
-                        Log.w(TAG, "MainActivity is null or finishing — cannot show native banner.");
-                    }
-
-                    // 2. ALWAYS also notify the JS layer so the web modal can act as a
-                    //    safety-net fallback if the native banner fails or the user misses it.
-                    if (mainActivity != null && !mainActivity.isFinishing()) {
-                        com.getcapacitor.JSObject notifData = new com.getcapacitor.JSObject();
-                        for (Map.Entry<String, String> entry : data.entrySet()) {
-                            notifData.put(entry.getKey(), entry.getValue());
-                        }
-                        mainActivity.postForegroundNotification(notifData);
-                    }
+                    CallManager.getInstance().showBanner(
+                        MainActivity.getInstance(),
+                        callerName != null ? callerName : "Unknown Caller",
+                        callId,
+                        callerId,
+                        callType,
+                        serverUrl
+                    );
                     break;
                 }
                 handleIncomingCall(data);
@@ -444,25 +419,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         Log.d(TAG, "Notification channels verified");
     }
 
-    /** Returns true if a user is currently signed in (auth token exists in SharedPreferences). */
-    private boolean isUserSignedIn() {
-        android.content.SharedPreferences prefs =
-            getSharedPreferences("zetime_prefs", android.content.Context.MODE_PRIVATE);
-        String token = prefs.getString("auth_token", null);
-        return token != null && !token.isEmpty();
-    }
-
     @Override
     public void onNewToken(@NonNull String token) {
         super.onNewToken(token);
         Log.d(TAG, "FCM token refreshed: " + token);
-
-        // If no user is signed in, do NOT re-register the token on the server.
-        // This prevents a signed-out device from receiving future push notifications.
-        if (!isUserSignedIn()) {
-            Log.d(TAG, "onNewToken: no signed-in user — skipping server registration");
-            return;
-        }
 
         // Persist the new token to the backend so server-side pushes keep working
         // We do this on a background thread to avoid blocking the main thread

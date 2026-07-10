@@ -177,17 +177,6 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
         call.resolve();
     }
 
-    /** Called on logout — wipes the native auth token so onNewToken cannot
-     *  re-register an FCM push token for a signed-out user. */
-    @PluginMethod
-    public void clearAuthToken(PluginCall call) {
-        android.content.SharedPreferences prefs =
-            getContext().getSharedPreferences("zetime_prefs", android.content.Context.MODE_PRIVATE);
-        prefs.edit().remove("auth_token").apply();
-        Log.d(TAG, "clearAuthToken: native auth token wiped");
-        call.resolve();
-    }
-
     // ═══════════════════════════════════════════════════════════════════════
     // Internal action dispatchers (called from Java, not from JS)
     // ═══════════════════════════════════════════════════════════════════════
@@ -209,21 +198,6 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
 
     public void notifyForegroundNotification(com.getcapacitor.JSObject notifData) {
         notifyListeners("onForegroundNotification", notifData);
-
-        // If this is an incoming call FCM notification, also fire onCallAction so
-        // CallProvider's addCallActionListener can show the web fallback modal.
-        String type = notifData.getString("type");
-        if ("incoming_call".equals(type)) {
-            com.getcapacitor.JSObject callAction = new com.getcapacitor.JSObject();
-            callAction.put("action", "INCOMING_CALL");
-            callAction.put("callId",     notifData.getString("callId"));
-            callAction.put("callerId",   notifData.getString("callerId"));
-            callAction.put("callerName", notifData.getString("callerName"));
-            callAction.put("callType",   notifData.getString("callType"));
-            callAction.put("serverUrl",  notifData.getString("serverUrl"));
-            notifyListeners("onCallAction", callAction);
-            Log.d(TAG, "notifyForegroundNotification: fired onCallAction/INCOMING_CALL as fallback");
-        }
     }
 
     public void handleIncomingCall(com.getcapacitor.JSObject callObj) {

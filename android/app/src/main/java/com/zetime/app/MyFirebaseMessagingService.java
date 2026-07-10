@@ -66,7 +66,20 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             case "incoming_call":
                 Log.d(TAG, "Handling incoming call");
                 if (isAppInForeground()) {
-                    Log.d(TAG, "App is in foreground. Suppressing native incoming call notification and ringing.");
+                    Log.d(TAG, "App is in foreground. Showing CallManager banner overlay.");
+                    String callerName = data.get("callerName");
+                    String callId      = data.get("callId");
+                    String callerId    = data.get("callerId");
+                    String callType    = data.get("callType");
+                    String serverUrl   = data.get("serverUrl");
+                    CallManager.getInstance().showBanner(
+                        MainActivity.getInstance(),
+                        callerName != null ? callerName : "Unknown Caller",
+                        callId,
+                        callerId,
+                        callType,
+                        serverUrl
+                    );
                     break;
                 }
                 handleIncomingCall(data);

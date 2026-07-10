@@ -410,20 +410,22 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!NativeBridge.isNative()) return;
 
-    const sub = NativeBridge.addCallActionListener((action, callId) => {
-      console.log(`Native call action received: ${action} for ${callId}`);
-      if (action === 'ANSWER') {
-        handleAccept();
-      } else if (action === 'DECLINE') {
-        handleReject();
-      }
+    const sub = NativeBridge.addCallActionListener((data: any) => {
+      console.log('[CallProvider] Native call action received:', data);
+      handlePendingCallAction(
+        data.action,
+        data.callId || '',
+        data.callerId,
+        data.callerName,
+        data.callType
+      );
     });
 
     return () => {
       // @ts-ignore
       sub?.then(s => s.remove());
     };
-  }, [handleAccept, handleReject]);
+  }, [handlePendingCallAction]);
 
   const activeCaller = participants.find(p => !p.isLocal);
 

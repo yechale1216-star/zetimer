@@ -60,7 +60,7 @@ public class CallManager {
     // ── Listener (CallPlugin bridges events to JS) ──────────────────────────
     public interface CallBannerListener {
         void onBannerAccept(String callId, String callerId, String callerName, String callType, String serverUrl);
-        void onBannerDecline(String callId, String serverUrl);
+        void onBannerDecline(String callId, String callerId, String serverUrl);
         void onBannerDismissed(String callId);
     }
     private CallBannerListener listener;
@@ -214,11 +214,12 @@ public class CallManager {
         btnDecline.setOnClickListener(v -> {
             Log.d(TAG, "Banner: Decline pressed");
             String cid = currentCallId;
+            String crid = currentCallerId;
             String surl = currentServerUrl;
             dismissBannerInternal(activity, false);
             sendDeclineToServer(activity, cid, surl);
             if (listener != null) {
-                listener.onBannerDecline(cid, surl);
+                listener.onBannerDecline(cid, crid, surl);
             }
         });
 
@@ -252,7 +253,7 @@ public class CallManager {
         container.addView(bannerView, lp);
 
         // Slide-down entrance animation
-        bannerView.setTranslationY(-300f);
+        bannerView.setTranslationY(-1000f);
         bannerView.setAlpha(0f);
         bannerView.animate()
                 .translationY(0f)
@@ -378,7 +379,7 @@ public class CallManager {
         if (bannerView != null && activity != null && !activity.isFinishing()) {
             // Slide-up exit animation
             bannerView.animate()
-                    .translationY(-300f)
+                    .translationY(-1000f)
                     .alpha(0f)
                     .setDuration(250)
                     .setListener(new AnimatorListenerAdapter() {

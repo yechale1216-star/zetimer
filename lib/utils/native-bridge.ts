@@ -294,7 +294,7 @@ export const NativeBridge = {
     }
   },
 
-  addCallActionListener: (callback: (action: string, callId: string) => void) => {
+  addCallActionListener: (callback: (data: any) => void) => {
     if (Capacitor.isNativePlatform()) {
       return CallPlugin.addListener('onCallAction', (data: any) => {
         if (data.action === 'NAVIGATE') {
@@ -307,12 +307,8 @@ export const NativeBridge = {
               schoolId: data.schoolId
             }
           }));
-        } else if (data.action === 'OPEN_CHAT' && data.conversationId && typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('zetime:open_conversation', {
-            detail: { conversationId: data.conversationId },
-          }));
         } else {
-          callback(data.action, data.callId || '');
+          callback(data);
         }
       });
     }

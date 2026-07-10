@@ -43,11 +43,13 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
     }
 
     @Override
-    public void onBannerDecline(String callId, String serverUrl) {
+    public void onBannerDecline(String callId, String callerId, String serverUrl) {
         Log.d(TAG, "Banner DECLINE -> firing JS DECLINE event for callId=" + callId);
         JSObject ret = new JSObject();
         ret.put("action", "DECLINE");
         ret.put("callId", callId);
+        ret.put("callerId", callerId);
+        ret.put("serverUrl", serverUrl);
         notifyListeners("onCallAction", ret);
     }
 

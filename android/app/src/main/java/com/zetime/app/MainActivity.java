@@ -38,6 +38,14 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (instance == this) {
+            instance = null;
+        }
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         isAppInForeground = true;

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pill-shaped green accept button for the foreground call banner -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#40FFFFFF">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FF43A047" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+</ripple>

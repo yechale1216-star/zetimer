@@ -48,8 +48,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('[CallProvider] Received incoming call from socket. Offer present:', !!data.offer);
     
     if (NativeBridge.isNative()) {
-      console.log('[CallProvider] Launching native calling activity overlay from foreground socket listener');
-      NativeBridge.startNativeRinging(
+      console.log('[CallProvider] Showing Telegram-style foreground call banner');
+      NativeBridge.showCallBanner(
         data.profile?.name || 'Unknown User',
         data.callId,
         data.from,
@@ -81,6 +81,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [participants, toast]);
 
   const onCallEnded = useCallback((userId: string) => {
+    NativeBridge.dismissCallBanner();
     setParticipants(prev => {
       const next = prev.filter(p => p.id !== userId);
       // If only the local participant remains, clear the incoming call data
@@ -281,6 +282,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAccept = useCallback(() => {
     if (incomingCallData) {
+      NativeBridge.dismissCallBanner();
       if (!incomingCallData.offer) {
         console.log('[CallProvider] User accepted call but offer not received yet. Setting isWaitingForOffer to true.');
         setIsWaitingForOffer(true);
@@ -295,6 +297,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [incomingCallData, webrtc]);
 
   const handleReject = useCallback((isMissed: boolean = false) => {
+    NativeBridge.dismissCallBanner();
     NativeBridge.endNativeCall();
     setIsWaitingForOffer(false);
     // Emit reject_call to notify the caller before cleaning up

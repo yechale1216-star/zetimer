@@ -287,11 +287,15 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     }
 
     private void handleCancelCall(Map<String, String> data) {
+        // Stop the background CallService (for locked/background calls)
         Intent intent = new Intent(this, CallService.class);
         this.stopService(intent);
 
         NotificationManager nm = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm != null) nm.cancel(NOTIF_ID_CALL);
+
+        // Dismiss the foreground banner if showing (for foreground calls)
+        CallManager.getInstance().handleCallCanceled();
     }
 
     private void showIncomingCallNotification(String callerName, String callId, String callType, String callerId, String serverUrl) {

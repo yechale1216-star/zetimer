@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small circular avatar background for the banner (48dp) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:type="radial"
+        android:gradientRadius="24dp"
+        android:startColor="#FF2B8C6F"
+        android:endColor="#FF1E6B53" />
+</shape>

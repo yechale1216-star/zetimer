@@ -19,6 +19,14 @@ interface CallPlugin {
     callType?: string;
     serverUrl?: string;
   }) => Promise<void>;
+  showCallBanner: (options: {
+    callerName: string;
+    callId?: string;
+    callerId?: string;
+    callType?: string;
+    serverUrl?: string;
+  }) => Promise<void>;
+  dismissCallBanner: () => Promise<void>;
   saveAuthToken: (options: { token: string }) => Promise<void>;
   getPendingCall: () => Promise<{
     hasPending: boolean;
@@ -262,6 +270,26 @@ export const NativeBridge = {
         await CallPlugin.startRinging({ callerName, callId, callerId, callType, serverUrl });
       } catch (e) {
         console.warn('CallPlugin: startRinging failed', e);
+      }
+    }
+  },
+
+  showCallBanner: async (callerName: string, callId?: string, callerId?: string, callType?: string, serverUrl?: string) => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await CallPlugin.showCallBanner({ callerName, callId, callerId, callType, serverUrl });
+      } catch (e) {
+        console.warn('CallPlugin: showCallBanner failed', e);
+      }
+    }
+  },
+
+  dismissCallBanner: async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await CallPlugin.dismissCallBanner();
+      } catch (e) {
+        console.warn('CallPlugin: dismissCallBanner failed', e);
       }
     }
   },

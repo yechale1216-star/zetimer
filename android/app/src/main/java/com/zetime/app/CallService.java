@@ -70,20 +70,6 @@ public class CallService extends Service {
             Log.d(TAG, "Starting call ringing for: " + pendingCallerName);
             startRinging();
             showForegroundNotification();
-
-            // Explicitly start IncomingCallActivity so it opens on top of MainActivity in foreground
-            try {
-                Intent callScreenIntent = new Intent(this, IncomingCallActivity.class);
-                callScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                callScreenIntent.putExtra("callId",     pendingCallId);
-                callScreenIntent.putExtra("callerId",   pendingCallerId);
-                callScreenIntent.putExtra("callerName", pendingCallerName);
-                callScreenIntent.putExtra("callType",   pendingCallType);
-                callScreenIntent.putExtra("serverUrl",  pendingServerUrl);
-                startActivity(callScreenIntent);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to start IncomingCallActivity directly", e);
-            }
         } else if ("STOP_CALL".equals(action)) {
             Log.d(TAG, "Stopping call ringing");
             stopRinging();

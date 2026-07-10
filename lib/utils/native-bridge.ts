@@ -12,7 +12,13 @@ import { registerPlugin } from '@capacitor/core';
 
 interface CallPlugin {
   endCall: () => Promise<void>;
-  startRinging: (options: { callerName: string }) => Promise<void>;
+  startRinging: (options: {
+    callerName: string;
+    callId?: string;
+    callerId?: string;
+    callType?: string;
+    serverUrl?: string;
+  }) => Promise<void>;
   saveAuthToken: (options: { token: string }) => Promise<void>;
   getPendingCall: () => Promise<{
     hasPending: boolean;
@@ -250,10 +256,10 @@ export const NativeBridge = {
     }
   },
 
-  startNativeRinging: async (callerName: string) => {
+  startNativeRinging: async (callerName: string, callId?: string, callerId?: string, callType?: string, serverUrl?: string) => {
     if (Capacitor.isNativePlatform()) {
       try {
-        await CallPlugin.startRinging({ callerName });
+        await CallPlugin.startRinging({ callerName, callId, callerId, callType, serverUrl });
       } catch (e) {
         console.warn('CallPlugin: startRinging failed', e);
       }

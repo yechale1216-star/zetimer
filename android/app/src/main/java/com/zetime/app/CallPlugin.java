@@ -50,9 +50,19 @@ public class CallPlugin extends Plugin {
     @PluginMethod
     public void startRinging(PluginCall call) {
         String callerName = call.getString("callerName", "Unknown");
+        String callId      = call.getString("callId");
+        String callerId    = call.getString("callerId");
+        String callType    = call.getString("callType");
+        String serverUrl   = call.getString("serverUrl");
+
         Intent intent = new Intent(getContext(), CallService.class);
         intent.putExtra("ACTION", "START_CALL");
         intent.putExtra("callerName", callerName);
+        intent.putExtra("callId", callId);
+        intent.putExtra("callerId", callerId);
+        intent.putExtra("callType", callType);
+        intent.putExtra("serverUrl", serverUrl);
+
         getContext().startService(intent);
         call.resolve();
     }

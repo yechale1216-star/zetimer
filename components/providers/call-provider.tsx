@@ -46,6 +46,18 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     console.log('[CallProvider] Received incoming call from socket. Offer present:', !!data.offer);
+    
+    if (NativeBridge.isNative()) {
+      console.log('[CallProvider] Launching native calling activity overlay from foreground socket listener');
+      NativeBridge.startNativeRinging(
+        data.profile?.name || 'Unknown User',
+        data.callId,
+        data.from,
+        data.type,
+        data.serverUrl || ''
+      );
+    }
+
     setIncomingCallData(data);
     setCallType(data.type);
     setParticipants(prev => [
@@ -116,85 +128,43 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }, 30000);
 
       // 2. Play synthetic calling/ringing sound
-      try {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        audioCtx = new AudioContext();
-        gainNode = audioCtx.createGain();
-        gainNode.connect(audioCtx.destination);
-        
-        const playTone = () => {
-          if (!audioCtx || !gainNode) return;
+      if (!(isIncoming && NativeBridge.isNative())) {
+        try {
+          const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+          audioCtx = new AudioContext();
+          gainNode = audioCtx.createGain();
+          gainNode.connect(audioCtx.destination);
           
-          if (!isIncoming) {
-            // --- CALLER: Outgoing dual-tone ringback (440Hz + 480Hz) ---
-            // Pattern: 1.5s tone, 3.0s pause. Repeats every 4.5 seconds.
-            const osc1 = audioCtx.createOscillator();
-            const osc2 = audioCtx.createOscillator();
-            const ringGain = audioCtx.createGain();
+          const playTone = () => {
+            if (!audioCtx || !gainNode) return;
             
-            osc1.type = 'sine';
-            osc2.type = 'sine';
-            
-            osc1.frequency.setValueAtTime(440, audioCtx.currentTime); 
-            osc2.frequency.setValueAtTime(480, audioCtx.currentTime);
-            
-            osc1.connect(ringGain);
-            osc2.connect(ringGain);
-            ringGain.connect(gainNode!);
-            
-            const now = audioCtx.currentTime;
-            ringGain.gain.setValueAtTime(0, now);
-            ringGain.gain.linearRampToValueAtTime(0.08, now + 0.1);
-            ringGain.gain.setValueAtTime(0.08, now + 1.5);
-            ringGain.gain.linearRampToValueAtTime(0, now + 1.6);
-            
-            osc1.start();
-            osc2.start();
-            activeOscillators.push(osc1, osc2);
-            
-            setTimeout(() => {
-              try {
-                osc1.stop();
-                osc2.stop();
-                osc1.disconnect();
-                osc2.disconnect();
-                ringGain.disconnect();
-                
-                const i1 = activeOscillators.indexOf(osc1);
-                if (i1 > -1) activeOscillators.splice(i1, 1);
-                const i2 = activeOscillators.indexOf(osc2);
-                if (i2 > -1) activeOscillators.splice(i2, 1);
-              } catch (e) {}
-            }, 1800);
-          } else {
-            // --- RECIPIENT: Rapid musical incoming call ringtone ---
-            // Pulse: 0.4s tone, 0.2s pause, 0.4s tone, 2.0s pause. Repeats every 3.2s.
-            const playPulse = (delay: number) => {
-              if (!audioCtx || !gainNode) return;
+            if (!isIncoming) {
+              // --- CALLER: Outgoing dual-tone ringback (440Hz + 480Hz) ---
+              // Pattern: 1.5s tone, 3.0s pause. Repeats every 4.5 seconds.
               const osc1 = audioCtx.createOscillator();
               const osc2 = audioCtx.createOscillator();
               const ringGain = audioCtx.createGain();
-
-              osc1.type = 'triangle';
+              
+              osc1.type = 'sine';
               osc2.type = 'sine';
-
-              osc1.frequency.setValueAtTime(550, audioCtx.currentTime + delay);
-              osc2.frequency.setValueAtTime(750, audioCtx.currentTime + delay);
-
+              
+              osc1.frequency.setValueAtTime(440, audioCtx.currentTime); 
+              osc2.frequency.setValueAtTime(480, audioCtx.currentTime);
+              
               osc1.connect(ringGain);
               osc2.connect(ringGain);
               ringGain.connect(gainNode!);
-
-              const now = audioCtx.currentTime + delay;
+              
+              const now = audioCtx.currentTime;
               ringGain.gain.setValueAtTime(0, now);
-              ringGain.gain.linearRampToValueAtTime(0.15, now + 0.05);
-              ringGain.gain.setValueAtTime(0.15, now + 0.4);
-              ringGain.gain.linearRampToValueAtTime(0, now + 0.45);
-
-              osc1.start(now);
-              osc2.start(now);
+              ringGain.gain.linearRampToValueAtTime(0.08, now + 0.1);
+              ringGain.gain.setValueAtTime(0.08, now + 1.5);
+              ringGain.gain.linearRampToValueAtTime(0, now + 1.6);
+              
+              osc1.start();
+              osc2.start();
               activeOscillators.push(osc1, osc2);
-
+              
               setTimeout(() => {
                 try {
                   osc1.stop();
@@ -208,18 +178,62 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   const i2 = activeOscillators.indexOf(osc2);
                   if (i2 > -1) activeOscillators.splice(i2, 1);
                 } catch (e) {}
-              }, (delay + 0.6) * 1000);
-            };
+              }, 1800);
+            } else {
+              // --- RECIPIENT: Rapid musical incoming call ringtone ---
+              // Pulse: 0.4s tone, 0.2s pause, 0.4s tone, 2.0s pause. Repeats every 3.2s.
+              const playPulse = (delay: number) => {
+                if (!audioCtx || !gainNode) return;
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                const ringGain = audioCtx.createGain();
 
-            playPulse(0);
-            playPulse(0.6);
-          }
-        };
+                osc1.type = 'triangle';
+                osc2.type = 'sine';
 
-        playTone();
-        ringInterval = setInterval(playTone, isIncoming ? 3200 : 4500);
-      } catch (e) {
-        console.warn('AudioContext not supported or blocked:', e);
+                osc1.frequency.setValueAtTime(550, audioCtx.currentTime + delay);
+                osc2.frequency.setValueAtTime(750, audioCtx.currentTime + delay);
+
+                osc1.connect(ringGain);
+                osc2.connect(ringGain);
+                ringGain.connect(gainNode!);
+
+                const now = audioCtx.currentTime + delay;
+                ringGain.gain.setValueAtTime(0, now);
+                ringGain.gain.linearRampToValueAtTime(0.15, now + 0.05);
+                ringGain.gain.setValueAtTime(0.15, now + 0.4);
+                ringGain.gain.linearRampToValueAtTime(0, now + 0.45);
+
+                osc1.start(now);
+                osc2.start(now);
+                activeOscillators.push(osc1, osc2);
+
+                setTimeout(() => {
+                  try {
+                    osc1.stop();
+                    osc2.stop();
+                    osc1.disconnect();
+                    osc2.disconnect();
+                    ringGain.disconnect();
+                    
+                    const i1 = activeOscillators.indexOf(osc1);
+                    if (i1 > -1) activeOscillators.splice(i1, 1);
+                    const i2 = activeOscillators.indexOf(osc2);
+                    if (i2 > -1) activeOscillators.splice(i2, 1);
+                  } catch (e) {}
+                }, (delay + 0.6) * 1000);
+              };
+
+              playPulse(0);
+              playPulse(0.6);
+            }
+          };
+
+          playTone();
+          ringInterval = setInterval(playTone, isIncoming ? 3200 : 4500);
+        } catch (e) {
+          console.warn('AudioContext not supported or blocked:', e);
+        }
       }
     }
 
@@ -416,7 +430,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       {/* Global Modals */}
       <IncomingCallModal
-        isOpen={!!incomingCallData}
+        isOpen={!!incomingCallData && !NativeBridge.isNative()}
         caller={activeCaller || { name: 'Unknown' }}
         type={callType}
         isConnecting={isWaitingForOffer}

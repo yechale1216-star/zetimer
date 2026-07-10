@@ -104,10 +104,10 @@ public class IncomingCallActivity extends Activity {
             stopCallServiceRinging();
             cancelCallNotification();
 
-            // Open MainActivity with INCOMING_CALL action
+            // Open MainActivity with ANSWER action
             Intent open = new Intent(this, MainActivity.class);
             open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            open.putExtra("callAction",  "INCOMING_CALL");
+            open.putExtra("callAction",  "ANSWER");
             open.putExtra("callId",      callId);
             open.putExtra("callerId",    callerId);
             open.putExtra("callerName",  callerName);

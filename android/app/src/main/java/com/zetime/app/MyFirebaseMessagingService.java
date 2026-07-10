@@ -59,6 +59,14 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         if (data.isEmpty()) return;
 
+        // ── SECURITY: Never show notifications to a signed-out user ──────────
+        // The server may still hold a stale push token (e.g., offline logout).
+        // Guard here so no banner, ringtone, or notification ever surfaces.
+        if (!isUserSignedIn()) {
+            Log.d(TAG, "onMessageReceived: user not signed in — suppressing notification");
+            return;
+        }
+
         String type = data.get("type");
         if (type == null) return;
 
@@ -419,10 +427,25 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         Log.d(TAG, "Notification channels verified");
     }
 
+    /** Returns true if a user is currently signed in (auth token exists in SharedPreferences). */
+    private boolean isUserSignedIn() {
+        android.content.SharedPreferences prefs =
+            getSharedPreferences("zetime_prefs", android.content.Context.MODE_PRIVATE);
+        String token = prefs.getString("auth_token", null);
+        return token != null && !token.isEmpty();
+    }
+
     @Override
     public void onNewToken(@NonNull String token) {
         super.onNewToken(token);
         Log.d(TAG, "FCM token refreshed: " + token);
+
+        // If no user is signed in, do NOT re-register the token on the server.
+        // This prevents a signed-out device from receiving future push notifications.
+        if (!isUserSignedIn()) {
+            Log.d(TAG, "onNewToken: no signed-in user — skipping server registration");
+            return;
+        }
 
         // Persist the new token to the backend so server-side pushes keep working
         // We do this on a background thread to avoid blocking the main thread

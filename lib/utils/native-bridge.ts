@@ -28,6 +28,7 @@ interface CallPlugin {
   }) => Promise<void>;
   dismissCallBanner: () => Promise<void>;
   saveAuthToken: (options: { token: string }) => Promise<void>;
+  clearAuthToken: () => Promise<void>;
   getPendingCall: () => Promise<{
     hasPending: boolean;
     action?: string;
@@ -61,6 +62,20 @@ export const NativeBridge = {
         await CallPlugin.saveAuthToken({ token });
       } catch (e) {
         console.warn('[NativeBridge] saveAuthToken failed', e);
+      }
+    }
+  },
+
+  /** Wipes the native auth token from SharedPreferences on logout.
+   *  This prevents onNewToken from re-registering a stale FCM token
+   *  and stops MyFirebaseMessagingService from showing notifications. */
+  clearAuthToken: async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await CallPlugin.clearAuthToken();
+        console.log('[NativeBridge] Native auth token cleared on logout');
+      } catch (e) {
+        console.warn('[NativeBridge] clearAuthToken failed', e);
       }
     }
   },

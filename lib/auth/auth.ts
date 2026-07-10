@@ -566,7 +566,18 @@ class AuthService {
       } catch (e) {
         console.error("Logout API call failed", e);
       }
-      
+
+      // ── Native: wipe the auth token from SharedPreferences ────────────────
+      // This prevents MyFirebaseMessagingService from showing notifications and
+      // prevents onNewToken from re-registering a stale FCM token for this device
+      // when the user is signed out — even if the network call above failed.
+      try {
+        const { NativeBridge } = await import("@/lib/utils/native-bridge");
+        await NativeBridge.clearAuthToken();
+      } catch (e) {
+        // Non-fatal — only applies on native platform
+      }
+
       // Clear ALL school-scoped keys so that no data leaks to the next login session.
       // Never rely on components cleaning up after themselves — do it here atomically.
       const keysToRemove = [
@@ -587,7 +598,6 @@ class AuthService {
     }
     console.log("[pg] User logged out — all school-scoped localStorage keys cleared")
   }
-
   handleUnauthorized(): void {
     if (this.isClient()) {
       window.dispatchEvent(new Event("sessionExpired"))

@@ -9,7 +9,22 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-@CapacitorPlugin(name = "CallPlugin")
+import android.Manifest;
+import com.getcapacitor.annotation.Permission;
+
+@CapacitorPlugin(
+    name = "CallPlugin",
+    permissions = {
+        @Permission(
+            alias = "camera",
+            strings = { Manifest.permission.CAMERA }
+        ),
+        @Permission(
+            alias = "microphone",
+            strings = { Manifest.permission.RECORD_AUDIO }
+        )
+    }
+)
 public class CallPlugin extends Plugin implements CallManager.CallBannerListener {
     private static final String TAG = "CallPlugin";
     private static com.getcapacitor.JSObject pendingCall = null;

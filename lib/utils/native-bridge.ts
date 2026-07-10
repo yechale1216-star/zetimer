@@ -45,6 +45,8 @@ interface CallPlugin {
     eventName: 'onCallAction' | 'onForegroundNotification',
     listenerFunc: (data: any) => void
   ) => Promise<any>;
+  requestPermissions: (options?: { permissions: string[] }) => Promise<any>;
+  checkPermissions: () => Promise<any>;
 }
 
 const CallPlugin = registerPlugin<CallPlugin>('CallPlugin');
@@ -252,6 +254,20 @@ export const NativeBridge = {
       }
     }
     return { hasPending: false };
+  },
+
+  requestPermissions: async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        console.log('[NativeBridge] Requesting permissions for call...');
+        const res = await CallPlugin.requestPermissions({ permissions: ['camera', 'microphone'] });
+        console.log('[NativeBridge] Permissions result:', res);
+        return res;
+      } catch (e) {
+        console.warn('CallPlugin: requestPermissions failed', e);
+      }
+    }
+    return null;
   },
 
   endNativeCall: async () => {

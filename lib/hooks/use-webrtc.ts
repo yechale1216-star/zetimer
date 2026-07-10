@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSocket } from '@/components/providers/socket-provider';
+import { NativeBridge } from '@/lib/utils/native-bridge';
 
 interface WebRTCOptions {
   userId: string;
@@ -181,6 +182,9 @@ export const useWebRTC = (options: WebRTCOptions) => {
     callType.current = type;
     isInitiator.current = true;
     try {
+      if (NativeBridge.isNative()) {
+        await NativeBridge.requestPermissions();
+      }
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
         audio: {
@@ -221,6 +225,9 @@ export const useWebRTC = (options: WebRTCOptions) => {
     callType.current = type;
     isInitiator.current = false;
     try {
+      if (NativeBridge.isNative()) {
+        await NativeBridge.requestPermissions();
+      }
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
         audio: {

@@ -52,7 +52,7 @@ public class CallNotificationActionReceiver extends BroadcastReceiver {
                     Intent.FLAG_ACTIVITY_SINGLE_TOP |
                     Intent.FLAG_ACTIVITY_CLEAR_TOP
             );
-            openAppIntent.putExtra("callAction",  "ANSWER");
+            openAppIntent.putExtra("callAction",  "INCOMING_CALL");
             openAppIntent.putExtra("callId",      callId);
             openAppIntent.putExtra("callerId",    callerId);
             openAppIntent.putExtra("callType",    callType);

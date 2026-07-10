@@ -125,12 +125,16 @@ public class MainActivity extends BridgeActivity {
             String callId = intent.getStringExtra("callId");
             String callerId = intent.getStringExtra("callerId");
             String callType = intent.getStringExtra("callType");
+            String callerName = intent.getStringExtra("callerName");
+            String serverUrl = intent.getStringExtra("serverUrl");
 
             com.getcapacitor.JSObject callObj = new com.getcapacitor.JSObject();
             callObj.put("action", action);
             callObj.put("callId", callId);
             callObj.put("callerId", callerId);
             callObj.put("callType", callType);
+            if (callerName != null) callObj.put("callerName", callerName);
+            if (serverUrl != null) callObj.put("serverUrl", serverUrl);
 
             CallPlugin.setPendingCall(callObj);
 

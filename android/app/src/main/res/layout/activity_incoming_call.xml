@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Native full-screen incoming call layout shown over the lock screen -->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF061018">
+
+    <!-- Gradient background overlay -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/incoming_call_bg" />
+
+    <!-- Main content container -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingTop="80dp"
+        android:paddingBottom="60dp"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp">
+
+        <!-- Call type label -->
+        <TextView
+            android:id="@+id/tv_call_type"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="INCOMING VOICE CALL"
+            android:textColor="#FF25D366"
+            android:textSize="12sp"
+            android:letterSpacing="0.15"
+            android:textAllCaps="true"
+            android:fontFamily="sans-serif-medium" />
+
+        <!-- Spacer -->
+        <Space android:layout_width="0dp" android:layout_height="48dp" />
+
+        <!-- Avatar circle -->
+        <FrameLayout
+            android:layout_width="144dp"
+            android:layout_height="144dp">
+
+            <!-- Pulse ring 1 -->
+            <View
+                android:id="@+id/pulse_ring_1"
+                android:layout_width="144dp"
+                android:layout_height="144dp"
+                android:layout_gravity="center"
+                android:background="@drawable/pulse_ring" />
+
+            <!-- Pulse ring 2 -->
+            <View
+                android:id="@+id/pulse_ring_2"
+                android:layout_width="144dp"
+                android:layout_height="144dp"
+                android:layout_gravity="center"
+                android:background="@drawable/pulse_ring" />
+
+            <!-- Avatar image / fallback initial -->
+            <TextView
+                android:id="@+id/tv_avatar_initials"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:text="ZZ"
+                android:textColor="#FFFFFFFF"
+                android:textSize="40sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-black"
+                android:background="@drawable/avatar_bg" />
+        </FrameLayout>
+
+        <!-- Spacer -->
+        <Space android:layout_width="0dp" android:layout_height="32dp" />
+
+        <!-- Caller name -->
+        <TextView
+            android:id="@+id/tv_caller_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Unknown Caller"
+            android:textColor="#FFFFFFFF"
+            android:textSize="36sp"
+            android:fontFamily="sans-serif-light"
+            android:gravity="center"
+            android:letterSpacing="0.01" />
+
+        <!-- App label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Zetime"
+            android:textColor="#80FFFFFF"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif"
+            android:layout_marginTop="8dp" />
+
+        <!-- Flexible spacer -->
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Action Buttons Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_horizontal"
+            android:weightSum="3">
+
+            <!-- Decline -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <FrameLayout
+                    android:layout_width="80dp"
+                    android:layout_height="80dp">
+                    <View
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:background="@drawable/btn_decline_glow" />
+                    <Button
+                        android:id="@+id/btn_decline"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/btn_decline_bg"
+                        android:text="✕"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="28sp" />
+                </FrameLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="DECLINE"
+                    android:textColor="#80FFFFFF"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:layout_marginTop="10dp" />
+            </LinearLayout>
+
+            <!-- Message (center, smaller) -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_gravity="bottom"
+                android:paddingBottom="16dp">
+                <Button
+                    android:id="@+id/btn_message"
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:background="@drawable/btn_message_bg"
+                    android:text="✉"
+                    android:textColor="#80FFFFFF"
+                    android:textSize="20sp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MSG"
+                    android:textColor="#50FFFFFF"
+                    android:textSize="9sp"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:layout_marginTop="6dp" />
+            </LinearLayout>
+
+            <!-- Accept -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <FrameLayout
+                    android:layout_width="80dp"
+                    android:layout_height="80dp">
+                    <View
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:background="@drawable/btn_accept_glow" />
+                    <Button
+                        android:id="@+id/btn_accept"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/btn_accept_bg"
+                        android:text="✆"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="28sp" />
+                </FrameLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ACCEPT"
+                    android:textColor="#80FFFFFF"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true"
+                    android:layout_marginTop="10dp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

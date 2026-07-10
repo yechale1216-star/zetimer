@@ -300,15 +300,15 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         createNotificationChannels(nm);
 
-        Intent fullScreenIntent = new Intent(this, MainActivity.class);
-        fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        Intent fullScreenIntent = new Intent(this, IncomingCallActivity.class);
+        fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
         fullScreenIntent.putExtra("callId", callId);
         fullScreenIntent.putExtra("callerId", callerId);
         fullScreenIntent.putExtra("isIncomingCall", true);
         fullScreenIntent.putExtra("callerName", callerName);
         fullScreenIntent.putExtra("callType", callType);
         fullScreenIntent.putExtra("serverUrl", serverUrl);
-        PendingIntent fsPendingIntent = PendingIntent.getActivity(this, 0,
+        PendingIntent fsPendingIntent = PendingIntent.getActivity(this, 99,
                 fullScreenIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         Intent answerIntent = new Intent(this, CallNotificationActionReceiver.class);

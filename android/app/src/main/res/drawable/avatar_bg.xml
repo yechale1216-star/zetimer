@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Circular background for the avatar initials -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:type="radial"
+        android:gradientRadius="60dp"
+        android:startColor="#FF2d3748"
+        android:endColor="#FF1a202c" />
+    <stroke android:width="3dp" android:color="#4DFFFFFF" />
+</shape>

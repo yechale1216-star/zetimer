@@ -70,6 +70,17 @@
             android:exported="false"
             android:foregroundServiceType="phoneCall|microphone" />
 
+        <activity
+            android:name=".IncomingCallActivity"
+            android:label="Incoming Call"
+            android:theme="@style/AppTheme.NoActionBar"
+            android:launchMode="singleTask"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density" />
+
         <receiver
             android:name=".CallNotificationActionReceiver"
             android:enabled="true"

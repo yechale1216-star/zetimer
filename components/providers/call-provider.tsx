@@ -25,6 +25,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [participants, setParticipants] = useState<any[]>([]);
   const [callType, setCallType] = useState<'VOICE' | 'VIDEO'>('VOICE');
   const [pendingAction, setPendingAction] = useState<{ action: string; callId: string; callerId?: string; callType?: string } | null>(null);
+  const [isWaitingForOffer, setIsWaitingForOffer] = useState(false);
   const { toast } = useToast();
   const { isSuspended } = useSuspension();
 
@@ -44,6 +45,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[CallProvider] Rejecting incoming call signal due to school suspension');
       return;
     }
+    console.log('[CallProvider] Received incoming call from socket. Offer present:', !!data.offer);
     setIncomingCallData(data);
     setCallType(data.type);
     setParticipants(prev => [
@@ -263,16 +265,24 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     webrtc.startCall(toId, type, callerProfile);
   };
 
-  const handleAccept = () => {
+  const handleAccept = useCallback(() => {
     if (incomingCallData) {
+      if (!incomingCallData.offer) {
+        console.log('[CallProvider] User accepted call but offer not received yet. Setting isWaitingForOffer to true.');
+        setIsWaitingForOffer(true);
+        return;
+      }
+      console.log('[CallProvider] Answering call immediately.');
       NativeBridge.endNativeCall();
       webrtc.answerCall(incomingCallData.from, incomingCallData.offer, incomingCallData.type);
       setIncomingCallData(null);
+      setIsWaitingForOffer(false);
     }
-  };
+  }, [incomingCallData, webrtc]);
 
-  const handleReject = (isMissed: boolean = false) => {
+  const handleReject = useCallback((isMissed: boolean = false) => {
     NativeBridge.endNativeCall();
+    setIsWaitingForOffer(false);
     // Emit reject_call to notify the caller before cleaning up
     if (incomingCallData) {
       webrtc.rejectCall(incomingCallData.from, isMissed);
@@ -281,18 +291,30 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setIncomingCallData(null);
     setParticipants(prev => prev.filter(p => p.isLocal));
-  };
+  }, [incomingCallData, webrtc]);
+
+  // Auto-answer when wait-triggered and socket offer arrives
+  useEffect(() => {
+    if (incomingCallData && incomingCallData.offer && isWaitingForOffer) {
+      console.log('[CallProvider] Offer received while waiting. Answering call now.');
+      NativeBridge.endNativeCall();
+      webrtc.answerCall(incomingCallData.from, incomingCallData.offer, incomingCallData.type);
+      setIncomingCallData(null);
+      setIsWaitingForOffer(false);
+    }
+  }, [incomingCallData, isWaitingForOffer, webrtc]);
 
   // ── Handle Pending Call Action from Native Bridge ──────────────────────────
   const handlePendingCallAction = useCallback((action: string, callId: string, callerId?: string, callerName?: string, callType?: string) => {
-    console.log(`[CallProvider] Handling pending call action: ${action} for call ${callId}`);
+    console.log(`[CallProvider] Handling pending call action: ${action} for call ${callId}, caller: ${callerName}`);
     
     if (action === 'INCOMING_CALL') {
+      const resolvedName = callerName && callerName.trim() ? callerName : 'Unknown Caller';
       const activeCall = {
         from: callerId || 'unknown',
         callId,
         type: callType === 'VIDEO' ? 'VIDEO' : 'VOICE',
-        profile: { name: callerName || 'Unknown', avatar: '' }
+        profile: { name: resolvedName, avatar: '' }
       };
       setIncomingCallData(activeCall);
       setCallType(callType === 'VIDEO' ? 'VIDEO' : 'VOICE');
@@ -397,6 +419,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isOpen={!!incomingCallData}
         caller={activeCaller || { name: 'Unknown' }}
         type={callType}
+        isConnecting={isWaitingForOffer}
         onAccept={handleAccept}
         onReject={handleReject}
       />

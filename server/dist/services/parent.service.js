@@ -332,7 +332,7 @@ const updatePreferences = async (phone, schoolId, data) => {
 };
 exports.updatePreferences = updatePreferences;
 const postAnnouncement = async (schoolId, data) => {
-    return await db_1.default.parentNotification.create({
+    const result = await db_1.default.parentNotification.create({
         data: {
             schoolId,
             studentId: data.studentId || null,
@@ -342,6 +342,48 @@ const postAnnouncement = async (schoolId, data) => {
             isRead: false
         }
     });
+    try {
+        const parentLinks = await db_1.default.parentStudentLink.findMany({
+            where: {
+                schoolId,
+                ...(data.studentId ? { studentId: data.studentId } : {})
+            },
+            include: {
+                parent: true
+            }
+        });
+        const { sendCategoryNotification } = require('./notification.service');
+        const uniqueParents = Array.from(new Map(parentLinks
+            .filter(l => l.parent !== null)
+            .map(l => [l.parentId, l.parent])).values());
+        for (const parent of uniqueParents) {
+            if (parent && parent.pushToken) {
+                // Check parent preferences only if phone is set
+                if (parent.phone) {
+                    const prefs = await db_1.default.parentPreferences.findUnique({
+                        where: { parentPhone_schoolId: { parentPhone: parent.phone, schoolId } }
+                    });
+                    if (prefs && !prefs.pushNotifications) {
+                        continue; // Guard: parent disabled push alerts
+                    }
+                }
+                await sendCategoryNotification(parent.pushToken, {
+                    type: 'new_announcement',
+                    title: data.title || 'New Announcement',
+                    body: data.message || 'There is a new announcement from school.',
+                    route: '/parent/announcements',
+                    schoolId,
+                    tag: 'announcements'
+                }).catch((err) => {
+                    console.error(`Failed to send announcement push to parent ${parent.id}:`, err);
+                });
+            }
+        }
+    }
+    catch (e) {
+        console.error('Failed to dispatch announcement push notifications:', e);
+    }
+    return result;
 };
 exports.postAnnouncement = postAnnouncement;
 const updateAnnouncement = async (id, schoolId, data) => {

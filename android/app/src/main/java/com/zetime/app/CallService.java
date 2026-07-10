@@ -166,7 +166,18 @@ public class CallService extends Service {
             nm.createNotificationChannel(channel);
         }
 
-        // Full-screen intent to open the call UI when user taps
+        // Full-screen intent -> IncomingCallActivity (shows immediately over lock screen)
+        Intent callScreenIntent = new Intent(this, IncomingCallActivity.class);
+        callScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+        callScreenIntent.putExtra("callId",     pendingCallId);
+        callScreenIntent.putExtra("callerId",   pendingCallerId);
+        callScreenIntent.putExtra("callerName", pendingCallerName);
+        callScreenIntent.putExtra("callType",   pendingCallType);
+        callScreenIntent.putExtra("serverUrl",  pendingServerUrl);
+        PendingIntent callScreenPI = PendingIntent.getActivity(this, 99, callScreenIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        // Content intent -> MainActivity (for tapping the notification banner)
         Intent openIntent = new Intent(this, MainActivity.class);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         openIntent.putExtra("isIncomingCall", true);
@@ -209,7 +220,7 @@ public class CallService extends Service {
                 .setOngoing(true)
                 .setAutoCancel(false)
                 .setContentIntent(openPI)
-                .setFullScreenIntent(openPI, true)
+                .setFullScreenIntent(callScreenPI, true)
                 .addAction(R.mipmap.ic_launcher, "Decline", declinePI)
                 .addAction(R.mipmap.ic_launcher, "Answer",  answerPI)
                 .build();

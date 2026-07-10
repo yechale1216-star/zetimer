@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   PhoneOff, Mic, MicOff, Video, VideoOff,
-  Maximize2, Minimize2, Users, Volume2, SwitchCamera
+  Maximize2, Minimize2, Volume2, SwitchCamera,
+  PhoneCall, SignalHigh
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -63,6 +64,8 @@ const VideoStream = React.memo(
     );
   }
 );
+VideoStream.displayName = 'VideoStream';
+
 // ── Stable audio element that attaches the stream via ref ────────────────────
 const AudioStream = React.memo(({ stream }: { stream: MediaStream | null }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -91,6 +94,60 @@ const AudioStream = React.memo(({ stream }: { stream: MediaStream | null }) => {
 });
 AudioStream.displayName = 'AudioStream';
 
+// Animated pulsing dot for "ringing" / "connecting" state
+const StatusDot = () => (
+  <span className="flex items-center gap-1">
+    {[0, 0.2, 0.4].map((d, i) => (
+      <motion.span
+        key={i}
+        className="h-1.5 w-1.5 rounded-full bg-green-400"
+        animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
+        transition={{ duration: 1.2, repeat: Infinity, delay: d }}
+      />
+    ))}
+  </span>
+);
+
+// ── Control Button ────────────────────────────────────────────────────────────
+const CtrlBtn = ({
+  onClick,
+  active,
+  danger,
+  large,
+  label,
+  children,
+}: {
+  onClick?: () => void;
+  active?: boolean;
+  danger?: boolean;
+  large?: boolean;
+  label?: string;
+  children: React.ReactNode;
+}) => (
+  <div className="flex flex-col items-center gap-2">
+    <motion.button
+      whileTap={{ scale: 0.85 }}
+      onClick={onClick}
+      className={cn(
+        'flex items-center justify-center rounded-full shadow-lg transition-colors focus:outline-none',
+        large ? 'h-[68px] w-[68px]' : 'h-[58px] w-[58px]',
+        danger
+          ? 'bg-red-500 hover:bg-red-600 text-white'
+          : active
+          ? 'bg-white text-slate-900'
+          : 'bg-white/15 backdrop-blur-xl border border-white/10 text-white hover:bg-white/25'
+      )}
+    >
+      {children}
+    </motion.button>
+    {label && (
+      <span className="text-white/70 text-[11px] tracking-wide font-medium drop-shadow-md">
+        {label}
+      </span>
+    )}
+  </div>
+);
+
 // ── Main component ────────────────────────────────────────────────────────────
 export const CallOverlay: React.FC<CallOverlayProps> = ({
   status,
@@ -109,7 +166,8 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [callTime, setCallTime] = useState(0);
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [showControls, setShowControls] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -118,6 +176,18 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
     }
     return () => clearInterval(interval);
   }, [status]);
+
+  // Auto-hide controls in video call after inactivity
+  useEffect(() => {
+    if (type !== 'VIDEO') return;
+    const resetTimer = () => {
+      setShowControls(true);
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 5000);
+    };
+    resetTimer();
+    return () => { if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current); };
+  }, [type]);
 
   const formatTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -130,6 +200,13 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
     firstRemoteStream.getVideoTracks().length > 0 &&
     firstRemoteStream.getVideoTracks()[0].enabled &&
     !isRemoteCameraOff;
+
+  const initials = caller.name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   // ── Minimized bubble ─────────────────────────────────────────────────────────
   if (isMinimized) {
@@ -147,7 +224,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
             <Avatar className="h-16 w-16 border-2 border-white/20">
               <AvatarImage src={caller.avatar} />
               <AvatarFallback className="bg-slate-700 text-white text-xl font-bold">
-                {caller.name.slice(0, 2).toUpperCase()}
+                {initials}
               </AvatarFallback>
             </Avatar>
             <span className="text-[10px] text-white/70 text-center px-2 truncate w-full">{caller.name}</span>
@@ -180,8 +257,15 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[110] bg-slate-950 flex flex-col overflow-hidden select-none"
+      className="fixed inset-0 z-[110] flex flex-col overflow-hidden select-none"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      onPointerDown={() => {
+        if (type === 'VIDEO') {
+          setShowControls(true);
+          if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+          controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 5000);
+        }
+      }}
     >
       {/* Hidden audio outputs for all remote participants who don't have an active video stream */}
       {participants.map(p => {
@@ -192,128 +276,171 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
         return <AudioStream key={p.id} stream={stream} />;
       })}
 
-      {/* ── Background: remote video or gradient ─────────────────────── */}
-      <div className="absolute inset-0 z-0">
+      {/* ── Background ─────────────────────────────────────────────── */}
+      <div className="absolute inset-0 z-0" style={{ pointerEvents: 'none' }}>
         {type === 'VIDEO' && hasRemoteVideo ? (
           <>
             <VideoStream stream={firstRemoteStream!} className="absolute inset-0" />
-            {/* Gradient overlays for readability */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/70 pointer-events-none" />
           </>
         ) : type === 'VIDEO' && firstRemote && !hasRemoteVideo ? (
-          // Telegram Style: show local video taking full screen while waiting
           <>
-             {localStream && !isCameraOff ? (
-                <VideoStream stream={localStream} isLocal={true} className="absolute inset-0" />
-             ) : (
-                <div className="w-full h-full bg-slate-900" />
-             )}
-             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none" />
-             {/* Center name and status */}
-             <div className="absolute top-28 left-1/2 -translate-x-1/2 flex flex-col items-center">
-                 <h1 className="text-white text-3xl md:text-4xl font-normal drop-shadow-md tracking-wide">{firstRemote.name}</h1>
-                 <p className="text-white text-[15px] font-medium mt-1 drop-shadow-md">
-                  {status === 'RINGING' ? 'Ringing...' : status === 'CONNECTING' ? 'Connecting...' : status === 'CONNECTED' ? 'Waiting for video...' : 'Reconnecting...'}
-                 </p>
-             </div>
+            {localStream && !isCameraOff ? (
+              <VideoStream stream={localStream} isLocal={true} className="absolute inset-0" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-b from-[#1a2a3a] via-[#0f1f2e] to-[#061018]" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none" />
           </>
         ) : (
-          // Voice call background
-          <div className="w-full h-full bg-gradient-to-br from-slate-900 via-primary/10 to-slate-950" />
+          // Voice call: deep gradient background
+          <div className="w-full h-full bg-gradient-to-b from-[#1a2a3a] via-[#0f1f2e] to-[#061018]">
+            {/* Ambient green glow */}
+            <motion.div
+              animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.45, 0.3] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full"
+              style={{ background: 'radial-gradient(circle, rgba(37,211,102,0.25) 0%, transparent 70%)' }}
+            />
+          </div>
         )}
       </div>
 
-      {/* ── Header ───────────────────────────────────────────────────────── */}
-      <div className="relative z-20 flex items-center justify-between px-6 pt-6 pb-2">
-        <button
-          onClick={() => setIsMinimized(true)}
-          className="p-2 text-white active:scale-90 transition-transform drop-shadow-md"
-        >
-          <Minimize2 className="h-6 w-6 md:h-7 md:w-7" />
-        </button>
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {(type === 'VOICE' || showControls) && (
+          <motion.div
+            initial={type === 'VIDEO' ? { opacity: 0 } : {}}
+            animate={{ opacity: 1 }}
+            exit={type === 'VIDEO' ? { opacity: 0 } : {}}
+            className="relative z-20 flex items-center justify-between px-5 pt-5 pb-2"
+          >
+            <button
+              onClick={() => setIsMinimized(true)}
+              className="p-2 text-white active:scale-90 transition-transform drop-shadow-md"
+            >
+              <Minimize2 className="h-6 w-6" />
+            </button>
 
-        <div className="flex flex-col items-center">
-          {status === 'CONNECTED' && type === 'VOICE' && (
-            <>
-              <span className="text-white/50 text-[10px] uppercase tracking-[0.25em] font-semibold">Encrypted</span>
-              <span className="text-white font-mono text-base font-bold">
-                {formatTime(callTime)}
-              </span>
-            </>
-          )}
-        </div>
+            {/* Center: Timer or status */}
+            <div className="flex flex-col items-center min-w-[80px]">
+              {status === 'CONNECTED' ? (
+                <>
+                  <span className="text-white/40 text-[10px] uppercase tracking-[0.25em] font-semibold flex items-center gap-1.5">
+                    <SignalHigh className="h-3 w-3 text-green-400" />
+                    Encrypted
+                  </span>
+                  <span className="text-white font-mono text-base font-bold">{formatTime(callTime)}</span>
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <StatusDot />
+                  <span className="text-white/60 text-xs font-medium">
+                    {status === 'RINGING' ? 'Ringing' : 'Connecting'}
+                  </span>
+                </div>
+              )}
+            </div>
 
-        <button className="p-2 text-white active:scale-90 transition-transform drop-shadow-md">
-          <Volume2 className="h-6 w-6 md:h-7 md:w-7" />
-        </button>
-      </div>
+            <button className="p-2 text-white active:scale-90 transition-transform drop-shadow-md">
+              <Volume2 className="h-6 w-6" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* ── Center: Voice call avatar / name ─────────────────────────────── */}
+      {/* ── Voice Call Center ───────────────────────────────────────── */}
       {type === 'VOICE' && (
         <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-6 px-6">
-          <div className="relative">
-            {/* Professional Smooth Ripple Effect */}
-            <div className="absolute inset-0">
+          <div className="relative flex items-center justify-center">
+            {/* Pulse rings — green when connected, white when ringing */}
+            <div className="absolute inset-0 flex items-center justify-center">
               {[0, 1, 2].map((i) => (
                 <motion.div
                   key={i}
                   initial={{ scale: 1, opacity: 0.5 }}
-                  animate={{ scale: [1, 2.8], opacity: [0.5, 0] }}
+                  animate={{ scale: [1, 2.8], opacity: [0.4, 0] }}
                   transition={{
                     duration: 3,
                     repeat: Infinity,
-                    ease: [0.33, 1, 0.68, 1], // easeOutQuart
+                    ease: [0.33, 1, 0.68, 1],
                     delay: i * 1,
                   }}
-                  className="absolute inset-0 rounded-full border border-green-500/30 bg-green-500/5 backdrop-blur-[2px]"
+                  className={cn(
+                    'absolute inset-0 rounded-full border',
+                    status === 'CONNECTED'
+                      ? 'border-green-500/40 bg-green-500/8'
+                      : 'border-white/20 bg-white/5'
+                  )}
                 />
               ))}
             </div>
 
-            <Avatar className={cn(
-              "relative h-36 w-36 md:h-44 md:w-44 border-[3px] shadow-2xl transition-all duration-700 ease-in-out",
-              (status === 'CONNECTED' || status === 'RINGING' || status === 'CONNECTING')
-                ? "border-green-500 ring-[12px] ring-green-500/5 shadow-green-500/10"
-                : "border-white/15"
-            )}>
+            <Avatar
+              className={cn(
+                'relative h-36 w-36 md:h-44 md:w-44 border-[3px] shadow-2xl transition-all duration-700',
+                status === 'CONNECTED'
+                  ? 'border-green-500 ring-[14px] ring-green-500/10'
+                  : 'border-white/30 ring-[14px] ring-white/5'
+              )}
+            >
               <AvatarImage src={caller.avatar} />
-              <AvatarFallback className={cn(
-                "text-6xl font-black transition-colors duration-700",
-                (status === 'CONNECTED' || status === 'RINGING' || status === 'CONNECTING')
-                  ? "bg-green-600 text-white"
-                  : "bg-slate-800 text-white"
-              )}>
-                {caller.name.slice(0, 2).toUpperCase()}
+              <AvatarFallback
+                className={cn(
+                  'text-5xl font-black transition-colors duration-700',
+                  status === 'CONNECTED' ? 'bg-green-700 text-white' : 'bg-slate-700 text-white'
+                )}
+              >
+                {initials}
               </AvatarFallback>
             </Avatar>
           </div>
+
           <div className="text-center">
-            <h2 className="text-white text-2xl md:text-3xl font-bold">{caller.name}</h2>
-            <p className="text-white/50 text-sm mt-1 uppercase tracking-widest">
+            <h2 className="text-white text-3xl md:text-4xl font-light tracking-wide">{caller.name}</h2>
+            <p className="text-white/50 text-sm mt-2 uppercase tracking-widest">
               {status === 'CONNECTED'
                 ? 'In Call'
                 : status === 'RINGING'
                 ? 'Ringing...'
-                : status === 'CONNECTING'
-                ? 'Connecting...'
-                : 'Reconnecting...'}
+                : 'Connecting...'}
             </p>
           </div>
         </div>
       )}
 
-      {/* ── Local PIP (Video mode only) ─────────────────────────────────── */}
+      {/* ── Video call: waiting for remote (show local full) ────────── */}
+      {type === 'VIDEO' && firstRemote && !hasRemoteVideo && (
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center">
+          <motion.div className="flex flex-col items-center gap-4">
+            <Avatar className="h-28 w-28 border-3 border-white/30 shadow-2xl">
+              <AvatarImage src={caller.avatar} />
+              <AvatarFallback className="text-4xl font-black bg-slate-700 text-white">{initials}</AvatarFallback>
+            </Avatar>
+            <div className="text-center">
+              <h1 className="text-white text-3xl font-light tracking-wide">{firstRemote.name}</h1>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <StatusDot />
+                <p className="text-white/60 text-sm">
+                  {status === 'RINGING' ? 'Ringing...' : status === 'CONNECTING' ? 'Connecting...' : 'Waiting for video...'}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ── Local PIP (Video mode — remote video is playing) ────────── */}
       {type === 'VIDEO' && hasRemoteVideo && (
-        <div className="relative z-20 flex-1">
-          {/* Local self-view: fixed to bottom-right but above controls */}
+        <>
+          <div className="relative z-20 flex-1" />
           <motion.div
             drag
             dragMomentum={false}
             className={cn(
-              "absolute z-30 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-900 cursor-move",
-              // Responsive sizing & positioning
-              "w-[90px] h-[130px] sm:w-[110px] sm:h-[160px] md:w-[130px] md:h-[190px]",
-              "bottom-4 right-4"
+              'fixed z-30 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-900 cursor-move',
+              'w-[88px] h-[128px] sm:w-[108px] sm:h-[158px] md:w-[128px] md:h-[188px]',
+              'bottom-36 right-4'
             )}
           >
             {!isCameraOff ? (
@@ -326,108 +453,92 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
                 <span className="text-[8px] text-white/40 uppercase font-bold">Cam Off</span>
               </div>
             )}
-            {/* Mute indicator */}
             {isMuted && (
               <div className="absolute bottom-1 right-1 bg-red-500/80 rounded-full p-0.5">
                 <MicOff className="h-2 w-2 text-white" />
               </div>
             )}
           </motion.div>
-        </div>
+        </>
       )}
 
-      {/* ── Voice call spacer ─────────────────────────────────────────────── */}
+      {/* ── Voice spacer ────────────────────────────────────────────── */}
       {type === 'VOICE' && <div className="flex-1" />}
 
-      {/* ── Controls Bar ─────────────────────────────────────────────────── */}
-      {type === 'VIDEO' ? (
-        <div className="relative z-20 flex items-start justify-between w-full max-w-sm mx-auto pb-10 pt-4 px-8 mt-auto">
-          {/* Flip */}
-          <div className="flex flex-col items-center gap-2">
-            <button
-              className="h-[60px] w-[60px] rounded-full bg-white text-slate-800 flex items-center justify-center transition-transform active:scale-90 shadow-2xl"
-              onClick={onFlipCamera}
-            >
-              <SwitchCamera className="h-7 w-7" />
-            </button>
-            <span className="text-white text-[12px] tracking-wide font-medium drop-shadow-md">Flip</span>
-          </div>
+      {/* ── Controls ────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {(type === 'VOICE' || showControls) && (
+          <motion.div
+            initial={type === 'VIDEO' ? { opacity: 0, y: 20 } : {}}
+            animate={{ opacity: 1, y: 0 }}
+            exit={type === 'VIDEO' ? { opacity: 0, y: 20 } : {}}
+            className="relative z-20 pb-10 pt-2 px-6 mt-auto"
+          >
+            {type === 'VIDEO' ? (
+              <div className="flex items-end justify-between w-full max-w-sm mx-auto">
+                <CtrlBtn onClick={onFlipCamera} label="Flip">
+                  <SwitchCamera className="h-6 w-6" />
+                </CtrlBtn>
 
-          {/* Stop Video */}
-          <div className="flex flex-col items-center gap-2">
-            <button
-              onClick={onToggleCamera}
-              className={cn(
-                "h-[60px] w-[60px] rounded-full flex items-center justify-center transition-transform active:scale-90 shadow-2xl",
-                isCameraOff ? "bg-white text-slate-900" : "bg-white/15 backdrop-blur-2xl border-white/20 text-white"
-              )}
-            >
-              {isCameraOff ? <VideoOff className="h-7 w-7" /> : <Video className="h-7 w-7" />}
-            </button>
-            <span className="text-white text-[12px] tracking-wide font-medium drop-shadow-md">
-              {isCameraOff ? 'Video On' : 'Stop Video'}
-            </span>
-          </div>
+                <CtrlBtn
+                  onClick={onToggleCamera}
+                  active={isCameraOff}
+                  label={isCameraOff ? 'Video On' : 'Stop Video'}
+                >
+                  {isCameraOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+                </CtrlBtn>
 
-          {/* Mute */}
-          <div className="flex flex-col items-center gap-2">
-            <button
-              onClick={onToggleMute}
-              className={cn(
-                "h-[60px] w-[60px] rounded-full flex items-center justify-center transition-transform active:scale-90 shadow-2xl",
-                isMuted ? "bg-white text-slate-900" : "bg-white/15 backdrop-blur-2xl border-white/20 text-white"
-              )}
-            >
-              {isMuted ? <MicOff className="h-7 w-7" /> : <Mic className="h-7 w-7" />}
-            </button>
-            <span className="text-white text-[12px] tracking-wide font-medium drop-shadow-md">
-              {isMuted ? 'Unmute' : 'Mute'}
-            </span>
-          </div>
+                <CtrlBtn
+                  onClick={onToggleMute}
+                  active={isMuted}
+                  label={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                </CtrlBtn>
 
-          {/* End Call */}
-          <div className="flex flex-col items-center gap-2">
-            <button
-              onClick={onEndCall}
-              className="h-[60px] w-[60px] rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-2xl transition-transform active:scale-90"
-            >
-              <PhoneOff className="h-7 w-7 text-white" />
-            </button>
-            <span className="text-white text-[12px] tracking-wide font-medium drop-shadow-md">End Call</span>
-          </div>
-        </div>
-      ) : (
-        <div className="relative z-20 flex items-center justify-center pb-8 pt-4 px-4 mt-auto">
-          <div className="bg-white/10 backdrop-blur-2xl rounded-full border border-white/10 shadow-2xl flex items-center gap-3 md:gap-5 px-6 md:px-8 py-3 md:py-4">
-            {/* Mute */}
-            <button
-              onClick={onToggleMute}
-              className={cn(
-                "h-12 w-12 md:h-14 md:w-14 rounded-full flex items-center justify-center transition-all active:scale-90",
-                isMuted ? "bg-white text-slate-900" : "bg-white/15 text-white hover:bg-white/25"
-              )}
-            >
-              {isMuted ? <MicOff className="h-5 w-5 md:h-6 md:w-6" /> : <Mic className="h-5 w-5 md:h-6 md:w-6" />}
-            </button>
+                <CtrlBtn onClick={onEndCall} danger large label="End Call">
+                  <PhoneOff className="h-7 w-7" />
+                </CtrlBtn>
+              </div>
+            ) : (
+              // Voice call controls — pill container
+              <div className="bg-white/10 backdrop-blur-2xl rounded-full border border-white/10 shadow-2xl flex items-center justify-center gap-3 md:gap-5 px-6 md:px-8 py-3 mx-auto w-fit">
+                {/* Mute */}
+                <motion.button
+                  whileTap={{ scale: 0.88 }}
+                  onClick={onToggleMute}
+                  className={cn(
+                    'h-13 w-13 md:h-14 md:w-14 h-[52px] w-[52px] rounded-full flex items-center justify-center transition-all',
+                    isMuted ? 'bg-white text-slate-900' : 'bg-white/15 text-white hover:bg-white/25'
+                  )}
+                >
+                  {isMuted ? <MicOff className="h-5 w-5 md:h-6 md:w-6" /> : <Mic className="h-5 w-5 md:h-6 md:w-6" />}
+                </motion.button>
 
-            {/* Speaker */}
-            <button className="h-12 w-12 md:h-14 md:w-14 rounded-full bg-white/15 text-white flex items-center justify-center hover:bg-white/25 transition-all active:scale-90">
-              <Volume2 className="h-5 w-5 md:h-6 md:w-6" />
-            </button>
+                {/* Speaker */}
+                <motion.button
+                  whileTap={{ scale: 0.88 }}
+                  className="h-[52px] w-[52px] rounded-full bg-white/15 text-white flex items-center justify-center hover:bg-white/25 transition-all"
+                >
+                  <Volume2 className="h-5 w-5 md:h-6 md:w-6" />
+                </motion.button>
 
-            {/* Divider */}
-            <div className="w-px h-8 bg-white/15 mx-1" />
+                {/* Divider */}
+                <div className="w-px h-8 bg-white/15 mx-1" />
 
-            {/* End Call */}
-            <button
-              onClick={onEndCall}
-              className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-xl transition-all active:scale-95"
-            >
-              <PhoneOff className="h-6 w-6 md:h-7 md:w-7 text-white" />
-            </button>
-          </div>
-        </div>
-      )}
+                {/* End Call — large red pill button */}
+                <motion.button
+                  whileTap={{ scale: 0.88 }}
+                  onClick={onEndCall}
+                  className="h-[60px] w-[60px] md:h-[68px] md:w-[68px] rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-xl transition-all"
+                >
+                  <PhoneOff className="h-6 w-6 md:h-7 md:w-7 text-white" />
+                </motion.button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

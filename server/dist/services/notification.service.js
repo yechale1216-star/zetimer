@@ -4,6 +4,7 @@ exports.sendPushNotification = sendPushNotification;
 exports.sendMessageNotification = sendMessageNotification;
 exports.sendCallNotification = sendCallNotification;
 exports.sendCallCancellation = sendCallCancellation;
+exports.sendCategoryNotification = sendCategoryNotification;
 const app_1 = require("firebase-admin/app");
 const messaging_1 = require("firebase-admin/messaging");
 let app;
@@ -88,9 +89,9 @@ async function sendPushNotification(token, title, body, data = {}) {
     }
 }
 /**
- * Sends a rich data-only FCM message for a new chat message.
- * Data-only ensures our Android native handler builds the notification
- * with full grouping, sound, preview, and chat-open action.
+ * Sends a rich FCM message for a new chat message.
+ * Includes both notification and data blocks so Android shows it on the
+ * lock screen / notification tray even when the app is backgrounded or killed.
  */
 async function sendMessageNotification(token, payload) {
     const activeApp = app || ((0, app_1.getApps)().length > 0 ? (0, app_1.getApps)()[0] : undefined);
@@ -100,8 +101,14 @@ async function sendMessageNotification(token, payload) {
         ? payload.messagePreview.substring(0, 97) + '...'
         : payload.messagePreview;
     const message = {
+        // notification block ensures delivery on lock screen / killed app via Google Play Services
+        notification: {
+            title: payload.senderName,
+            body: preview,
+        },
         data: {
             type: 'new_message',
+            notifType: 'new_message',
             conversationId: payload.conversationId,
             senderId: payload.senderId,
             senderName: payload.senderName,
@@ -115,6 +122,11 @@ async function sendMessageNotification(token, payload) {
         android: {
             priority: 'high',
             ttl: 86400000,
+            notification: {
+                channelId: 'high_priority',
+                sound: 'notification',
+                visibility: 'public',
+            },
         },
         apns: {
             payload: {
@@ -122,7 +134,7 @@ async function sendMessageNotification(token, payload) {
             },
             headers: {
                 'apns-priority': '10',
-                'apns-push-type': 'background',
+                'apns-push-type': 'alert',
             },
         },
         webpush: {
@@ -151,29 +163,35 @@ async function sendMessageNotification(token, payload) {
     }
 }
 /**
- * Sends a high-priority data-only notification to trigger a full-screen call UI.
+ * Sends a DATA-ONLY high-priority FCM call notification.
+ * Must NOT include a notification block — if it does, Google Play Services
+ * renders a basic banner and skips onMessageReceived entirely, so our Java code
+ * (which adds Answer/Decline buttons, vibration, and fullScreenIntent) never runs.
+ * High-priority data messages reliably wake the app even when backgrounded.
  */
 async function sendCallNotification(token, data) {
     const activeApp = app || ((0, app_1.getApps)().length > 0 ? (0, app_1.getApps)()[0] : undefined);
     if (!activeApp)
         return;
     const message = {
-        // SILENT DATA-ONLY MESSAGE
+        // DATA-ONLY: no notification block — ensures onMessageReceived fires so Java
+        // can show the full HUN with Answer/Decline action buttons + vibration + fullScreenIntent
         data: {
             type: 'incoming_call',
+            notifType: 'incoming_call',
             callId: data.callId,
             callerId: data.callerId,
             callerName: data.callerName,
             callerAvatar: data.callerAvatar || '',
             callType: data.callType,
             serverUrl: data.serverUrl,
+            isIncomingCall: 'true',
         },
         token: token,
         android: {
-            priority: 'high',
-            ttl: 30000,
+            priority: 'high', // critical: wakes the device even when screen is off
+            ttl: 30000, // 30-second max age — stale calls must not ring
         },
-        // Required for some delivery contexts
         apns: {
             payload: {
                 aps: {
@@ -181,7 +199,7 @@ async function sendCallNotification(token, data) {
                     priority: 10,
                 },
             },
-        }
+        },
     };
     try {
         const messaging = (0, messaging_1.getMessaging)(activeApp);
@@ -193,6 +211,7 @@ async function sendCallNotification(token, data) {
 }
 /**
  * Sends a notification to cancel an ongoing call ring.
+ * Data-only is intentional here — no system tray entry needed, just wake the app.
  */
 async function sendCallCancellation(token, callId) {
     const activeApp = app || ((0, app_1.getApps)().length > 0 ? (0, app_1.getApps)()[0] : undefined);
@@ -214,5 +233,96 @@ async function sendCallCancellation(token, callId) {
     }
     catch (error) {
         console.error('[NotificationService] Error sending call cancellation:', error);
+    }
+}
+/**
+ * Sends a structured, category-specific push notification.
+ * Includes BOTH notification and data blocks:
+ *   - notification block → Google Play Services shows it natively on lock screen / killed app
+ *   - data block         → carries routing info for deep-linking when the user taps
+ *   - android.notification.channelId → uses our custom channels (sound, vibration, priority)
+ */
+async function sendCategoryNotification(token, payload) {
+    const activeApp = app || ((0, app_1.getApps)().length > 0 ? (0, app_1.getApps)()[0] : undefined);
+    if (!activeApp)
+        return;
+    const dataPayload = {
+        type: payload.type,
+        // Duplicate as notifType so MainActivity.handleIntent works for both tap paths
+        notifType: payload.type,
+        title: payload.title,
+        body: payload.body,
+        timestamp: Date.now().toString(),
+    };
+    if (payload.route)
+        dataPayload.route = payload.route;
+    if (payload.studentId)
+        dataPayload.studentId = payload.studentId;
+    if (payload.schoolId)
+        dataPayload.schoolId = payload.schoolId;
+    if (payload.badge !== undefined)
+        dataPayload.badge = payload.badge.toString();
+    if (payload.tag)
+        dataPayload.tag = payload.tag;
+    // Map notification type to Android channel ID (must match MyFirebaseMessagingService channels)
+    let channelId = 'default_priority';
+    if (payload.type === 'new_message' || payload.type === 'account_security') {
+        channelId = 'high_priority';
+    }
+    else if (payload.type === 'system_update') {
+        channelId = 'low_priority';
+    }
+    const message = {
+        notification: {
+            title: payload.title,
+            body: payload.body,
+        },
+        data: dataPayload,
+        token,
+        android: {
+            priority: 'high',
+            ttl: 86400000,
+            notification: {
+                channelId,
+                sound: channelId === 'low_priority' ? undefined : 'notification',
+                visibility: 'public',
+            },
+        },
+        apns: {
+            payload: {
+                aps: {
+                    contentAvailable: true,
+                    sound: 'default',
+                    badge: payload.badge
+                },
+            },
+            headers: {
+                'apns-priority': '10',
+                'apns-push-type': 'alert',
+            },
+        },
+        webpush: {
+            headers: { Urgency: 'high' },
+            notification: {
+                title: payload.title,
+                body: payload.body,
+                icon: '/icon-192.png',
+                badge: '/icon-192.png',
+                tag: payload.tag || payload.type,
+                renotify: true,
+            },
+        },
+    };
+    try {
+        const messaging = (0, messaging_1.getMessaging)(activeApp);
+        const response = await messaging.send(message);
+        return response;
+    }
+    catch (error) {
+        if (error.code === 'messaging/registration-token-not-registered') {
+            console.warn('[NotificationService] Category token expired');
+            return 'EXPIRED_TOKEN';
+        }
+        console.error('[NotificationService] Error sending category notification:', error);
     }
 }

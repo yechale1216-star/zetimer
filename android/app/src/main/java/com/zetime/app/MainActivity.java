@@ -33,6 +33,18 @@ public class MainActivity extends BridgeActivity {
                     | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
                     | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
         }
+
+        // Disable WebKit autoplay restrictions so voice/video call audio starts playing
+        // immediately upon answering, even if the app was launched by a background intent
+        // (like tapping 'Answer' on lock screen) and hasn't received a touch gesture yet.
+        try {
+            if (bridge != null && bridge.getWebView() != null) {
+                bridge.getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
+                android.util.Log.d("MainActivity", "WebView setMediaPlaybackRequiresUserGesture set to FALSE");
+            }
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error disabling webview media playback user gesture requirement", e);
+        }
         
         handleIntent(getIntent());
     }

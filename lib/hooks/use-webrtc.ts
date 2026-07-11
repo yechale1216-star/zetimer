@@ -154,6 +154,14 @@ export const useWebRTC = (options: WebRTCOptions) => {
     }
   }, [socket, options.userId]);
 
+  const transitionToConnected = useCallback(() => {
+    if (!connectedAt.current) {
+      console.log('[WebRTC] ⚡ Transitioning call status to CONNECTED (media flowing or ICE candidates connected)');
+      setCallStatus('CONNECTED');
+      connectedAt.current = Date.now();
+    }
+  }, []);
+
   const createPeerConnection = useCallback((userId: string) => {
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
@@ -187,6 +195,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
       });
 
       if (options.onRemoteStream) options.onRemoteStream(userId, stream);
+      transitionToConnected();
     };
 
     pc.oniceconnectionstatechange = () => {
@@ -216,6 +225,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
           clearTimeout(iceRestartTimer.current);
           iceRestartTimer.current = null;
         }
+        transitionToConnected();
       } else if (pc.iceConnectionState === 'closed') {
         cleanupUser(userId);
       }
@@ -223,6 +233,9 @@ export const useWebRTC = (options: WebRTCOptions) => {
 
     pc.onconnectionstatechange = () => {
       console.log(`[WebRTC] Connection State for ${userId}: ${pc.connectionState}`);
+      if (pc.connectionState === 'connected') {
+        transitionToConnected();
+      }
     };
 
     pc.onicegatheringstatechange = () => {
@@ -231,7 +244,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
 
     peerConnections.current.set(userId, pc);
     return pc;
-  }, [socket, options, cleanupUser, cleanupAll, initiateIceRestart]);
+  }, [socket, options, cleanupUser, cleanupAll, initiateIceRestart, transitionToConnected]);
 
   const startCall = useCallback(async (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => {
     setCallStatus('CONNECTING');
@@ -363,9 +376,16 @@ export const useWebRTC = (options: WebRTCOptions) => {
         console.error('[WebRTC] CRITICAL: socket is null at time of answer_call emission!');
       }
 
-      setCallStatus('CONNECTED');
-      connectedAt.current = Date.now();
-      console.log('[WebRTC] ✅ Call CONNECTED at', new Date().toISOString());
+      // Wait for ICE/ontrack/connectionState to transition to CONNECTED natively.
+      // We set a safety fallback timer of 4 seconds just in case WebRTC events get delayed.
+      const currentCallId = callIdRef.current;
+      setTimeout(() => {
+        if (!connectedAt.current && callIdRef.current === currentCallId) {
+          console.log('[WebRTC] Safety connected fallback triggered in answerCall');
+          transitionToConnected();
+        }
+      }, 4000);
+      console.log('[WebRTC] Waiting for ICE connection to establish...');
     } catch (error) {
       console.error('[WebRTC] Error answering call:', error);
       setMediaError(describeMediaError(error));
@@ -545,8 +565,15 @@ export const useWebRTC = (options: WebRTCOptions) => {
         }
         queuedCandidates.current.delete(from);
 
-        setCallStatus('CONNECTED');
-        connectedAt.current = Date.now();
+        // Wait for ICE/ontrack/connectionState to transition to CONNECTED natively.
+        // We set a safety fallback timer of 4 seconds just in case WebRTC events get delayed.
+        const currentCallId = callIdRef.current;
+        setTimeout(() => {
+          if (!connectedAt.current && callIdRef.current === currentCallId) {
+            console.log('[WebRTC] Safety connected fallback triggered in handleAnswer');
+            transitionToConnected();
+          }
+        }, 4000);
         if (options.onCallAccepted) options.onCallAccepted(from);
 
         // Emit media state immediately on connection

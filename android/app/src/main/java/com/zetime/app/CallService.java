@@ -151,18 +151,44 @@ public class CallService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "Error releasing wake lock", e);
         }
+        // Explicitly abandon audio focus so the WebView's getUserMedia() can
+        // successfully claim the microphone without audio-focus conflicts.
+        try {
+            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    // On O+ we should release the audio focus request object, but since
+                    // we used a stream-based request, abandonAudioFocus(null) clears it.
+                    audioManager.abandonAudioFocus(null);
+                } else {
+                    audioManager.abandonAudioFocus(null);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error abandoning audio focus", e);
+        }
     }
 
     private void showForegroundNotification() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        // Create the persistent foreground service channel (low importance — no sound/vibrate,
-        // that is handled by the separate HUN notification from MyFirebaseMessagingService)
+        // IMPORTANCE_HIGH is required so the foreground notification triggers a Heads-Up
+        // popup AND fires the full-screen intent on the lock screen.
+        // IMPORTANCE_LOW actively suppresses both — do NOT use it for incoming calls.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "Active Calls", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("Keeps the call service alive");
+                    CHANNEL_ID, "Incoming Calls", NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription("Incoming voice and video call alerts");
+            channel.enableVibration(true);
+            channel.setVibrationPattern(new long[]{0, 1000, 500, 1000});
+            // Use ringtone sound for this channel
+            android.media.AudioAttributes callAa = new android.media.AudioAttributes.Builder()
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                    .build();
+            channel.setSound(android.media.RingtoneManager.getDefaultUri(
+                    android.media.RingtoneManager.TYPE_RINGTONE), callAa);
             nm.createNotificationChannel(channel);
         }
 
@@ -240,10 +266,13 @@ public class CallService extends Service {
                 .setAutoCancel(false)
                 .setContentIntent(openPI)
                 .setFullScreenIntent(callScreenPI, true)
-                .setCustomContentView(customView)
-                .setCustomHeadsUpContentView(customView)
+                // Custom banner view for the notification drawer/expanded state
                 .setCustomBigContentView(customView)
-                .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
+                // Keep compact content simple for lock-screen preview
+                .setCustomContentView(customView)
+                // NOTE: Do NOT use DecoratedCustomViewStyle — on HIGH-importance channels
+                // it can suppress the custom HUN view on some OEMs. We rely on
+                // setFullScreenIntent (IncomingCallActivity) for the lock-screen UI.
                 .build();
 
 

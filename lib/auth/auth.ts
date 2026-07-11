@@ -572,11 +572,16 @@ class AuthService {
         console.error("Logout API call failed", e);
       }
 
-      // Stop any ongoing native call services, clear native ringing, and clear native persisted auth token
+      // Stop any ongoing native call services, clear native ringing,
+      // and fully deregister the FCM push token so this device receives
+      // NO notifications or calls after sign-out (security requirement).
       try {
         const { NativeBridge } = await import('@/lib/utils/native-bridge');
         await NativeBridge.endNativeCall();
-        await NativeBridge.saveAuthToken(""); // Clears sharedPreferences token
+        // Delete the Firebase device token first, then clear the stored auth token.
+        // Order matters: deregisterFcmToken also clears auth from SharedPreferences.
+        await NativeBridge.deregisterFcmToken();
+        await NativeBridge.saveAuthToken(""); // Clears sharedPreferences token (belt + suspenders)
       } catch (e) {
         console.error("Failed to clean up native call state on logout", e);
       }

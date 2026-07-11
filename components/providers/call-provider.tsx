@@ -270,7 +270,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Ref that carries the pending ANSWER intent across renders/re-connects
   const pendingAnswerRef = useRef<{ callId: string; callerId?: string; callerName?: string; callType?: string } | null>(null);
 
-  const executePendingAnswer = useCallback(() => {
+  const executePendingAnswer = useCallback(async () => {
     const pending = pendingAnswerRef.current;
     const current = incomingCallRef.current;
 
@@ -283,10 +283,14 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[CallProvider] ✅ Executing ANSWER — all data present');
       NativeBridge.endNativeCall();
       NativeBridge.dismissCallBanner();
+      pendingAnswerRef.current = null;
+      // Wait for the native MediaPlayer / AudioManager to fully release audio focus
+      // before getUserMedia() claims the microphone. Without this delay, Android
+      // can grant the mic but deliver silence because the ringtone still holds focus.
+      await new Promise(resolve => setTimeout(resolve, 300));
       webrtc.answerCall(current.from, current.offer, current.type, current.callId, current.conversationId);
       setIncomingCallData(null);
       setIsWaitingForOffer(false);
-      pendingAnswerRef.current = null;
     } else if (current && current.callId === pending.callId && !current.offer) {
       // Data arrived but offer not yet included → wait
       console.log('[CallProvider] incomingCallData present but no offer yet → isWaitingForOffer=true');

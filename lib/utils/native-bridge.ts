@@ -28,6 +28,7 @@ interface CallPlugin {
   }) => Promise<void>;
   dismissCallBanner: () => Promise<void>;
   saveAuthToken: (options: { token: string; apiUrl?: string }) => Promise<void>;
+  deregisterFcmToken: () => Promise<void>;
   getPendingCall: () => Promise<{
     hasPending: boolean;
     action?: string;
@@ -62,6 +63,20 @@ export const NativeBridge = {
         await CallPlugin.saveAuthToken({ token, apiUrl: urlToPersist });
       } catch (e) {
         console.warn('[NativeBridge] saveAuthToken failed', e);
+      }
+    }
+  },
+
+  // Deregisters FCM token from Firebase — call on sign-out to prevent
+  // the device from receiving notifications/calls after the user logs out.
+  deregisterFcmToken: async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await CallPlugin.deregisterFcmToken();
+        console.log('[NativeBridge] ✅ FCM token deleted from Firebase');
+      } catch (e) {
+        // Non-fatal — server has already cleared the token in the DB via logout API
+        console.warn('[NativeBridge] deregisterFcmToken failed (non-fatal):', e);
       }
     }
   },

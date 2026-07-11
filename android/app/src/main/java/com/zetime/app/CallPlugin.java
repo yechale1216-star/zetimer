@@ -183,6 +183,31 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
         call.resolve();
     }
 
+    /**
+     * Deletes the FCM registration token from Firebase so this device will
+     * no longer receive push notifications or incoming call wakeups after sign-out.
+     * The server already clears pushToken in the DB via the /logout endpoint;
+     * this is the device-side cleanup that prevents stale tokens from being
+     * re-used if Firebase re-delivers a cached message.
+     */
+    @PluginMethod
+    public void deregisterFcmToken(PluginCall call) {
+        new Thread(() -> {
+            try {
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().deleteToken();
+                // Also wipe the stored auth token so onNewToken() won't re-register
+                MainActivity.saveAuthTokenToPrefs(getContext(), "");
+                android.util.Log.d("CallPlugin", "FCM token deleted — device fully deregistered");
+                call.resolve();
+            } catch (Exception e) {
+                android.util.Log.w("CallPlugin", "Failed to delete FCM token: " + e.getMessage());
+                // Resolve anyway — server-side cleanup is the primary protection
+                call.resolve();
+            }
+        }).start();
+    }
+
+
     // ═══════════════════════════════════════════════════════════════════════
     // Internal action dispatchers (called from Java, not from JS)
     // ═══════════════════════════════════════════════════════════════════════

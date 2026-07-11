@@ -646,8 +646,7 @@ export const searchParentByPhone = async (phone: string, schoolId: string) => {
 
   const user = await prisma.user.findFirst({
     where: { 
-      phone: { in: phoneVariations },
-      role: 'parent' 
+      phone: { in: phoneVariations }
     },
     select: { id: true, full_name: true, email: true, phone: true, address: true, schoolId: true }
   });

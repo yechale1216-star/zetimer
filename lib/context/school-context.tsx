@@ -18,7 +18,7 @@ interface SchoolContextValue {
   activeSchool: School | null
   availableSchools: School[]
   isLoadingSchool: boolean
-  switchSchool: (schoolId: string) => Promise<boolean>
+  switchSchool: (schoolId: string, role?: string) => Promise<boolean>
   setSchoolsFromLogin: (schools: School[], initialSchoolId?: string) => void
   clearSchoolContext: () => void
   refreshSchools: () => Promise<void>
@@ -174,13 +174,13 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
    * Switch the active school — validates with the backend first.
    * Returns true on success.
    */
-  const switchSchool = useCallback(async (schoolId: string): Promise<boolean> => {
+  const switchSchool = useCallback(async (schoolId: string, role?: string): Promise<boolean> => {
     setIsLoadingSchool(true)
     try {
       const res = await fetch(`${API_URL}/api/users/me/active-school`, {
         method: "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify({ schoolId }),
+        body: JSON.stringify({ schoolId, role }),
       })
 
       if (!res.ok) {

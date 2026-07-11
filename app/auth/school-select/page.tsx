@@ -54,9 +54,9 @@ export default function SchoolSelectPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleSelectSchool = async (schoolId: string) => {
-    setSwitchingId(schoolId)
-    const success = await switchSchool(schoolId)
+  const handleSelectSchool = async (schoolId: string, role: string) => {
+    setSwitchingId(`${schoolId}-${role}`)
+    const success = await switchSchool(schoolId, role)
     if (success) {
       // Use a hard redirect (not router.push) so all React contexts re-initialize
       // cleanly from localStorage after the school switch. SPA navigation keeps stale
@@ -182,9 +182,9 @@ export default function SchoolSelectPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {displaySchools.map((school: any) => (
             <Card
-              key={school.id}
+              key={`${school.id}-${school.role || 'user'}`}
               className="group relative overflow-hidden border-2 border-slate-200 dark:border-white/5 hover:border-emerald-500/50 transition-all cursor-pointer shadow-sm hover:shadow-xl active:scale-[0.98] bg-white dark:bg-slate-900"
-              onClick={() => handleSelectSchool(school.id)}
+              onClick={() => handleSelectSchool(school.id, school.role)}
             >
               <CardContent className="p-6 flex flex-col items-center text-center space-y-4">
                 <div className="h-20 w-20 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center overflow-hidden border border-slate-200 dark:border-white/10 group-hover:bg-emerald-50 transition-colors">
@@ -194,10 +194,17 @@ export default function SchoolSelectPage() {
                     <GraduationCap className="h-10 w-10 text-slate-400 group-hover:text-emerald-600 transition-colors" />
                   )}
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 flex flex-col items-center">
+                  {school.role && (
+                    <span className={`inline-flex px-2 py-0.5 rounded text-[8px] font-black uppercase text-white mb-1.5 select-none ${
+                      school.role === 'parent' ? 'bg-blue-500' : school.role === 'teacher' ? 'bg-orange-500' : 'bg-emerald-600'
+                    }`}>
+                      {school.role.replace('_', ' ')}
+                    </span>
+                  )}
                   <h3 className="font-black text-lg leading-tight">{school.name}</h3>
                   {school.customSchoolId && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[9px] font-black uppercase tracking-widest">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[9px] font-black uppercase tracking-widest mt-1">
                       {school.customSchoolId}
                     </span>
                   )}
@@ -207,7 +214,7 @@ export default function SchoolSelectPage() {
                   className="w-full rounded-xl group-hover:bg-emerald-500 group-hover:text-white transition-colors font-bold text-xs uppercase tracking-widest"
                   disabled={switchingId !== null}
                 >
-                  {switchingId === school.id
+                  {switchingId === `${school.id}-${school.role}`
                     ? <Loader2 className="h-4 w-4 animate-spin" />
                     : <>Access Portal <ArrowRight className="ml-2 h-4 w-4" /></>
                   }

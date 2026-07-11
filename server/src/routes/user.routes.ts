@@ -161,22 +161,22 @@ router.get('/me/schools', async (req: AuthenticatedRequest, res: Response, next:
 router.post('/me/active-school', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user?.id) return res.status(401).json({ success: false, message: 'Unauthorized' });
-    const { schoolId } = req.body;
+    const { schoolId, role: requestedRole } = req.body;
     if (!schoolId) return res.status(400).json({ success: false, message: 'schoolId is required' });
 
     const { resolveRoleInSchool, getMemberships } = require('../services/auth_resolution.service');
-    const role = await resolveRoleInSchool(req.user.id, schoolId);
+    const role = await resolveRoleInSchool(req.user.id, schoolId, requestedRole);
     
     if (!role) {
       return res.status(403).json({ success: false, message: 'You do not have an active role in this school.' });
     }
 
     const memberships = await getMemberships(req.user.id);
-    // Membership uses `id` (not `schoolId`) — match against it correctly
-    const school = memberships.find((m: any) => m.id === schoolId);
+    // Match both school id and role
+    const school = memberships.find((m: any) => m.id === schoolId && m.role === role);
     
     if (!school) {
-      return res.status(404).json({ success: false, message: 'School membership not found.' });
+      return res.status(404).json({ success: false, message: 'School membership not found for this role.' });
     }
 
     // Generate a fresh token with the NEW school context

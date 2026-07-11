@@ -34,6 +34,7 @@ export interface User {
   isSuperAdmin: boolean
   profile_photo?: string
   onboardingCompleted?: boolean
+  isVerified?: boolean
 }
 
 export interface AuthResponse {
@@ -341,6 +342,7 @@ class AuthService {
         isSuperAdmin: false,
         profile_photo: newUser.profile_photo || "",
         onboardingCompleted: false, // new accounts always start onboarding
+        isVerified: newUser.isVerified ?? data.data.user?.isVerified ?? false,
       }
 
       if (this.isClient()) {
@@ -489,6 +491,44 @@ class AuthService {
       return { available: data.available ?? true }
     } catch {
       return { available: true }
+    }
+  }
+
+  // ─── EMAIL VERIFICATION ───────────────────────────────────────────────────
+  async verifyEmail(email: string, code: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        const currentUser = this.getCurrentUser()
+        if (currentUser && this.isClient()) {
+          const updated = { ...currentUser, isVerified: true }
+          localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(updated))
+          window.dispatchEvent(new Event('userSessionChanged'))
+        }
+        return { success: true, message: data.message }
+      }
+      return { success: false, message: data.message || 'Verification failed' }
+    } catch {
+      return { success: false, message: 'Network error. Please try again.' }
+    }
+  }
+
+  async resendVerification(email: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json()
+      return { success: res.ok && data.success, message: data.message || 'Failed to resend code' }
+    } catch {
+      return { success: false, message: 'Network error. Please try again.' }
     }
   }
 

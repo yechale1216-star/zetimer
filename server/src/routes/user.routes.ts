@@ -20,6 +20,7 @@ router.get('/profile', async (req: AuthenticatedRequest, res: Response, next: Ne
       ...user,
       role: req.user?.role || user.role,
       schoolId: schoolId || user.schoolId,
+      isVerified: (user as any).is_verified ?? false,
       // Map school info for the frontend
       schoolName: (user as any).school?.name || '',
       schoolLogo: (user as any).school?.settings?.school_logo || '',

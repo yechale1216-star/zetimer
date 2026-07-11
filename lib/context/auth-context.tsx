@@ -353,7 +353,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           schoolId: dbUser.schoolId || dbUser.school_id || currentUser!.schoolId,
           schoolName: dbUser.schoolName || currentUser!.schoolName || "",
           schoolLogo: dbUser.schoolLogo || currentUser!.schoolLogo || "",
-          onboardingCompleted: dbUser.onboardingCompleted ?? currentUser!.onboardingCompleted
+          onboardingCompleted: dbUser.onboardingCompleted ?? currentUser!.onboardingCompleted,
+          isVerified: dbUser.isVerified ?? dbUser.is_verified ?? currentUser!.isVerified ?? false,
         }
 
         console.log(`[AuthContext][validateSession] Profile loaded | userId: ${updatedUser.id} | finalRole: ${updatedUser.role}`)

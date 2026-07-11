@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { authService } from "@/lib/auth/auth"
 import { useAuth } from "@/lib/context/auth-context"
@@ -21,6 +21,9 @@ import {
   Loader2,
   Sparkles,
   X,
+  Mail,
+  ShieldCheck,
+  RefreshCw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -78,7 +81,10 @@ export default function OnboardingWizard() {
     allowLateMark: true,
   })
   
-  // Auth guard: If not logged in as admin, redirect to login
+  // ─── Email Verification gate ───────────────────────────────────────────────
+
+  const [isVerified, setIsVerified] = useState<boolean | null>(null)
+
   useEffect(() => {
     setMounted(true)
     if (typeof window !== "undefined") {
@@ -88,15 +94,23 @@ export default function OnboardingWizard() {
         hasUser: !!currentUser, 
         role: currentUser?.role, 
         isAdmin,
-        onboardingCompleted: currentUser?.onboardingCompleted
+        onboardingCompleted: currentUser?.onboardingCompleted,
+        isVerified: currentUser?.isVerified,
       })
 
       if (!currentUser || !isAdmin) {
         console.warn("[RedirectDebug] OnboardingWizard: Not an admin, redirecting to login")
         router.replace("/login")
+        return
       }
+
+      setIsVerified(currentUser.isVerified ?? false)
     }
   }, [router])
+
+  const handleVerified = useCallback(() => {
+    setIsVerified(true)
+  }, [])
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -185,6 +199,17 @@ export default function OnboardingWizard() {
 
   const progressPercent = step === 0 ? 0 : Math.round(((step) / (STEPS.length - 1)) * 100)
 
+  // Show verification gate if not yet verified
+  if (isVerified === false) {
+    const currentUser = authService.getCurrentUser()
+    return (
+      <EmailVerificationGate
+        email={currentUser?.email || ""}
+        onVerified={handleVerified}
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Header */}
@@ -268,6 +293,173 @@ export default function OnboardingWizard() {
           )}
         </div>
       </main>
+    </div>
+  )
+}
+
+// ─── Email Verification Gate ──────────────────────────────────────────────────
+
+function EmailVerificationGate({ email, onVerified }: { email: string; onVerified: () => void }) {
+  const [digits, setDigits] = useState<string[]>([""  , "", "", "", "", ""])
+  const [verifying, setVerifying] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [error, setError] = useState("")
+  const [countdown, setCountdown] = useState(60)
+  const [canResend, setCanResend] = useState(false)
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Countdown timer for resend
+  useEffect(() => {
+    if (countdown <= 0) { setCanResend(true); return }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [countdown])
+
+  const handleDigitChange = (index: number, value: string) => {
+    const sanitized = value.replace(/\D/g, "").slice(-1)
+    const next = [...digits]
+    next[index] = sanitized
+    setDigits(next)
+    setError("")
+    if (sanitized && index < 5) {
+      inputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !digits[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus()
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6)
+    if (pasted.length === 6) {
+      e.preventDefault()
+      setDigits(pasted.split(""))
+      inputRefs.current[5]?.focus()
+    }
+  }
+
+  const handleVerify = async () => {
+    const code = digits.join("")
+    if (code.length < 6) { setError("Please enter all 6 digits"); return }
+    setVerifying(true)
+    setError("")
+    const result = await authService.verifyEmail(email, code)
+    setVerifying(false)
+    if (result.success) {
+      notifications.success("Email Verified!", "Your email has been confirmed.")
+      onVerified()
+    } else {
+      setError(result.message)
+      setDigits(["", "", "", "", "", ""])
+      inputRefs.current[0]?.focus()
+    }
+  }
+
+  const handleResend = async () => {
+    if (!canResend) return
+    setResending(true)
+    const result = await authService.resendVerification(email)
+    setResending(false)
+    if (result.success) {
+      notifications.info("Code Resent", "A new verification code has been sent to your email.")
+      setCountdown(60)
+      setCanResend(false)
+      setDigits(["", "", "", "", "", ""])
+      inputRefs.current[0]?.focus()
+    } else {
+      notifications.error("Failed", result.message)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-6">
+      <div className="w-full max-w-md">
+        <div className="bg-card/80 backdrop-blur-xl border border-border/40 rounded-3xl shadow-2xl p-8 animate-in fade-in-0 slide-in-from-bottom-4 duration-400">
+          {/* Icon */}
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center">
+              <Mail className="w-8 h-8 text-primary" />
+            </div>
+          </div>
+
+          {/* Heading */}
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold tracking-tight mb-2">Verify Your Email</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              We sent a 6-digit code to{" "}
+              <span className="font-semibold text-foreground">{email}</span>.
+              {" "}Enter it below to continue setting up your school.
+            </p>
+          </div>
+
+          {/* OTP Input */}
+          <div className="flex gap-2 justify-center mb-6" onPaste={handlePaste}>
+            {digits.map((d, i) => (
+              <input
+                key={i}
+                ref={el => { inputRefs.current[i] = el }}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={d}
+                onChange={e => handleDigitChange(i, e.target.value)}
+                onKeyDown={e => handleKeyDown(i, e)}
+                className={`w-12 h-14 text-center text-xl font-bold rounded-xl border-2 bg-background/50 outline-none transition-all focus:border-primary focus:bg-primary/5 focus:scale-105 ${
+                  error ? "border-destructive" : d ? "border-primary/50" : "border-border/50"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Error */}
+          {error && (
+            <p className="text-sm text-destructive text-center mb-4 flex items-center justify-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-destructive inline-block" />
+              {error}
+            </p>
+          )}
+
+          {/* Verify button */}
+          <Button
+            onClick={handleVerify}
+            disabled={verifying || digits.join("").length < 6}
+            size="lg"
+            className="w-full rounded-xl shadow-lg shadow-primary/10 gap-2 mb-4"
+          >
+            {verifying ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
+            ) : (
+              <><ShieldCheck className="w-4 h-4" /> Confirm &amp; Continue</>
+            )}
+          </Button>
+
+          {/* Resend */}
+          <div className="text-center">
+            {canResend ? (
+              <button
+                onClick={handleResend}
+                disabled={resending}
+                className="text-sm text-primary hover:text-primary/80 font-medium flex items-center gap-1.5 mx-auto transition-colors disabled:opacity-50"
+              >
+                {resending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                Resend code
+              </button>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Resend available in <span className="font-semibold text-foreground">{countdown}s</span>
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Info note */}
+        <p className="text-xs text-muted-foreground text-center mt-4 px-4">
+          Didn&apos;t receive the email? Check your spam folder or wait a few minutes.
+        </p>
+      </div>
     </div>
   )
 }

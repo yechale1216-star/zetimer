@@ -141,6 +141,21 @@ public class MainActivity extends BridgeActivity {
                     + " callId=" + callId + " callerId=" + callerId
                     + " callType=" + callType + " callerName=" + callerName);
 
+            // Stop native ringing state and clean up notification views
+            try {
+                android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+                if (nm != null) {
+                    nm.cancel(1001);
+                    nm.cancel(1002);
+                }
+                Intent stopService = new Intent(this, CallService.class);
+                stopService.putExtra("ACTION", "STOP_CALL");
+                startService(stopService);
+                android.util.Log.d("MainActivity", "Successfully requested CallService to STOP_CALL ringing");
+            } catch (Exception e) {
+                android.util.Log.e("MainActivity", "Error dismissing call notification or stopping CallService", e);
+            }
+
             com.getcapacitor.JSObject callObj = new com.getcapacitor.JSObject();
             callObj.put("action", action);
             callObj.put("callId", callId);

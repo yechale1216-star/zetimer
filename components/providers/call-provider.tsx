@@ -267,7 +267,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ═══════════════════════════════════════════════════════════════════════════
 
   // Ref that carries the pending ANSWER intent across renders/re-connects
-  const pendingAnswerRef = useRef<{ callId: string; callerId?: string; callType?: string } | null>(null);
+  // Ref that carries the pending ANSWER intent across renders/re-connects
+  const pendingAnswerRef = useRef<{ callId: string; callerId?: string; callerName?: string; callType?: string } | null>(null);
 
   const executePendingAnswer = useCallback(() => {
     const pending = pendingAnswerRef.current;
@@ -293,12 +294,13 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       // incomingCallData not received (app was backgrounded during signaling)
       // Build a synthetic stub so the WebRTC hook is ready to receive the offer
-      console.log('[CallProvider] No incomingCallData. Building stub and waiting for socket offer');
+      const stubName = pending.callerName && pending.callerName.trim() ? pending.callerName : 'Caller';
+      console.log(`[CallProvider] No incomingCallData. Building stub with name "${stubName}" and waiting for socket offer`);
       const stub = {
         from: pending.callerId || 'unknown',
         callId: pending.callId,
         type: (pending.callType === 'VIDEO' ? 'VIDEO' : 'VOICE') as 'VOICE' | 'VIDEO',
-        profile: { name: 'Caller', avatar: '' },
+        profile: { name: stubName, avatar: '' },
         offer: null,
       };
       setIncomingCallData(stub);
@@ -340,8 +342,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else if (action === 'ANSWER') {
       console.log('[CallProvider] ANSWER action received from native bridge');
       // Store in ref so it survives re-renders and socket reconnects
-      pendingAnswerRef.current = { callId, callerId, callType };
+      pendingAnswerRef.current = { callId, callerId, callerName, callType };
       executePendingAnswer();
+
 
     } else if (action === 'DECLINE') {
       console.log('[CallProvider] DECLINE action received from native bridge');
@@ -463,7 +466,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       {/* Global Modals */}
       <IncomingCallModal
-        isOpen={!!incomingCallData && !NativeBridge.isNative()}
+        isOpen={!!incomingCallData && !isWaitingForOffer && !NativeBridge.isNative()}
         caller={activeCaller || { name: 'Unknown' }}
         type={callType}
         isConnecting={isWaitingForOffer}
@@ -471,10 +474,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         onReject={handleReject}
       />
 
-      {webrtc.callStatus !== 'IDLE' && !incomingCallData && (
+      {(webrtc.callStatus !== 'IDLE' || isWaitingForOffer) && (!incomingCallData || isWaitingForOffer) && (
         <CallOverlay
-          status={webrtc.callStatus === 'RINGING' ? 'RINGING' : webrtc.callStatus}
+          status={isWaitingForOffer || webrtc.callStatus === 'IDLE' ? 'CONNECTING' : webrtc.callStatus}
           type={callType}
+
           isMuted={webrtc.isMuted}
           isCameraOff={webrtc.isCameraOff}
           localStream={webrtc.localStream}

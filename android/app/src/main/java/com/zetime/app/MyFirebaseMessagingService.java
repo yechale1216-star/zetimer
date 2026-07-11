@@ -331,14 +331,15 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         PendingIntent fsPendingIntent = PendingIntent.getActivity(this, 99,
                 fullScreenIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        Intent answerIntent = new Intent(this, CallNotificationActionReceiver.class);
-        answerIntent.setAction("ACTION_ANSWER");
-        answerIntent.putExtra("callId",    callId);
-        answerIntent.putExtra("callerId",  callerId);
-        answerIntent.putExtra("callType",  callType);
-        answerIntent.putExtra("callerName", callerName);
-        answerIntent.putExtra("serverUrl", serverUrl);
-        PendingIntent answerPI = PendingIntent.getBroadcast(this, 1, answerIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Intent answerIntent = new Intent(this, MainActivity.class);
+        answerIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        answerIntent.putExtra("callAction",  "ANSWER");
+        answerIntent.putExtra("callId",      callId);
+        answerIntent.putExtra("callerId",    callerId);
+        answerIntent.putExtra("callType",    callType);
+        answerIntent.putExtra("callerName",  callerName);
+        answerIntent.putExtra("serverUrl",   serverUrl);
+        PendingIntent answerPI = PendingIntent.getActivity(this, 1, answerIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         Intent declineIntent = new Intent(this, CallNotificationActionReceiver.class);
         declineIntent.setAction("ACTION_DECLINE");

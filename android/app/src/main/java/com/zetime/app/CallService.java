@@ -190,14 +190,15 @@ public class CallService extends Service {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         // Answer action
-        Intent answerIntent = new Intent(this, CallNotificationActionReceiver.class);
-        answerIntent.setAction("ACTION_ANSWER");
-        answerIntent.putExtra("callId",    pendingCallId);
-        answerIntent.putExtra("callerId",  pendingCallerId);
-        answerIntent.putExtra("callType",  pendingCallType);
-        answerIntent.putExtra("callerName", pendingCallerName);
-        answerIntent.putExtra("serverUrl", pendingServerUrl);
-        PendingIntent answerPI = PendingIntent.getBroadcast(this, 10, answerIntent,
+        Intent answerIntent = new Intent(this, MainActivity.class);
+        answerIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        answerIntent.putExtra("callAction",  "ANSWER");
+        answerIntent.putExtra("callId",      pendingCallId);
+        answerIntent.putExtra("callerId",    pendingCallerId);
+        answerIntent.putExtra("callType",    pendingCallType);
+        answerIntent.putExtra("callerName",  pendingCallerName);
+        answerIntent.putExtra("serverUrl",   pendingServerUrl);
+        PendingIntent answerPI = PendingIntent.getActivity(this, 10, answerIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         // Decline action

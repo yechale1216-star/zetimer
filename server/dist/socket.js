@@ -519,6 +519,7 @@ const initSocket = (server) => {
             const tenant = socketData.get(socket.id);
             if (!tenant)
                 return;
+            console.log(`[Socket] answer_call: from=${data.from} to=${data.to} callId=${data.callId}`);
             const answererInfo = await prisma.user.findUnique({
                 where: { id: data.from },
                 select: { schoolId: true, role: true }
@@ -546,6 +547,7 @@ const initSocket = (server) => {
                 return;
             }
             // Emit answer to the caller
+            console.log(`[Socket] Relaying call_answered to caller ${data.to}`);
             emitToUser(io, data.to, 'call_answered', { from: data.from, answer: data.answer });
             // Stop ringing on all OTHER devices of the answerer (multi-device sync)
             emitToUserExcept(io, data.from, socket.id, 'call_stop_ringing', { callId: data.callId });

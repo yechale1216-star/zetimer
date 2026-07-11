@@ -529,6 +529,8 @@ export const initSocket = (server: HttpServer) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
 
+      console.log(`[Socket] answer_call: from=${data.from} to=${data.to} callId=${data.callId}`);
+
       const answererInfo = await prisma.user.findUnique({
         where: { id: data.from },
         select: { schoolId: true, role: true }
@@ -557,6 +559,7 @@ export const initSocket = (server: HttpServer) => {
       }
 
       // Emit answer to the caller
+      console.log(`[Socket] Relaying call_answered to caller ${data.to}`);
       emitToUser(io, data.to, 'call_answered', { from: data.from, answer: data.answer });
 
       // Stop ringing on all OTHER devices of the answerer (multi-device sync)
@@ -576,6 +579,7 @@ export const initSocket = (server: HttpServer) => {
         }
       }
     });
+
 
     socket.on('ice_candidate', (data: any) => {
       emitToUser(io, data.to, 'ice_candidate', { from: data.from, candidate: data.candidate });

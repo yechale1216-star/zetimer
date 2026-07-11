@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useWebRTC } from '@/lib/hooks/use-webrtc';
 import { IncomingCallModal } from '@/components/messaging/calling/IncomingCallModal';
 import { CallOverlay } from '@/components/messaging/calling/CallOverlay';
@@ -26,31 +26,28 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [incomingCallData, setIncomingCallData] = useState<any>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [callType, setCallType] = useState<'VOICE' | 'VIDEO'>('VOICE');
-  const [pendingAction, setPendingAction] = useState<{ action: string; callId: string; callerId?: string; callType?: string } | null>(null);
   const [isWaitingForOffer, setIsWaitingForOffer] = useState(false);
   const { toast } = useToast();
   const { isSuspended } = useSuspension();
 
-  useEffect(() => {
-    if (currentUser) {
-      setParticipants(prev => {
-        const local = { id: currentUser.id || 'local', name: 'You', avatar: currentUser.profile_photo || '', isLocal: true };
-        return [local, ...prev.filter(p => !p.isLocal)];
-      });
-    } else {
-      setParticipants([]);
-    }
-  }, [currentUser]);
+  // ── Refs for values needed inside event-listener closures (no stale state) ─
+  const incomingCallRef = useRef<any>(null);
+  const isWaitingForOfferRef = useRef(false);
 
+  // Keep the ref in sync with state
+  useEffect(() => { incomingCallRef.current = incomingCallData; }, [incomingCallData]);
+  useEffect(() => { isWaitingForOfferRef.current = isWaitingForOffer; }, [isWaitingForOffer]);
+
+  // ── onIncomingCall: socket 'incoming_call' event ─────────────────────────
   const onIncomingCall = useCallback((data: any) => {
     if (isSuspended) {
-      console.log('[CallProvider] Rejecting incoming call signal due to school suspension');
+      console.log('[CallProvider] Rejecting incoming call signal — school suspended');
       return;
     }
-    console.log('[CallProvider] Received incoming call from socket. Offer present:', !!data.offer);
-    
+    console.log('[CallProvider] ✅ incoming_call received. callId:', data.callId, '| offer present:', !!data.offer);
+
     if (NativeBridge.isNative()) {
-      console.log('[CallProvider] Showing Telegram-style foreground call banner');
+      console.log('[CallProvider] → Showing foreground call banner');
       NativeBridge.showCallBanner(
         data.profile?.name || 'Unknown User',
         data.callId,
@@ -64,16 +61,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCallType(data.type);
     setParticipants(prev => [
       ...prev.filter(p => p.isLocal),
-      { id: data.from, name: data.profile.name, avatar: data.profile.avatar }
+      { id: data.from, name: data.profile?.name || 'Unknown', avatar: data.profile?.avatar || '' }
     ]);
   }, [isSuspended]);
 
   const onCallAccepted = useCallback((userId: string) => {
-    console.log('Call accepted by:', userId);
+    console.log('[CallProvider] ✅ Call accepted by remote peer:', userId);
   }, []);
 
   const onCallRejected = useCallback((userId: string) => {
-    // Show the caller a clear "call rejected" notification
     const name = participants.find(p => p.id === userId)?.name || 'The other person';
     toast({
       title: '📵 Call Declined',
@@ -83,13 +79,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [participants, toast]);
 
   const onCallEnded = useCallback((userId: string) => {
+    console.log('[CallProvider] Call ended by:', userId);
     NativeBridge.dismissCallBanner();
     setParticipants(prev => {
       const next = prev.filter(p => p.id !== userId);
-      // If only the local participant remains, clear the incoming call data
-      if (next.length <= 1) {
-        setIncomingCallData(null);
-      }
+      if (next.length <= 1) setIncomingCallData(null);
       return next;
     });
   }, []);
@@ -102,226 +96,142 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     onCallEnded,
   });
 
-  // Show a toast whenever the WebRTC hook reports a media-access error
+  // ── Sync local participant when auth changes ──────────────────────────────
+  useEffect(() => {
+    if (currentUser) {
+      setParticipants(prev => {
+        const local = { id: currentUser.id || 'local', name: 'You', avatar: currentUser.profile_photo || '', isLocal: true };
+        return [local, ...prev.filter(p => !p.isLocal)];
+      });
+    } else {
+      console.log('[CallProvider] User logged out — tearing down call state');
+      setParticipants([]);
+      setIncomingCallData(null);
+      setIsWaitingForOffer(false);
+      NativeBridge.dismissCallBanner();
+      NativeBridge.endNativeCall();
+      try { webrtc.endCall(); } catch (e) {}
+    }
+  }, [currentUser, webrtc]);
+
+  // ── Media-error toast ─────────────────────────────────────────────────────
   useEffect(() => {
     if (webrtc.mediaError) {
-      toast({
-        title: 'Camera / Microphone Error',
-        description: webrtc.mediaError,
-        variant: 'destructive',
-      });
+      toast({ title: 'Camera / Microphone Error', description: webrtc.mediaError, variant: 'destructive' });
     }
   }, [webrtc.mediaError, toast]);
 
+  // ── Ringing sound / auto-dismiss ─────────────────────────────────────────
   useEffect(() => {
     let timeout: NodeJS.Timeout;
     let audioCtx: AudioContext | null = null;
     let gainNode: GainNode | null = null;
     let ringInterval: NodeJS.Timeout;
-    
-    // Track active oscillators for clean disposal
     const activeOscillators: any[] = [];
 
     if (webrtc.callStatus === 'RINGING') {
       const isIncoming = !!incomingCallData;
+      timeout = setTimeout(() => { handleReject(true); }, 30000);
 
-      // 1. Auto-missed call after 30 seconds
-      timeout = setTimeout(() => {
-        handleReject(true);
-      }, 30000);
-
-      // 2. Play synthetic calling/ringing sound
       if (!(isIncoming && NativeBridge.isNative())) {
         try {
           const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
           audioCtx = new AudioContext();
           gainNode = audioCtx.createGain();
           gainNode.connect(audioCtx.destination);
-          
+
           const playTone = () => {
             if (!audioCtx || !gainNode) return;
-            
             if (!isIncoming) {
-              // --- CALLER: Outgoing dual-tone ringback (440Hz + 480Hz) ---
-              // Pattern: 1.5s tone, 3.0s pause. Repeats every 4.5 seconds.
-              const osc1 = audioCtx.createOscillator();
-              const osc2 = audioCtx.createOscillator();
+              const osc1 = audioCtx.createOscillator(); const osc2 = audioCtx.createOscillator();
               const ringGain = audioCtx.createGain();
-              
-              osc1.type = 'sine';
-              osc2.type = 'sine';
-              
-              osc1.frequency.setValueAtTime(440, audioCtx.currentTime); 
+              osc1.type = 'sine'; osc2.type = 'sine';
+              osc1.frequency.setValueAtTime(440, audioCtx.currentTime);
               osc2.frequency.setValueAtTime(480, audioCtx.currentTime);
-              
-              osc1.connect(ringGain);
-              osc2.connect(ringGain);
-              ringGain.connect(gainNode!);
-              
+              osc1.connect(ringGain); osc2.connect(ringGain); ringGain.connect(gainNode!);
               const now = audioCtx.currentTime;
               ringGain.gain.setValueAtTime(0, now);
               ringGain.gain.linearRampToValueAtTime(0.08, now + 0.1);
               ringGain.gain.setValueAtTime(0.08, now + 1.5);
               ringGain.gain.linearRampToValueAtTime(0, now + 1.6);
-              
-              osc1.start();
-              osc2.start();
+              osc1.start(); osc2.start();
               activeOscillators.push(osc1, osc2);
-              
-              setTimeout(() => {
-                try {
-                  osc1.stop();
-                  osc2.stop();
-                  osc1.disconnect();
-                  osc2.disconnect();
-                  ringGain.disconnect();
-                  
-                  const i1 = activeOscillators.indexOf(osc1);
-                  if (i1 > -1) activeOscillators.splice(i1, 1);
-                  const i2 = activeOscillators.indexOf(osc2);
-                  if (i2 > -1) activeOscillators.splice(i2, 1);
-                } catch (e) {}
-              }, 1800);
+              setTimeout(() => { try { osc1.stop(); osc2.stop(); osc1.disconnect(); osc2.disconnect(); ringGain.disconnect(); } catch (e) {} }, 1800);
             } else {
-              // --- RECIPIENT: Rapid musical incoming call ringtone ---
-              // Pulse: 0.4s tone, 0.2s pause, 0.4s tone, 2.0s pause. Repeats every 3.2s.
               const playPulse = (delay: number) => {
                 if (!audioCtx || !gainNode) return;
-                const osc1 = audioCtx.createOscillator();
-                const osc2 = audioCtx.createOscillator();
-                const ringGain = audioCtx.createGain();
-
-                osc1.type = 'triangle';
-                osc2.type = 'sine';
-
-                osc1.frequency.setValueAtTime(550, audioCtx.currentTime + delay);
-                osc2.frequency.setValueAtTime(750, audioCtx.currentTime + delay);
-
-                osc1.connect(ringGain);
-                osc2.connect(ringGain);
-                ringGain.connect(gainNode!);
-
+                const o1 = audioCtx.createOscillator(); const o2 = audioCtx.createOscillator();
+                const rg = audioCtx.createGain();
+                o1.type = 'triangle'; o2.type = 'sine';
+                o1.frequency.setValueAtTime(550, audioCtx.currentTime + delay);
+                o2.frequency.setValueAtTime(750, audioCtx.currentTime + delay);
+                o1.connect(rg); o2.connect(rg); rg.connect(gainNode!);
                 const now = audioCtx.currentTime + delay;
-                ringGain.gain.setValueAtTime(0, now);
-                ringGain.gain.linearRampToValueAtTime(0.15, now + 0.05);
-                ringGain.gain.setValueAtTime(0.15, now + 0.4);
-                ringGain.gain.linearRampToValueAtTime(0, now + 0.45);
-
-                osc1.start(now);
-                osc2.start(now);
-                activeOscillators.push(osc1, osc2);
-
-                setTimeout(() => {
-                  try {
-                    osc1.stop();
-                    osc2.stop();
-                    osc1.disconnect();
-                    osc2.disconnect();
-                    ringGain.disconnect();
-                    
-                    const i1 = activeOscillators.indexOf(osc1);
-                    if (i1 > -1) activeOscillators.splice(i1, 1);
-                    const i2 = activeOscillators.indexOf(osc2);
-                    if (i2 > -1) activeOscillators.splice(i2, 1);
-                  } catch (e) {}
-                }, (delay + 0.6) * 1000);
+                rg.gain.setValueAtTime(0, now);
+                rg.gain.linearRampToValueAtTime(0.15, now + 0.05);
+                rg.gain.setValueAtTime(0.15, now + 0.4);
+                rg.gain.linearRampToValueAtTime(0, now + 0.45);
+                o1.start(now); o2.start(now);
+                activeOscillators.push(o1, o2);
+                setTimeout(() => { try { o1.stop(); o2.stop(); o1.disconnect(); o2.disconnect(); rg.disconnect(); } catch (e) {} }, (delay + 0.6) * 1000);
               };
-
-              playPulse(0);
-              playPulse(0.6);
+              playPulse(0); playPulse(0.6);
             }
           };
-
           playTone();
           ringInterval = setInterval(playTone, isIncoming ? 3200 : 4500);
-        } catch (e) {
-          console.warn('AudioContext not supported or blocked:', e);
-        }
+        } catch (e) { console.warn('AudioContext not supported:', e); }
       }
     }
 
     return () => {
-      // CLEAR NATIVE RINGING ON UNMOUNT OR STATE CHANGE
       NativeBridge.endNativeCall();
       clearTimeout(timeout);
       clearInterval(ringInterval);
-      
-      activeOscillators.forEach((osc) => {
-        try {
-          osc.stop();
-          osc.disconnect();
-        } catch (e) {}
-      });
+      activeOscillators.forEach(osc => { try { osc.stop(); osc.disconnect(); } catch (e) {} });
       activeOscillators.length = 0;
-
-      if (audioCtx) {
-        audioCtx.close().catch(() => {});
-      }
+      if (audioCtx) audioCtx.close().catch(() => {});
     };
   }, [webrtc.callStatus, incomingCallData]);
 
-  const initiateCall = (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => {
-    if (isSuspended) {
-      toast({
-        title: 'Portal Read-Only',
-        description: 'Voice and video calls are disabled under school suspension.',
-        variant: 'destructive',
-      });
+  // ── handleAccept: called by the in-app modal (foreground only) ────────────
+  const handleAccept = useCallback(() => {
+    const current = incomingCallRef.current;
+    if (!current) {
+      console.warn('[CallProvider] handleAccept: no incomingCallData');
       return;
     }
-    setCallType(type);
-    setParticipants(prev => [
-      ...prev.filter(p => p.isLocal),
-      { id: toId, name: profile.name, avatar: profile.avatar }
-    ]);
-    
-    const callerProfile = {
-      name: currentUser?.name || 'Unknown User',
-      avatar: currentUser?.profile_photo || ''
-    };
-    webrtc.startCall(toId, type, callerProfile);
-  };
-
-  const handleAccept = useCallback(() => {
-    if (incomingCallData) {
-      NativeBridge.dismissCallBanner();
-      if (!incomingCallData.offer) {
-        console.log('[CallProvider] User accepted call but offer not received yet. Setting isWaitingForOffer to true.');
-        setIsWaitingForOffer(true);
-        return;
-      }
-      console.log('[CallProvider] Answering call immediately.');
-      NativeBridge.endNativeCall();
-      webrtc.answerCall(
-        incomingCallData.from,
-        incomingCallData.offer,
-        incomingCallData.type,
-        incomingCallData.callId,
-        incomingCallData.conversationId
-      );
-      setIncomingCallData(null);
-      setIsWaitingForOffer(false);
+    NativeBridge.dismissCallBanner();
+    if (!current.offer) {
+      console.log('[CallProvider] handleAccept: offer not yet received — waiting for offer');
+      setIsWaitingForOffer(true);
+      return;
     }
-  }, [incomingCallData, webrtc]);
+    console.log('[CallProvider] handleAccept: answering immediately');
+    NativeBridge.endNativeCall();
+    webrtc.answerCall(current.from, current.offer, current.type, current.callId, current.conversationId);
+    setIncomingCallData(null);
+    setIsWaitingForOffer(false);
+  }, [webrtc]);
 
   const handleReject = useCallback((isMissed: boolean = false) => {
+    const current = incomingCallRef.current;
     NativeBridge.dismissCallBanner();
     NativeBridge.endNativeCall();
     setIsWaitingForOffer(false);
-    // Emit reject_call to notify the caller before cleaning up
-    if (incomingCallData) {
-      webrtc.rejectCall(incomingCallData.from, isMissed, incomingCallData.callId);
+    if (current) {
+      webrtc.rejectCall(current.from, isMissed, current.callId);
     } else {
       webrtc.endCall();
     }
     setIncomingCallData(null);
     setParticipants(prev => prev.filter(p => p.isLocal));
-  }, [incomingCallData, webrtc]);
+  }, [webrtc]);
 
-  // Auto-answer when wait-triggered and socket offer arrives
+  // ── Auto-answer when offer finally arrives while waiting ──────────────────
   useEffect(() => {
     if (incomingCallData && incomingCallData.offer && isWaitingForOffer) {
-      console.log('[CallProvider] Offer received while waiting. Answering call now.');
+      console.log('[CallProvider] Offer arrived while waiting — answering now');
       NativeBridge.endNativeCall();
       webrtc.answerCall(
         incomingCallData.from,
@@ -335,93 +245,162 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [incomingCallData, isWaitingForOffer, webrtc]);
 
-  // ── Handle Pending Call Action from Native Bridge ──────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ANSWER FLOW — complete rewrite
+  //
+  // When the user taps Answer from:
+  //   A) The foreground CallManager banner  → onBannerAccept → JS 'ANSWER' action
+  //   B) The system notification action     → BroadcastReceiver → ANSWER intent → MainActivity
+  //   C) The IncomingCallActivity           → startActivity(MainActivity, callAction=ANSWER)
+  //
+  // In cases B and C the app may have been backgrounded/killed.  The socket
+  // may not yet be authenticated, and incomingCallData may be null because
+  // we never received the socket 'incoming_call' event in-process.
+  //
+  // Strategy:
+  //   1. Store the ANSWER intent in a stable ref immediately.
+  //   2. If incomingCallData is already present AND has an offer → answer right away.
+  //   3. Otherwise set isWaitingForOffer=true so that when the socket
+  //      'incoming_call' fires (on reconnect/resume) we auto-answer.
+  //   4. If incomingCallData is present but has NO offer → wait for the updated
+  //      event that carries the offer (the re-delivery on socket auth).
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Ref that carries the pending ANSWER intent across renders/re-connects
+  const pendingAnswerRef = useRef<{ callId: string; callerId?: string; callType?: string } | null>(null);
+
+  const executePendingAnswer = useCallback(() => {
+    const pending = pendingAnswerRef.current;
+    const current = incomingCallRef.current;
+
+    if (!pending) return;
+
+    console.log('[CallProvider] executePendingAnswer: pending=', pending, '| incomingCallData=', current ? `{callId:${current.callId}, hasOffer:${!!current.offer}}` : 'null');
+
+    if (current && current.callId === pending.callId && current.offer) {
+      // Perfect condition: data + offer both present
+      console.log('[CallProvider] ✅ Executing ANSWER — all data present');
+      NativeBridge.endNativeCall();
+      NativeBridge.dismissCallBanner();
+      webrtc.answerCall(current.from, current.offer, current.type, current.callId, current.conversationId);
+      setIncomingCallData(null);
+      setIsWaitingForOffer(false);
+      pendingAnswerRef.current = null;
+    } else if (current && current.callId === pending.callId && !current.offer) {
+      // Data arrived but offer not yet included → wait
+      console.log('[CallProvider] incomingCallData present but no offer yet → isWaitingForOffer=true');
+      setIsWaitingForOffer(true);
+    } else {
+      // incomingCallData not received (app was backgrounded during signaling)
+      // Build a synthetic stub so the WebRTC hook is ready to receive the offer
+      console.log('[CallProvider] No incomingCallData. Building stub and waiting for socket offer');
+      const stub = {
+        from: pending.callerId || 'unknown',
+        callId: pending.callId,
+        type: (pending.callType === 'VIDEO' ? 'VIDEO' : 'VOICE') as 'VOICE' | 'VIDEO',
+        profile: { name: 'Caller', avatar: '' },
+        offer: null,
+      };
+      setIncomingCallData(stub);
+      setCallType(stub.type);
+      setParticipants(prev => [...prev.filter(p => p.isLocal), { id: stub.from, name: stub.profile.name, avatar: '' }]);
+      setIsWaitingForOffer(true);
+    }
+  }, [webrtc]);
+
+  // Re-run executePendingAnswer whenever incomingCallData changes (offer may now be available)
+  useEffect(() => {
+    if (pendingAnswerRef.current) {
+      executePendingAnswer();
+    }
+  }, [incomingCallData, executePendingAnswer]);
+
+  // ── Handle native/push call actions ───────────────────────────────────────
   const handlePendingCallAction = useCallback((action: string, callId: string, callerId?: string, callerName?: string, callType?: string) => {
-    console.log(`[CallProvider] Handling pending call action: ${action} for call ${callId}, caller: ${callerName}`);
-    
+    console.log(`[CallProvider] handlePendingCallAction: action=${action}, callId=${callId}, callerId=${callerId}, callerName=${callerName}, callType=${callType}`);
+
     if (action === 'INCOMING_CALL') {
+      // Native bridge told us about an incoming call (e.g. app was in background, FCM woke it)
       const resolvedName = callerName && callerName.trim() ? callerName : 'Unknown Caller';
       const activeCall = {
         from: callerId || 'unknown',
         callId,
-        type: callType === 'VIDEO' ? 'VIDEO' : 'VOICE',
-        profile: { name: resolvedName, avatar: '' }
+        type: (callType === 'VIDEO' ? 'VIDEO' : 'VOICE') as 'VOICE' | 'VIDEO',
+        profile: { name: resolvedName, avatar: '' },
+        offer: null, // offer will arrive via socket
       };
+      console.log('[CallProvider] INCOMING_CALL stub created, awaiting socket offer');
       setIncomingCallData(activeCall);
-      setCallType(callType === 'VIDEO' ? 'VIDEO' : 'VOICE');
+      setCallType(activeCall.type);
       setParticipants(prev => [
         ...prev.filter(p => p.isLocal),
-        { id: activeCall.from, name: activeCall.profile.name, avatar: activeCall.profile.avatar }
+        { id: activeCall.from, name: resolvedName, avatar: '' }
       ]);
+
     } else if (action === 'ANSWER') {
-      console.log('[CallProvider] Received ANSWER action. Setting pendingAction.');
-      setPendingAction({ action, callId, callerId, callType });
+      console.log('[CallProvider] ANSWER action received from native bridge');
+      // Store in ref so it survives re-renders and socket reconnects
+      pendingAnswerRef.current = { callId, callerId, callType };
+      executePendingAnswer();
+
     } else if (action === 'DECLINE') {
-      console.log('[CallProvider] Received DECLINE action.');
-      if (callerId) {
-        webrtc.rejectCall(callerId, false);
-      }
+      console.log('[CallProvider] DECLINE action received from native bridge');
+      pendingAnswerRef.current = null;
+      if (callerId) webrtc.rejectCall(callerId, false, callId);
       setIncomingCallData(null);
       setParticipants(prev => prev.filter(p => p.isLocal));
       NativeBridge.endNativeCall();
     }
-  }, [webrtc]);
+  }, [webrtc, executePendingAnswer]);
 
-  // Execute ANSWER when both incomingCallData and ANSWER pending action exist
-  useEffect(() => {
-    if (incomingCallData && pendingAction && pendingAction.action === 'ANSWER' && pendingAction.callId === incomingCallData.callId) {
-      console.log('[CallProvider] Executing deferred ANSWER action');
-      NativeBridge.endNativeCall();
-      webrtc.answerCall(
-        incomingCallData.from,
-        incomingCallData.offer,
-        incomingCallData.type,
-        incomingCallData.callId,
-        incomingCallData.conversationId
-      );
-      setIncomingCallData(null);
-      setPendingAction(null);
-    }
-  }, [incomingCallData, pendingAction, webrtc]);
-
-  // Listen for call_stop_ringing from multi-device synchronization
+  // ── call_stop_ringing: answered on another device ─────────────────────────
   useEffect(() => {
     if (!socket) return;
     const handleStopRinging = ({ callId }: { callId: string }) => {
-      console.log(`[CallProvider] call_stop_ringing received: ${callId}`);
-      if (incomingCallData && incomingCallData.callId === callId) {
+      console.log(`[CallProvider] call_stop_ringing received for callId=${callId}`);
+      const current = incomingCallRef.current;
+      if (current && current.callId === callId) {
         setIncomingCallData(null);
         setParticipants(prev => prev.filter(p => p.isLocal));
       }
-      setPendingAction(null);
+      pendingAnswerRef.current = null;
+      setIsWaitingForOffer(false);
       NativeBridge.dismissCallBanner();
       NativeBridge.endNativeCall();
     };
-
     socket.on('call_stop_ringing', handleStopRinging);
-    return () => {
-      socket.off('call_stop_ringing', handleStopRinging);
-    };
-  }, [socket, incomingCallData]);
+    return () => { socket.off('call_stop_ringing', handleStopRinging); };
+  }, [socket]);
 
-  // Poll/Check pending intents on resume or startup
+  // ── socket:authed — socket reconnected and re-authenticated ───────────────
+  // Re-run executePendingAnswer after the socket becomes ready.
+  // This handles the case where the user tapped Answer while the socket
+  // was disconnected (app was backgrounded), so by the time the socket
+  // reconnects and authenticates, we retry the pending answer.
+  useEffect(() => {
+    const onSocketAuthed = () => {
+      console.log('[CallProvider] socket:authed received — re-running executePendingAnswer');
+      if (pendingAnswerRef.current) {
+        executePendingAnswer();
+      }
+    };
+    window.addEventListener('socket:authed', onSocketAuthed);
+    return () => window.removeEventListener('socket:authed', onSocketAuthed);
+  }, [executePendingAnswer]);
+
+
+  // ── Poll pending intents on startup / app-resume ──────────────────────────
   useEffect(() => {
     if (!NativeBridge.isNative()) return;
 
     const checkPending = async () => {
       try {
         const res = await NativeBridge.getPendingCall();
+        console.log('[CallProvider] getPendingCall result:', JSON.stringify(res));
         if (res && res.hasPending && res.action) {
           if (res.action === 'NAVIGATE') {
-            console.log('[CallProvider] Found pending navigation action:', res);
             window.dispatchEvent(new CustomEvent('zetime:navigate', {
-              detail: {
-                type: res.type,
-                route: res.route,
-                conversationId: res.conversationId,
-                studentId: res.studentId,
-                schoolId: res.schoolId
-              }
+              detail: { type: res.type, route: res.route, conversationId: res.conversationId, studentId: res.studentId, schoolId: res.schoolId }
             }));
           } else {
             handlePendingCallAction(res.action, res.callId || '', res.callerId, res.callerName, res.callType);
@@ -432,26 +411,24 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Check immediately on load
     checkPending();
 
-    // Also check when app comes to active
     const sub = App.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
+        console.log('[CallProvider] App foregrounded — re-checking pending call intents');
         checkPending();
       }
     });
 
-    return () => {
-      sub.then(s => s.remove());
-    };
+    return () => { sub.then(s => s.remove()); };
   }, [handlePendingCallAction]);
 
+  // ── Listen for real-time native call action events ────────────────────────
   useEffect(() => {
     if (!NativeBridge.isNative()) return;
 
     const sub = NativeBridge.addCallActionListener((data: any) => {
-      console.log('[CallProvider] Native call action received:', data);
+      console.log('[CallProvider] Native call action event:', JSON.stringify(data));
       handlePendingCallAction(
         data.action,
         data.callId || '',
@@ -461,18 +438,29 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
     });
 
-    return () => {
-      // @ts-ignore
-      sub?.then(s => s.remove());
-    };
+    return () => { (sub as any)?.then((s: any) => s.remove()); };
   }, [handlePendingCallAction]);
+
+  const initiateCall = (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => {
+    if (isSuspended) {
+      toast({ title: 'Portal Read-Only', description: 'Voice and video calls are disabled under school suspension.', variant: 'destructive' });
+      return;
+    }
+    setCallType(type);
+    setParticipants(prev => [
+      ...prev.filter(p => p.isLocal),
+      { id: toId, name: profile.name, avatar: profile.avatar }
+    ]);
+    const callerProfile = { name: currentUser?.name || 'Unknown User', avatar: currentUser?.profile_photo || '' };
+    webrtc.startCall(toId, type, callerProfile);
+  };
 
   const activeCaller = participants.find(p => !p.isLocal);
 
   return (
     <CallContext.Provider value={{ initiateCall, endCall: webrtc.endCall, status: webrtc.callStatus }}>
       {children}
-      
+
       {/* Global Modals */}
       <IncomingCallModal
         isOpen={!!incomingCallData && !NativeBridge.isNative()}
@@ -507,8 +495,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useCall = () => {
   const context = useContext(CallContext);
-  if (!context) {
-    throw new Error('useCall must be used within a CallProvider');
-  }
+  if (!context) throw new Error('useCall must be used within a CallProvider');
   return context;
 };

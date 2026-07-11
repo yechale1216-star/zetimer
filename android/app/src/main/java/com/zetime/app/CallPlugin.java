@@ -171,8 +171,14 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
     @PluginMethod
     public void saveAuthToken(PluginCall call) {
         String token = call.getString("token");
+        String apiUrl = call.getString("apiUrl");
         if (token != null) {
             MainActivity.saveAuthTokenToPrefs(getContext(), token);
+        }
+        if (apiUrl != null) {
+            android.content.SharedPreferences prefs = getContext().getSharedPreferences("zetime_prefs", android.content.Context.MODE_PRIVATE);
+            prefs.edit().putString("api_url", apiUrl).apply();
+            android.util.Log.d("CallPlugin", "API URL persisted to SharedPreferences: " + apiUrl);
         }
         call.resolve();
     }

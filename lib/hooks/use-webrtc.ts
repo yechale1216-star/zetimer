@@ -280,16 +280,28 @@ export const useWebRTC = (options: WebRTCOptions) => {
   }, [options.userId, socket, createPeerConnection, cleanupAll]);
 
   const answerCall = useCallback(async (fromId: string, offer: any, type: 'VOICE' | 'VIDEO', callId?: string, conversationId?: string) => {
+    console.log(`[WebRTC] AnswerCall START — from=${fromId} type=${type} callId=${callId} hasOffer=${!!offer}`);
+
+    if (!offer) {
+      console.error('[WebRTC] answerCall called with no SDP offer! Aborting to prevent invalid state.');
+      return;
+    }
+
     setCallStatus('CONNECTING');
     setMediaError(null);
     callType.current = type;
     isInitiator.current = false;
     if (callId) callIdRef.current = callId;
     if (conversationId) conversationIdRef.current = conversationId;
+
     try {
       if (NativeBridge.isNative()) {
+        console.log('[WebRTC] Requesting camera/mic permissions...');
         await NativeBridge.requestPermissions();
+        console.log('[WebRTC] Permissions granted');
       }
+
+      console.log('[WebRTC] Acquiring local media stream...');
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
         audio: {
@@ -299,29 +311,46 @@ export const useWebRTC = (options: WebRTCOptions) => {
         },
         video: type === 'VIDEO' ? { facingMode: 'user' } : false,
       });
+      console.log('[WebRTC] ✅ Local media stream acquired. tracks:', stream.getTracks().map(t => t.kind));
       setLocalStream(stream);
 
+      console.log('[WebRTC] Creating RTCPeerConnection for', fromId);
       const pc = createPeerConnection(fromId);
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      stream.getTracks().forEach(track => {
+        pc.addTrack(track, stream);
+        console.log('[WebRTC] → Added local track:', track.kind);
+      });
 
+      console.log('[WebRTC] Setting remote description (offer)...');
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      console.log('[WebRTC] ✅ Remote description set');
 
-      // Drain queued ICE candidates
+      // Drain queued ICE candidates that arrived before remote description was set
       const queue = queuedCandidates.current.get(fromId) || [];
-      for (const candidate of queue) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {
-          console.error('Error adding queued candidate:', e);
+      if (queue.length > 0) {
+        console.log(`[WebRTC] Draining ${queue.length} queued ICE candidates`);
+        for (const candidate of queue) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.error('[WebRTC] Error adding queued candidate:', e);
+          }
         }
       }
       queuedCandidates.current.delete(fromId);
 
+      console.log('[WebRTC] Creating SDP answer...');
       const answer = await pc.createAnswer();
+      console.log('[WebRTC] ✅ SDP answer created');
+
+      console.log('[WebRTC] Setting local description (answer)...');
       await pc.setLocalDescription(answer);
+      console.log('[WebRTC] ✅ Local description set');
 
       if (socket) {
+        console.log('[WebRTC] Emitting answer_call to signaling server for callId=', callIdRef.current);
         socket.emit('answer_call', { to: fromId, from: options.userId, answer, callId: callIdRef.current });
+
         // Emit media state immediately on connection
         socket.emit('media_state_change', {
           to: fromId,
@@ -329,15 +358,21 @@ export const useWebRTC = (options: WebRTCOptions) => {
           isCameraOff: isCameraOffRef.current,
           isMuted: isMutedRef.current,
         });
+        console.log('[WebRTC] ✅ answer_call emitted. Waiting for ICE to connect...');
+      } else {
+        console.error('[WebRTC] CRITICAL: socket is null at time of answer_call emission!');
       }
+
       setCallStatus('CONNECTED');
       connectedAt.current = Date.now();
+      console.log('[WebRTC] ✅ Call CONNECTED at', new Date().toISOString());
     } catch (error) {
-      console.error('Error answering call:', error);
+      console.error('[WebRTC] Error answering call:', error);
       setMediaError(describeMediaError(error));
       cleanupAll();
     }
   }, [socket, options.userId, createPeerConnection, cleanupAll]);
+
 
   const endCall = useCallback(() => {
     let duration = 0;
@@ -479,9 +514,13 @@ export const useWebRTC = (options: WebRTCOptions) => {
     if (!socket) return;
 
     socket.on('incoming_call', (data) => {
+      console.log('[WebRTC] ✅ incoming_call received. callId:', data.callId, '| from:', data.from, '| hasOffer:', !!data.offer);
+      // Store callId in ref so we can match it against pending ANSWER intents
+      if (data.callId) callIdRef.current = data.callId;
       if (options.onIncomingCall) options.onIncomingCall(data);
       setCallStatus('RINGING');
       socket.emit('call_ringing', { to: data.from, from: options.userId });
+      console.log('[WebRTC] call_ringing emitted to', data.from);
     });
 
     const handleRinging = ({ from }: any) => {

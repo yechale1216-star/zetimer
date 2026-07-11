@@ -427,12 +427,21 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         super.onNewToken(token);
         Log.d(TAG, "FCM token refreshed: " + token);
 
+        // Read the stored auth token and API URL from SharedPreferences
+        android.content.SharedPreferences prefs = getSharedPreferences("zetime_prefs", android.content.Context.MODE_PRIVATE);
+        String authToken = prefs.getString("auth_token", null);
+        if (authToken == null || authToken.isEmpty()) {
+            Log.d(TAG, "No auth token found in SharedPreferences. Skipping token refresh on server.");
+            return;
+        }
+
+        String baseUrl = prefs.getString("api_url", "https://zetime-backend.onrender.com");
+        String apiUrl = baseUrl + "/api/auth/push-token";
+
         // Persist the new token to the backend so server-side pushes keep working
         // We do this on a background thread to avoid blocking the main thread
         new Thread(() -> {
             try {
-                String apiUrl = "https://zetime-backend.onrender.com/api/auth/push-token";
-                
                 java.net.URL url = new java.net.URL(apiUrl);
                 java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -440,13 +449,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 conn.setDoOutput(true);
                 conn.setConnectTimeout(10000);
                 conn.setReadTimeout(10000);
-
-                // Read the stored auth token from SharedPreferences (saved on login)
-                android.content.SharedPreferences prefs = getSharedPreferences("zetime_prefs", android.content.Context.MODE_PRIVATE);
-                String authToken = prefs.getString("auth_token", null);
-                if (authToken != null && !authToken.isEmpty()) {
-                    conn.setRequestProperty("Authorization", "Bearer " + authToken);
-                }
+                conn.setRequestProperty("Authorization", "Bearer " + authToken);
 
                 String jsonBody = "{\"token\":\"" + token + "\"}";
                 byte[] bytes = jsonBody.getBytes("UTF-8");

@@ -47,6 +47,7 @@ const validate_1 = require("../middleware/validate");
 const db_1 = __importDefault(require("../config/db"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const router = (0, express_1.Router)();
 // Startup Debug
 console.log('Auth Routes Loaded');
@@ -222,7 +223,15 @@ router.post('/logout', async (req, res) => {
     try {
         const token = req.cookies?.attendance_token || req.headers.authorization?.split(' ')[1];
         if (token) {
-            const decoded = (0, jwt_1.verifyToken)(token);
+            let decoded = null;
+            try {
+                decoded = (0, jwt_1.verifyToken)(token);
+            }
+            catch (err) {
+                // Safe fallback: decode token anyway without verifying expiration to clear target pushToken
+                console.warn('[Logout] Token verification failed (possibly expired), decoding to clear pushToken', err);
+                decoded = jsonwebtoken_1.default.decode(token);
+            }
             if (decoded && decoded.id) {
                 await db_1.default.user.update({
                     where: { id: decoded.id },
@@ -319,11 +328,16 @@ router.post('/push-token', async (req, res, next) => {
         if (!decoded || !decoded.id) {
             return res.status(401).json({ success: false, message: 'Invalid token' });
         }
+        // Prevent duplicate: set pushToken to null for any other user holding this token
+        await db_1.default.user.updateMany({
+            where: { pushToken: token, id: { not: decoded.id } },
+            data: { pushToken: null }
+        });
         await db_1.default.user.update({
             where: { id: decoded.id },
             data: { pushToken: token },
         });
-        console.log(`[PushToken] Saved FCM token for user ${decoded.id}`);
+        console.log(`[PushToken] Saved FCM token for user ${decoded.id} and cleared duplicates`);
         res.status(200).json({ success: true });
     }
     catch (error) {

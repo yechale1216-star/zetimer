@@ -27,7 +27,7 @@ interface CallPlugin {
     serverUrl?: string;
   }) => Promise<void>;
   dismissCallBanner: () => Promise<void>;
-  saveAuthToken: (options: { token: string }) => Promise<void>;
+  saveAuthToken: (options: { token: string; apiUrl?: string }) => Promise<void>;
   getPendingCall: () => Promise<{
     hasPending: boolean;
     action?: string;
@@ -55,10 +55,11 @@ export const NativeBridge = {
   isNative: () => Capacitor.isNativePlatform(),
 
   // Saves JWT token to native SharedPreferences
-  saveAuthToken: async (token: string) => {
+  saveAuthToken: async (token: string, apiUrl?: string) => {
     if (Capacitor.isNativePlatform()) {
       try {
-        await CallPlugin.saveAuthToken({ token });
+        const urlToPersist = apiUrl || process.env.NEXT_PUBLIC_API_URL || 'https://zetime-backend.onrender.com';
+        await CallPlugin.saveAuthToken({ token, apiUrl: urlToPersist });
       } catch (e) {
         console.warn('[NativeBridge] saveAuthToken failed', e);
       }
@@ -142,7 +143,7 @@ export const NativeBridge = {
           
           if (authToken) {
             // Also sync the token to Java so background FCM receiver can use it on refresh
-            await NativeBridge.saveAuthToken(authToken);
+            await NativeBridge.saveAuthToken(authToken, API_URL);
           }
           
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };

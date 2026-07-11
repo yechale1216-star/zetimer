@@ -33,14 +33,25 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     if (socketRef.current) {
       console.log('[SocketProvider] Auth user changed — reconnecting socket...');
       socketRef.current.disconnect();
-      socketRef.current.connect();
+      if (user) {
+        socketRef.current.connect();
+      }
     }
   }, [user]);
 
   const authenticate = useCallback(async (s: Socket) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('attendance_token') : null;
     if (token && s.connected) {
+      console.log('[SocketProvider] Authenticating socket...');
       s.emit('authenticate', { token });
+
+      // Signal to CallProvider (and any other listeners) that the socket
+      // is now authenticated and ready to send signaling events.
+      // This is critical for the ANSWER flow when the app resumes from background.
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('socket:authed'));
+        console.log('[SocketProvider] socket:authed event dispatched');
+      }
 
       // --- Register Push Token ---
       try {
@@ -56,15 +67,17 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const reconnect = useCallback(() => {
-    if (socketRef.current && !socketRef.current.connected) {
+    if (socketRef.current && !socketRef.current.connected && user) {
       socketRef.current.connect();
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     // ── WebSocket-first transport (skip HTTP long-polling entirely).
     // This reduces connection latency by ~300ms on initial connect and
     // eliminates the polling overhead that drains battery on mobile.
+    const hasUser = typeof window !== 'undefined' ? (!!localStorage.getItem('attendance_current_user') && !!localStorage.getItem('attendance_token')) : false;
+
     const socketInstance = ClientIO(socketUrl, {
       transports: ['websocket'],       // Never fall back to polling
       reconnection: true,
@@ -73,6 +86,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       reconnectionDelayMax: 30000,     // Cap at 30s (mobile: don't hammer the server)
       randomizationFactor: 0.5,        // Jitter to avoid thundering herd on server restart
       timeout: 20000,
+      autoConnect: hasUser,
     });
 
     socketRef.current = socketInstance;

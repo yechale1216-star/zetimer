@@ -9,6 +9,7 @@ import { validateSignup } from '../middleware/validate';
 import prisma from '../config/db';
 import fs from 'fs';
 import path from 'path';
+import jwt from 'jsonwebtoken';
 
 const router = Router();
 
@@ -203,7 +204,14 @@ router.post('/logout', async (req: Request, res: Response) => {
   try {
     const token = req.cookies?.attendance_token || req.headers.authorization?.split(' ')[1];
     if (token) {
-      const decoded = verifyToken(token);
+      let decoded: any = null;
+      try {
+        decoded = verifyToken(token);
+      } catch (err) {
+        // Safe fallback: decode token anyway without verifying expiration to clear target pushToken
+        console.warn('[Logout] Token verification failed (possibly expired), decoding to clear pushToken', err);
+        decoded = jwt.decode(token);
+      }
       if (decoded && decoded.id) {
         await prisma.user.update({
           where: { id: decoded.id },
@@ -310,12 +318,18 @@ router.post('/push-token', async (req: Request, res: Response, next: NextFunctio
       return res.status(401).json({ success: false, message: 'Invalid token' });
     }
 
+    // Prevent duplicate: set pushToken to null for any other user holding this token
+    await prisma.user.updateMany({
+      where: { pushToken: token, id: { not: decoded.id } },
+      data: { pushToken: null }
+    });
+
     await prisma.user.update({
       where: { id: decoded.id },
       data: { pushToken: token },
     });
 
-    console.log(`[PushToken] Saved FCM token for user ${decoded.id}`);
+    console.log(`[PushToken] Saved FCM token for user ${decoded.id} and cleared duplicates`);
     res.status(200).json({ success: true });
   } catch (error) {
     next(error);

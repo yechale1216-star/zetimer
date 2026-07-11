@@ -137,6 +137,10 @@ public class MainActivity extends BridgeActivity {
             String callerName = intent.getStringExtra("callerName");
             String serverUrl = intent.getStringExtra("serverUrl");
 
+            android.util.Log.d("MainActivity", "[handleIntent] callAction=" + action
+                    + " callId=" + callId + " callerId=" + callerId
+                    + " callType=" + callType + " callerName=" + callerName);
+
             com.getcapacitor.JSObject callObj = new com.getcapacitor.JSObject();
             callObj.put("action", action);
             callObj.put("callId", callId);
@@ -145,6 +149,7 @@ public class MainActivity extends BridgeActivity {
             if (callerName != null) callObj.put("callerName", callerName);
             if (serverUrl != null) callObj.put("serverUrl", serverUrl);
 
+            // Always persist as pending so JS can retrieve it after WebView loads
             CallPlugin.setPendingCall(callObj);
 
             if (bridge != null) {
@@ -152,7 +157,11 @@ public class MainActivity extends BridgeActivity {
                 if (handle != null) {
                     CallPlugin plugin = (CallPlugin) handle.getInstance();
                     if (plugin != null) {
-                        plugin.handleCallAction(action, callId);
+                        // ⚡ Use handleIncomingCall (notifyListeners) so the FULL payload
+                        //    (callerId, callType, callerName) reaches JS — not just the
+                        //    stripped (action, callId) from handleCallAction.
+                        android.util.Log.d("MainActivity", "[handleIntent] Dispatching full call object to JS: " + callObj);
+                        plugin.handleIncomingCall(callObj);
                     }
                 }
             }

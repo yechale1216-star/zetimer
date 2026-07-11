@@ -562,9 +562,23 @@ class AuthService {
   async logout(): Promise<void> {
     if (this.isClient()) {
       try {
-        await fetch(`${API_URL}/api/auth/logout`, { method: "POST" });
+        const headers = this.getAuthHeaders();
+        await fetch(`${API_URL}/api/auth/logout`, { 
+          method: "POST", 
+          headers,
+          credentials: "include" 
+        });
       } catch (e) {
         console.error("Logout API call failed", e);
+      }
+
+      // Stop any ongoing native call services, clear native ringing, and clear native persisted auth token
+      try {
+        const { NativeBridge } = await import('@/lib/utils/native-bridge');
+        await NativeBridge.endNativeCall();
+        await NativeBridge.saveAuthToken(""); // Clears sharedPreferences token
+      } catch (e) {
+        console.error("Failed to clean up native call state on logout", e);
       }
       
       // Clear ALL school-scoped keys so that no data leaks to the next login session.
@@ -585,7 +599,7 @@ class AuthService {
       ]
       keysToRemove.forEach(key => localStorage.removeItem(key))
     }
-    console.log("[pg] User logged out — all school-scoped localStorage keys cleared")
+    console.log("[pg] User logged out — all school-scoped localStorage keys and native credentials cleared")
   }
 
   handleUnauthorized(): void {

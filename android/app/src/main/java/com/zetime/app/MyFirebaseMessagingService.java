@@ -349,6 +349,23 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         String callTypeLabel = "VIDEO".equalsIgnoreCase(callType) ? "Video" : "Voice";
 
+        // Create custom RemoteViews styled precisely like the foreground call banner
+        android.widget.RemoteViews customView = new android.widget.RemoteViews(getPackageName(), R.layout.layout_notification_call_banner);
+        customView.setTextViewText(R.id.banner_caller_name, callerName != null ? callerName : "Unknown Caller");
+        customView.setTextViewText(R.id.banner_call_subtitle, "VIDEO".equalsIgnoreCase(callType) ? "Incoming video call" : "Incoming voice call");
+        
+        String name = (callerName != null && !callerName.isEmpty()) ? callerName : "Unknown Caller";
+        String[] parts = name.split("\\s+");
+        StringBuilder initials = new StringBuilder();
+        for (String p : parts) {
+            if (!p.isEmpty()) initials.append(p.charAt(0));
+            if (initials.length() >= 2) break;
+        }
+        customView.setTextViewText(R.id.banner_avatar_initials, initials.toString().toUpperCase());
+        
+        customView.setOnClickPendingIntent(R.id.banner_btn_accept, answerPI);
+        customView.setOnClickPendingIntent(R.id.banner_btn_decline, declinePI);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_CALLS)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("Incoming " + callTypeLabel + " Call")
@@ -359,11 +376,14 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setOngoing(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setFullScreenIntent(fsPendingIntent, true)
-                .addAction(R.mipmap.ic_launcher, "Decline", declinePI)
-                .addAction(R.mipmap.ic_launcher, "Answer",  answerPI);
+                .setCustomContentView(customView)
+                .setCustomHeadsUpContentView(customView)
+                .setCustomBigContentView(customView)
+                .setStyle(new NotificationCompat.DecoratedCustomViewStyle());
 
         nm.notify(NOTIF_ID_CALL, builder.build());
     }
+
 
     // ─────────────────────────────────────────────────────────────────────────
     // NOTIFICATION CHANNELS Setup

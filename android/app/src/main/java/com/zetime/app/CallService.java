@@ -212,6 +212,23 @@ public class CallService extends Service {
         String callerLabel = pendingCallerName != null ? pendingCallerName : "Unknown";
         String callTypeLabel = "VIDEO".equalsIgnoreCase(pendingCallType) ? "Video" : "Voice";
 
+        // Create custom RemoteViews styled precisely like the foreground call banner
+        android.widget.RemoteViews customView = new android.widget.RemoteViews(getPackageName(), R.layout.layout_notification_call_banner);
+        customView.setTextViewText(R.id.banner_caller_name, callerLabel);
+        customView.setTextViewText(R.id.banner_call_subtitle, "VIDEO".equalsIgnoreCase(pendingCallType) ? "Incoming video call" : "Incoming voice call");
+        
+        String name = (pendingCallerName != null && !pendingCallerName.isEmpty()) ? pendingCallerName : "Unknown Caller";
+        String[] parts = name.split("\\s+");
+        StringBuilder initials = new StringBuilder();
+        for (String p : parts) {
+            if (!p.isEmpty()) initials.append(p.charAt(0));
+            if (initials.length() >= 2) break;
+        }
+        customView.setTextViewText(R.id.banner_avatar_initials, initials.toString().toUpperCase());
+        
+        customView.setOnClickPendingIntent(R.id.banner_btn_accept, answerPI);
+        customView.setOnClickPendingIntent(R.id.banner_btn_decline, declinePI);
+
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Incoming " + callTypeLabel + " Call")
                 .setContentText(callerLabel)
@@ -223,9 +240,12 @@ public class CallService extends Service {
                 .setAutoCancel(false)
                 .setContentIntent(openPI)
                 .setFullScreenIntent(callScreenPI, true)
-                .addAction(R.mipmap.ic_launcher, "Decline", declinePI)
-                .addAction(R.mipmap.ic_launcher, "Answer",  answerPI)
+                .setCustomContentView(customView)
+                .setCustomHeadsUpContentView(customView)
+                .setCustomBigContentView(customView)
+                .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
                 .build();
+
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

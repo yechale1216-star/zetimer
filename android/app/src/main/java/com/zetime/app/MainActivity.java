@@ -19,9 +19,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         instance = this;
         SplashScreen.installSplashScreen(this);
-        super.onCreate(savedInstanceState);
-        
         registerPlugin(CallPlugin.class);
+        super.onCreate(savedInstanceState);
 
         // Turn screen on and show over lock screen
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {

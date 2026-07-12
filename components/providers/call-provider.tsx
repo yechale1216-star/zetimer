@@ -33,8 +33,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ── Refs for values needed inside event-listener closures (no stale state) ─
   const incomingCallRef = useRef<any>(null);
   const isWaitingForOfferRef = useRef(false);
+  // Stable ref to webrtc.endCall — avoids listing `webrtc` as a useEffect dep
+  // (useWebRTC returns a new object ref on every render, which would cause
+  // the logout cleanup effect to loop infinitely if webrtc were a dep).
+  const webrtcEndCallRef = useRef<() => void>(() => {});
 
-  // Keep the ref in sync with state
+  // Keep the refs in sync with state/latest values
   useEffect(() => { incomingCallRef.current = incomingCallData; }, [incomingCallData]);
   useEffect(() => { isWaitingForOfferRef.current = isWaitingForOffer; }, [isWaitingForOffer]);
 
@@ -96,7 +100,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     onCallEnded,
   });
 
+  // Keep webrtcEndCallRef always pointing at the latest endCall implementation
+  // (runs after every render — no dep array — so it is always fresh)
+  useEffect(() => { webrtcEndCallRef.current = webrtc.endCall; });
+
   // ── Sync local participant when auth changes ──────────────────────────────
+  // IMPORTANT: `webrtc` is intentionally NOT in the dep array here.
+  // useWebRTC returns a new object reference on every render, so including it
+  // would cause this effect to re-run → setState → re-render → new ref → loop.
+  // We use webrtcEndCallRef (a stable ref) to call endCall without the dep.
   useEffect(() => {
     if (currentUser) {
       setParticipants(prev => {
@@ -110,9 +122,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsWaitingForOffer(false);
       NativeBridge.dismissCallBanner();
       NativeBridge.endNativeCall();
-      try { webrtc.endCall(); } catch (e) {}
+      try { webrtcEndCallRef.current(); } catch (e) {}
     }
-  }, [currentUser, webrtc]);
+  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Media-error toast ─────────────────────────────────────────────────────
   useEffect(() => {

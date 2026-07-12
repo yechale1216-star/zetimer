@@ -17,6 +17,8 @@ services:
         sync: false
       - key: DIRECT_URL
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
 
   # Frontend Next.js Service
   - type: web

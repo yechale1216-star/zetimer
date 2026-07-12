@@ -263,7 +263,7 @@ export const createPasswordResetToken = async (email: string) => {
   if (!user) return null;
 
   const token = crypto.randomBytes(32).toString('hex');
-  const expires = new Date(Date.now() + 3600000); // 1 hour
+  const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
   await prisma.user.update({
     where: { id: user.id },

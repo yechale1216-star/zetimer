@@ -429,4 +429,69 @@ router.post('/resend-verification', async (req, res, next) => {
         next(error);
     }
 });
+// Diagnostic route to test SMTP configuration live
+router.get('/smtp-test', async (req, res) => {
+    try {
+        const { sendVerificationEmail } = await Promise.resolve().then(() => __importStar(require('../utils/email')));
+        console.log('[SMTP Test] Initiating SMTP connection test...');
+        // We import/resolve the transporter directly to check its properties
+        const { default: nodemailer } = await Promise.resolve().then(() => __importStar(require('nodemailer')));
+        const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
+        let EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
+        let EMAIL_SECURE = process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : (EMAIL_PORT === 465);
+        const EMAIL_USER = process.env.EMAIL_USER || 'yechale1216@gmail.com';
+        const EMAIL_PASS = process.env.EMAIL_PASS || 'ttcmdoaazznhlavr';
+        if (process.env.RENDER && EMAIL_PORT === 465) {
+            console.warn('[SMTP Test] Redirecting test outbound mail port 465 to port 587.');
+            EMAIL_PORT = 587;
+            EMAIL_SECURE = false;
+        }
+        const testTransporter = nodemailer.createTransport({
+            host: EMAIL_HOST,
+            port: EMAIL_PORT,
+            secure: EMAIL_SECURE,
+            auth: {
+                user: EMAIL_USER,
+                pass: EMAIL_PASS,
+            },
+        });
+        console.log('[SMTP Test] Verifying transporter...');
+        await testTransporter.verify();
+        console.log('[SMTP Test] Transporter verified. Sending test mail...');
+        const result = await testTransporter.sendMail({
+            from: `"Zetime Diagnostic" <${EMAIL_USER}>`,
+            to: 'yechale1216@gmail.com',
+            subject: 'Zetime SMTP Live Diagnostic Test',
+            text: `SMTP test configuration successful!\n\nEmail User: ${EMAIL_USER}\nHost: ${EMAIL_HOST}\nPort: ${EMAIL_PORT}\nSecure: ${EMAIL_SECURE}`
+        });
+        res.status(200).json({
+            success: true,
+            message: 'SMTP configuration is valid and test message sent successfully.',
+            config: {
+                host: EMAIL_HOST,
+                port: EMAIL_PORT,
+                secure: EMAIL_SECURE,
+                user: EMAIL_USER,
+            },
+            messageId: result.messageId,
+            response: result.response
+        });
+    }
+    catch (err) {
+        console.error('[SMTP Test] Diagnostic failed:', err);
+        res.status(500).json({
+            success: false,
+            message: 'SMTP Diagnostic test failed.',
+            error: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+            config: {
+                host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+                port: parseInt(process.env.EMAIL_PORT || '465'),
+                secure: process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : true,
+                user: process.env.EMAIL_USER || 'yechale1216@gmail.com',
+                hasPass: !!(process.env.EMAIL_PASS || 'ttcmdoaazznhlavr')
+            }
+        });
+    }
+});
 exports.default = router;

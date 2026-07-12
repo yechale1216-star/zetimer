@@ -14,13 +14,35 @@ const debugLog = (msg) => {
     }
     catch (err) { }
 };
+const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
+const EMAIL_USER = process.env.EMAIL_USER || 'yechale1216@gmail.com';
+const EMAIL_PASS = process.env.EMAIL_PASS || 'ttcmdoaazznhlavr';
+// Render blocks outbound SMTP on ports 25 and 465.
+// Always force port 587 (STARTTLS) when running on Render,
+// regardless of what EMAIL_PORT env var contains.
+const SMTP_BLOCKED_PORTS = [25, 465];
+const rawSmtpPort = parseInt(process.env.EMAIL_PORT || '587');
+const isRenderEnv = !!process.env.RENDER;
+let EMAIL_PORT;
+let EMAIL_SECURE;
+if (isRenderEnv && (isNaN(rawSmtpPort) || SMTP_BLOCKED_PORTS.includes(rawSmtpPort))) {
+    console.warn(`[SMTP Setup] Render env: overriding blocked/invalid port (${rawSmtpPort}) → 587 (STARTTLS).`);
+    EMAIL_PORT = 587;
+    EMAIL_SECURE = false;
+}
+else {
+    EMAIL_PORT = isNaN(rawSmtpPort) ? 587 : rawSmtpPort;
+    EMAIL_SECURE = process.env.EMAIL_SECURE
+        ? process.env.EMAIL_SECURE === 'true'
+        : (EMAIL_PORT === 465);
+}
 const transporter = nodemailer_1.default.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT || '465'),
-    secure: process.env.EMAIL_SECURE === 'true',
+    host: EMAIL_HOST,
+    port: EMAIL_PORT,
+    secure: EMAIL_SECURE,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: EMAIL_USER,
+        pass: EMAIL_PASS,
     },
 });
 // Verify connection configuration
@@ -35,7 +57,7 @@ transporter.verify((error, success) => {
 const sendResetPasswordEmail = async (email, token) => {
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
     const mailOptions = {
-        from: `"Zetime Attendance" <${process.env.EMAIL_USER}>`,
+        from: `"Zetime Attendance" <${EMAIL_USER}>`,
         to: email,
         subject: 'Password Reset Request',
         html: `
@@ -68,7 +90,7 @@ const sendResetPasswordEmail = async (email, token) => {
 exports.sendResetPasswordEmail = sendResetPasswordEmail;
 const sendVerificationEmail = async (email, code) => {
     const mailOptions = {
-        from: `"Zetime Attendance" <${process.env.EMAIL_USER}>`,
+        from: `"Zetime Attendance" <${EMAIL_USER}>`,
         to: email,
         subject: 'Verify Your Zetime Account',
         html: `

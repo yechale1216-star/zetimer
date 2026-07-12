@@ -10,17 +10,28 @@ const debugLog = (msg: string) => {
 };
 
 const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
-let EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
-let EMAIL_SECURE = process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : (EMAIL_PORT === 465);
 const EMAIL_USER = process.env.EMAIL_USER || 'yechale1216@gmail.com';
 const EMAIL_PASS = process.env.EMAIL_PASS || 'ttcmdoaazznhlavr';
 
-// Auto-correction for Render hosting environment:
-// Outbound SMTP on port 465 is blocked by Render’s firewall.
-if (process.env.RENDER && EMAIL_PORT === 465) {
-  console.warn('[SMTP Setup] Outgoing mail port 465 is blocked by Render. Redirecting connection to port 587.');
+// Render blocks outbound SMTP on ports 25 and 465.
+// Always force port 587 (STARTTLS) when running on Render,
+// regardless of what EMAIL_PORT env var contains.
+const SMTP_BLOCKED_PORTS = [25, 465];
+const rawSmtpPort = parseInt(process.env.EMAIL_PORT || '587');
+const isRenderEnv = !!process.env.RENDER;
+
+let EMAIL_PORT: number;
+let EMAIL_SECURE: boolean;
+
+if (isRenderEnv && (isNaN(rawSmtpPort) || SMTP_BLOCKED_PORTS.includes(rawSmtpPort))) {
+  console.warn(`[SMTP Setup] Render env: overriding blocked/invalid port (${rawSmtpPort}) → 587 (STARTTLS).`);
   EMAIL_PORT = 587;
   EMAIL_SECURE = false;
+} else {
+  EMAIL_PORT = isNaN(rawSmtpPort) ? 587 : rawSmtpPort;
+  EMAIL_SECURE = process.env.EMAIL_SECURE
+    ? process.env.EMAIL_SECURE === 'true'
+    : (EMAIL_PORT === 465);
 }
 
 const transporter = nodemailer.createTransport({

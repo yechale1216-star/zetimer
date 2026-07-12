@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendResetPasswordEmail = void 0;
+exports.sendVerificationEmail = exports.sendResetPasswordEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -66,3 +66,42 @@ const sendResetPasswordEmail = async (email, token) => {
     }
 };
 exports.sendResetPasswordEmail = sendResetPasswordEmail;
+const sendVerificationEmail = async (email, code) => {
+    const mailOptions = {
+        from: `"Zetime Attendance" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: 'Verify Your Zetime Account',
+        html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 12px; padding: 12px 20px;">
+            <span style="color: white; font-size: 20px; font-weight: bold; letter-spacing: 1px;">Zetime</span>
+          </div>
+        </div>
+        <h2 style="color: #111827; margin-bottom: 8px;">Verify Your Email Address</h2>
+        <p style="color: #6b7280; margin-bottom: 24px;">Thank you for signing up! Enter the 6-digit code below to verify your email and continue setting up your school.</p>
+        <div style="text-align: center; margin: 32px 0;">
+          <div style="display: inline-block; background: #f0f4ff; border: 2px solid #3b82f6; border-radius: 12px; padding: 20px 40px;">
+            <span style="font-size: 36px; font-weight: bold; letter-spacing: 10px; color: #1d4ed8;">${code}</span>
+          </div>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">This code will expire in <strong>24 hours</strong>. If you didn't create a Zetime account, you can safely ignore this email.</p>
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+        <p style="font-size: 12px; color: #9ca3af; text-align: center;">This is an automated email from Zetime — please do not reply.</p>
+      </div>
+    `,
+    };
+    try {
+        debugLog(`Sending verification email to: ${email}`);
+        const info = await transporter.sendMail(mailOptions);
+        debugLog(`Verification email sent: ${info.messageId}`);
+        console.log(`[Email] Verification email sent to ${email}: ${info.messageId}`);
+        return true;
+    }
+    catch (error) {
+        debugLog(`Verification email error: ${error instanceof Error ? error.message : String(error)}`);
+        console.error('[Email] Verification email send error:', error);
+        return false;
+    }
+};
+exports.sendVerificationEmail = sendVerificationEmail;

@@ -177,8 +177,21 @@ router.post('/signup', validate_1.validateSignup, async (req, res, next) => {
             adminEmail: email,
             adminPhone: phone,
             adminPassword: password,
-            subscriptionTier: 'free' // Default for public signup
+            subscriptionTier: 'free'
         });
+        // Generate a 6-digit email verification code
+        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        await db_1.default.user.update({
+            where: { id: admin.id },
+            data: {
+                verification_token: verificationCode,
+                verification_token_expires: verificationExpires,
+                is_verified: false
+            }
+        });
+        // Send verification email (non-blocking — don't fail signup if email fails)
+        (0, email_1.sendVerificationEmail)(admin.email, verificationCode).catch(err => console.error('[Signup] Failed to send verification email:', err));
         const token = (0, jwt_1.generateToken)({
             id: admin.id,
             email: admin.email,
@@ -203,11 +216,13 @@ router.post('/signup', validate_1.validateSignup, async (req, res, next) => {
                     role: admin.role,
                     schoolId: school.id,
                     customSchoolId: school.schoolId,
+                    isVerified: false,
                 },
                 schoolName: school.name,
                 schoolLogo: '',
                 onboardingCompleted: false,
-                onboardingStatus: school.onboardingStatus
+                onboardingStatus: school.onboardingStatus,
+                requiresEmailVerification: true,
             }
         });
     }
@@ -339,6 +354,76 @@ router.post('/push-token', async (req, res, next) => {
         });
         console.log(`[PushToken] Saved FCM token for user ${decoded.id} and cleared duplicates`);
         res.status(200).json({ success: true });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Verify Email (6-digit code)
+router.post('/verify-email', async (req, res, next) => {
+    try {
+        const { email, code } = req.body;
+        if (!email || !code) {
+            return res.status(400).json({ success: false, message: 'Email and verification code are required' });
+        }
+        const user = await db_1.default.user.findFirst({
+            where: {
+                email: email.toLowerCase().trim(),
+                verification_token: code.trim(),
+                verification_token_expires: { gt: new Date() }
+            }
+        });
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired verification code. Please request a new one.' });
+        }
+        await db_1.default.user.update({
+            where: { id: user.id },
+            data: {
+                is_verified: true,
+                verification_token: null,
+                verification_token_expires: null
+            }
+        });
+        res.status(200).json({
+            success: true,
+            message: 'Email verified successfully. You can now continue with onboarding.',
+            data: { isVerified: true }
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Resend Verification Code
+router.post('/resend-verification', async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, message: 'Email is required' });
+        }
+        const user = await db_1.default.user.findUnique({
+            where: { email: email.toLowerCase().trim() }
+        });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'No account found with this email' });
+        }
+        if (user.is_verified) {
+            return res.status(400).json({ success: false, message: 'This email is already verified' });
+        }
+        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await db_1.default.user.update({
+            where: { id: user.id },
+            data: {
+                verification_token: verificationCode,
+                verification_token_expires: verificationExpires
+            }
+        });
+        await (0, email_1.sendVerificationEmail)(user.email, verificationCode);
+        res.status(200).json({
+            success: true,
+            message: 'A new verification code has been sent to your email.'
+        });
     }
     catch (error) {
         next(error);

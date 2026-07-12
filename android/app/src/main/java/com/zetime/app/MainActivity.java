@@ -34,16 +34,24 @@ public class MainActivity extends BridgeActivity {
                     | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
         }
 
-        // Disable WebKit autoplay restrictions so voice/video call audio starts playing
-        // immediately upon answering, even if the app was launched by a background intent
-        // (like tapping 'Answer' on lock screen) and hasn't received a touch gesture yet.
+        // Configure WebView settings to prevent ANR on cold start.
+        // The large Next.js static bundle can block the main thread if the WebView
+        // has to parse all JS assets from disk every launch without a cache.
         try {
             if (bridge != null && bridge.getWebView() != null) {
-                bridge.getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
-                android.util.Log.d("MainActivity", "WebView setMediaPlaybackRequiresUserGesture set to FALSE");
+                android.webkit.WebSettings settings = bridge.getWebView().getSettings();
+                // Allow media to play immediately on call answer (no user gesture required)
+                settings.setMediaPlaybackRequiresUserGesture(false);
+                // Persist DOM storage (localStorage) across restarts
+                settings.setDomStorageEnabled(true);
+                // Use cached assets when available — avoids re-parsing the full JS bundle on cold start
+                settings.setCacheMode(android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK);
+                // Enable database storage for offline capability
+                settings.setDatabaseEnabled(true);
+                android.util.Log.d("MainActivity", "WebView performance settings applied (cache, DOM storage, media)");
             }
         } catch (Exception e) {
-            android.util.Log.e("MainActivity", "Error disabling webview media playback user gesture requirement", e);
+            android.util.Log.e("MainActivity", "Error configuring WebView settings", e);
         }
         
         handleIntent(getIntent());

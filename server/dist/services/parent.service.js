@@ -626,8 +626,7 @@ const searchParentByPhone = async (phone, schoolId) => {
     }
     const user = await db_1.default.user.findFirst({
         where: {
-            phone: { in: phoneVariations },
-            role: 'parent'
+            phone: { in: phoneVariations }
         },
         select: { id: true, full_name: true, email: true, phone: true, address: true, schoolId: true }
     });

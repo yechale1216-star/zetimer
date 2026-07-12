@@ -263,7 +263,7 @@ const createPasswordResetToken = async (email) => {
     if (!user)
         return null;
     const token = crypto_1.default.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 3600000); // 1 hour
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
     await db_1.default.user.update({
         where: { id: user.id },
         data: {

@@ -1,5 +1,20 @@
-import dotenv from 'dotenv';
-dotenv.config();
+import * as dotenv from 'dotenv';
+import path from 'path';
+// Choose .env location based on whether we are running compiled code (dist) or source (src)
+const envPath = path.resolve(
+  __dirname,
+  process.env.NODE_ENV === 'production' ? '../../.env' : '../.env'
+);
+dotenv.config({ path: envPath });
+
+// Validate critical environment variables
+const requiredEnv = ['RESEND_API_KEY', 'APP_URL', 'DATABASE_URL'];
+const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+if (missingEnv.length > 0) {
+  console.error(`[EnvError] Missing required env vars: ${missingEnv.join(', ')}`);
+  // Exit the process to avoid running in a broken state
+  process.exit(1);
+}
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';

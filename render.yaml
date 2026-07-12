@@ -30,7 +30,7 @@ services:
       - key: NODE_VERSION
         value: 20
       - key: NEXT_PUBLIC_API_URL
-        value: https://zetimer-ctgw.onrender.com
+        value: https://zetime-backend.onrender.com
       - key: NEXT_PUBLIC_APP_URL
         value: https://zetimer-ctgw.onrender.com
       - key: NEXT_PUBLIC_SUPABASE_URL

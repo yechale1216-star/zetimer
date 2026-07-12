@@ -447,10 +447,16 @@ router.get('/smtp-test', async (req: Request, res: Response) => {
     const { default: nodemailer } = await import('nodemailer');
     
     const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
-    const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
-    const EMAIL_SECURE = process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : (EMAIL_PORT === 465);
+    let EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
+    let EMAIL_SECURE = process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : (EMAIL_PORT === 465);
     const EMAIL_USER = process.env.EMAIL_USER || 'yechale1216@gmail.com';
     const EMAIL_PASS = process.env.EMAIL_PASS || 'ttcmdoaazznhlavr';
+
+    if (process.env.RENDER && EMAIL_PORT === 465) {
+      console.warn('[SMTP Test] Redirecting test outbound mail port 465 to port 587.');
+      EMAIL_PORT = 587;
+      EMAIL_SECURE = false;
+    }
 
     const testTransporter = nodemailer.createTransport({
       host: EMAIL_HOST,

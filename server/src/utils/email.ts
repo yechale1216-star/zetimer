@@ -10,10 +10,18 @@ const debugLog = (msg: string) => {
 };
 
 const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
-const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
-const EMAIL_SECURE = process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : (EMAIL_PORT === 465);
+let EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
+let EMAIL_SECURE = process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : (EMAIL_PORT === 465);
 const EMAIL_USER = process.env.EMAIL_USER || 'yechale1216@gmail.com';
 const EMAIL_PASS = process.env.EMAIL_PASS || 'ttcmdoaazznhlavr';
+
+// Auto-correction for Render hosting environment:
+// Outbound SMTP on port 465 is blocked by Render’s firewall.
+if (process.env.RENDER && EMAIL_PORT === 465) {
+  console.warn('[SMTP Setup] Outgoing mail port 465 is blocked by Render. Redirecting connection to port 587.');
+  EMAIL_PORT = 587;
+  EMAIL_SECURE = false;
+}
 
 const transporter = nodemailer.createTransport({
   host: EMAIL_HOST,

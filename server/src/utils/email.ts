@@ -9,13 +9,19 @@ const debugLog = (msg: string) => {
   } catch (err) {}
 };
 
+const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
+const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '465');
+const EMAIL_SECURE = process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : true;
+const EMAIL_USER = process.env.EMAIL_USER || 'yechale1216@gmail.com';
+const EMAIL_PASS = process.env.EMAIL_PASS || 'ttcmdoaazznhlavr';
+
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: parseInt(process.env.EMAIL_PORT || '465'),
-  secure: process.env.EMAIL_SECURE === 'true',
+  host: EMAIL_HOST,
+  port: EMAIL_PORT,
+  secure: EMAIL_SECURE,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: EMAIL_USER,
+    pass: EMAIL_PASS,
   },
 });
 
@@ -32,7 +38,7 @@ export const sendResetPasswordEmail = async (email: string, token: string) => {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
   const mailOptions = {
-    from: `"Zetime Attendance" <${process.env.EMAIL_USER}>`,
+    from: `"Zetime Attendance" <${EMAIL_USER}>`,
     to: email,
     subject: 'Password Reset Request',
     html: `
@@ -65,7 +71,7 @@ export const sendResetPasswordEmail = async (email: string, token: string) => {
 
 export const sendVerificationEmail = async (email: string, code: string): Promise<boolean> => {
   const mailOptions = {
-    from: `"Zetime Attendance" <${process.env.EMAIL_USER}>`,
+    from: `"Zetime Attendance" <${EMAIL_USER}>`,
     to: email,
     subject: 'Verify Your Zetime Account',
     html: `

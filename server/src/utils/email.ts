@@ -10,8 +10,8 @@ const debugLog = (msg: string) => {
 };
 
 const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
-const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '465');
-const EMAIL_SECURE = process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : true;
+const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
+const EMAIL_SECURE = process.env.EMAIL_SECURE ? process.env.EMAIL_SECURE === 'true' : (EMAIL_PORT === 465);
 const EMAIL_USER = process.env.EMAIL_USER || 'yechale1216@gmail.com';
 const EMAIL_PASS = process.env.EMAIL_PASS || 'ttcmdoaazznhlavr';
 

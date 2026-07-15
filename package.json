@@ -6,7 +6,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "build": "next build",
+    "build": "next build --webpack",
     "build:android": "node scripts/capacitor-build.js && npx cap sync android",
     "dev": "next dev --turbo",
     "dev:stable": "next dev --webpack",

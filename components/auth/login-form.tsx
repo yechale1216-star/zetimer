@@ -205,11 +205,41 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
         // Run validateSession AFTER marking fresh login so the role is preserved
         await validateSession()
 
-        // Handle multi-school redirection
-        if (result.availableSchools && result.availableSchools.length > 1) {
-          console.log(`[Login][STAFF] Multiple schools — redirecting to /auth/school-select`)
+        // STAFF PORTAL FIX: When logging in via the school (email/password) portal,
+        // only consider staff-type memberships (admin, teacher, etc.) — NOT parent roles.
+        // This prevents showing the role selection screen when a user is both admin and parent
+        // at the same school, since they explicitly chose the school staff portal.
+        const staffRoles = ['admin', 'school_admin', 'teacher', 'staff', 'super_admin']
+        const staffMemberships = (result.availableSchools || []).filter(
+          (s: any) => staffRoles.includes(s.role)
+        )
+
+        // Only show school-select if there are multiple STAFF memberships
+        // (e.g., admin at School A + teacher at School B)
+        if (staffMemberships.length > 1) {
+          // Filter the stored schools to only show staff roles in the selection screen
+          setSchoolsFromLogin(staffMemberships, result.user?.schoolId)
+          localStorage.setItem("available_schools", JSON.stringify(staffMemberships))
+          console.log(`[Login][STAFF] Multiple staff memberships (${staffMemberships.length}) — redirecting to /auth/school-select`)
           router.push("/auth/school-select")
           return
+        }
+
+        // Single staff membership (or none) — use the confirmed role to auto-redirect
+        // If there's exactly one staff membership, ensure localStorage reflects it
+        if (staffMemberships.length === 1) {
+          const membership = staffMemberships[0]
+          // Update user to reflect this specific staff membership
+          const updatedUser = {
+            ...result.user,
+            role: membership.role,
+            schoolId: membership.id,
+            schoolName: membership.name,
+          }
+          localStorage.setItem("attendance_current_user", JSON.stringify(updatedUser))
+          localStorage.setItem("x-school-id", membership.id)
+          localStorage.setItem("_zt_login_role", membership.role)
+          console.log(`[Login][STAFF] Single staff membership — auto-selecting role: ${membership.role} at school: ${membership.name}`)
         }
 
         // Single school or global role — redirect based on the confirmed role from login API

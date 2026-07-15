@@ -2,6 +2,7 @@
 
 import { API_URL } from "@/lib/api-config"
 import type { AttendanceRecord } from "../types"
+import { apiFetch } from "@/lib/utils/fetch-with-timeout"
 
 export function mapAttendance(r: any, schoolId: string): AttendanceRecord {
   return {
@@ -14,25 +15,15 @@ export function mapAttendance(r: any, schoolId: string): AttendanceRecord {
 }
 
 export async function getAttendance(headers: any, schoolId: string): Promise<AttendanceRecord[]> {
-  try {
-    if (!schoolId) return []
-    const res = await fetch(`${API_URL}/api/attendance?_t=${Date.now()}`, { 
+  if (!schoolId) return []
+  const result = await apiFetch<{ success: boolean; data: any[] }>(
+    `${API_URL}/api/attendance?_t=${Date.now()}`,
+    { 
       headers,
       cache: 'no-store'
-    })
-    if (!res.ok) {
-      if (res.status === 401) {
-        const { authService } = await import("@/lib/auth/auth");
-        authService.handleUnauthorized();
-      }
-      throw new Error(res.statusText)
     }
-    const result = await res.json()
-    return result.data.map((r: any) => mapAttendance(r, schoolId))
-  } catch (error) {
-    console.error("[pg] getAttendance error:", error)
-    return []
-  }
+  )
+  return result.data.map((r: any) => mapAttendance(r, schoolId))
 }
 
 export async function markAttendance(headers: any, schoolId: string, records: Partial<AttendanceRecord>[]): Promise<void> {
@@ -49,17 +40,12 @@ export async function markAttendance(headers: any, schoolId: string, records: Pa
     }
   })
 
-  const res = await fetch(`${API_URL}/api/attendance/bulk`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ records: formattedRecords }),
-  })
-
-  if (!res.ok) {
-    if (res.status === 401) {
-      const { authService } = await import("@/lib/auth/auth");
-      authService.handleUnauthorized();
+  await apiFetch(
+    `${API_URL}/api/attendance/bulk`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ records: formattedRecords }),
     }
-    throw new Error("Failed to mark attendance")
-  }
+  )
 }

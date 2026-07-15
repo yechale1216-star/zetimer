@@ -1,6 +1,7 @@
 "use client"
 
 import { API_URL } from "@/lib/api-config"
+import { apiFetch, RequestError } from "@/lib/utils/fetch-with-timeout"
 
 export function defaultSettings() {
   return {
@@ -19,14 +20,15 @@ export function defaultSettings() {
 }
 
 export async function getSettings(headers: any, schoolId: string): Promise<any> {
+  if (!schoolId) return defaultSettings()
   try {
-    if (!schoolId) return defaultSettings()
-    const res = await fetch(`${API_URL}/api/settings?_t=${Date.now()}`, { 
-      headers,
-      cache: 'no-store'
-    })
-    if (!res.ok) return defaultSettings()
-    const result = await res.json()
+    const result = await apiFetch<{ success: boolean; data: any }>(
+      `${API_URL}/api/settings?_t=${Date.now()}`,
+      { 
+        headers,
+        cache: 'no-store'
+      }
+    )
     const s = result.data
     return {
       schoolName: s.school_name || "Zetime School",
@@ -43,7 +45,11 @@ export async function getSettings(headers: any, schoolId: string): Promise<any> 
       schoolLogo: s.school_logo || "",
     }
   } catch (error) {
+    // If settings are not found (404), return default settings. Otherwise, propagate the error.
+    if (error instanceof RequestError && error.type === "not_found") {
+      return defaultSettings()
+    }
     console.error("[pg] getSettings error:", error)
-    return defaultSettings()
+    throw error
   }
 }

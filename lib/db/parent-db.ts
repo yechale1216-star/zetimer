@@ -1,4 +1,6 @@
 import { apiUrl } from "@/lib/api-config";
+import { apiFetch } from "@/lib/utils/fetch-with-timeout";
+
 const API_URL = apiUrl;
 
 export interface ParentNotification {
@@ -44,102 +46,82 @@ class ParentDatabase {
 
   // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
   async getNotifications(phone: string, schoolId?: string): Promise<ParentNotification[]> {
-    try {
-      const res = await fetch(`${API_URL}/api/parent/notifications/${encodeURIComponent(phone)}`, {
+    const result = await apiFetch<{ success: boolean; data: ParentNotification[] }>(
+      `${API_URL}/api/parent/notifications/${encodeURIComponent(phone)}`,
+      {
         headers: this.getHeaders(schoolId),
-      });
-      if (!res.ok) throw new Error("Failed to fetch notifications");
-      const result = await res.json();
-      return result.data || [];
-    } catch (error) {
-      console.error("[parent-db] getNotifications error:", error);
-      return [];
-    }
+      }
+    );
+    return result.data || [];
   }
 
   async markNotificationAsRead(id: string, schoolId?: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_URL}/api/parent/notifications/${id}/read`, {
+    await apiFetch(
+      `${API_URL}/api/parent/notifications/${id}/read`,
+      {
         method: "PATCH",
         headers: this.getHeaders(schoolId),
-      });
-      return res.ok;
-    } catch (error) {
-      console.error("[parent-db] markNotificationAsRead error:", error);
-      return false;
-    }
+      }
+    );
+    return true;
   }
 
   async deleteNotification(id: string, schoolId?: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_URL}/api/parent/notifications/${id}`, {
+    await apiFetch(
+      `${API_URL}/api/parent/notifications/${id}`,
+      {
         method: "DELETE",
         headers: this.getHeaders(schoolId),
-      });
-      return res.ok;
-    } catch (error) {
-      console.error("[parent-db] deleteNotification error:", error);
-      return false;
-    }
+      }
+    );
+    return true;
   }
 
   async markAllNotificationsAsRead(phone: string, schoolId?: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_URL}/api/parent/notifications/read-all/${encodeURIComponent(phone)}`, {
+    await apiFetch(
+      `${API_URL}/api/parent/notifications/read-all/${encodeURIComponent(phone)}`,
+      {
         method: "PATCH",
         headers: this.getHeaders(schoolId),
-      });
-      return res.ok;
-    } catch (error) {
-      console.error("[parent-db] markAllNotificationsAsRead error:", error);
-      return false;
-    }
+      }
+    );
+    return true;
   }
 
   // ─── PREFERENCES ──────────────────────────────────────────────────────────
   async getPreferences(phone: string, schoolId?: string): Promise<ParentPreferences | null> {
-    try {
-      const res = await fetch(`${API_URL}/api/parent/preferences/${encodeURIComponent(phone)}`, {
+    const result = await apiFetch<{ success: boolean; data: ParentPreferences }>(
+      `${API_URL}/api/parent/preferences/${encodeURIComponent(phone)}`,
+      {
         headers: this.getHeaders(schoolId),
-      });
-      if (!res.ok) throw new Error("Failed to fetch preferences");
-      const result = await res.json();
-      return result.data || null;
-    } catch (error) {
-      console.error("[parent-db] getPreferences error:", error);
-      return null;
-    }
+      }
+    );
+    return result.data || null;
   }
 
   async updatePreferences(phone: string, data: Partial<ParentPreferences>, schoolId?: string): Promise<ParentPreferences | null> {
-    try {
-      const res = await fetch(`${API_URL}/api/parent/preferences/${encodeURIComponent(phone)}`, {
+    const result = await apiFetch<{ success: boolean; data: ParentPreferences }>(
+      `${API_URL}/api/parent/preferences/${encodeURIComponent(phone)}`,
+      {
         method: "PUT",
         headers: this.getHeaders(schoolId),
         body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to update preferences");
-      const result = await res.json();
-      return result.data || null;
-    } catch (error) {
-      console.error("[parent-db] updatePreferences error:", error);
-      return null;
-    }
+      }
+    );
+    return result.data || null;
   }
 
   // ─── ANNOUNCEMENTS / TEST GENERATOR ───────────────────────────────────────
   async postAnnouncement(schoolId: string, data: { studentId?: string; type?: string; title: string; message: string }): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_URL}/api/parent/announcements`, {
+    await apiFetch(
+      `${API_URL}/api/parent/announcements`,
+      {
         method: "POST",
         headers: this.getHeaders(),
         body: JSON.stringify(data),
-      });
-      return res.ok;
-    } catch (error) {
-      console.error("[parent-db] postAnnouncement error:", error);
-      return false;
-    }
+      }
+    );
+    return true;
   }
 }
 

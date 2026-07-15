@@ -1,6 +1,7 @@
 "use client"
 
 import { API_URL } from "@/lib/api-config"
+import { fetchWithTimeout, RequestError } from "@/lib/utils/fetch-with-timeout"
 
 export class BaseDatabase {
   // NOTE: No cached schoolId — always read fresh to prevent cross-school data leaks
@@ -61,8 +62,9 @@ export class BaseDatabase {
       // Use dynamic import to avoid potential circular dependencies if auth needs db
       const { authService } = await import("@/lib/auth/auth");
       authService.handleUnauthorized();
+      throw new RequestError("Your session has expired. Please sign in again.", "unauthorized", 401)
     }
-    
+
     let message = `HTTP ${res.status}: ${res.statusText}`
     try {
       const data = await res.json()
@@ -73,6 +75,19 @@ export class BaseDatabase {
         if (text && text.length < 200) message = text
       } catch {}
     }
-    throw new Error(message)
+
+    const type: RequestError["type"] =
+      res.status === 403 ? "forbidden" :
+      res.status === 404 ? "not_found" :
+      res.status >= 500 ? "server" :
+      "client"
+
+    throw new RequestError(message, type, res.status)
   }
+
+  /**
+   * Enhanced fetch with timeout (20 s) and offline detection.
+   * Delegates to fetchWithTimeout from the shared utility module.
+   */
+  protected fetch = fetchWithTimeout
 }

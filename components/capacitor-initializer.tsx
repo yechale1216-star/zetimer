@@ -79,8 +79,8 @@ export function CapacitorInitializer() {
         console.warn('Failed to listen to native foreground notifications:', err);
       }
 
-      // Ensure splash screen hides
-      SplashScreen.hide()
+      // Splash screen is now hidden manually by StartupLoadingScreen to guarantee smooth transition
+      // SplashScreen.hide()
 
       return () => {
         if (foregroundSub) {

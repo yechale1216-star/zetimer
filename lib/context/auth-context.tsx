@@ -286,13 +286,86 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (profileRes.status === 401) {
-        console.warn("[AuthContext][validateSession] Token invalid (401) — setting validation error")
-        setError("Your session is invalid or has expired. Please retry verification or sign out to log in again.")
-        setUser(currentUser)
-        setSessionId(storedSessionId)
-        setAuthLoading(false)
-        setPermissionsLoading(false)
-        return
+        console.warn("[AuthContext][validateSession] Token invalid (401) — checking if Bearer token can recover session")
+        // On Android APK, WebView may not send cross-origin HTTP-only cookies.
+        // If we have a Bearer token in localStorage, try an explicit re-request with it.
+        if (token) {
+          try {
+            const retryHeaders: Record<string, string> = {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            }
+            if (schoolId) retryHeaders["x-school-id"] = schoolId
+            if (headers["x-requested-role"]) retryHeaders["x-requested-role"] = headers["x-requested-role"]
+
+            const retryRes = await fetch(`${getApiUrl()}/api/users/profile`, {
+              headers: retryHeaders,
+              cache: 'no-store',
+              // Do NOT send credentials here — we want the explicit Bearer token only
+            })
+
+            if (retryRes.ok) {
+              console.log("[AuthContext][validateSession] Bearer-token retry succeeded — session recovered")
+              // Re-assign profileRes to the retried response so the code below can process it normally
+              const retryJson = await retryRes.json()
+              if (retryJson.success && retryJson.data) {
+                const dbUser = retryJson.data
+                const updatedUser: User = {
+                  ...currentUser!,
+                  name: dbUser.full_name || dbUser.name || currentUser!.name,
+                  email: dbUser.email || currentUser!.email,
+                  phone: dbUser.phone || currentUser!.phone || "",
+                  profile_photo: dbUser.profile_photo || currentUser!.profile_photo || "",
+                  role: dbUser.role || currentUser!.role,
+                  schoolId: dbUser.schoolId || dbUser.school_id || currentUser!.schoolId,
+                  schoolName: dbUser.schoolName || currentUser!.schoolName || "",
+                  schoolLogo: dbUser.schoolLogo || currentUser!.schoolLogo || "",
+                  onboardingCompleted: dbUser.onboardingCompleted ?? currentUser!.onboardingCompleted,
+                  isVerified: dbUser.isVerified ?? dbUser.is_verified ?? currentUser!.isVerified ?? false,
+                }
+                setUser(updatedUser)
+                setSessionId(storedSessionId)
+                setError(null)
+                localStorage.setItem("attendance_current_user", JSON.stringify(updatedUser))
+                currentUser = updatedUser
+                // Fall through to features fetch below
+              } else {
+                // Retry response was ok but data malformed — use cached user silently
+                setUser(currentUser)
+                setSessionId(storedSessionId)
+                setError(null)
+              }
+              setAuthLoading(false)
+              // Continue to features fetch
+            } else {
+              // Both cookie-based and Bearer requests returned 401 — token truly expired
+              console.warn("[AuthContext][validateSession] Bearer retry also failed — token truly expired")
+              setError("Your session is invalid or has expired. Please retry verification or sign out to log in again.")
+              setUser(currentUser)
+              setSessionId(storedSessionId)
+              setAuthLoading(false)
+              setPermissionsLoading(false)
+              return
+            }
+          } catch (retryErr) {
+            console.warn("[AuthContext][validateSession] Bearer retry threw error:", retryErr)
+            // Network error during retry — use cached user, don't show error
+            setUser(currentUser)
+            setSessionId(storedSessionId)
+            setAuthLoading(false)
+            setPermissionsLoading(false)
+            return
+          }
+        } else {
+          // No Bearer token at all — truly unauthorized
+          console.warn("[AuthContext][validateSession] No Bearer token and cookie failed — session expired")
+          setError("Your session is invalid or has expired. Please retry verification or sign out to log in again.")
+          setUser(currentUser)
+          setSessionId(storedSessionId)
+          setAuthLoading(false)
+          setPermissionsLoading(false)
+          return
+        }
       }
 
       if (!profileRes.ok) {

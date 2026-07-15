@@ -18,6 +18,8 @@ import {
   PieChart, Pie, Cell, Legend, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip
 } from "recharts"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { ErrorBanner } from "@/components/ui/data-state-view"
+import { getErrorMessage } from "@/lib/utils/fetch-with-timeout"
 import { cn } from "../../lib/utils/utils"
 
 interface DashboardStats {
@@ -55,6 +57,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [chartData, setChartData] = useState<{ trendData: any[]; statusData: any[] } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [sessionFilter, setSessionFilter] = useState<"morning" | "afternoon" | "total">("total")
   const [rawData, setRawData] = useState<{ today: any[], all: any[], students: Student[] } | null>(null)
   const { toast } = useToast()
@@ -108,6 +111,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const loadDashboardData = async (isBackground = false) => {
     if (!isBackground) setIsLoading(true)
+    setFetchError(null)
     try {
       // Safety net: never fetch if schoolId is missing — all API calls would
       // lack the tenant header and could return another school's data.
@@ -172,7 +176,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       setRawData({ today: filteredTodayAttendance, all: filteredAllAttendance, students })
     } catch (error) {
-      notifications.error("Error", "Failed to load dashboard data")
+      console.error("[Dashboard] loadDashboardData error:", error)
+      if (!isBackground) {
+        // Import getErrorMessage lazily to avoid a circular dep at build time
+        const { getErrorMessage } = await import("@/lib/utils/fetch-with-timeout")
+        setFetchError(getErrorMessage(error))
+      }
     } finally {
       setIsLoading(false)
     }
@@ -497,6 +506,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="space-y-6 px-4 md:px-0">
+      {/* Error Banner */}
+      {fetchError && (
+        <ErrorBanner
+          message={fetchError}
+          onRetry={() => loadDashboardData()}
+          className="mb-4"
+        />
+      )}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
         <div className="space-y-1.5 w-full md:w-auto">
           <h2 className="text-xl md:text-5xl font-black text-foreground leading-[1.1] tracking-tight uppercase whitespace-nowrap overflow-hidden text-ellipsis">

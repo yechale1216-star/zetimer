@@ -85,6 +85,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const onCallEnded = useCallback((userId: string) => {
     console.log('[CallProvider] Call ended by:', userId);
     NativeBridge.dismissCallBanner();
+    NativeBridge.endNativeCall();
     setParticipants(prev => {
       const next = prev.filter(p => p.id !== userId);
       if (next.length <= 1) setIncomingCallData(null);
@@ -197,7 +198,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return () => {
-      NativeBridge.endNativeCall();
       clearTimeout(timeout);
       clearInterval(ringInterval);
       activeOscillators.forEach(osc => { try { osc.stop(); osc.disconnect(); } catch (e) {} });

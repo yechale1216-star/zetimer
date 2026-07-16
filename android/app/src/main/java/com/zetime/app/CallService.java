@@ -27,7 +27,7 @@ import com.zetime.app.R;
 
 public class CallService extends Service {
     private static final String TAG = "CallService";
-    private static final String CHANNEL_ID = "active_calls";
+    private static final String CHANNEL_ID = "incoming_calls_channel_v3";
     private static final int NOTIF_ID = 1002;
 
     private MediaPlayer mediaPlayer;
@@ -175,13 +175,14 @@ public class CallService extends Service {
 
         // IMPORTANCE_HIGH is required so the foreground notification triggers a Heads-Up
         // popup AND fires the full-screen intent on the lock screen.
-        // IMPORTANCE_LOW actively suppresses both — do NOT use it for incoming calls.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID, "Incoming Calls", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("Incoming voice and video call alerts");
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{0, 1000, 500, 1000});
+            channel.setBypassDnd(true);
+            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             // Use ringtone sound for this channel
             android.media.AudioAttributes callAa = new android.media.AudioAttributes.Builder()
                     .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -194,7 +195,10 @@ public class CallService extends Service {
 
         // Full-screen intent -> IncomingCallActivity (shows immediately over lock screen)
         Intent callScreenIntent = new Intent(this, IncomingCallActivity.class);
-        callScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+        callScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK 
+                | Intent.FLAG_ACTIVITY_NO_USER_ACTION 
+                | Intent.FLAG_ACTIVITY_SINGLE_TOP 
+                | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         callScreenIntent.putExtra("callId",     pendingCallId);
         callScreenIntent.putExtra("callerId",   pendingCallerId);
         callScreenIntent.putExtra("callerName", pendingCallerName);
@@ -266,17 +270,11 @@ public class CallService extends Service {
                 .setAutoCancel(false)
                 .setContentIntent(openPI)
                 .setFullScreenIntent(callScreenPI, true)
-                // Custom banner view for the notification drawer/expanded state
                 .setCustomBigContentView(customView)
-                // Keep compact content simple for lock-screen preview
                 .setCustomContentView(customView)
-                // NOTE: Do NOT use DecoratedCustomViewStyle — on HIGH-importance channels
-                // it can suppress the custom HUN view on some OEMs. We rely on
-                // setFullScreenIntent (IncomingCallActivity) for the lock-screen UI.
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePI)
                 .addAction(android.R.drawable.ic_menu_call, "Answer", answerPI)
                 .build();
-
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -287,7 +285,25 @@ public class CallService extends Service {
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to start foreground notification", e);
-            // Still proceed — ringing continues via MediaPlayer + Vibrator
+        }
+
+        // Also call startActivity directly as a robust Telegram-style fallback.
+        // This forces screen wake-up and overlay display on OEM devices that limit fullScreenIntent.
+        try {
+            Intent directIntent = new Intent(this, IncomingCallActivity.class);
+            directIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK 
+                    | Intent.FLAG_ACTIVITY_NO_USER_ACTION 
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP 
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            directIntent.putExtra("callId",     pendingCallId);
+            directIntent.putExtra("callerId",   pendingCallerId);
+            directIntent.putExtra("callerName", pendingCallerName);
+            directIntent.putExtra("callType",   pendingCallType);
+            directIntent.putExtra("serverUrl",  pendingServerUrl);
+            startActivity(directIntent);
+            Log.d(TAG, "Direct launch of IncomingCallActivity succeeded");
+        } catch (Exception e) {
+            Log.w(TAG, "Direct launch of IncomingCallActivity failed (expected behavior if background start blocked by OS)", e);
         }
     }
 

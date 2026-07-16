@@ -87,6 +87,27 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        
+        // Force display over lock screen and wake screen up on new intent (e.g. call accepted)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true);
+            setTurnScreenOn(true);
+        }
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
+        try {
+            android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(android.content.Context.KEYGUARD_SERVICE);
+            if (km != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    km.requestDismissKeyguard(this, null);
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error dismissing keyguard onNewIntent", e);
+        }
+
         handleIntent(intent);
     }
 

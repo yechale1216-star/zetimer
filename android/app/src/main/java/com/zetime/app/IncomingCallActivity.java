@@ -39,6 +39,40 @@ public class IncomingCallActivity extends Activity {
     private View pulseRing2;
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        
+        callId     = intent.getStringExtra("callId");
+        callerId   = intent.getStringExtra("callerId");
+        callerName = intent.getStringExtra("callerName");
+        callType   = intent.getStringExtra("callType");
+        serverUrl  = intent.getStringExtra("serverUrl");
+
+        Log.d(TAG, "IncomingCallActivity received new intent for call: " + callerName);
+        
+        TextView tvCallType   = findViewById(R.id.tv_call_type);
+        TextView tvCallerName = findViewById(R.id.tv_caller_name);
+        TextView tvInitials   = findViewById(R.id.tv_avatar_initials);
+        
+        if (tvCallerName != null) {
+            String name = (callerName != null && !callerName.isEmpty()) ? callerName : "Unknown Caller";
+            tvCallerName.setText(name);
+
+            String[] parts = name.split("\\s+");
+            StringBuilder initials = new StringBuilder();
+            for (String p : parts) {
+                if (!p.isEmpty()) initials.append(p.charAt(0));
+                if (initials.length() >= 2) break;
+            }
+            if (tvInitials != null) tvInitials.setText(initials.toString().toUpperCase());
+
+            boolean isVideo = "VIDEO".equalsIgnoreCase(callType);
+            if (tvCallType != null) tvCallType.setText(isVideo ? "INCOMING VIDEO CALL" : "INCOMING VOICE CALL");
+        }
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 

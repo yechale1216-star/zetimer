@@ -411,12 +411,18 @@ const initSocket = (server) => {
             if (!tenant || tenant.userId !== data.userId || !data.messageIds?.length)
                 return;
             try {
-                await prisma.$transaction(data.messageIds.map((messageId) => prisma.messageRead.upsert({
-                    where: { messageId_userId: { messageId, userId: data.userId } }, update: { readAt: new Date() }, create: { messageId, userId: data.userId, schoolId: tenant.schoolId }
+                // Use Promise.allSettled with individual upserts instead of $transaction to prevent
+                // Prisma engine panics caused by concurrent constraint collisions on the same rows.
+                await Promise.allSettled(data.messageIds.map((messageId) => prisma.messageRead.upsert({
+                    where: { messageId_userId: { messageId, userId: data.userId } },
+                    update: { readAt: new Date() },
+                    create: { messageId, userId: data.userId, schoolId: tenant.schoolId },
                 })));
                 socket.to(data.conversationId).emit('messages_read', { conversationId: data.conversationId, userId: data.userId, messageIds: data.messageIds });
             }
-            catch (err) { }
+            catch (err) {
+                console.warn('[Socket] mark_conversation_read error (non-fatal):', err);
+            }
         });
         // ── CALL: Initiate ────────────────────────────────────────────────────
         socket.on('call_user', async (data) => {

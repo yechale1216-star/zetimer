@@ -49,11 +49,11 @@
                     android:background="@drawable/banner_avatar_bg" />
 
                 <!-- Online indicator dot representing connection style -->
-                <View
+                <ImageView
                     android:layout_width="13dp"
                     android:layout_height="13dp"
                     android:layout_gravity="bottom|end"
-                    android:background="@drawable/btn_accept_bg"
+                    android:background="@drawable/remoteviews_btn_accept_bg"
                     android:layout_marginEnd="0dp"
                     android:layout_marginBottom="0dp" />
             </FrameLayout>
@@ -103,7 +103,7 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginEnd="6dp"
-                android:background="@drawable/banner_btn_decline_bg"
+                android:background="@drawable/remoteviews_btn_decline_bg"
                 android:text="Decline"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFFFF"
@@ -118,7 +118,7 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginStart="6dp"
-                android:background="@drawable/banner_btn_accept_bg"
+                android:background="@drawable/remoteviews_btn_accept_bg"
                 android:text="Answer"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFFFF"

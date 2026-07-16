@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plain shape (NO ripple) — safe for RemoteViews inflation in system notifications -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FFE53935" />
+    <corners android:radius="14dp" />
+</shape>

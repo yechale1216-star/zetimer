@@ -277,6 +277,11 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         String callType    = data.get("callType");
         String serverUrl   = data.get("serverUrl");
 
+        // Start CallService as a foreground service — it owns the notification lifecycle.
+        // CallService.showForegroundNotification() posts the HUN + fullScreenIntent (ID 1002).
+        // We must NOT also call showIncomingCallNotification() here because that would post a
+        // second conflicting notification (ID 1001) that races the service's startForeground(),
+        // causing the system to show two banners and potentially drop the fullScreenIntent.
         Intent intent = new Intent(this, CallService.class);
         intent.putExtra("ACTION", "START_CALL");
         intent.putExtra("callerName", callerName);
@@ -287,16 +292,15 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         intent.putExtra("serverUrl", serverUrl);
         try {
             ContextCompat.startForegroundService(this, intent);
+            Log.d(TAG, "CallService started as foreground service for incoming call");
         } catch (Exception e) {
-            Log.e(TAG, "Not allowed to start foreground service from background, falling back to background service", e);
+            Log.e(TAG, "startForegroundService failed, falling back to startService", e);
             try {
                 this.startService(intent);
             } catch (Exception ex) {
-                Log.e(TAG, "Failed to start call service completely", ex);
+                Log.e(TAG, "Failed to start CallService completely", ex);
             }
         }
-
-        showIncomingCallNotification(callerName, callId, callType, callerId, serverUrl);
     }
 
     private void handleCancelCall(Map<String, String> data) {

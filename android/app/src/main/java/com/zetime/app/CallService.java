@@ -273,14 +273,15 @@ public class CallService extends Service {
                 // NOTE: Do NOT use DecoratedCustomViewStyle — on HIGH-importance channels
                 // it can suppress the custom HUN view on some OEMs. We rely on
                 // setFullScreenIntent (IncomingCallActivity) for the lock-screen UI.
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePI)
+                .addAction(android.R.drawable.ic_menu_call, "Answer", answerPI)
                 .build();
 
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(NOTIF_ID, notification,
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL |
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL);
             } else {
                 startForeground(NOTIF_ID, notification);
             }

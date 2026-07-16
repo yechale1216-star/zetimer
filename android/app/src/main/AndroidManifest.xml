@@ -71,7 +71,7 @@
             android:name=".CallService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="phoneCall|microphone" />
+            android:foregroundServiceType="phoneCall" />
 
         <activity
             android:name=".IncomingCallActivity"

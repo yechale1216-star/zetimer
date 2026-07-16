@@ -379,7 +379,9 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setCustomContentView(customView)
                 .setCustomHeadsUpContentView(customView)
                 .setCustomBigContentView(customView)
-                .setStyle(new NotificationCompat.DecoratedCustomViewStyle());
+                .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePI)
+                .addAction(android.R.drawable.ic_menu_call, "Answer", answerPI);
 
         nm.notify(NOTIF_ID_CALL, builder.build());
     }

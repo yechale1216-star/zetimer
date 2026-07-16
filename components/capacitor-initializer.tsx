@@ -1,15 +1,98 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useCallback } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { NativeBridge } from '@/lib/utils/native-bridge'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { Capacitor } from '@capacitor/core'
+import { App } from '@capacitor/app'
 import { useAuth } from '@/lib/context/auth-context'
+import { toast } from 'sonner'
+
+// Root/entry screens where back button should trigger "exit app" behavior
+const ROOT_PATHS = [
+  '/',
+  '/login',
+  '/parent/dashboard',
+  '/school/admin',
+  '/school/teacher',
+  '/super-admin',
+  '/onboarding',
+  '/auth/school-select',
+]
+
+function isRootPath(pathname: string): boolean {
+  return ROOT_PATHS.some(root => pathname === root || pathname === root + '/')
+}
 
 export function CapacitorInitializer() {
   const router = useRouter()
+  const pathname = usePathname()
   const { user } = useAuth()
+  
+  // Track the last back press timestamp for "press again to exit"
+  const lastBackPressRef = useRef<number>(0)
+  // Store pathname in a ref so the backButton listener always has the latest value
+  const pathnameRef = useRef(pathname)
+
+  // Keep pathnameRef in sync
+  useEffect(() => {
+    pathnameRef.current = pathname
+  }, [pathname])
+
+  // ─── Android Hardware Back Button Handler ──────────────────────────────
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    const backButtonHandler = App.addListener('backButton', ({ canGoBack }) => {
+      const currentPath = pathnameRef.current
+
+      console.log(`[BackButton] pressed | path: ${currentPath} | canGoBack: ${canGoBack}`)
+
+      // If we're on a root screen, use "press again to exit" pattern
+      if (isRootPath(currentPath)) {
+        const now = Date.now()
+        const timeSinceLastPress = now - lastBackPressRef.current
+
+        if (timeSinceLastPress < 2000) {
+          // Second press within 2 seconds — exit the app
+          console.log('[BackButton] Double-press detected on root screen. Exiting app.')
+          App.exitApp()
+        } else {
+          // First press — show toast warning
+          lastBackPressRef.current = now
+          toast('Press back again to exit', {
+            duration: 2000,
+            position: 'bottom-center',
+            style: {
+              background: '#333',
+              color: '#fff',
+              borderRadius: '8px',
+              textAlign: 'center',
+              fontSize: '14px',
+            },
+          })
+          console.log('[BackButton] First press on root screen. Waiting for second press.')
+        }
+        return
+      }
+
+      // Not a root screen — navigate back
+      if (canGoBack) {
+        console.log('[BackButton] Navigating back via history.')
+        window.history.back()
+      } else {
+        // Fallback: if Capacitor says we can't go back but we're not on root,
+        // try router.back() which works with Next.js internal history
+        console.log('[BackButton] No browser history, using router.back().')
+        router.back()
+      }
+    })
+
+    return () => {
+      backButtonHandler.then(handle => handle.remove()).catch(() => {})
+    }
+  }, [router])
 
   useEffect(() => {
     const handleNavigateEvent = (e: Event) => {

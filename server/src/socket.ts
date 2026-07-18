@@ -498,14 +498,17 @@ export const initSocket = (server: HttpServer) => {
         callId,
       });
 
-      // Send FCM push notification (wakes device when backgrounded/locked)
+      // Send FCM push notification (wakes device when backgrounded/locked).
+      // NOTE: callerAvatar is intentionally excluded — avatar URLs are often
+      // base64-encoded and can easily exceed FCM's 4 KB data-payload limit,
+      // causing the entire notification to be dropped silently.
+      // The native CallService builds initials from callerName instead.
       if (targetUser.pushToken) {
         const serverUrl = process.env.NEXT_PUBLIC_API_URL || 'https://zetime-backend.onrender.com';
         sendCallNotification(targetUser.pushToken, {
           callId,
           callerId: data.from,
-          callerName: data.profile?.name || callerInfo?.full_name || 'Unknown',
-          callerAvatar: data.profile?.avatar || '',
+          callerName: (data.profile?.name || callerInfo?.full_name || 'Unknown').slice(0, 64),
           callType: (data.type || 'VOICE') as 'VOICE' | 'VIDEO',
           serverUrl,
         });

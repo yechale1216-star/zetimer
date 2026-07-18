@@ -190,7 +190,6 @@ export async function sendCallNotification(
     callId: string;
     callerId: string;
     callerName: string;
-    callerAvatar?: string;
     callType: 'VOICE' | 'VIDEO';
     serverUrl: string;
   }
@@ -207,7 +206,6 @@ export async function sendCallNotification(
       callId: data.callId,
       callerId: data.callerId,
       callerName: data.callerName,
-      callerAvatar: data.callerAvatar || '',
       callType: data.callType,
       serverUrl: data.serverUrl,
       isIncomingCall: 'true',

@@ -169,6 +169,21 @@ public class CallService extends Service {
         }
     }
 
+    private boolean isDeviceLocked() {
+        android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        boolean isLocked = km != null && km.isKeyguardLocked();
+        boolean isInteractive = true;
+        if (pm != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+                isInteractive = pm.isInteractive();
+            } else {
+                isInteractive = pm.isScreenOn();
+            }
+        }
+        return isLocked || !isInteractive;
+    }
+
     private void showForegroundNotification() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
@@ -272,8 +287,6 @@ public class CallService extends Service {
                 .setFullScreenIntent(callScreenPI, true)
                 .setCustomBigContentView(customView)
                 .setCustomContentView(customView)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePI)
-                .addAction(android.R.drawable.ic_menu_call, "Answer", answerPI)
                 .build();
 
         try {
@@ -289,21 +302,27 @@ public class CallService extends Service {
 
         // Also call startActivity directly as a robust Telegram-style fallback.
         // This forces screen wake-up and overlay display on OEM devices that limit fullScreenIntent.
-        try {
-            Intent directIntent = new Intent(this, IncomingCallActivity.class);
-            directIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK 
-                    | Intent.FLAG_ACTIVITY_NO_USER_ACTION 
-                    | Intent.FLAG_ACTIVITY_SINGLE_TOP 
-                    | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            directIntent.putExtra("callId",     pendingCallId);
-            directIntent.putExtra("callerId",   pendingCallerId);
-            directIntent.putExtra("callerName", pendingCallerName);
-            directIntent.putExtra("callType",   pendingCallType);
-            directIntent.putExtra("serverUrl",  pendingServerUrl);
-            startActivity(directIntent);
-            Log.d(TAG, "Direct launch of IncomingCallActivity succeeded");
-        } catch (Exception e) {
-            Log.w(TAG, "Direct launch of IncomingCallActivity failed (expected behavior if background start blocked by OS)", e);
+        // We only force the full-screen Activity takeover if the device is locked or the screen is off.
+        // If the device is unlocked and active, the Heads-Up Notification (HUN) banner is sufficient and less disruptive.
+        if (isDeviceLocked()) {
+            try {
+                Intent directIntent = new Intent(this, IncomingCallActivity.class);
+                directIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK 
+                        | Intent.FLAG_ACTIVITY_NO_USER_ACTION 
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP 
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                directIntent.putExtra("callId",     pendingCallId);
+                directIntent.putExtra("callerId",   pendingCallerId);
+                directIntent.putExtra("callerName", pendingCallerName);
+                directIntent.putExtra("callType",   pendingCallType);
+                directIntent.putExtra("serverUrl",  pendingServerUrl);
+                startActivity(directIntent);
+                Log.d(TAG, "Direct launch of IncomingCallActivity succeeded");
+            } catch (Exception e) {
+                Log.w(TAG, "Direct launch of IncomingCallActivity failed (expected behavior if background start blocked by OS)", e);
+            }
+        } else {
+            Log.d(TAG, "Device is unlocked and interactive; letting Heads-Up Notification banner handle the display.");
         }
     }
 

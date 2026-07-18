@@ -97,6 +97,10 @@ public class CallManager {
     public void showBanner(Activity activity,
                            String callerName, String callId, String callerId,
                            String callType, String serverUrl) {
+        if (!MainActivity.isAppInForeground) {
+            Log.w(TAG, "Suppressing CallManager banner because app is in background.");
+            return;
+        }
         if (activity == null || activity.isFinishing()) return;
 
         // Prevent duplicates

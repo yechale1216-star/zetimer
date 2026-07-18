@@ -43,7 +43,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => { isWaitingForOfferRef.current = isWaitingForOffer; }, [isWaitingForOffer]);
 
   // ── onIncomingCall: socket 'incoming_call' event ─────────────────────────
-  const onIncomingCall = useCallback((data: any) => {
+  const onIncomingCall = useCallback(async (data: any) => {
     if (isSuspended) {
       console.log('[CallProvider] Rejecting incoming call signal — school suspended');
       return;
@@ -51,14 +51,30 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('[CallProvider] ✅ incoming_call received. callId:', data.callId, '| offer present:', !!data.offer);
 
     if (NativeBridge.isNative()) {
-      console.log('[CallProvider] → Showing foreground call banner');
-      NativeBridge.showCallBanner(
-        data.profile?.name || 'Unknown User',
-        data.callId,
-        data.from,
-        data.type,
-        data.serverUrl || ''
-      );
+      try {
+        const state = await App.getState();
+        if (state.isActive) {
+          console.log('[CallProvider] App is active. Showing foreground call banner');
+          NativeBridge.showCallBanner(
+            data.profile?.name || 'Unknown User',
+            data.callId,
+            data.from,
+            data.type,
+            data.serverUrl || ''
+          );
+        } else {
+          console.log('[CallProvider] App is in background. Skipping showCallBanner.');
+        }
+      } catch (err) {
+        console.warn('[CallProvider] Failed to get app state, default to show banner', err);
+        NativeBridge.showCallBanner(
+          data.profile?.name || 'Unknown User',
+          data.callId,
+          data.from,
+          data.type,
+          data.serverUrl || ''
+        );
+      }
     }
 
     setIncomingCallData(data);

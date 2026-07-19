@@ -8,8 +8,16 @@ const envPath = path.resolve(
 dotenv.config({ path: envPath });
 
 // Validate critical environment variables
-const requiredEnv = ['RESEND_API_KEY', 'APP_URL', 'DATABASE_URL'];
+const requiredEnv = ['APP_URL', 'DATABASE_URL'];
 const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+
+const hasSmtp = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+const hasResend = !!process.env.RESEND_API_KEY;
+
+if (!hasSmtp && !hasResend) {
+  missingEnv.push('RESEND_API_KEY (or EMAIL_USER and EMAIL_PASS for SMTP)');
+}
+
 if (missingEnv.length > 0) {
   console.error(`[EnvError] Missing required env vars: ${missingEnv.join(', ')}`);
   // Exit the process to avoid running in a broken state

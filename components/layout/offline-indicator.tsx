@@ -1,7 +1,7 @@
 "use client"
 
 import { useOnline } from "@/hooks/use-online"
-import { WifiOff, Wifi } from "lucide-react"
+import { Wifi, WifiOff } from "lucide-react"
 import { useEffect, useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -40,23 +40,7 @@ export function OfflineIndicator() {
 
   return (
     <AnimatePresence>
-      {/* ── Offline banner (persistent, like YouTube) ── */}
-      {!isOnline && (
-        <motion.div
-          key="offline"
-          initial={{ y: -44, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -44, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed top-0 inset-x-0 z-[200] flex items-center justify-center gap-2 bg-[#1a1a1a] text-white text-[13px] font-medium h-11 px-4 shadow-lg"
-          style={{ paddingTop: 'env(safe-area-inset-top)' }}
-        >
-          <WifiOff className="h-4 w-4 shrink-0 text-gray-300" />
-          <span>No internet connection</span>
-        </motion.div>
-      )}
-
-      {/* ── Back Online banner (auto-dismisses, YouTube green style) ── */}
+      {/* ── Back Online banner only (GlobalOfflineOverlay handles the offline wall) ── */}
       {showBackOnline && isOnline && (
         <motion.div
           key="back-online"

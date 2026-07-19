@@ -5,20 +5,29 @@ const path = require('path');
 // Load .env from server directory
 dotenv.config({ path: path.join(__dirname, '.env') });
 
+const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+const port = parseInt(process.env.SMTP_PORT || '587', 10);
+const secure = process.env.SMTP_SECURE === 'true'; // will be false if it's set to "false"
+const user = process.env.EMAIL_USER;
+const pass = process.env.EMAIL_PASS;
+
 console.log('Testing SMTP connection with:');
-console.log('Host:', process.env.EMAIL_HOST);
-console.log('Port:', process.env.EMAIL_PORT);
-console.log('User:', process.env.EMAIL_USER);
-console.log('Secure:', process.env.EMAIL_SECURE);
+console.log('Host:', host);
+console.log('Port:', port);
+console.log('User:', user);
+console.log('Secure:', secure);
 
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: parseInt(process.env.EMAIL_PORT || '465'),
-  secure: process.env.EMAIL_SECURE === 'true',
+  host: host,
+  port: port,
+  secure: secure,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: user,
+    pass: pass,
   },
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 async function runTest() {

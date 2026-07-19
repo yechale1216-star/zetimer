@@ -571,7 +571,6 @@ export function MessagingCenter() {
         return;
       }
 
-      // --- Open conversation instantly (Telegram-style) ---
       // 1. Pre-seed an empty array immediately so the window renders now
       //    without any skeleton or blank-white-screen delay.
       setMessagesByConversation(prev => {
@@ -579,29 +578,28 @@ export function MessagingCenter() {
         return { ...prev, [id]: [] };
       });
 
-      // 2. Switch active conversation
+      // 2. Switch active conversation & join socket room FIRST — this
+      //    ensures we don't miss any incoming messages while fetching metadata.
       setActiveConversationId(id);
-      
-      let finalChatData = chatData;
-      if (chatData?.isGroup) {
-        try {
-          const res = await fetch(`${API_URL}/api/groups/${id}`, { headers: getAuthHeaders() });
-          if (res.ok) {
-            finalChatData = await res.json();
-          }
-        } catch (err) {
-          console.error('Failed to fetch full group data:', err);
-        }
-      }
-      setActiveConversationData(finalChatData);
-
-      // 2. Join the socket room for this conversation
       if (socket && isConnected) {
         socket.emit('join_conversation', id);
       }
 
-      // 3. Load messages for this specific conversation
-      await loadMessages(id);
+      // 3. Fetch group metadata & messages in parallel (non-blocking for UI)
+      let finalChatData = chatData;
+      const parallelTasks: Promise<any>[] = [loadMessages(id)];
+
+      if (chatData?.isGroup) {
+        parallelTasks.push(
+          fetch(`${API_URL}/api/groups/${id}`, { headers: getAuthHeaders() })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => { if (data) finalChatData = data; })
+            .catch(err => console.error('Failed to fetch full group data:', err))
+        );
+      }
+
+      await Promise.all(parallelTasks);
+      setActiveConversationData(finalChatData);
     },
     [user, socket, isConnected, loadMessages, t, toast]
   );
@@ -858,8 +856,25 @@ export function MessagingCenter() {
     socket.emit('authenticate', { token });
 
     const handleNewMessage = (message: any) => {
+      const clientReceivedAt = Date.now();
       const convId: string = message.conversationId;
       const currentUser = userRef.current;
+
+      // ── E2E Latency Logging ───────────────────────────────────────────────
+      if (message.performance?.clientSent) {
+        const e2eMs = clientReceivedAt - message.performance.clientSent;
+        const dbMs = message.performance.dbWriteTime;
+        const transitMs = message.performance.serverReceived - message.performance.clientSent;
+        console.log(
+          `[Messaging Latency] new_message received:\n` +
+          `  - Client→Server Transit: ${transitMs}ms\n` +
+          `  - DB Write: ${dbMs}ms\n` +
+          `  - End-to-End (Client→Client): ${e2eMs}ms`
+        );
+        if (e2eMs > 500) {
+          console.warn(`[Messaging Latency] ⚠️ High latency detected: ${e2eMs}ms E2E for conversation ${convId}`);
+        }
+      }
 
       const formatted = {
         id: message.id || Date.now().toString(),
@@ -1204,6 +1219,7 @@ export function MessagingCenter() {
           attachment: options?.attachment,
           replyToId: options?.replyToId,
           tempId: realTempId,
+          clientTimestamp: Date.now(),
         });
         return;
       }
@@ -1255,6 +1271,7 @@ export function MessagingCenter() {
           attachment: options?.attachment,
           replyToId: options?.replyToId,
           tempId,
+          clientTimestamp: Date.now(),
         });
       } else {
         // Offline-first: persist to outbox so the message survives disconnections.

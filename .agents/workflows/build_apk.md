@@ -4,33 +4,35 @@ description: Build Android APK for testing or update
 
 # Workflow: Build Android APK
 
-1. **Install project dependencies**
+1. **Install project dependencies (if needed)**
    ```
    npm ci
    ```
 
-2. **Build the web assets**
+2. **Build the web assets and Sync to Android**
+   This script triggers `CAPACITOR_BUILD=1`, avoiding slow linting or typescript checks, and automatically syncs the output directory.
    ```
-   npm run build
-   ```
-
-3. **Sync Capacitor plugins and assets to Android platform**
-   ```
-   npx cap sync android
+   npm run build:android
    ```
 
-4. **Navigate to Android project directory**
+3. **Navigate to Android project directory**
    ```
    cd android
    ```
 
-5. **Assemble Debug APK**
+4. **Assemble Debug APK**
    // turbo
    ```
    .\gradlew.bat assembleDebug
    ```
 
    *The generated APK will be located at `android/app/build/outputs/apk/debug/app-debug.apk`.*
+
+5. **Copy the Debug APK to the root directory**
+   To easily access and test the APK, you can copy it to the root of the project:
+   ```
+   Copy-Item -Path "app/build/outputs/apk/debug/app-debug.apk" -Destination "../Zetime-test.apk" -Force
+   ```
 
 6. **(Optional) Assemble Release APK**
    ```

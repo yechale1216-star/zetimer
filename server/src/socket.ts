@@ -30,6 +30,53 @@ async function isSchoolSuspended(schoolId: string): Promise<boolean> {
   }
 }
 
+// ── User profile & conversation caches for message performance ───────────────
+const userCache = new Map<string, { schoolId: string; role: string; expires: number }>();
+const USER_CACHE_TTL = 5 * 60 * 1000;
+
+const convSchoolCache = new Map<string, { schoolId: string; expires: number }>();
+const CONV_SCHOOL_CACHE_TTL = 5 * 60 * 1000;
+
+async function getUserCachedInfo(userId: string): Promise<{ schoolId: string; role: string } | null> {
+  const cached = userCache.get(userId);
+  if (cached && cached.expires > Date.now()) {
+    return cached;
+  }
+  try {
+    const info = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { schoolId: true, role: true }
+    });
+    if (info) {
+      const data = { schoolId: info.schoolId || '', role: info.role || '' };
+      userCache.set(userId, { ...data, expires: Date.now() + USER_CACHE_TTL });
+      return data;
+    }
+  } catch (err) {
+    console.error(`[Socket] Error fetching user info for ${userId}:`, err);
+  }
+  return null;
+}
+
+async function getConvSchoolId(convId: string): Promise<string> {
+  const cached = convSchoolCache.get(convId);
+  if (cached && cached.expires > Date.now()) {
+    return cached.schoolId;
+  }
+  try {
+    const conv = await prisma.conversation.findUnique({
+      where: { id: convId },
+      select: { schoolId: true }
+    });
+    const schoolId = conv?.schoolId || '';
+    convSchoolCache.set(convId, { schoolId, expires: Date.now() + CONV_SCHOOL_CACHE_TTL });
+    return schoolId;
+  } catch (err) {
+    console.error(`[Socket] Error fetching conversation schoolId for ${convId}:`, err);
+    return '';
+  }
+}
+
 // ── Conversation membership cache ────────────────────────────────────────────
 const convMemberCache = new Map<string, { memberIds: string[]; expires: number }>();
 const CONV_CACHE_TTL = 60 * 1000;
@@ -200,31 +247,22 @@ export const initSocket = (server: HttpServer) => {
     });
 
     socket.on('send_message', async (data: any) => {
+      const startTime = Date.now();
       const tenant = socketData.get(socket.id);
       if (!tenant || tenant.userId !== data.senderId) return;
 
-      let targetSchoolId = tenant.schoolId;
-      if (data.conversationId) {
-        const conv = await prisma.conversation.findUnique({
-          where: { id: data.conversationId },
-          select: { schoolId: true }
-        });
-        if (conv?.schoolId) {
-          targetSchoolId = conv.schoolId;
-        }
-      }
+      // Parallelize all prerequisite lookups for minimum latency
+      const [targetSchoolId, senderInfo] = await Promise.all([
+        data.conversationId ? getConvSchoolId(data.conversationId) : Promise.resolve(tenant.schoolId),
+        getUserCachedInfo(data.senderId),
+      ]);
 
-      const senderInfo = await prisma.user.findUnique({
-        where: { id: data.senderId },
-        select: { schoolId: true, role: true }
-      });
+      const senderSchoolId = (senderInfo && senderInfo.role !== 'parent') ? senderInfo.schoolId : null;
+      const schoolIdsToCheck = [...new Set([targetSchoolId || '', senderSchoolId].filter(Boolean))] as string[];
+      const suspensionResults = await Promise.all(schoolIdsToCheck.map(id => isSchoolSuspended(id)));
+      const isAnySuspended = suspensionResults.some(Boolean);
 
-      const isConvSuspended = await isSchoolSuspended(targetSchoolId || '');
-      const isSenderSuspended = (senderInfo && senderInfo.role !== 'parent')
-        ? await isSchoolSuspended(senderInfo.schoolId || '')
-        : false;
-
-      if (isConvSuspended || isSenderSuspended) {
+      if (isAnySuspended) {
         socket.emit('message_error', { tempId: data.tempId, message: 'Your school account is suspended. Read-only access only.' });
         socket.emit('school_suspended', { message: 'Your school account is suspended.' });
         return;
@@ -247,6 +285,7 @@ export const initSocket = (server: HttpServer) => {
           }
         }
 
+        const dbStart = Date.now();
         const message = await prisma.message.create({
           data: {
             conversationId: data.conversationId,
@@ -259,8 +298,27 @@ export const initSocket = (server: HttpServer) => {
           },
           include: { sender: { select: { id: true, full_name: true, profile_photo: true } } }
         });
+        const dbEnd = Date.now();
+
         if (data.tempId) recentTempIds.set(`${tenant.schoolId}:${data.tempId}`, { messageId: message.id, expires: Date.now() + TEMPID_TTL });
-        io.to(data.conversationId).emit('new_message', { ...message, tempId: data.tempId });
+        
+        const serverEnd = Date.now();
+        const performance = {
+          clientSent: data.clientTimestamp || startTime,
+          serverReceived: startTime,
+          dbWriteTime: dbEnd - dbStart,
+          broadcastSent: serverEnd,
+        };
+
+        const totalDuration = serverEnd - startTime;
+        const transitLatency = startTime - (data.clientTimestamp || startTime);
+        console.log(`[Socket Latency] Message delivered:
+          - Client-to-Server Transit: ${transitLatency}ms
+          - DB Write: ${dbEnd - dbStart}ms
+          - Server Processing (Total): ${totalDuration}ms
+          - Total Pipeline Latency (Client to Broadcast): ${transitLatency + totalDuration}ms`);
+
+        io.to(data.conversationId).emit('new_message', { ...message, tempId: data.tempId, performance });
         socket.emit('message_sent', { tempId: data.tempId, messageId: message.id });
 
         getConversationMemberIds(data.conversationId).then(async (memberIds) => {

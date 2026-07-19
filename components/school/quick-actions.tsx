@@ -8,6 +8,7 @@ import { authService } from "@/lib/auth/auth"
 import { db } from "@/lib/db/database"
 import { notifications } from "@/lib/utils/notifications"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
+import { ClipboardCheck, BarChart3, UserCog } from "lucide-react"
 
 
 interface QuickActionsProps {
@@ -113,14 +114,14 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       title: "Take Attendance",
       description: "Quickly navigate to attendance tracking",
       action: handleQuickAttendance,
-      icon: "✅",
+      icon: <ClipboardCheck className="w-6 h-6 text-blue-600 dark:text-blue-500" />,
       color: "bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30",
     },
     {
       title: "Weekly Report",
       description: "Generate last 7 days attendance report",
       action: handleGenerateReport,
-      icon: "📊",
+      icon: <BarChart3 className="w-6 h-6 text-purple-600 dark:text-purple-500" />,
       color: "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30",
     },
   ]
@@ -131,7 +132,7 @@ export function QuickActions({ onNavigate }: QuickActionsProps) {
       title: "Manage Teachers",
       description: "Assign teachers to classes and subjects",
       action: () => onNavigate("assignments"),
-      icon: "👨‍🏫",
+      icon: <UserCog className="w-6 h-6 text-green-600 dark:text-green-500" />,
       color: "bg-green-500/10 hover:bg-green-500/20 border-green-500/30",
     },
   ]

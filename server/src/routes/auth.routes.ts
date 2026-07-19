@@ -440,12 +440,15 @@ router.post('/resend-verification', async (req: Request, res: Response, next: Ne
 
 // Health-check route for email service
 router.get('/email-health', async (_req: Request, res: Response) => {
+  const hasSmtp = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
   const hasApiKey = !!process.env.RESEND_API_KEY;
   res.status(200).json({
     success: true,
-    provider: 'resend',
-    configured: hasApiKey,
-    message: hasApiKey ? 'Resend API key is configured.' : 'RESEND_API_KEY is not set.',
+    provider: hasSmtp ? 'smtp' : (hasApiKey ? 'resend' : 'none'),
+    configured: hasSmtp || hasApiKey,
+    message: hasSmtp 
+      ? `SMTP is configured for ${process.env.EMAIL_USER}` 
+      : (hasApiKey ? 'Resend API key is configured.' : 'Neither SMTP nor Resend is configured.'),
   });
 });
 

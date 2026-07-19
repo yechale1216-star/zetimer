@@ -49,14 +49,30 @@
                     android:fontFamily="sans-serif-medium"
                     android:background="@drawable/banner_avatar_bg" />
 
-                <!-- Online indicator dot -->
-                <View
-                    android:layout_width="13dp"
-                    android:layout_height="13dp"
+                <ImageView
+                    android:id="@+id/banner_avatar_image"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+
+                <!-- Online indicator dot / App badge -->
+                <FrameLayout
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
                     android:layout_gravity="bottom|end"
                     android:background="@drawable/btn_accept_bg"
-                    android:layout_marginEnd="0dp"
-                    android:layout_marginBottom="0dp" />
+                    android:padding="2.5dp"
+                    android:layout_marginEnd="-2dp"
+                    android:layout_marginBottom="-2dp">
+                    
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/zetime_icon"
+                        android:scaleType="fitCenter" />
+                </FrameLayout>
             </FrameLayout>
 
             <!-- Name and subtitle -->

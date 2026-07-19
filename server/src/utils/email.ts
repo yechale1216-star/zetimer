@@ -1,18 +1,50 @@
+import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 
-// ─── Resend Configuration ────────────────────────────────────────────────────
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+// ─── Configuration ───────────────────────────────────────────────────────────
 const APP_URL = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
 
-if (!RESEND_API_KEY) {
-  console.error('[EmailService] RESEND_API_KEY is not configured. Emails will fail.');
+// SMTP Configuration
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
+const SMTP_SECURE = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : true;
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS;
+const FROM_EMAIL_SMTP = process.env.FROM_EMAIL || 'Zetime Attendance <zetime12@gmail.com>';
+
+// Resend Configuration
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const FROM_EMAIL_RESEND = 'Zetime Attendance <onboarding@resend.dev>';
+
+let transporter: nodemailer.Transporter | null = null;
+let resend: Resend | null = null;
+
+if (EMAIL_USER && EMAIL_PASS) {
+  console.log(`[EmailService] Initializing SMTP Transporter for host: ${SMTP_HOST}, user: ${EMAIL_USER}`);
+  transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+} else {
+  console.warn('[EmailService] SMTP credentials not set. Email will not send via SMTP.');
 }
 
-const resend = new Resend(RESEND_API_KEY);
+if (RESEND_API_KEY) {
+  console.log('[EmailService] Initializing Resend client...');
+  resend = new Resend(RESEND_API_KEY);
+}
 
-// Resend requires a verified sender domain, or you can use the shared onboarding address.
-// Update FROM_EMAIL once you've verified your domain in Resend dashboard.
-const FROM_EMAIL = 'Zetime Attendance <onboarding@resend.dev>';
+if (!transporter && !resend) {
+  console.error('[EmailService] Neither SMTP nor Resend is configured. Emails will fail.');
+}
 
 // ─── Centralized Email Service ──────────────────────────────────────────────
 
@@ -22,14 +54,14 @@ interface SendEmailOptions {
   html: string;
 }
 
-/**
- * Low-level email sender. All email functions route through here.
- * Returns true on success, false on failure.
- */
-const sendEmail = async (options: SendEmailOptions): Promise<boolean> => {
+const sendEmailViaResend = async (options: SendEmailOptions): Promise<boolean> => {
+  if (!resend) {
+    console.error('[EmailService] Resend client not configured.');
+    return false;
+  }
   try {
     const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
+      from: FROM_EMAIL_RESEND,
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -40,10 +72,42 @@ const sendEmail = async (options: SendEmailOptions): Promise<boolean> => {
       return false;
     }
 
-    console.log(`[EmailService] Email sent successfully to ${options.to} — ID: ${data?.id}`);
+    console.log(`[EmailService] Email sent successfully via Resend to ${options.to} — ID: ${data?.id}`);
     return true;
   } catch (error) {
-    console.error('[EmailService] Failed to send email:', error instanceof Error ? error.message : error);
+    console.error('[EmailService] Failed to send email via Resend:', error instanceof Error ? error.message : error);
+    return false;
+  }
+};
+
+/**
+ * Low-level email sender. All email functions route through here.
+ * Returns true on success, false on failure.
+ */
+const sendEmail = async (options: SendEmailOptions): Promise<boolean> => {
+  if (transporter) {
+    try {
+      const info = await transporter.sendMail({
+        from: FROM_EMAIL_SMTP,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+      });
+
+      console.log(`[EmailService] Email sent successfully via SMTP to ${options.to} — MessageID: ${info.messageId}`);
+      return true;
+    } catch (error) {
+      console.error('[EmailService] Failed to send email via SMTP:', error instanceof Error ? error.message : error);
+      if (resend) {
+        console.log('[EmailService] Attempting fallback to Resend...');
+        return sendEmailViaResend(options);
+      }
+      return false;
+    }
+  } else if (resend) {
+    return sendEmailViaResend(options);
+  } else {
+    console.error('[EmailService] No email service is configured. Cannot send email.');
     return false;
   }
 };

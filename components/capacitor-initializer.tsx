@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useEffect, useRef, useCallback } from 'react'
@@ -29,7 +30,7 @@ export function CapacitorInitializer() {
   const router = useRouter()
   const pathname = usePathname()
   const { user } = useAuth()
-  
+
   // Track the last back press timestamp for "press again to exit"
   const lastBackPressRef = useRef<number>(0)
   // Store pathname in a ref so the backButton listener always has the latest value
@@ -90,7 +91,7 @@ export function CapacitorInitializer() {
     })
 
     return () => {
-      backButtonHandler.then(handle => handle.remove()).catch(() => {})
+      backButtonHandler.then(handle => handle.remove()).catch(() => { })
     }
   }, [router])
 
@@ -119,7 +120,7 @@ export function CapacitorInitializer() {
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       console.log('Zetime: Native Platform Detected. Initializing Bridge...')
-      
+
       // If user is authenticated, ensure the token is synced to native SharedPreferences as well
       const syncTokenAndFeatures = async () => {
         const token = localStorage.getItem('attendance_token');
@@ -127,7 +128,7 @@ export function CapacitorInitializer() {
           console.log('[CapacitorInitializer] Syncing auth token to native side...');
           await NativeBridge.saveAuthToken(token);
         }
-        
+
         console.log('[CapacitorInitializer] Running NativeBridge.initPush...');
         await NativeBridge.initPush();
       };
@@ -167,7 +168,7 @@ export function CapacitorInitializer() {
 
       return () => {
         if (foregroundSub) {
-          foregroundSub.then((s: any) => s?.remove()).catch(() => {});
+          foregroundSub.then((s: any) => s?.remove()).catch(() => { });
         }
       };
     }

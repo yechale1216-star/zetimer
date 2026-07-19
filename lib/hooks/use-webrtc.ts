@@ -11,6 +11,7 @@ interface WebRTCOptions {
   onCallRejected?: (userId: string) => void;
   onCallEnded?: (userId: string) => void;
   onRemoteStream?: (userId: string, stream: MediaStream) => void;
+  isAppActive?: () => boolean;
 }
 
 const ICE_SERVERS = {
@@ -77,6 +78,7 @@ export const useWebRTC = (options: WebRTCOptions) => {
   const callIdRef = useRef<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   const iceRestartTimer = useRef<NodeJS.Timeout | null>(null);
+  const seenCallIdsRef = useRef<Set<string>>(new Set());
 
   // Keep a ref to localStream so acquireStream always sees the latest value
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -535,6 +537,25 @@ export const useWebRTC = (options: WebRTCOptions) => {
 
     socket.on('incoming_call', (data) => {
       console.log('[WebRTC] ✅ incoming_call received. callId:', data.callId, '| from:', data.from, '| hasOffer:', !!data.offer);
+      
+      const appActive = options.isAppActive ? options.isAppActive() : true;
+      if (!appActive) {
+        console.log('[WebRTC] App is in background/inactive. Ignoring socket incoming_call.');
+        return;
+      }
+
+      if (data.callId) {
+        if (seenCallIdsRef.current.has(data.callId)) {
+          console.log('[WebRTC] Duplicate callId ignored in socket incoming_call. callId:', data.callId);
+          return;
+        }
+        seenCallIdsRef.current.add(data.callId);
+        if (seenCallIdsRef.current.size > 50) {
+          const first = Array.from(seenCallIdsRef.current)[0];
+          seenCallIdsRef.current.delete(first);
+        }
+      }
+
       // Store callId in ref so we can match it against pending ANSWER intents
       if (data.callId) callIdRef.current = data.callId;
       if (options.onIncomingCall) options.onIncomingCall(data);

@@ -22,12 +22,14 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.Person;
+import androidx.core.graphics.drawable.IconCompat;
 
 import com.zetime.app.R;
 
 public class CallService extends Service {
     private static final String TAG = "CallService";
-    private static final String CHANNEL_ID = "incoming_calls_channel_v3";
+    private static final String CHANNEL_ID = "incoming_calls_channel_v5";
     private static final int NOTIF_ID = 1002;
 
     private MediaPlayer mediaPlayer;
@@ -36,6 +38,7 @@ public class CallService extends Service {
 
     // Extras stored for building the foreground notification action buttons
     private String pendingCallerName;
+    private String pendingCallerAvatar;
     private String pendingCallId;
     private String pendingCallerId;
     private String pendingCallType;
@@ -61,13 +64,25 @@ public class CallService extends Service {
 
         String action = intent.getStringExtra("ACTION");
         if ("START_CALL".equals(action)) {
+            // Stop any existing ringing first (Requirement 10: Stop any existing ringtone before starting another)
+            stopRinging();
+
+            // Dismiss any active foreground CallManager banner to avoid UI overlap
+            try {
+                CallManager.getInstance().dismissBanner();
+                Log.d(TAG, "Dismissed CallManager banner before starting background ringtone");
+            } catch (Exception e) {
+                Log.e(TAG, "Error dismissing CallManager banner", e);
+            }
+
             pendingCallerName = intent.getStringExtra("callerName");
+            pendingCallerAvatar = intent.getStringExtra("callerAvatar");
             pendingCallId     = intent.getStringExtra("callId");
             pendingCallerId   = intent.getStringExtra("callerId");
             pendingCallType   = intent.getStringExtra("callType");
             pendingServerUrl  = intent.getStringExtra("serverUrl");
 
-            Log.d(TAG, "Starting call ringing for: " + pendingCallerName);
+            Log.d(TAG, "Starting call ringing for: " + pendingCallerName + ", callId: " + pendingCallId);
             startRinging();
             showForegroundNotification();
         } else if ("STOP_CALL".equals(action)) {
@@ -169,43 +184,24 @@ public class CallService extends Service {
         }
     }
 
-    private boolean isDeviceLocked() {
-        android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
-        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        boolean isLocked = km != null && km.isKeyguardLocked();
-        boolean isInteractive = true;
-        if (pm != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
-                isInteractive = pm.isInteractive();
-            } else {
-                isInteractive = pm.isScreenOn();
-            }
-        }
-        return isLocked || !isInteractive;
-    }
-
     private void showForegroundNotification() {
+        Log.d(TAG, "Constructing head-up CallStyle notification for " + pendingCallerName);
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        // IMPORTANCE_HIGH is required so the foreground notification triggers a Heads-Up
-        // popup AND fires the full-screen intent on the lock screen.
+        // IMPORTANCE_HIGH is required so the foreground notification triggers a Heads-Up popup
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID, "Incoming Calls", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("Incoming voice and video call alerts");
             channel.enableVibration(true);
-            channel.setVibrationPattern(new long[]{0, 1000, 500, 1000});
+            channel.setVibrationPattern(new long[]{0, 1000, 600, 1000, 600});
             channel.setBypassDnd(true);
             channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-            // Use ringtone sound for this channel
-            android.media.AudioAttributes callAa = new android.media.AudioAttributes.Builder()
-                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                    .build();
-            channel.setSound(android.media.RingtoneManager.getDefaultUri(
-                    android.media.RingtoneManager.TYPE_RINGTONE), callAa);
+            // Mute notification sound (handled manually by CallService's MediaPlayer)
+            channel.setSound(null, null);
             nm.createNotificationChannel(channel);
+            Log.d(TAG, "Created incoming call notification channel with HIGH importance: " + CHANNEL_ID);
         }
 
         // Full-screen intent -> IncomingCallActivity (shows immediately over lock screen)
@@ -221,8 +217,9 @@ public class CallService extends Service {
         callScreenIntent.putExtra("serverUrl",  pendingServerUrl);
         PendingIntent callScreenPI = PendingIntent.getActivity(this, 99, callScreenIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Log.d(TAG, "Configured fullScreenIntent PendingIntent");
 
-        // Content intent -> MainActivity (for tapping the notification banner)
+        // Content intent (tap on notification) -> MainActivity
         Intent openIntent = new Intent(this, MainActivity.class);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         openIntent.putExtra("isIncomingCall", true);
@@ -234,7 +231,7 @@ public class CallService extends Service {
         PendingIntent openPI = PendingIntent.getActivity(this, 0, openIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        // Answer action
+        // Answer PendingIntent (starts MainActivity with ANSWER action)
         Intent answerIntent = new Intent(this, MainActivity.class);
         answerIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         answerIntent.putExtra("callAction",  "ANSWER");
@@ -246,7 +243,7 @@ public class CallService extends Service {
         PendingIntent answerPI = PendingIntent.getActivity(this, 10, answerIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        // Decline action
+        // Decline PendingIntent (declines via CallNotificationActionReceiver)
         Intent declineIntent = new Intent(this, CallNotificationActionReceiver.class);
         declineIntent.setAction("ACTION_DECLINE");
         declineIntent.putExtra("callId",    pendingCallId);
@@ -257,37 +254,38 @@ public class CallService extends Service {
         String callerLabel = pendingCallerName != null ? pendingCallerName : "Unknown";
         String callTypeLabel = "VIDEO".equalsIgnoreCase(pendingCallType) ? "Video" : "Voice";
 
-        // Create custom RemoteViews styled precisely like the foreground call banner
-        android.widget.RemoteViews customView = new android.widget.RemoteViews(getPackageName(), R.layout.layout_notification_call_banner);
-        customView.setTextViewText(R.id.banner_caller_name, callerLabel);
-        customView.setTextViewText(R.id.banner_call_subtitle, "VIDEO".equalsIgnoreCase(pendingCallType) ? "Incoming video call" : "Incoming voice call");
-        
-        String name = (pendingCallerName != null && !pendingCallerName.isEmpty()) ? pendingCallerName : "Unknown Caller";
-        String[] parts = name.split("\\s+");
-        StringBuilder initials = new StringBuilder();
-        for (String p : parts) {
-            if (!p.isEmpty()) initials.append(p.charAt(0));
-            if (initials.length() >= 2) break;
-        }
-        customView.setTextViewText(R.id.banner_avatar_initials, initials.toString().toUpperCase());
-        
-        customView.setOnClickPendingIntent(R.id.banner_btn_accept, answerPI);
-        customView.setOnClickPendingIntent(R.id.banner_btn_decline, declinePI);
+        // Generate fallback initials avatar immediately
+        android.graphics.Bitmap initialsBitmap = createInitialsBitmap(callerLabel);
 
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+        // Build native CallStyle Person
+        Person caller = new Person.Builder()
+                .setName(callerLabel)
+                .setIcon(IconCompat.createWithBitmap(initialsBitmap))
+                .setImportant(true)
+                .build();
+
+        // Build CallStyle
+        NotificationCompat.CallStyle callStyle = NotificationCompat.CallStyle.forIncomingCall(
+                caller, declinePI, answerPI);
+
+        // Build the primary notificationCompat Builder using CallStyle
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("Incoming " + callTypeLabel + " Call")
                 .setContentText(callerLabel)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSubText("Incoming voice call")
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setOngoing(true)
                 .setAutoCancel(false)
+                .setSound(null)  // Handled by MediaPlayer
+                .setSilent(true) // Handled by MediaPlayer
                 .setContentIntent(openPI)
                 .setFullScreenIntent(callScreenPI, true)
-                .setCustomBigContentView(customView)
-                .setCustomContentView(customView)
-                .build();
+                .setStyle(callStyle);
+
+        Notification notification = builder.build();
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -296,34 +294,123 @@ public class CallService extends Service {
             } else {
                 startForeground(NOTIF_ID, notification);
             }
+            Log.d(TAG, "Service startForeground executed successfully with NOTIF_ID " + NOTIF_ID);
         } catch (Exception e) {
             Log.e(TAG, "Failed to start foreground notification", e);
         }
 
-        // Also call startActivity directly as a robust Telegram-style fallback.
-        // This forces screen wake-up and overlay display on OEM devices that limit fullScreenIntent.
-        // We only force the full-screen Activity takeover if the device is locked or the screen is off.
-        // If the device is unlocked and active, the Heads-Up Notification (HUN) banner is sufficient and less disruptive.
-        if (isDeviceLocked()) {
-            try {
-                Intent directIntent = new Intent(this, IncomingCallActivity.class);
-                directIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK 
-                        | Intent.FLAG_ACTIVITY_NO_USER_ACTION 
-                        | Intent.FLAG_ACTIVITY_SINGLE_TOP 
-                        | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                directIntent.putExtra("callId",     pendingCallId);
-                directIntent.putExtra("callerId",   pendingCallerId);
-                directIntent.putExtra("callerName", pendingCallerName);
-                directIntent.putExtra("callType",   pendingCallType);
-                directIntent.putExtra("serverUrl",  pendingServerUrl);
-                startActivity(directIntent);
-                Log.d(TAG, "Direct launch of IncomingCallActivity succeeded");
-            } catch (Exception e) {
-                Log.w(TAG, "Direct launch of IncomingCallActivity failed (expected behavior if background start blocked by OS)", e);
-            }
-        } else {
-            Log.d(TAG, "Device is unlocked and interactive; letting Heads-Up Notification banner handle the display.");
+        // Asynchronously load the real photo if URL is provided
+        loadAvatarAndResource(pendingCallerAvatar, callerLabel, declinePI, answerPI, NOTIF_ID, builder, nm);
+
+        // Also call startActivity directly as a fallback.
+        try {
+            Intent directIntent = new Intent(this, IncomingCallActivity.class);
+            directIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK 
+                    | Intent.FLAG_ACTIVITY_NO_USER_ACTION 
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP 
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            directIntent.putExtra("callId",     pendingCallId);
+            directIntent.putExtra("callerId",   pendingCallerId);
+            directIntent.putExtra("callerName", pendingCallerName);
+            directIntent.putExtra("callType",   pendingCallType);
+            directIntent.putExtra("serverUrl",  pendingServerUrl);
+            startActivity(directIntent);
+            Log.d(TAG, "Direct launch of IncomingCallActivity succeeded");
+        } catch (Exception e) {
+            Log.w(TAG, "Direct launch of IncomingCallActivity failed (expected background delay)", e);
         }
+    }
+
+    private android.graphics.Bitmap createInitialsBitmap(String name) {
+        int size = 120;
+        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+        
+        // Background circle
+        android.graphics.Paint paint = new android.graphics.Paint();
+        paint.setAntiAlias(true);
+        paint.setColor(0xFF1a2351); // Dark blue Zetime background
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+        
+        // Initials text
+        String[] parts = name.split("\\s+");
+        StringBuilder initials = new StringBuilder();
+        for (String p : parts) {
+            if (!p.isEmpty()) initials.append(p.charAt(0));
+            if (initials.length() >= 2) break;
+        }
+        String text = initials.toString().toUpperCase();
+        
+        paint.setColor(0xFFFFFFFF); // White text
+        paint.setTextSize(48);
+        paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+        paint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD));
+        
+        // Center text Vertically
+        android.graphics.Rect bounds = new android.graphics.Rect();
+        paint.getTextBounds(text, 0, text.length(), bounds);
+        float y = (size / 2f) - bounds.exactCenterY();
+        
+        canvas.drawText(text, size / 2f, y, paint);
+        return bitmap;
+    }
+
+    private android.graphics.Bitmap getCircleBitmap(android.graphics.Bitmap bitmap) {
+        int size = Math.min(bitmap.getWidth(), bitmap.getHeight());
+        android.graphics.Bitmap output = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(output);
+
+        final int color = 0xff424242;
+        final android.graphics.Paint paint = new android.graphics.Paint();
+        final android.graphics.Rect rect = new android.graphics.Rect(0, 0, size, size);
+
+        paint.setAntiAlias(true);
+        canvas.drawARGB(0, 0, 0, 0);
+        paint.setColor(color);
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+        paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, rect, rect, paint);
+        return output;
+    }
+
+    private void loadAvatarAndResource(String avatarUrl, final String callerLabel, final PendingIntent declinePI, final PendingIntent answerPI, final int notifId, final NotificationCompat.Builder builder, final NotificationManager nm) {
+        if (avatarUrl == null || avatarUrl.isEmpty()) return;
+        new Thread(() -> {
+            try {
+                Log.d(TAG, "Downloading avatar URL asynchronously: " + avatarUrl);
+                java.net.URL url = new java.net.URL(avatarUrl);
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setDoInput(true);
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+                connection.connect();
+                java.io.InputStream input = connection.getInputStream();
+                android.graphics.Bitmap myBitmap = android.graphics.BitmapFactory.decodeStream(input);
+                if (myBitmap != null) {
+                    android.graphics.Bitmap circularBitmap = getCircleBitmap(myBitmap);
+                    
+                    // Create Person with the downloaded avatar
+                    Person caller = new Person.Builder()
+                            .setName(callerLabel)
+                            .setIcon(IconCompat.createWithBitmap(circularBitmap))
+                            .setImportant(true)
+                            .build();
+                    
+                    // Re-apply CallStyle
+                    NotificationCompat.CallStyle callStyle = NotificationCompat.CallStyle.forIncomingCall(
+                            caller, declinePI, answerPI);
+                    
+                    builder.setStyle(callStyle);
+                    builder.setLargeIcon(circularBitmap); // Secondary large icon binding
+                    
+                    // Re-notify
+                    nm.notify(notifId, builder.build());
+                    Log.d(TAG, "Successfully loaded caller photo and updated CallStyle notification");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error downloading caller avatar: " + e.getMessage());
+            }
+        }).start();
     }
 
     @Nullable

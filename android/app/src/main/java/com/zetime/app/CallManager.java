@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
@@ -47,6 +48,7 @@ public class CallManager {
     private String currentCallerName;
     private String currentCallType;
     private String currentServerUrl;
+    private String currentCallerAvatar;
 
     // ── Media ───────────────────────────────────────────────────────────────
     private MediaPlayer mediaPlayer;
@@ -82,6 +84,24 @@ public class CallManager {
         this.listener = listener;
     }
 
+    private static final int MAX_CALL_HISTORY = 50;
+    private static final java.util.LinkedHashMap<String, Boolean> sProcessedCalls = 
+        new java.util.LinkedHashMap<String, Boolean>(MAX_CALL_HISTORY, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
+                return size() > MAX_CALL_HISTORY;
+            }
+        };
+
+    public static synchronized boolean isCallDuplicate(String callId) {
+        if (callId == null || callId.isEmpty()) return false;
+        if (sProcessedCalls.containsKey(callId)) {
+            return true;
+        }
+        sProcessedCalls.put(callId, true);
+        return false;
+    }
+
     public boolean isRinging() {
         return isRinging;
     }
@@ -97,16 +117,33 @@ public class CallManager {
     public void showBanner(Activity activity,
                            String callerName, String callId, String callerId,
                            String callType, String serverUrl) {
-        if (!MainActivity.isAppInForeground) {
-            Log.w(TAG, "Suppressing CallManager banner because app is in background.");
-            return;
-        }
+        showBanner(activity, callerName, callId, callerId, callType, serverUrl, null);
+    }
+
+    public void showBanner(Activity activity,
+                           String callerName, String callId, String callerId,
+                           String callType, String serverUrl, String callerAvatar) {
         if (activity == null || activity.isFinishing()) return;
 
         // Prevent duplicates
+        if (callId != null && isCallDuplicate(callId)) {
+            Log.d(TAG, "Duplicate incoming call ignored in CallManager. callId=" + callId);
+            return;
+        }
+
         if (isRinging && callId != null && callId.equals(currentCallId)) {
             Log.d(TAG, "Banner already showing for callId=" + callId);
             return;
+        }
+
+        // If CallService is running in the background, stop it first to prevent duplicate ringtone
+        try {
+            Intent stopService = new Intent(activity, CallService.class);
+            stopService.putExtra("ACTION", "STOP_CALL");
+            activity.startService(stopService);
+            Log.d(TAG, "Requested CallService to STOP_CALL before displaying foreground banner");
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping CallService from CallManager", e);
         }
 
         // If another call is ringing, dismiss it first
@@ -120,6 +157,7 @@ public class CallManager {
         currentCallerName = callerName;
         currentCallType   = callType;
         currentServerUrl  = serverUrl;
+        currentCallerAvatar = callerAvatar;
         isRinging = true;
 
         Log.d(TAG, "Showing foreground call banner for: " + callerName);
@@ -193,6 +231,7 @@ public class CallManager {
 
         // Populate views
         TextView tvInitials  = bannerView.findViewById(R.id.banner_avatar_initials);
+        android.widget.ImageView imgAvatar = bannerView.findViewById(R.id.banner_avatar_image);
         TextView tvName      = bannerView.findViewById(R.id.banner_caller_name);
         TextView tvSubtitle  = bannerView.findViewById(R.id.banner_call_subtitle);
         Button   btnDecline  = bannerView.findViewById(R.id.banner_btn_decline);
@@ -210,6 +249,38 @@ public class CallManager {
             if (initials.length() >= 2) break;
         }
         tvInitials.setText(initials.toString().toUpperCase());
+
+        // Asynchronously load the caller avatar if URL is provided
+        if (currentCallerAvatar != null && !currentCallerAvatar.isEmpty()) {
+            final String avatarUrl = currentCallerAvatar;
+            new Thread(() -> {
+                try {
+                    java.net.URL url = new java.net.URL(avatarUrl);
+                    java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                    connection.setDoInput(true);
+                    connection.setConnectTimeout(5000);
+                    connection.setReadTimeout(5000);
+                    connection.connect();
+                    java.io.InputStream input = connection.getInputStream();
+                    android.graphics.Bitmap myBitmap = android.graphics.BitmapFactory.decodeStream(input);
+                    if (myBitmap != null) {
+                        final android.graphics.Bitmap circularBitmap = getCircleBitmap(myBitmap);
+                        mainHandler.post(() -> {
+                            if (imgAvatar != null && tvInitials != null) {
+                                imgAvatar.setImageBitmap(circularBitmap);
+                                imgAvatar.setVisibility(View.VISIBLE);
+                                tvInitials.setVisibility(View.GONE);
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error downloading caller avatar: " + e.getMessage());
+                }
+            }).start();
+        } else {
+            if (imgAvatar != null) imgAvatar.setVisibility(View.GONE);
+            if (tvInitials != null) tvInitials.setVisibility(View.VISIBLE);
+        }
 
         boolean isVideo = "VIDEO".equalsIgnoreCase(currentCallType);
         tvSubtitle.setText(isVideo ? "Incoming video call" : "Incoming voice call");
@@ -403,6 +474,7 @@ public class CallManager {
         currentCallerName = null;
         currentCallType   = null;
         currentServerUrl  = null;
+        currentCallerAvatar = null;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -429,5 +501,23 @@ public class CallManager {
                 Log.e(TAG, "Error sending decline", e);
             }
         }).start();
+    }
+
+    private android.graphics.Bitmap getCircleBitmap(android.graphics.Bitmap bitmap) {
+        int size = Math.min(bitmap.getWidth(), bitmap.getHeight());
+        android.graphics.Bitmap output = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(output);
+
+        final int color = 0xff424242;
+        final android.graphics.Paint paint = new android.graphics.Paint();
+        final android.graphics.Rect rect = new android.graphics.Rect(0, 0, size, size);
+
+        paint.setAntiAlias(true);
+        canvas.drawARGB(0, 0, 0, 0);
+        paint.setColor(color);
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+        paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, rect, rect, paint);
+        return output;
     }
 }

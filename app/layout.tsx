@@ -12,6 +12,7 @@ import { PWAClientWrapper } from "@/components/system/pwa-client-wrapper"
 import { FetchInterceptor } from "@/components/providers/fetch-interceptor"
 import { CapacitorInitializer } from "@/components/capacitor-initializer"
 import { StartupLoadingScreen } from "@/components/system/startup-loading-screen"
+import { GlobalOfflineOverlay } from "@/components/system/global-offline-overlay"
 import { InAppNotificationProvider } from "@/components/providers/in-app-notification-provider"
 import { SocketProvider } from "@/components/providers/socket-provider"
 import { CallProvider } from "@/components/providers/call-provider"
@@ -80,6 +81,8 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
+          {/* Global offline wall — sits above every page at z-[9999] */}
+          <GlobalOfflineOverlay />
           <FetchInterceptor>
             <LanguageProvider>
               <AuthProvider>

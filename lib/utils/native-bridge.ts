@@ -7,7 +7,6 @@ import { Capacitor } from '@capacitor/core';
 
 import { App } from '@capacitor/app';
 import { Network } from '@capacitor/network';
-import { notifications } from '@/lib/utils/notifications';
 import { registerPlugin } from '@capacitor/core';
 
 interface CallPlugin {
@@ -18,6 +17,7 @@ interface CallPlugin {
     callerId?: string;
     callType?: string;
     serverUrl?: string;
+    callerAvatar?: string;
   }) => Promise<void>;
   showCallBanner: (options: {
     callerName: string;
@@ -25,6 +25,7 @@ interface CallPlugin {
     callerId?: string;
     callType?: string;
     serverUrl?: string;
+    callerAvatar?: string;
   }) => Promise<void>;
   dismissCallBanner: () => Promise<void>;
   saveAuthToken: (options: { token: string; apiUrl?: string }) => Promise<void>;
@@ -48,6 +49,9 @@ interface CallPlugin {
   ) => Promise<any>;
   requestPermissions: (options?: { permissions: string[] }) => Promise<any>;
   checkPermissions: () => Promise<any>;
+  setAudioModeInCall: (options?: { speakerphone?: boolean }) => Promise<void>;
+  setAudioModeNormal: () => Promise<void>;
+  setSpeakerphone: (options: { enabled: boolean }) => Promise<void>;
 }
 
 const CallPlugin = registerPlugin<CallPlugin>('CallPlugin');
@@ -98,9 +102,9 @@ export const NativeBridge = {
     if (!Capacitor.isNativePlatform()) return;
     
     Network.addListener('networkStatusChange', status => {
-      if (!status.connected) {
-        notifications.warning("Offline Mode", "You are currently offline. Some features may be limited.");
-      }
+      // Offline UI is handled globally by GlobalOfflineOverlay in app/layout.tsx
+      // No toast needed — the full-screen overlay takes over automatically
+      console.log('[NativeBridge] Network status changed:', status.connected ? 'online' : 'offline');
     });
   },
 
@@ -296,20 +300,20 @@ export const NativeBridge = {
     }
   },
 
-  startNativeRinging: async (callerName: string, callId?: string, callerId?: string, callType?: string, serverUrl?: string) => {
+  startNativeRinging: async (callerName: string, callId?: string, callerId?: string, callType?: string, serverUrl?: string, callerAvatar?: string) => {
     if (Capacitor.isNativePlatform()) {
       try {
-        await CallPlugin.startRinging({ callerName, callId, callerId, callType, serverUrl });
+        await CallPlugin.startRinging({ callerName, callId, callerId, callType, serverUrl, callerAvatar });
       } catch (e) {
         console.warn('CallPlugin: startRinging failed', e);
       }
     }
   },
 
-  showCallBanner: async (callerName: string, callId?: string, callerId?: string, callType?: string, serverUrl?: string) => {
+  showCallBanner: async (callerName: string, callId?: string, callerId?: string, callType?: string, serverUrl?: string, callerAvatar?: string) => {
     if (Capacitor.isNativePlatform()) {
       try {
-        await CallPlugin.showCallBanner({ callerName, callId, callerId, callType, serverUrl });
+        await CallPlugin.showCallBanner({ callerName, callId, callerId, callType, serverUrl, callerAvatar });
       } catch (e) {
         console.warn('CallPlugin: showCallBanner failed', e);
       }
@@ -354,5 +358,50 @@ export const NativeBridge = {
       });
     }
     return null;
-  }
+  },
+
+  /**
+   * Switch Android audio to MODE_IN_COMMUNICATION.
+   * This enables hardware Acoustic Echo Cancellation (AEC) and Noise
+   * Suppression (NS) — the fix for echo/noise disruption during WebRTC calls.
+   * Call when the call transitions to CONNECTED.
+   */
+  setAudioModeInCall: async (speakerphone = false) => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await CallPlugin.setAudioModeInCall({ speakerphone });
+        console.log('[NativeBridge] Audio mode: IN_COMMUNICATION, speakerphone=' + speakerphone);
+      } catch (e) {
+        console.warn('[NativeBridge] setAudioModeInCall failed (non-fatal):', e);
+      }
+    }
+  },
+
+  /**
+   * Restore audio to MODE_NORMAL after a call ends.
+   * Required so that media apps (music, video) return to normal routing.
+   */
+  setAudioModeNormal: async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await CallPlugin.setAudioModeNormal();
+        console.log('[NativeBridge] Audio mode: NORMAL restored');
+      } catch (e) {
+        console.warn('[NativeBridge] setAudioModeNormal failed (non-fatal):', e);
+      }
+    }
+  },
+
+  /**
+   * Toggle speakerphone on/off during an active call.
+   */
+  setSpeakerphone: async (enabled: boolean) => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await CallPlugin.setSpeakerphone({ enabled });
+      } catch (e) {
+        console.warn('[NativeBridge] setSpeakerphone failed (non-fatal):', e);
+      }
+    }
+  },
 };

@@ -340,11 +340,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               // Both cookie-based and Bearer requests returned 401 — token truly expired
               console.warn("[AuthContext][validateSession] Bearer retry also failed — token truly expired")
-              setError("Your session is invalid or has expired. Please retry verification or sign out to log in again.")
-              setUser(currentUser)
-              setSessionId(storedSessionId)
-              setAuthLoading(false)
-              setPermissionsLoading(false)
+              logout("/login?reason=expired")
               return
             }
           } catch (retryErr) {
@@ -359,11 +355,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           // No Bearer token at all — truly unauthorized
           console.warn("[AuthContext][validateSession] No Bearer token and cookie failed — session expired")
-          setError("Your session is invalid or has expired. Please retry verification or sign out to log in again.")
-          setUser(currentUser)
-          setSessionId(storedSessionId)
-          setAuthLoading(false)
-          setPermissionsLoading(false)
+          logout("/login?reason=expired")
           return
         }
       }
@@ -443,14 +435,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.warn("[AuthContext][validateSession] Profile fetch failed:", err)
-      if (!navigator.onLine) {
-        console.log("[AuthContext][validateSession] Offline — using cached user")
+      // Transition gracefully using cached user if available
+      if (currentUser) {
+        console.log("[AuthContext][validateSession] Using cached user due to profile fetch failure")
         setUser(currentUser)
         setSessionId(storedSessionId)
+        setError(null) // Do NOT block the user when cached session is available
       } else {
-        setUser(currentUser)
-        setSessionId(storedSessionId)
-        setError("Network/Server error during session validation. Please retry.")
+        setError("Network or server connection failed. Please retry.")
       }
     } finally {
       setAuthLoading(false)
@@ -492,23 +484,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error("Features API returned success: false")
         }
       } catch (err) {
-        console.warn("[AuthContext][validateSession] Features fetch failed:", err)
-        if (!navigator.onLine) {
-          if (cachedFeaturesStr) {
-            try {
-              setFeatures(JSON.parse(cachedFeaturesStr))
-              console.log("[AuthContext][validateSession] Offline — using cached features")
-            } catch {
-              setFeatures([])
-            }
-          } else {
+        console.warn("[AuthContext][validateSession] Features fetch failed, falling back to cached features:", err)
+        // Fall back to cached features if available, otherwise default to empty array.
+        // DO NOT show a blocking error screen under any circumstance.
+        if (cachedFeaturesStr) {
+          try {
+            setFeatures(JSON.parse(cachedFeaturesStr))
+            console.log("[AuthContext][validateSession] Loaded features from local storage cache")
+          } catch {
             setFeatures([])
           }
-          setError(null)
         } else {
-          setFeatures(null)
-          setError("Failed to verify school permissions. Please retry.")
+          setFeatures([])
         }
+        setError(null) // Clear error to keep the dashboard accessible
       } finally {
         setPermissionsLoading(false)
       }
@@ -553,8 +542,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const handleSessionExpired = () => {
-      console.log("[AuthContext] Session expired event detected. Setting validation error.")
-      setError("Your session is invalid or has expired. Please retry verification or sign out to log in again.")
+      console.log("[AuthContext] Session expired event detected. Logging out...")
+      logout("/login?reason=expired")
     }
 
     window.addEventListener("userSessionChanged", handleSessionChange)

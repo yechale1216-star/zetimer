@@ -114,17 +114,27 @@ export default function CallPage() {
     setShowConfirm(true);
   };
 
-  const handleConfirmCall = async () => {
+  const handleConfirmCall = () => {
     if (!selectedContact) return;
-    await db.logCall({
+    const phone = selectedContact.phone.replace(/\s+/g, '');
+    
+    // Instantly dismiss the modal so the call redirect is fast
+    setShowConfirm(false);
+    
+    // Log the call in background asynchronously
+    db.logCall({
       recipientId: selectedContact.id,
       type: 'VOICE',
       status: 'OUTGOING',
+    }).then(() => {
+      if (view === 'HISTORY') fetchData();
+    }).catch(err => {
+      console.error('[Calls] Failed to log call:', err);
     });
-    window.location.href = `tel:${selectedContact.phone.replace(/\s+/g, '')}`;
-    setShowConfirm(false);
+
+    // Trigger the phone call and display calling indicator instantly
     toast.success(`Calling ${selectedContact.full_name}...`);
-    if (view === 'HISTORY') fetchData();
+    window.location.href = `tel:${phone}`;
   };
 
   return (

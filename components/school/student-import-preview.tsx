@@ -252,7 +252,7 @@ export function StudentImportPreview({ data, onImport, onCancel, isImporting }: 
       <div className="relative border border-border/50 rounded-2xl overflow-hidden bg-background flex-1 min-h-0">
 
         {/* Horizontal + Vertical scroll wrapper */}
-        <div className="overflow-x-auto overflow-y-auto max-h-[420px] md:max-h-[520px] scrollbar-hide">
+        <div className="overflow-x-auto overflow-y-auto max-h-[250px] sm:max-h-[350px] md:max-h-[520px] scrollbar-hide">
           <Table className="min-w-[640px]">
             <TableHeader className="sticky top-0 bg-muted/90 backdrop-blur-md z-10">
               <TableRow className="border-border/50">

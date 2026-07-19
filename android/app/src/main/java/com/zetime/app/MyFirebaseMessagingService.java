@@ -15,6 +15,8 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.app.Person;
+import androidx.core.graphics.drawable.IconCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.firebase.messaging.FirebaseMessagingService;
@@ -65,21 +67,14 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         switch (type) {
             case "incoming_call":
                 Log.d(TAG, "Handling incoming call");
+                String callId = data.get("callId");
+                if (callId != null && CallManager.isCallDuplicate(callId)) {
+                    Log.d(TAG, "Duplicate FCM incoming_call event ignored. callId: " + callId);
+                    break;
+                }
+
                 if (isAppInForeground()) {
-                    Log.d(TAG, "App is in foreground. Showing CallManager banner overlay.");
-                    String callerName = data.get("callerName");
-                    String callId      = data.get("callId");
-                    String callerId    = data.get("callerId");
-                    String callType    = data.get("callType");
-                    String serverUrl   = data.get("serverUrl");
-                    CallManager.getInstance().showBanner(
-                        MainActivity.getInstance(),
-                        callerName != null ? callerName : "Unknown Caller",
-                        callId,
-                        callerId,
-                        callType,
-                        serverUrl
-                    );
+                    Log.d(TAG, "App is in foreground. Ignoring FCM call notification, relying on WebSocket/Socket.IO.");
                     break;
                 }
                 handleIncomingCall(data);
@@ -318,7 +313,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         CallManager.getInstance().handleCallCanceled();
     }
 
-    private void showIncomingCallNotification(String callerName, String callId, String callType, String callerId, String serverUrl) {
+    private void showIncomingCallNotification(String callerName, String callId, String callType, String callerId, String serverUrl, String callerAvatar) {
         NotificationManager nm = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
@@ -351,43 +346,40 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         declineIntent.putExtra("serverUrl", serverUrl);
         PendingIntent declinePI = PendingIntent.getBroadcast(this, 2, declineIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        String callerLabel = callerName != null ? callerName : "Unknown Caller";
         String callTypeLabel = "VIDEO".equalsIgnoreCase(callType) ? "Video" : "Voice";
 
-        // Create custom RemoteViews styled precisely like the foreground call banner
-        android.widget.RemoteViews customView = new android.widget.RemoteViews(getPackageName(), R.layout.layout_notification_call_banner);
-        customView.setTextViewText(R.id.banner_caller_name, callerName != null ? callerName : "Unknown Caller");
-        customView.setTextViewText(R.id.banner_call_subtitle, "VIDEO".equalsIgnoreCase(callType) ? "Incoming video call" : "Incoming voice call");
-        
-        String name = (callerName != null && !callerName.isEmpty()) ? callerName : "Unknown Caller";
-        String[] parts = name.split("\\s+");
-        StringBuilder initials = new StringBuilder();
-        for (String p : parts) {
-            if (!p.isEmpty()) initials.append(p.charAt(0));
-            if (initials.length() >= 2) break;
-        }
-        customView.setTextViewText(R.id.banner_avatar_initials, initials.toString().toUpperCase());
-        
-        customView.setOnClickPendingIntent(R.id.banner_btn_accept, answerPI);
-        customView.setOnClickPendingIntent(R.id.banner_btn_decline, declinePI);
+        // Generate initials bitmap
+        android.graphics.Bitmap initialsBitmap = createInitialsBitmap(callerLabel);
+
+        // Build native CallStyle Person
+        Person caller = new Person.Builder()
+                .setName(callerLabel)
+                .setIcon(IconCompat.createWithBitmap(initialsBitmap))
+                .setImportant(true)
+                .build();
+
+        // Build CallStyle
+        NotificationCompat.CallStyle callStyle = NotificationCompat.CallStyle.forIncomingCall(
+                caller, declinePI, answerPI);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_CALLS)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("Incoming " + callTypeLabel + " Call")
-                .setContentText(callerName)
+                .setContentText(callerLabel)
+                .setSubText("Incoming voice call")
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setAutoCancel(false)
                 .setOngoing(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setFullScreenIntent(fsPendingIntent, true)
-                .setCustomContentView(customView)
-                .setCustomHeadsUpContentView(customView)
-                .setCustomBigContentView(customView)
-                .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePI)
-                .addAction(android.R.drawable.ic_menu_call, "Answer", answerPI);
+                .setStyle(callStyle);
 
         nm.notify(NOTIF_ID_CALL, builder.build());
+
+        // Asynchronously load the caller avatar if URL is provided
+        loadAvatarAndResource(callerAvatar, callerLabel, declinePI, answerPI, NOTIF_ID_CALL, builder, nm);
     }
 
 
@@ -487,6 +479,97 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 conn.disconnect();
             } catch (Exception e) {
                 Log.e(TAG, "Failed to save refreshed FCM token to server: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private android.graphics.Bitmap createInitialsBitmap(String name) {
+        int size = 120;
+        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+        
+        // Background circle
+        android.graphics.Paint paint = new android.graphics.Paint();
+        paint.setAntiAlias(true);
+        paint.setColor(0xFF1a2351); // Dark blue Zetime background
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+        
+        // Initials text
+        String[] parts = name.split("\\s+");
+        StringBuilder initials = new StringBuilder();
+        for (String p : parts) {
+            if (!p.isEmpty()) initials.append(p.charAt(0));
+            if (initials.length() >= 2) break;
+        }
+        String text = initials.toString().toUpperCase();
+        
+        paint.setColor(0xFFFFFFFF); // White text
+        paint.setTextSize(48);
+        paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+        paint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD));
+        
+        // Center text Vertically
+        android.graphics.Rect bounds = new android.graphics.Rect();
+        paint.getTextBounds(text, 0, text.length(), bounds);
+        float y = (size / 2f) - bounds.exactCenterY();
+        
+        canvas.drawText(text, size / 2f, y, paint);
+        return bitmap;
+    }
+
+    private android.graphics.Bitmap getCircleBitmap(android.graphics.Bitmap bitmap) {
+        int size = Math.min(bitmap.getWidth(), bitmap.getHeight());
+        android.graphics.Bitmap output = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(output);
+
+        final int color = 0xff424242;
+        final android.graphics.Paint paint = new android.graphics.Paint();
+        final android.graphics.Rect rect = new android.graphics.Rect(0, 0, size, size);
+
+        paint.setAntiAlias(true);
+        canvas.drawARGB(0, 0, 0, 0);
+        paint.setColor(color);
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+        paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, rect, rect, paint);
+        return output;
+    }
+
+    private void loadAvatarAndResource(String avatarUrl, final String callerLabel, final PendingIntent declinePI, final PendingIntent answerPI, final int notifId, final NotificationCompat.Builder builder, final NotificationManager nm) {
+        if (avatarUrl == null || avatarUrl.isEmpty()) return;
+        new Thread(() -> {
+            try {
+                java.net.URL url = new java.net.URL(avatarUrl);
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setDoInput(true);
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+                connection.connect();
+                java.io.InputStream input = connection.getInputStream();
+                android.graphics.Bitmap myBitmap = android.graphics.BitmapFactory.decodeStream(input);
+                if (myBitmap != null) {
+                    android.graphics.Bitmap circularBitmap = getCircleBitmap(myBitmap);
+                    
+                    // Create Person with the downloaded avatar
+                    Person caller = new Person.Builder()
+                            .setName(callerLabel)
+                            .setIcon(IconCompat.createWithBitmap(circularBitmap))
+                            .setImportant(true)
+                            .build();
+                    
+                    // Re-apply CallStyle
+                    NotificationCompat.CallStyle callStyle = NotificationCompat.CallStyle.forIncomingCall(
+                            caller, declinePI, answerPI);
+                    
+                    builder.setStyle(callStyle);
+                    builder.setLargeIcon(circularBitmap);
+                    
+                    // Re-notify
+                    nm.notify(notifId, builder.build());
+                    Log.d(TAG, "Successfully loaded and updated notification avatar");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error downloading caller avatar: " + e.getMessage());
             }
         }).start();
     }

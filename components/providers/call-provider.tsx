@@ -30,6 +30,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
   const { isSuspended } = useSuspension();
 
+  const [isAppActive, setIsAppActive] = useState(true);
+  const isAppActiveRef = useRef(true);
+  const pendingAnswerRef = useRef<{ callId: string; callerId?: string; callerName?: string; callType?: string } | null>(null);
+
+  // Sync ref with state
+  useEffect(() => {
+    isAppActiveRef.current = isAppActive;
+  }, [isAppActive]);
+
   // ── Refs for values needed inside event-listener closures (no stale state) ─
   const incomingCallRef = useRef<any>(null);
   const isWaitingForOfferRef = useRef(false);
@@ -43,38 +52,25 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => { isWaitingForOfferRef.current = isWaitingForOffer; }, [isWaitingForOffer]);
 
   // ── onIncomingCall: socket 'incoming_call' event ─────────────────────────
-  const onIncomingCall = useCallback(async (data: any) => {
+  const onIncomingCall = useCallback((data: any) => {
     if (isSuspended) {
       console.log('[CallProvider] Rejecting incoming call signal — school suspended');
       return;
     }
     console.log('[CallProvider] ✅ incoming_call received. callId:', data.callId, '| offer present:', !!data.offer);
 
-    if (NativeBridge.isNative()) {
-      try {
-        const state = await App.getState();
-        if (state.isActive) {
-          console.log('[CallProvider] App is active. Showing foreground call banner');
-          NativeBridge.showCallBanner(
-            data.profile?.name || 'Unknown User',
-            data.callId,
-            data.from,
-            data.type,
-            data.serverUrl || ''
-          );
-        } else {
-          console.log('[CallProvider] App is in background. Skipping showCallBanner.');
-        }
-      } catch (err) {
-        console.warn('[CallProvider] Failed to get app state, default to show banner', err);
-        NativeBridge.showCallBanner(
-          data.profile?.name || 'Unknown User',
-          data.callId,
-          data.from,
-          data.type,
-          data.serverUrl || ''
-        );
-      }
+    const isAnswering = isWaitingForOfferRef.current || !!pendingAnswerRef.current;
+
+    if (NativeBridge.isNative() && !isAnswering) {
+      console.log('[CallProvider] → Showing foreground call banner');
+      NativeBridge.showCallBanner(
+        data.profile?.name || 'Unknown User',
+        data.callId,
+        data.from,
+        data.type,
+        data.serverUrl || '',
+        data.profile?.avatar || ''
+      );
     }
 
     setIncomingCallData(data);
@@ -102,6 +98,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('[CallProvider] Call ended by:', userId);
     NativeBridge.dismissCallBanner();
     NativeBridge.endNativeCall();
+    NativeBridge.setAudioModeNormal(); // Restore audio routing after call
     setParticipants(prev => {
       const next = prev.filter(p => p.id !== userId);
       if (next.length <= 1) setIncomingCallData(null);
@@ -115,6 +112,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     onCallAccepted,
     onCallRejected,
     onCallEnded,
+    isAppActive: () => isAppActiveRef.current,
   });
 
   // Keep webrtcEndCallRef always pointing at the latest endCall implementation
@@ -222,6 +220,22 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [webrtc.callStatus, incomingCallData]);
 
+  // ── Android audio mode: activate hardware AEC/NS when call connects ───────
+  // Setting MODE_IN_COMMUNICATION enables the hardware Acoustic Echo Canceler
+  // (AEC) and Noise Suppressor (NS) at the driver level — this is the primary
+  // cause of echo, howling, and background noise disruption in WebRTC calls.
+  // Must be restored to MODE_NORMAL when call ends so other apps work normally.
+  useEffect(() => {
+    if (!NativeBridge.isNative()) return;
+    if (webrtc.callStatus === 'CONNECTED') {
+      // Use earpiece by default for voice; video usually prefers speakerphone
+      const useSpeaker = callType === 'VIDEO';
+      NativeBridge.setAudioModeInCall(useSpeaker);
+    } else if (webrtc.callStatus === 'IDLE') {
+      NativeBridge.setAudioModeNormal();
+    }
+  }, [webrtc.callStatus, callType]);
+
   // ── handleAccept: called by the in-app modal (foreground only) ────────────
   const handleAccept = useCallback(() => {
     const current = incomingCallRef.current;
@@ -246,6 +260,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const current = incomingCallRef.current;
     NativeBridge.dismissCallBanner();
     NativeBridge.endNativeCall();
+    NativeBridge.setAudioModeNormal(); // Ensure audio is restored on decline
     setIsWaitingForOffer(false);
     if (current) {
       webrtc.rejectCall(current.from, isMissed, current.callId);
@@ -296,7 +311,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Ref that carries the pending ANSWER intent across renders/re-connects
   // Ref that carries the pending ANSWER intent across renders/re-connects
-  const pendingAnswerRef = useRef<{ callId: string; callerId?: string; callerName?: string; callType?: string } | null>(null);
 
   const executePendingAnswer = useCallback(async () => {
     const pending = pendingAnswerRef.current;
@@ -428,6 +442,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!NativeBridge.isNative()) return;
 
+    // Get initial app state
+    App.getState().then((state) => {
+      setIsAppActive(state.isActive);
+      isAppActiveRef.current = state.isActive;
+    }).catch(e => console.warn('[CallProvider] Failed to get initial app state:', e));
+
     const checkPending = async () => {
       try {
         const res = await NativeBridge.getPendingCall();
@@ -449,6 +469,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkPending();
 
     const sub = App.addListener('appStateChange', ({ isActive }) => {
+      setIsAppActive(isActive);
+      isAppActiveRef.current = isActive;
       if (isActive) {
         console.log('[CallProvider] App foregrounded — re-checking pending call intents');
         checkPending();

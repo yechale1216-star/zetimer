@@ -125,6 +125,7 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
     @PluginMethod
     public void startRinging(PluginCall call) {
         String callerName = call.getString("callerName", "Unknown");
+        String callerAvatar = call.getString("callerAvatar", "");
         String callId      = call.getString("callId");
         String callerId    = call.getString("callerId");
         String callType    = call.getString("callType");
@@ -133,6 +134,7 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
         Intent intent = new Intent(getContext(), CallService.class);
         intent.putExtra("ACTION", "START_CALL");
         intent.putExtra("callerName", callerName);
+        intent.putExtra("callerAvatar", callerAvatar);
         intent.putExtra("callId", callId);
         intent.putExtra("callerId", callerId);
         intent.putExtra("callType", callType);
@@ -153,9 +155,10 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
         String callerId    = call.getString("callerId");
         String callType    = call.getString("callType");
         String serverUrl   = call.getString("serverUrl");
+        String callerAvatar = call.getString("callerAvatar", "");
 
         Activity activity = getActivity();
-        CallManager.getInstance().showBanner(activity, callerName, callId, callerId, callType, serverUrl);
+        CallManager.getInstance().showBanner(activity, callerName, callId, callerId, callType, serverUrl, callerAvatar);
         call.resolve();
     }
 
@@ -207,6 +210,74 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
         }).start();
     }
 
+
+    /**
+     * Switch Android audio routing into VoIP/communication mode.
+     * This activates the hardware Acoustic Echo Canceler (AEC) and Noise
+     * Suppressor (NS) at the driver level — the primary fix for echo and
+     * background noise during WebRTC calls.  Call this when the call connects.
+     * Accepts optional param: speakerphone (boolean, default false for earpiece).
+     */
+    @PluginMethod
+    public void setAudioModeInCall(PluginCall call) {
+        try {
+            boolean useSpeaker = Boolean.TRUE.equals(call.getBoolean("speakerphone", false));
+            android.media.AudioManager am =
+                (android.media.AudioManager) getContext().getSystemService(android.content.Context.AUDIO_SERVICE);
+            if (am != null) {
+                am.setMode(android.media.AudioManager.MODE_IN_COMMUNICATION);
+                am.setMicrophoneMute(false);
+                am.setSpeakerphoneOn(useSpeaker);
+                Log.d(TAG, "Audio: MODE_IN_COMMUNICATION, speakerphone=" + useSpeaker);
+            }
+            call.resolve();
+        } catch (Exception e) {
+            Log.e(TAG, "setAudioModeInCall failed", e);
+            call.reject(e.getMessage());
+        }
+    }
+
+    /**
+     * Restore normal audio routing after a call ends.
+     * Must be called to release MODE_IN_COMMUNICATION so other apps
+     * (music, videos, etc.) regain normal audio behaviour.
+     */
+    @PluginMethod
+    public void setAudioModeNormal(PluginCall call) {
+        try {
+            android.media.AudioManager am =
+                (android.media.AudioManager) getContext().getSystemService(android.content.Context.AUDIO_SERVICE);
+            if (am != null) {
+                am.setSpeakerphoneOn(false);
+                am.setMode(android.media.AudioManager.MODE_NORMAL);
+                Log.d(TAG, "Audio: MODE_NORMAL restored");
+            }
+            call.resolve();
+        } catch (Exception e) {
+            Log.e(TAG, "setAudioModeNormal failed", e);
+            call.reject(e.getMessage());
+        }
+    }
+
+    /**
+     * Toggle speakerphone on/off during an active call.
+     */
+    @PluginMethod
+    public void setSpeakerphone(PluginCall call) {
+        try {
+            boolean on = Boolean.TRUE.equals(call.getBoolean("enabled", false));
+            android.media.AudioManager am =
+                (android.media.AudioManager) getContext().getSystemService(android.content.Context.AUDIO_SERVICE);
+            if (am != null) {
+                am.setSpeakerphoneOn(on);
+                Log.d(TAG, "Speakerphone set to: " + on);
+            }
+            call.resolve();
+        } catch (Exception e) {
+            Log.e(TAG, "setSpeakerphone failed", e);
+            call.reject(e.getMessage());
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // Internal action dispatchers (called from Java, not from JS)

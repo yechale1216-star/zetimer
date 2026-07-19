@@ -505,7 +505,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
 
   return (
-    <div className="space-y-6 px-4 md:px-0">
+    <div className="space-y-6 px-4 md:px-0 pb-24">
       {/* Error Banner */}
       {fetchError && (
         <ErrorBanner

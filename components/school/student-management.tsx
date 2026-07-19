@@ -20,6 +20,7 @@ import { ValidationService } from "@/lib/utils/validation"
 import { authService } from "@/lib/auth/auth"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { DataStateView } from "@/components/ui/data-state-view"
 import { MobileCard, MobileCardList } from "@/components/ui/mobile-card"
 import { NativeBridge } from "@/lib/utils/native-bridge"
 import { Camera } from "lucide-react"
@@ -669,7 +670,18 @@ export function StudentManagement() {
   }, [students])
 
   return (
-    <div className="space-y-8 pb-32">
+    <>
+      <DataStateView
+        isLoading={isLoading}
+        isEmpty={students.length === 0}
+        emptyTitle="No Students Yet"
+        emptyDescription="There are no students available. Add students to get started."
+        crumbsTitle="Students"
+        onEmptyActionClick={() => { resetForm(); setIsAddModalOpen(true); }}
+        emptyActionText="+ Add Student"
+        skeletonVariant="table"
+      >
+        <div className="space-y-8 pb-32">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
         <div>
@@ -1557,7 +1569,9 @@ export function StudentManagement() {
           </Button>
         </div>
       )}
-    </div>
+        </div>
+      </DataStateView>
+    </>
   )
 }
 

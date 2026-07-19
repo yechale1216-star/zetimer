@@ -84,6 +84,19 @@ public class MainActivity extends BridgeActivity {
         isAppInForeground = false;
     }
 
+    private void dismissKeyguard() {
+        try {
+            android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(android.content.Context.KEYGUARD_SERVICE);
+            if (km != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    km.requestDismissKeyguard(this, null);
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error dismissing keyguard", e);
+        }
+    }
+
     @Override
     public void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -97,16 +110,8 @@ public class MainActivity extends BridgeActivity {
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
                 | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
                 | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
-        try {
-            android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(android.content.Context.KEYGUARD_SERVICE);
-            if (km != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    km.requestDismissKeyguard(this, null);
-                }
-            }
-        } catch (Exception e) {
-            android.util.Log.e("MainActivity", "Error dismissing keyguard onNewIntent", e);
-        }
+        
+        dismissKeyguard();
 
         handleIntent(intent);
     }
@@ -171,6 +176,7 @@ public class MainActivity extends BridgeActivity {
                 }
             }
         } else if (intent.hasExtra("callAction")) {
+            dismissKeyguard();
             String action = intent.getStringExtra("callAction");
             String callId = intent.getStringExtra("callId");
             String callerId = intent.getStringExtra("callerId");
@@ -222,6 +228,7 @@ public class MainActivity extends BridgeActivity {
                 }
             }
         } else if (isIncomingCall || "incoming_call".equals(notifType)) {
+            dismissKeyguard();
             String callId    = intent.getStringExtra("callId");
             String callerId  = intent.getStringExtra("callerId");
             String callerName = intent.getStringExtra("callerName");

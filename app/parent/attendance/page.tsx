@@ -685,46 +685,48 @@ export default function AttendanceHistory() {
         <TabsContent value="table" className="outline-none animate-in fade-in duration-300">
           <Card className="border-border/40 shadow-xl rounded-3xl bg-card/60 backdrop-blur-md overflow-hidden">
             <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-muted/30 border-b border-border/20">
-                  <TableRow>
-                    <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("date")}</TableHead>
-                    <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("session")}</TableHead>
-                    <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("status_label")}</TableHead>
-                    <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("remarks")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAttendance.length === 0 ? (
+              <div className="overflow-x-auto w-full">
+                <Table>
+                  <TableHeader className="bg-muted/30 border-b border-border/20">
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-16 text-muted-foreground">
-                        <CalendarDays className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
-                        <p className="typography-label">{t("no_attendance_records")}</p>
-                        <span className="typography-label text-[10px] text-muted-foreground/60">{t("verify_month")}</span>
-                      </TableCell>
+                      <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("date")}</TableHead>
+                      <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("session")}</TableHead>
+                      <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("status_label")}</TableHead>
+                      <TableHead className="typography-label uppercase text-muted-foreground py-4 px-6">{t("remarks")}</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredAttendance.map((record) => (
-                      <TableRow key={record.id} className="border-b border-border/20 hover:bg-muted/10">
-                        <TableCell className="typography-label py-4 px-6">{formatTableDate(record.date)}</TableCell>
-                        <TableCell className="typography-label py-4 px-6 text-muted-foreground">
-                          {record.session ? (
-                            <Badge variant="outline" className="typography-label capitalize text-[10px] rounded-md bg-muted/40">
-                              {record.session === "morning" ? t("morning_session") : t("afternoon_session")}
-                            </Badge>
-                          ) : (
-                            <span className="typography-helper italic text-muted-foreground/60">{t("full_day")}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="py-4 px-6">{getStatusBadge(record.status)}</TableCell>
-                        <TableCell className="typography-label py-4 px-6 text-muted-foreground max-w-xs truncate">
-                          {record.remarks || <span className="text-muted-foreground/40 italic text-[11px]">{t("no_notes")}</span>}
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAttendance.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-16 text-muted-foreground">
+                          <CalendarDays className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+                          <p className="typography-label">{t("no_attendance_records")}</p>
+                          <span className="typography-label text-[10px] text-muted-foreground/60">{t("verify_month")}</span>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      filteredAttendance.map((record) => (
+                        <TableRow key={record.id} className="border-b border-border/20 hover:bg-muted/10">
+                          <TableCell className="typography-label py-4 px-6">{formatTableDate(record.date)}</TableCell>
+                          <TableCell className="typography-label py-4 px-6 text-muted-foreground">
+                            {record.session ? (
+                              <Badge variant="outline" className="typography-label capitalize text-[10px] rounded-md bg-muted/40">
+                                {record.session === "morning" ? t("morning_session") : t("afternoon_session")}
+                              </Badge>
+                            ) : (
+                              <span className="typography-helper italic text-muted-foreground/60">{t("full_day")}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-4 px-6">{getStatusBadge(record.status)}</TableCell>
+                          <TableCell className="typography-label py-4 px-6 text-muted-foreground max-w-xs truncate">
+                            {record.remarks || <span className="text-muted-foreground/40 italic text-[11px]">{t("no_notes")}</span>}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

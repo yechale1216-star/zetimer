@@ -211,7 +211,7 @@ export default function TeacherLayout({
                   onScroll={handleMainScroll}
                 >
                   <SuspendedBanner />
-                  <div className="flex-1 flex flex-col h-full min-h-0">
+                  <div className="flex-1 flex flex-col min-h-0">
                     {children}
                   </div>
                 </main>

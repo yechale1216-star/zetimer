@@ -43,6 +43,16 @@ public class IncomingCallActivity extends Activity {
         super.onNewIntent(intent);
         setIntent(intent);
         
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true);
+            setTurnScreenOn(true);
+        }
+        getWindow().addFlags(
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+            | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        );
+
         callId     = intent.getStringExtra("callId");
         callerId   = intent.getStringExtra("callerId");
         callerName = intent.getStringExtra("callerName");
@@ -76,7 +86,13 @@ public class IncomingCallActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Show over the lock screen
+        // Show over the lock screen WITHOUT dismissing the keyguard.
+        // FLAG_DISMISS_KEYGUARD / requestDismissKeyguard() cause the OS to
+        // intercept focus and show the PIN/password prompt on secure devices,
+        // which blocks the call UI. Using only FLAG_SHOW_WHEN_LOCKED renders
+        // the activity OVER the keyguard (Telegram-style) — the user sees the
+        // incoming call immediately and the PIN is only requested if they tap
+        // "Answer" (which opens MainActivity).
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true);
             setTurnScreenOn(true);
@@ -85,18 +101,7 @@ public class IncomingCallActivity extends Activity {
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
             | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-            | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
         );
-        try {
-            android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
-            if (km != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    km.requestDismissKeyguard(this, null);
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error dismissing keyguard", e);
-        }
         // Make the activity full-screen (hide status bar for immersive call UI)
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 

@@ -77,7 +77,7 @@
             android:name=".IncomingCallActivity"
             android:label="Incoming Call"
             android:theme="@style/AppTheme.NoActionBar"
-            android:launchMode="singleTask"
+            android:launchMode="singleInstance"
             android:exported="false"
             android:showWhenLocked="true"
             android:turnScreenOn="true"

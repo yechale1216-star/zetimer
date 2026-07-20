@@ -7,6 +7,12 @@ import android.view.WindowManager;
 import androidx.core.splashscreen.SplashScreen;
 import com.getcapacitor.BridgeActivity;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.media.AudioAttributes;
+import android.net.Uri;
+import android.media.RingtoneManager;
+
 public class MainActivity extends BridgeActivity {
     public static volatile boolean isAppInForeground = false;
     private static MainActivity instance = null;
@@ -21,6 +27,10 @@ public class MainActivity extends BridgeActivity {
         SplashScreen.installSplashScreen(this);
         registerPlugin(CallPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // Pre-create notification channels with high priorities and bypass features
+        // so that OS cannot create them with default importance values on background pushes.
+        createNotificationChannels();
 
         // Turn screen on and show over lock screen — apply BOTH the API calls (O_MR1+)
         // AND the legacy window flags because many OEM Androids (Samsung, Xiaomi) still
@@ -254,6 +264,67 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
             }
+        }
+    }
+
+    private void createNotificationChannels() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager nm = (NotificationManager) getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+
+            // 1. Calls Channel (incoming_calls_v8)
+            NotificationChannel callCh = new NotificationChannel(
+                    "incoming_calls_v8", "Incoming Calls", NotificationManager.IMPORTANCE_HIGH);
+            callCh.setDescription("Incoming voice and video call notifications");
+            callCh.enableVibration(true);
+            callCh.setVibrationPattern(new long[]{0, 1000, 500, 1000});
+            callCh.setBypassDnd(true);
+            callCh.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+            AudioAttributes callAa = new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                    .build();
+            callCh.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE), callAa);
+            nm.createNotificationChannel(callCh);
+
+            // 2. High Priority Channel (high_priority_v8)
+            Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.notification);
+            AudioAttributes aa = new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build();
+
+            NotificationChannel highCh = new NotificationChannel(
+                    "high_priority_v8", "High Priority Alert", NotificationManager.IMPORTANCE_HIGH);
+            highCh.setDescription("Voice/video calls, chat messages, and security alerts.");
+            highCh.enableVibration(true);
+            highCh.setVibrationPattern(new long[]{0, 250, 150, 250});
+            highCh.setShowBadge(true);
+            highCh.setBypassDnd(true);
+            highCh.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+            highCh.setSound(soundUri, aa);
+            nm.createNotificationChannel(highCh);
+
+            // 3. Default Channel
+            NotificationChannel defaultCh = new NotificationChannel(
+                    "default_priority_v8", "Default Notification", NotificationManager.IMPORTANCE_DEFAULT);
+            defaultCh.setDescription("Attendance alerts and announcements.");
+            defaultCh.enableVibration(true);
+            defaultCh.setVibrationPattern(new long[]{0, 200, 100, 200});
+            defaultCh.setShowBadge(true);
+            defaultCh.setSound(soundUri, aa);
+            nm.createNotificationChannel(defaultCh);
+
+            // 4. Low Channel
+            NotificationChannel lowCh = new NotificationChannel(
+                    "low_priority_v8", "Low Priority Update", NotificationManager.IMPORTANCE_LOW);
+            lowCh.setDescription("System updates and minor alerts.");
+            lowCh.enableVibration(false);
+            lowCh.setShowBadge(true);
+            lowCh.setSound(null, null);
+            nm.createNotificationChannel(lowCh);
+
+            android.util.Log.d("MainActivity", "Notification channels initialized successfully on startup");
         }
     }
 }

@@ -62,8 +62,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const isAnswering = isWaitingForOfferRef.current || !!pendingAnswerRef.current;
 
     if (NativeBridge.isNative() && !isAnswering) {
-      console.log('[CallProvider] → Showing foreground call banner');
-      NativeBridge.showCallBanner(
+      // On Android: use the native foreground service (HUN + fullScreenIntent)
+      // instead of the React overlay banner. This makes it behave like Telegram:
+      // the native notification appears immediately even when the app is open.
+      console.log('[CallProvider] → Launching native CallService (HUN + IncomingCallActivity)');
+      NativeBridge.startNativeRinging(
         data.profile?.name || 'Unknown User',
         data.callId,
         data.from,

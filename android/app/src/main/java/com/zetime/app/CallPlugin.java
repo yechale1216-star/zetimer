@@ -2,6 +2,12 @@ package com.zetime.app;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.media.audiofx.AcousticEchoCanceler;
+import android.media.audiofx.AutomaticGainControl;
+import android.media.audiofx.NoiseSuppressor;
+import android.media.AudioFocusRequest;
+import android.media.AudioAttributes;
+import android.os.Build;
 import android.util.Log;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -218,6 +224,21 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
      * background noise during WebRTC calls.  Call this when the call connects.
      * Accepts optional param: speakerphone (boolean, default false for earpiece).
      */
+    // Holds the active AudioFocusRequest so we can abandon it correctly (API 26+)
+    private AudioFocusRequest callAudioFocusRequest;
+
+    /**
+     * Switch Android audio into VoIP/communication mode.
+     *
+     * This enables hardware Acoustic Echo Cancellation (AEC), Noise Suppression (NS),
+     * and Automatic Gain Control (AGC) at the driver level — the primary fix for
+     * echo and background noise disruption during WebRTC calls.
+     *
+     * Also requests AUDIOFOCUS_GAIN so the system routes audio exclusively to this
+     * session (prevents other apps from interfering with the mic or speaker).
+     *
+     * Call this when the call transitions to CONNECTED state.
+     */
     @PluginMethod
     public void setAudioModeInCall(PluginCall call) {
         try {
@@ -225,9 +246,52 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
             android.media.AudioManager am =
                 (android.media.AudioManager) getContext().getSystemService(android.content.Context.AUDIO_SERVICE);
             if (am != null) {
+                // 1. Set MODE_IN_COMMUNICATION — activates hardware AEC/NS/AGC
                 am.setMode(android.media.AudioManager.MODE_IN_COMMUNICATION);
                 am.setMicrophoneMute(false);
                 am.setSpeakerphoneOn(useSpeaker);
+
+                // 2. Request exclusive audio focus for VoIP
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    AudioAttributes voipAttrs = new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build();
+                    callAudioFocusRequest = new AudioFocusRequest.Builder(
+                            android.media.AudioManager.AUDIOFOCUS_GAIN)
+                            .setAudioAttributes(voipAttrs)
+                            .setAcceptsDelayedFocusGain(false)
+                            .setOnAudioFocusChangeListener(focusChange ->
+                                    Log.d(TAG, "Audio focus changed during call: " + focusChange))
+                            .build();
+                    int result = am.requestAudioFocus(callAudioFocusRequest);
+                    Log.d(TAG, "Audio focus result (call): " + result);
+                } else {
+                    am.requestAudioFocus(null,
+                            android.media.AudioManager.STREAM_VOICE_CALL,
+                            android.media.AudioManager.AUDIOFOCUS_GAIN);
+                }
+
+                // 3. Enable hardware AEC / NS / AGC using the session ID from AudioManager
+                //    These operate at the driver level, independently of WebRTC software effects.
+                try {
+                    int sessionId = am.generateAudioSessionId();
+                    if (AcousticEchoCanceler.isAvailable()) {
+                        AcousticEchoCanceler aec = AcousticEchoCanceler.create(sessionId);
+                        if (aec != null) { aec.setEnabled(true); Log.d(TAG, "AEC enabled"); }
+                    }
+                    if (NoiseSuppressor.isAvailable()) {
+                        NoiseSuppressor ns = NoiseSuppressor.create(sessionId);
+                        if (ns != null) { ns.setEnabled(true); Log.d(TAG, "NS enabled"); }
+                    }
+                    if (AutomaticGainControl.isAvailable()) {
+                        AutomaticGainControl agc = AutomaticGainControl.create(sessionId);
+                        if (agc != null) { agc.setEnabled(true); Log.d(TAG, "AGC enabled"); }
+                    }
+                } catch (Exception effectEx) {
+                    Log.w(TAG, "Hardware audio effects not available: " + effectEx.getMessage());
+                }
+
                 Log.d(TAG, "Audio: MODE_IN_COMMUNICATION, speakerphone=" + useSpeaker);
             }
             call.resolve();
@@ -239,8 +303,8 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
 
     /**
      * Restore normal audio routing after a call ends.
-     * Must be called to release MODE_IN_COMMUNICATION so other apps
-     * (music, videos, etc.) regain normal audio behaviour.
+     * Abandons audio focus and resets AudioManager mode so other apps (music,
+     * video) regain normal audio behaviour.
      */
     @PluginMethod
     public void setAudioModeNormal(PluginCall call) {
@@ -250,7 +314,15 @@ public class CallPlugin extends Plugin implements CallManager.CallBannerListener
             if (am != null) {
                 am.setSpeakerphoneOn(false);
                 am.setMode(android.media.AudioManager.MODE_NORMAL);
-                Log.d(TAG, "Audio: MODE_NORMAL restored");
+
+                // Abandon audio focus so music/video apps can resume
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && callAudioFocusRequest != null) {
+                    am.abandonAudioFocusRequest(callAudioFocusRequest);
+                    callAudioFocusRequest = null;
+                } else {
+                    am.abandonAudioFocus(null);
+                }
+                Log.d(TAG, "Audio: MODE_NORMAL restored, focus released");
             }
             call.resolve();
         } catch (Exception e) {

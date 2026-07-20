@@ -49,7 +49,7 @@ async function sendPushNotification(token, title, body, data = {}) {
             priority: 'high',
             notification: {
                 sound: 'default',
-                channelId: data.type === 'call' ? 'calls' : 'messages',
+                channelId: data.type === 'call' ? 'incoming_calls_v8' : 'high_priority_v8',
                 tag: data.tag || (data.type === 'call' ? 'incoming-call' : 'new-message')
             }
         },
@@ -123,7 +123,7 @@ async function sendMessageNotification(token, payload) {
             priority: 'high',
             ttl: 86400000,
             notification: {
-                channelId: 'high_priority',
+                channelId: 'high_priority_v8',
                 sound: 'notification',
                 visibility: 'public',
             },
@@ -182,7 +182,6 @@ async function sendCallNotification(token, data) {
             callId: data.callId,
             callerId: data.callerId,
             callerName: data.callerName,
-            callerAvatar: data.callerAvatar || '',
             callType: data.callType,
             serverUrl: data.serverUrl,
             isIncomingCall: 'true',
@@ -278,12 +277,12 @@ async function sendCategoryNotification(token, payload) {
     if (payload.tag)
         dataPayload.tag = payload.tag;
     // Map notification type to Android channel ID (must match MyFirebaseMessagingService channels)
-    let channelId = 'default_priority';
+    let channelId = 'default_priority_v8';
     if (payload.type === 'new_message' || payload.type === 'account_security') {
-        channelId = 'high_priority';
+        channelId = 'high_priority_v8';
     }
     else if (payload.type === 'system_update') {
-        channelId = 'low_priority';
+        channelId = 'low_priority_v8';
     }
     const message = {
         notification: {

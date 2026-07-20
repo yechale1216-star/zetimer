@@ -59,7 +59,7 @@
                 android:layout_gravity="center"
                 android:background="@drawable/pulse_ring" />
 
-            <!-- Avatar image / fallback initial -->
+            <!-- Avatar initials fallback -->
             <TextView
                 android:id="@+id/tv_avatar_initials"
                 android:layout_width="120dp"
@@ -72,6 +72,15 @@
                 android:textStyle="bold"
                 android:fontFamily="sans-serif-black"
                 android:background="@drawable/avatar_bg" />
+
+            <!-- Real caller photo (loaded asynchronously, hides initials on success) -->
+            <ImageView
+                android:id="@+id/iv_avatar_photo"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:layout_gravity="center"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
         </FrameLayout>
 
         <!-- Spacer -->

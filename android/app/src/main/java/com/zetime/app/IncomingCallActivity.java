@@ -8,22 +8,28 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.util.Log;
 
 /**
- * IncomingCallActivity
+ * IncomingCallActivity — native full-screen incoming call shown over the lock screen.
  *
- * A pure native Activity shown immediately over the lock screen when a call arrives
- * while the app is fully killed or the device is locked. It displays the caller's name,
- * provides Accept / Decline actions, then hands off to MainActivity (Capacitor) if accepted.
+ * Displayed immediately when:
+ *   • The device is locked and a call FCM arrives (via fullScreenIntent in CallService)
+ *   • CallService calls startActivity() directly as a fallback
  *
- * This avoids the delay of waiting for the full Capacitor/Next.js WebView to load before
- * the user can respond to the call.
+ * Design: Telegram-style — blur/dark background, avatar with pulse rings,
+ * large Decline (red) and Accept (green) buttons.
+ *
+ * On Accept → opens MainActivity with callAction=ANSWER
+ * On Decline → POSTs /api/calls/public-reject and finishes
  */
 public class IncomingCallActivity extends Activity {
 
@@ -32,129 +38,129 @@ public class IncomingCallActivity extends Activity {
     private String callId;
     private String callerId;
     private String callerName;
+    private String callerAvatar;
     private String callType;
     private String serverUrl;
 
-    private View pulseRing1;
-    private View pulseRing2;
+    private View        pulseRing1;
+    private View        pulseRing2;
+    private ImageView   imgAvatar;
+    private TextView    tvInitials;
 
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true);
-            setTurnScreenOn(true);
-        }
-        getWindow().addFlags(
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-            | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-        );
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-        callId     = intent.getStringExtra("callId");
-        callerId   = intent.getStringExtra("callerId");
-        callerName = intent.getStringExtra("callerName");
-        callType   = intent.getStringExtra("callType");
-        serverUrl  = intent.getStringExtra("serverUrl");
-
-        Log.d(TAG, "IncomingCallActivity received new intent for call: " + callerName);
-        
-        TextView tvCallType   = findViewById(R.id.tv_call_type);
-        TextView tvCallerName = findViewById(R.id.tv_caller_name);
-        TextView tvInitials   = findViewById(R.id.tv_avatar_initials);
-        
-        if (tvCallerName != null) {
-            String name = (callerName != null && !callerName.isEmpty()) ? callerName : "Unknown Caller";
-            tvCallerName.setText(name);
-
-            String[] parts = name.split("\\s+");
-            StringBuilder initials = new StringBuilder();
-            for (String p : parts) {
-                if (!p.isEmpty()) initials.append(p.charAt(0));
-                if (initials.length() >= 2) break;
-            }
-            if (tvInitials != null) tvInitials.setText(initials.toString().toUpperCase());
-
-            boolean isVideo = "VIDEO".equalsIgnoreCase(callType);
-            if (tvCallType != null) tvCallType.setText(isVideo ? "INCOMING VIDEO CALL" : "INCOMING VOICE CALL");
-        }
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // onCreate
+    // ─────────────────────────────────────────────────────────────────────────
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Show over the lock screen WITHOUT dismissing the keyguard.
-        // FLAG_DISMISS_KEYGUARD / requestDismissKeyguard() cause the OS to
-        // intercept focus and show the PIN/password prompt on secure devices,
-        // which blocks the call UI. Using only FLAG_SHOW_WHEN_LOCKED renders
-        // the activity OVER the keyguard (Telegram-style) — the user sees the
-        // incoming call immediately and the PIN is only requested if they tap
-        // "Answer" (which opens MainActivity).
+        // Show over lock screen WITHOUT dismissing the keyguard.
+        // FLAG_DISMISS_KEYGUARD causes the OS to show the PIN prompt on secure
+        // devices, blocking the call UI. Using FLAG_SHOW_WHEN_LOCKED renders
+        // the activity OVER the keyguard (Telegram-style).
+        applyLockScreenFlags();
+
+        // Immersive full-screen
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+        setContentView(R.layout.activity_incoming_call);
+
+        // Read intent extras
+        bindIntentExtras(getIntent());
+
+        Log.d(TAG, "Incoming call from: " + callerName + " (" + callType + ")");
+
+        // Bind + populate views
+        setupViews();
+
+        // Async load avatar photo
+        loadCallerAvatar();
+
+        // Start avatar pulse
+        startPulseAnimation();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // onNewIntent — handle re-delivery (singleInstance)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        applyLockScreenFlags();
+
+        bindIntentExtras(intent);
+        Log.d(TAG, "IncomingCallActivity: new intent for call from " + callerName);
+
+        // Refresh displayed caller info
+        if (tvInitials != null) tvInitials.setText(buildInitials(callerName));
+        TextView tvCallerName = findViewById(R.id.tv_caller_name);
+        if (tvCallerName != null) tvCallerName.setText(callerName);
+        TextView tvCallType   = findViewById(R.id.tv_call_type);
+        if (tvCallType != null) {
+            boolean isVideo = "VIDEO".equalsIgnoreCase(callType);
+            tvCallType.setText(isVideo ? "INCOMING VIDEO CALL" : "INCOMING VOICE CALL");
+        }
+        loadCallerAvatar();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // HELPERS
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void applyLockScreenFlags() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true);
             setTurnScreenOn(true);
         }
         getWindow().addFlags(
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-            | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         );
-        // Make the activity full-screen (hide status bar for immersive call UI)
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    }
 
-        setContentView(R.layout.activity_incoming_call);
+    private void bindIntentExtras(Intent intent) {
+        callId      = intent.getStringExtra("callId");
+        callerId    = intent.getStringExtra("callerId");
+        callerName  = intent.getStringExtra("callerName");
+        callerAvatar = intent.getStringExtra("callerAvatar");
+        callType    = intent.getStringExtra("callType");
+        serverUrl   = intent.getStringExtra("serverUrl");
 
-        // Extract intent extras
-        Intent intent = getIntent();
-        callId     = intent.getStringExtra("callId");
-        callerId   = intent.getStringExtra("callerId");
-        callerName = intent.getStringExtra("callerName");
-        callType   = intent.getStringExtra("callType");
-        serverUrl  = intent.getStringExtra("serverUrl");
+        if (callerName == null || callerName.isEmpty()) callerName = "Unknown Caller";
+    }
 
-        Log.d(TAG, "Incoming call from: " + callerName + " (" + callType + ")");
-
-        // Bind views
+    private void setupViews() {
         TextView tvCallType   = findViewById(R.id.tv_call_type);
         TextView tvCallerName = findViewById(R.id.tv_caller_name);
-        TextView tvInitials   = findViewById(R.id.tv_avatar_initials);
+        tvInitials            = findViewById(R.id.tv_avatar_initials);
+        imgAvatar             = findViewById(R.id.iv_avatar_photo); // optional ImageView for real photo
         Button   btnAccept    = findViewById(R.id.btn_accept);
         Button   btnDecline   = findViewById(R.id.btn_decline);
         pulseRing1 = findViewById(R.id.pulse_ring_1);
         pulseRing2 = findViewById(R.id.pulse_ring_2);
 
-        // Populate caller info
-        String name = (callerName != null && !callerName.isEmpty()) ? callerName : "Unknown Caller";
-        tvCallerName.setText(name);
+        tvCallerName.setText(callerName);
+        tvInitials.setText(buildInitials(callerName));
 
-        // Initials (up to 2 chars)
-        String[] parts = name.split("\\s+");
-        StringBuilder initials = new StringBuilder();
-        for (String p : parts) {
-            if (!p.isEmpty()) initials.append(p.charAt(0));
-            if (initials.length() >= 2) break;
-        }
-        tvInitials.setText(initials.toString().toUpperCase());
-
-        // Call type label
         boolean isVideo = "VIDEO".equalsIgnoreCase(callType);
         tvCallType.setText(isVideo ? "INCOMING VIDEO CALL" : "INCOMING VOICE CALL");
 
-        // Start avatar pulse animation
-        startPulseAnimation();
-
-        // ── Accept ──────────────────────────────────────────────────
+        // ── Accept ──────────────────────────────────────────────────────────
         btnAccept.setOnClickListener(v -> {
             Log.d(TAG, "User tapped Accept");
             stopCallServiceRinging();
             cancelCallNotification();
 
-            // Open MainActivity with ANSWER action
             Intent open = new Intent(this, MainActivity.class);
-            open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             open.putExtra("callAction",  "ANSWER");
             open.putExtra("callId",      callId);
             open.putExtra("callerId",    callerId);
@@ -165,7 +171,7 @@ public class IncomingCallActivity extends Activity {
             finish();
         });
 
-        // ── Decline ─────────────────────────────────────────────────
+        // ── Decline ─────────────────────────────────────────────────────────
         btnDecline.setOnClickListener(v -> {
             Log.d(TAG, "User tapped Decline");
             stopCallServiceRinging();
@@ -175,10 +181,71 @@ public class IncomingCallActivity extends Activity {
         });
     }
 
-    /** Animate both pulse rings with staggered scale/alpha loops */
+    private String buildInitials(String name) {
+        if (name == null || name.isEmpty()) return "?";
+        String[] parts = name.split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (!p.isEmpty()) sb.append(p.charAt(0));
+            if (sb.length() >= 2) break;
+        }
+        return sb.toString().toUpperCase();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ASYNC AVATAR LOADING
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void loadCallerAvatar() {
+        if (callerAvatar == null || callerAvatar.isEmpty()) return;
+        final String url = callerAvatar;
+        new Thread(() -> {
+            try {
+                java.net.URL netUrl = new java.net.URL(url);
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) netUrl.openConnection();
+                conn.setDoInput(true);
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                conn.connect();
+                java.io.InputStream input = conn.getInputStream();
+                android.graphics.Bitmap raw = android.graphics.BitmapFactory.decodeStream(input);
+                if (raw != null) {
+                    android.graphics.Bitmap circular = makeCircular(raw);
+                    mainHandler.post(() -> {
+                        if (imgAvatar != null && tvInitials != null && !isFinishing()) {
+                            imgAvatar.setImageBitmap(circular);
+                            imgAvatar.setVisibility(View.VISIBLE);
+                            tvInitials.setVisibility(View.GONE);
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Avatar load failed: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private android.graphics.Bitmap makeCircular(android.graphics.Bitmap src) {
+        int size = Math.min(src.getWidth(), src.getHeight());
+        android.graphics.Bitmap out = android.graphics.Bitmap.createBitmap(
+                size, size, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(out);
+        android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        android.graphics.Rect r = new android.graphics.Rect(0, 0, size, size);
+        canvas.drawARGB(0, 0, 0, 0);
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+        paint.setXfermode(new android.graphics.PorterDuffXfermode(
+                android.graphics.PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(src, r, r, paint);
+        return out;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PULSE ANIMATION
+    // ─────────────────────────────────────────────────────────────────────────
+
     private void startPulseAnimation() {
         if (pulseRing1 == null || pulseRing2 == null) return;
-
         animateRing(pulseRing1, 0);
         animateRing(pulseRing2, 900);
     }
@@ -193,22 +260,25 @@ public class IncomingCallActivity extends Activity {
         set.setDuration(2400);
         set.setStartDelay(startDelay);
         set.setInterpolator(new AccelerateDecelerateInterpolator());
-        // Use a listener to repeat
         set.addListener(new android.animation.AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(android.animation.Animator animation) {
-                ring.setScaleX(1f);
-                ring.setScaleY(1f);
-                ring.setAlpha(0.6f);
-                // Re-start
-                set.setStartDelay(0);
-                set.start();
+                if (!isFinishing()) {
+                    ring.setScaleX(1f);
+                    ring.setScaleY(1f);
+                    ring.setAlpha(0.6f);
+                    set.setStartDelay(0);
+                    set.start();
+                }
             }
         });
         set.start();
     }
 
-    /** Ask CallService to stop ringing */
+    // ─────────────────────────────────────────────────────────────────────────
+    // RINGING CLEANUP
+    // ─────────────────────────────────────────────────────────────────────────
+
     private void stopCallServiceRinging() {
         try {
             Intent stop = new Intent(this, CallService.class);
@@ -219,7 +289,6 @@ public class IncomingCallActivity extends Activity {
         }
     }
 
-    /** Cancel both notification IDs */
     private void cancelCallNotification() {
         try {
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -232,10 +301,9 @@ public class IncomingCallActivity extends Activity {
         }
     }
 
-    /** POST /api/calls/public-reject on a background thread */
     private void sendDeclineToServer() {
         if (serverUrl == null || callId == null) return;
-        final String fCallId = callId;
+        final String fCallId    = callId;
         final String fServerUrl = serverUrl;
         new Thread(() -> {
             try {
@@ -256,10 +324,13 @@ public class IncomingCallActivity extends Activity {
         }).start();
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // LIFECYCLE
+    // ─────────────────────────────────────────────────────────────────────────
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Clean up animations if activity is destroyed
         if (pulseRing1 != null) pulseRing1.clearAnimation();
         if (pulseRing2 != null) pulseRing2.clearAnimation();
     }

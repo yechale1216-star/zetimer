@@ -28,11 +28,11 @@ import java.util.Map;
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
     private static final String TAG = "MyFirebaseMessaging";
 
-    // Notification channel IDs
-    private static final String CHANNEL_CALLS    = "incoming_calls";
-    private static final String CHANNEL_HIGH     = "high_priority";
-    private static final String CHANNEL_DEFAULT  = "default_priority";
-    private static final String CHANNEL_LOW      = "low_priority";
+    // Notification channel IDs - versioned to _v8 to reset cached OS preferences
+    private static final String CHANNEL_CALLS    = "incoming_calls_v8";
+    private static final String CHANNEL_HIGH     = "high_priority_v8";
+    private static final String CHANNEL_DEFAULT  = "default_priority_v8";
+    private static final String CHANNEL_LOW      = "low_priority_v8";
 
     // Notification ID ranges
     private static final int NOTIF_ID_CALL = 1001;
@@ -58,6 +58,9 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         Map<String, String> data = remoteMessage.getData();
         Log.d(TAG, "FCM payload: " + data);
+        
+        // Log diagnostics to aid in troubleshooting HUN suppression
+        logNotificationDiagnostics();
 
         if (data.isEmpty()) return;
 
@@ -374,6 +377,8 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setOngoing(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setFullScreenIntent(fsPendingIntent, true)
+                .setSound(null)          // sound handled by MediaPlayer/CallService
+                .setSilent(true)         // avoid double sound on channel (allows HUN popup flags)
                 .setStyle(callStyle);
 
         nm.notify(NOTIF_ID_CALL, builder.build());
@@ -432,6 +437,8 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         callCh.setDescription("Incoming voice and video call notifications");
         callCh.enableVibration(true);
         callCh.setVibrationPattern(new long[]{0, 1000, 500, 1000});
+        callCh.setBypassDnd(true);
+        callCh.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         AudioAttributes callAa = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
@@ -439,6 +446,34 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         callCh.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE), callAa);
         nm.createNotificationChannel(callCh);
         Log.d(TAG, "Notification channels verified");
+    }
+
+    private void logNotificationDiagnostics() {
+        try {
+            androidx.core.app.NotificationManagerCompat nmc = androidx.core.app.NotificationManagerCompat.from(this);
+            boolean enabled = nmc.areNotificationsEnabled();
+            Log.d(TAG, "[DIAGNOSTICS] Notifications enabled at system level: " + enabled);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                NotificationManager nm = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
+                if (nm != null) {
+                    for (String cid : new String[]{CHANNEL_CALLS, CHANNEL_HIGH, CHANNEL_DEFAULT, CHANNEL_LOW}) {
+                        NotificationChannel chan = nm.getNotificationChannel(cid);
+                        if (chan != null) {
+                            Log.d(TAG, "[DIAGNOSTICS] Channel status check: ID=" + chan.getId()
+                                + ", Name=" + chan.getName()
+                                + ", Importance=" + chan.getImportance()
+                                + ", BypassesDnd=" + chan.canBypassDnd()
+                                + ", Sound=" + chan.getSound());
+                        } else {
+                            Log.w(TAG, "[DIAGNOSTICS] Channel ID=" + cid + " not initialized yet!");
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Diagnostics failed", e);
+        }
     }
 
     @Override

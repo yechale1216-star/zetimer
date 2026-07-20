@@ -38,7 +38,7 @@ export function onMessageListener() {
   const messaging = getMessaging(app);
 
   return new Promise((resolve) => {
-    onMessage(messaging, (payload) => {
+    onMessage(messaging, (payload: any) => {
       resolve(payload);
     });
   });

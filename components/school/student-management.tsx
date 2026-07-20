@@ -49,6 +49,7 @@ export function StudentManagement() {
   >([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -165,8 +166,10 @@ export function StudentManagement() {
       } else {
         setStudents(studentsData)
       }
-    } catch (error) {
-      console.error("[v0] Error loading students:", error)
+      setError(null)
+    } catch (err: any) {
+      console.error("[v0] Error loading students:", err)
+      setError(err.message || "Failed to load students")
       notifications.error("Error", "Failed to load students")
     } finally {
       setIsLoading(false)
@@ -674,6 +677,7 @@ export function StudentManagement() {
       <DataStateView
         isLoading={isLoading}
         isEmpty={students.length === 0}
+        error={error}
         emptyTitle="No Students Yet"
         emptyDescription="There are no students available. Add students to get started."
         crumbsTitle="Students"

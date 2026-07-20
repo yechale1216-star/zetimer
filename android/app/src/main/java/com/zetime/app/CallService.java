@@ -354,8 +354,11 @@ public class CallService extends Service {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)  // show on lock screen
                 .setOngoing(true)        // can't be swiped away while ringing
                 .setAutoCancel(false)
-                .setSound(null)          // sound handled by MediaPlayer
-                .setSilent(true)         // prevent notification-level sound duplication
+                // NOTE: Do NOT call setSilent(true) or setSound(null) here.
+                // setSilent(true) suppresses the Heads-Up banner entirely, causing
+                // the notification to appear only in the drawer (not at screen top).
+                // The channel sound fires once to trigger the HUN pop-up; MediaPlayer
+                // handles the looping ringtone independently after that.
                 .setContentIntent(openPI)
                 .setFullScreenIntent(callScreenPI, true)  // triggers IncomingCallActivity
                 .setStyle(callStyle);
@@ -484,8 +487,8 @@ public class CallService extends Service {
                                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                                     .setOngoing(true)
                                     .setAutoCancel(false)
-                                    .setSound(null)
-                                    .setSilent(true)
+                                    // Keep alerting flags intact on avatar update —
+                                    // no setSilent / setSound(null) so HUN stays visible
                                     .setContentIntent(openPI)
                                     .setFullScreenIntent(callScreenPI, true)
                                     .setStyle(updatedStyle);

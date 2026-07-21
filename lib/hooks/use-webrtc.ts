@@ -14,17 +14,31 @@ interface WebRTCOptions {
   isAppActive?: () => boolean;
 }
 
-const ICE_SERVERS = {
+const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:stun.ekiga.net' },
-    { urls: 'stun:stun.ideasip.com' },
-    { urls: 'stun:stun.schlund.de' },
+    // Open-relay TURN servers for NAT traversal (free tier, replace with paid for production)
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 /** Returns a human-readable reason for getUserMedia errors. */
@@ -62,16 +76,109 @@ async function acquireStream(
   return navigator.mediaDevices.getUserMedia(constraints);
 }
 
+export type CallStatus =
+  | 'IDLE'
+  | 'RINGING'
+  | 'CONNECTING'
+  | 'CONNECTED'
+  | 'RECONNECTING'
+  | 'DECLINED'
+  | 'MISSED'
+  | 'CANCELLED'
+  | 'FAILED'
+  | 'BUSY';
+
+export interface CallStats {
+  audioBitrate: number;      // in kbps
+  videoBitrate: number;      // in kbps
+  packetLoss: number;        // in %
+  rtt: number;               // in ms
+  jitter: number;            // in ms
+  quality: 'EXCELLENT' | 'GOOD' | 'POOR' | 'BAD';
+  resolution?: string;       // e.g. "1280x720"
+  frameRate?: number;        // e.g. 30
+}
+
+/** HD Audio constraints tailored for Opus crystal-clear voice (48kHz, low-latency, AEC/NS/AGC) */
+const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+  echoCancellation: { ideal: true },
+  noiseSuppression: { ideal: true },
+  autoGainControl: { ideal: true },
+  sampleRate: { ideal: 48000 },
+  sampleSize: { ideal: 16 },
+  channelCount: { ideal: 1 },
+};
+
+/** Adaptive HD Video constraints (720p 30fps default) */
+const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
+  width: { ideal: 1280, max: 1920, min: 480 },
+  height: { ideal: 720, max: 1080, min: 360 },
+  frameRate: { ideal: 30, max: 30, min: 15 },
+  facingMode: 'user',
+};
+
+/**
+ * Optimizes WebRTC SDP offer/answer for Opus voice FEC + high bitrate
+ * and VP8/H.264 video codec priority (Telegram-style SDP munging).
+ */
+function optimizeSDP(sdp: string, isVideo: boolean): string {
+  let modified = sdp;
+
+  // 1. Opus Audio Optimization
+  // minptime=10 (10ms low latency frames), useinbandfec=1 (In-Band Forward Error Correction for packet loss recovery),
+  // usedtx=1 (discontinuous transmission during silence), maxaveragebitrate=128000 (128kbps HD audio).
+  if (modified.includes('opus/48000')) {
+    modified = modified.replace(
+      /(a=fmtp:\d+ .*opus\/48000.*)/g,
+      '$1;useinbandfec=1;usedtx=1;minptime=10;maxaveragebitrate=128000;stereo=0;sprop-maxcapturerate=48000'
+    );
+    if (!modified.includes('maxaveragebitrate=')) {
+      modified = modified.replace(
+        /(a=rtpmap:(\d+) opus\/48000\/2)/g,
+        '$1\r\na=fmtp:$2 minptime=10;useinbandfec=1;usedtx=1;maxaveragebitrate=128000;stereo=0;sprop-maxcapturerate=48000'
+      );
+    }
+  }
+
+  // 2. Video Codec Prioritization (Prefer VP8 or H264 for mobile efficiency)
+  if (isVideo && modified.includes('m=video')) {
+    // Prefer VP8 payload if present
+    const vp8Match = modified.match(/a=rtpmap:(\d+) VP8\/90000/);
+    if (vp8Match) {
+      const payload = vp8Match[1];
+      modified = modified.replace(
+        /(m=video \d+ [A-Z\/]+)(.*)/,
+        (match, mLine, pList) => {
+          const reordered = [payload, ...pList.split(' ').filter((p: string) => p && p !== payload)].join(' ');
+          return `${mLine} ${reordered}`;
+        }
+      );
+    }
+  }
+
+  return modified;
+}
+
 export const useWebRTC = (options: WebRTCOptions) => {
   const { socket } = useSocket();
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [remoteMediaStates, setRemoteMediaStates] = useState<Record<string, { isCameraOff: boolean; isMuted: boolean }>>({});
-  const [callStatus, setCallStatus] = useState<'IDLE' | 'RINGING' | 'CONNECTING' | 'CONNECTED'>('IDLE');
+  const [callStatus, setCallStatus] = useState<CallStatus>('IDLE');
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOff, setIsCameraOff] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [connectionQuality, setConnectionQuality] = useState<'GOOD' | 'POOR' | 'BAD'>('GOOD');
+  const [callStats, setCallStats] = useState<CallStats>({
+    audioBitrate: 0,
+    videoBitrate: 0,
+    packetLoss: 0,
+    rtt: 0,
+    jitter: 0,
+    quality: 'EXCELLENT',
+  });
+  const [callDuration, setCallDuration] = useState(0);
   
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const callType = useRef<'VOICE' | 'VIDEO'>('VOICE');
@@ -79,6 +186,9 @@ export const useWebRTC = (options: WebRTCOptions) => {
   const conversationIdRef = useRef<string | null>(null);
   const iceRestartTimer = useRef<NodeJS.Timeout | null>(null);
   const seenCallIdsRef = useRef<Set<string>>(new Set());
+  const answerTimeRef = useRef<number | null>(null);  // unix ms when call was answered
+  const schoolIdRef = useRef<string | null>(null);
+  const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Keep a ref to localStream so acquireStream always sees the latest value
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -127,11 +237,18 @@ export const useWebRTC = (options: WebRTCOptions) => {
       clearTimeout(iceRestartTimer.current);
       iceRestartTimer.current = null;
     }
+    if (durationTimerRef.current) {
+      clearInterval(durationTimerRef.current);
+      durationTimerRef.current = null;
+    }
     setRemoteStreams({});
     setRemoteMediaStates({});
     setCallStatus('IDLE');
     setConnectionQuality('GOOD');
+    setCallDuration(0);
+    setIsSpeakerOn(false);
     connectedAt.current = null;
+    answerTimeRef.current = null;
     isInitiator.current = false;
     callIdRef.current = null;
     conversationIdRef.current = null;
@@ -161,6 +278,19 @@ export const useWebRTC = (options: WebRTCOptions) => {
       console.log('[WebRTC] ⚡ Transitioning call status to CONNECTED (media flowing or ICE candidates connected)');
       setCallStatus('CONNECTED');
       connectedAt.current = Date.now();
+      answerTimeRef.current = answerTimeRef.current || Date.now();
+
+      // Start live duration counter
+      if (durationTimerRef.current) clearInterval(durationTimerRef.current);
+      const startMs = Date.now();
+      durationTimerRef.current = setInterval(() => {
+        setCallDuration(Math.floor((Date.now() - startMs) / 1000));
+      }, 1000);
+
+      // Switch audio to in-call mode on native
+      if (NativeBridge.isNative()) {
+        NativeBridge.setAudioModeInCall(true).catch(() => {});
+      }
     }
   }, []);
 
@@ -203,22 +333,30 @@ export const useWebRTC = (options: WebRTCOptions) => {
     pc.oniceconnectionstatechange = () => {
       console.log(`[WebRTC] ICE Connection State for ${userId}: ${pc.iceConnectionState}`);
       if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+        // Show RECONNECTING state to the user immediately
+        setCallStatus('RECONNECTING');
         if (isInitiator.current && !iceRestartTimer.current) {
           console.warn(`[WebRTC] ICE state ${pc.iceConnectionState}. Triggering ICE restart...`);
           initiateIceRestart(userId);
           iceRestartTimer.current = setTimeout(() => {
-            console.error('[WebRTC] ICE restart timed out after 10s. Cleaning up call.');
-            cleanupUser(userId);
-            cleanupAll();
-            if (options.onCallEnded) options.onCallEnded(userId);
+            console.error('[WebRTC] ICE restart timed out after 10s. Call FAILED.');
+            setCallStatus('FAILED');
+            setTimeout(() => {
+              cleanupUser(userId);
+              cleanupAll();
+              if (options.onCallEnded) options.onCallEnded(userId);
+            }, 2000);
           }, 10000);
         } else if (!isInitiator.current && !iceRestartTimer.current) {
           // Receiver: wait 10s for initiator to trigger ICE restart offer
           iceRestartTimer.current = setTimeout(() => {
-            console.error('[WebRTC] Initiator did not trigger ICE restart. Cleaning up call.');
-            cleanupUser(userId);
-            cleanupAll();
-            if (options.onCallEnded) options.onCallEnded(userId);
+            console.error('[WebRTC] Initiator did not trigger ICE restart. Call FAILED.');
+            setCallStatus('FAILED');
+            setTimeout(() => {
+              cleanupUser(userId);
+              cleanupAll();
+              if (options.onCallEnded) options.onCallEnded(userId);
+            }, 2000);
           }, 10000);
         }
       } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
@@ -248,11 +386,12 @@ export const useWebRTC = (options: WebRTCOptions) => {
     return pc;
   }, [socket, options, cleanupUser, cleanupAll, initiateIceRestart, transitionToConnected]);
 
-  const startCall = useCallback(async (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => {
+  const startCall = useCallback(async (toId: string, type: 'VOICE' | 'VIDEO', profile: any, schoolId?: string) => {
     setCallStatus('CONNECTING');
     setMediaError(null);
     callType.current = type;
     isInitiator.current = true;
+    if (schoolId) schoolIdRef.current = schoolId;
     const generatedCallId = `call-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     callIdRef.current = generatedCallId;
     conversationIdRef.current = (window as any).activeConversationId;
@@ -262,29 +401,41 @@ export const useWebRTC = (options: WebRTCOptions) => {
       }
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-        video: type === 'VIDEO' ? { facingMode: 'user' } : false,
+        audio: AUDIO_CONSTRAINTS,
+        video: type === 'VIDEO' ? VIDEO_CONSTRAINTS : false,
       });
       setLocalStream(stream);
 
       const pc = createPeerConnection(toId);
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      stream.getTracks().forEach(track => {
+        const sender = pc.addTrack(track, stream);
+        if (track.kind === 'video' && sender) {
+          try {
+            const params = sender.getParameters() as RTCRtpSendParameters & { degradationPreference?: RTCDegradationPreference };
+            if (!params.encodings) params.encodings = [{}];
+            params.degradationPreference = 'maintain-framerate';
+            sender.setParameters(params).catch(() => {});
+          } catch (e) {}
+        }
+      });
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      const rawOffer = await pc.createOffer();
+      const optimizedOffer = new RTCSessionDescription({
+        type: rawOffer.type,
+        sdp: optimizeSDP(rawOffer.sdp || '', type === 'VIDEO'),
+      });
+      await pc.setLocalDescription(optimizedOffer);
 
       if (socket) {
         socket.emit('call_user', {
           to: toId,
-          offer,
+          offer: optimizedOffer,
           from: options.userId,
           profile,
           type,
           callId: generatedCallId,
+          conversationId: conversationIdRef.current,
+          schoolId: schoolIdRef.current,
         });
       }
     } catch (error) {
@@ -319,12 +470,8 @@ export const useWebRTC = (options: WebRTCOptions) => {
       console.log('[WebRTC] Acquiring local media stream...');
       // acquireStream stops stale tracks first — prevents NotReadableError
       const stream = await acquireStream(localStreamRef.current, {
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-        video: type === 'VIDEO' ? { facingMode: 'user' } : false,
+        audio: AUDIO_CONSTRAINTS,
+        video: type === 'VIDEO' ? VIDEO_CONSTRAINTS : false,
       });
       console.log('[WebRTC] ✅ Local media stream acquired. tracks:', stream.getTracks().map(t => t.kind));
       setLocalStream(stream);
@@ -332,7 +479,15 @@ export const useWebRTC = (options: WebRTCOptions) => {
       console.log('[WebRTC] Creating RTCPeerConnection for', fromId);
       const pc = createPeerConnection(fromId);
       stream.getTracks().forEach(track => {
-        pc.addTrack(track, stream);
+        const sender = pc.addTrack(track, stream);
+        if (track.kind === 'video' && sender) {
+          try {
+            const params = sender.getParameters() as RTCRtpSendParameters & { degradationPreference?: RTCDegradationPreference };
+            if (!params.encodings) params.encodings = [{}];
+            params.degradationPreference = 'maintain-framerate';
+            sender.setParameters(params).catch(() => {});
+          } catch (e) {}
+        }
         console.log('[WebRTC] → Added local track:', track.kind);
       });
 
@@ -355,16 +510,20 @@ export const useWebRTC = (options: WebRTCOptions) => {
       queuedCandidates.current.delete(fromId);
 
       console.log('[WebRTC] Creating SDP answer...');
-      const answer = await pc.createAnswer();
-      console.log('[WebRTC] ✅ SDP answer created');
+      const rawAnswer = await pc.createAnswer();
+      const optimizedAnswer = new RTCSessionDescription({
+        type: rawAnswer.type,
+        sdp: optimizeSDP(rawAnswer.sdp || '', type === 'VIDEO'),
+      });
+      console.log('[WebRTC] ✅ SDP answer created & optimized');
 
       console.log('[WebRTC] Setting local description (answer)...');
-      await pc.setLocalDescription(answer);
+      await pc.setLocalDescription(optimizedAnswer);
       console.log('[WebRTC] ✅ Local description set');
 
       if (socket) {
         console.log('[WebRTC] Emitting answer_call to signaling server for callId=', callIdRef.current);
-        socket.emit('answer_call', { to: fromId, from: options.userId, answer, callId: callIdRef.current });
+        socket.emit('answer_call', { to: fromId, from: options.userId, answer: optimizedAnswer, callId: callIdRef.current });
 
         // Emit media state immediately on connection
         socket.emit('media_state_change', {
@@ -411,12 +570,21 @@ export const useWebRTC = (options: WebRTCOptions) => {
         type: callType.current,
         callId: callIdRef.current,
         conversationId: conversationIdRef.current || (window as any).activeConversationId,
+        schoolId: schoolIdRef.current,
         duration,
-        reason
+        answerTime: answerTimeRef.current,
+        reason,
+        networkQuality: connectionQuality,
       });
     });
+
+    // Restore normal audio mode
+    if (NativeBridge.isNative()) {
+      NativeBridge.setAudioModeInCall(false).catch(() => {});
+    }
+
     cleanupAll();
-  }, [socket, options.userId, cleanupAll]);
+  }, [socket, options.userId, cleanupAll, connectionQuality]);
 
   // Emitted by the RECEIVER to notify the caller they were declined
   const rejectCall = useCallback((callerId: string, timeoutMissed: boolean = false, optionalCallId?: string) => {
@@ -456,6 +624,30 @@ export const useWebRTC = (options: WebRTCOptions) => {
       }
     }
   }, [localStream, socket, options.userId]);
+
+  const toggleSpeaker = useCallback(async () => {
+    const next = !isSpeakerOn;
+    setIsSpeakerOn(next);
+    if (NativeBridge.isNative()) {
+      try {
+        await NativeBridge.setSpeakerphone(next);
+      } catch (e) {
+        console.warn('[WebRTC] toggleSpeaker native bridge error:', e);
+      }
+    } else {
+      // Web: switch audio output if the browser supports it
+      try {
+        const audioEl = document.querySelector<HTMLAudioElement>('audio[data-remote-audio]');
+        if (audioEl && 'setSinkId' in audioEl) {
+          // If speaker is on use default (speaker), otherwise try to use earpiece
+          // setSinkId('') restores to system default (usually speaker)
+          await (audioEl as any).setSinkId(next ? '' : 'communications');
+        }
+      } catch (e) {
+        // setSinkId not supported or no communications device; ignore
+      }
+    }
+  }, [isSpeakerOn]);
 
   const toggleCamera = useCallback(() => {
     if (localStream) {
@@ -684,10 +876,31 @@ export const useWebRTC = (options: WebRTCOptions) => {
     });
 
     socket.on('call_rejected', ({ from }: any) => {
-      // The callee rejected — notify the caller and clean up
-      if (options.onCallRejected) options.onCallRejected(from);
-      cleanupUser(from);
-      cleanupAll();
+      // The callee rejected — show DECLINED briefly then clean up
+      setCallStatus('DECLINED');
+      setTimeout(() => {
+        if (options.onCallRejected) options.onCallRejected(from);
+        cleanupUser(from);
+        cleanupAll();
+      }, 2500);
+    });
+
+    socket.on('call_busy', ({ from }: any) => {
+      // The callee is already on another call
+      console.log('[WebRTC] call_busy received from', from);
+      setCallStatus('BUSY');
+      setTimeout(() => {
+        cleanupAll();
+      }, 2500);
+    });
+
+    socket.on('call_missed', ({ callId: _callId }: any) => {
+      // Server timed out this call (no answer)
+      console.log('[WebRTC] call_missed received, callId:', _callId);
+      setCallStatus('MISSED');
+      setTimeout(() => {
+        cleanupAll();
+      }, 2500);
     });
 
     socket.on('call_blocked', ({ message }: any) => {
@@ -706,42 +919,142 @@ export const useWebRTC = (options: WebRTCOptions) => {
       socket.off('ice_restart_answer', handleIceRestartAnswer);
       socket.off('call_ended');
       socket.off('call_rejected');
+      socket.off('call_busy');
+      socket.off('call_missed');
       socket.off('call_blocked');
     };
   }, [socket, options, cleanupUser, cleanupAll]);
 
-  // Monitor connection quality
+  // Monitor connection quality & dynamic bitrate adaptation
+  const prevStatsRef = useRef<{ bytesReceived: number; bytesSent: number; timestamp: number }>({
+    bytesReceived: 0,
+    bytesSent: 0,
+    timestamp: Date.now(),
+  });
+
   useEffect(() => {
     if (callStatus !== 'CONNECTED') {
       setConnectionQuality('GOOD');
+      setCallStats({
+        audioBitrate: 0,
+        videoBitrate: 0,
+        packetLoss: 0,
+        rtt: 0,
+        jitter: 0,
+        quality: 'EXCELLENT',
+      });
       return;
     }
+
     const interval = setInterval(async () => {
-      peerConnections.current.forEach(async (pc) => {
+      peerConnections.current.forEach(async (pc, userId) => {
         try {
           const stats = await pc.getStats();
           let currentRtt = 0;
-          let packetsLost = 0;
+          let totalPacketsLost = 0;
+          let totalPacketsReceived = 0;
+          let totalAudioBytes = 0;
+          let totalVideoBytes = 0;
+          let currentJitter = 0;
+          let frameWidth = 0;
+          let frameHeight = 0;
+          let framesPerSec = 0;
+
+          const now = Date.now();
+          const timeDiffSec = (now - prevStatsRef.current.timestamp) / 1000;
+
           stats.forEach((report) => {
             if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-              currentRtt = report.currentRoundTripTime || 0;
+              currentRtt = Math.round((report.currentRoundTripTime || 0) * 1000); // ms
             }
             if (report.type === 'inbound-rtp') {
-              packetsLost = report.packetsLost || 0;
+              if (report.kind === 'audio') {
+                totalAudioBytes += report.bytesReceived || 0;
+                currentJitter = Math.round((report.jitter || 0) * 1000); // ms
+              } else if (report.kind === 'video') {
+                totalVideoBytes += report.bytesReceived || 0;
+                frameWidth = report.frameWidth || 0;
+                frameHeight = report.frameHeight || 0;
+                framesPerSec = report.framesPerSecond || 0;
+              }
+              totalPacketsLost += report.packetsLost || 0;
+              totalPacketsReceived += report.packetsReceived || 0;
             }
           });
-          if (currentRtt > 0.4 || packetsLost > 20) {
-            setConnectionQuality('BAD');
-          } else if (currentRtt > 0.2 || packetsLost > 5) {
-            setConnectionQuality('POOR');
+
+          // Compute bitrates (kbps)
+          const totalBytesReceived = totalAudioBytes + totalVideoBytes;
+          const audioKbps = timeDiffSec > 0
+            ? Math.round(((totalAudioBytes - (prevStatsRef.current.bytesReceived || 0)) * 8) / (timeDiffSec * 1000))
+            : 0;
+          const videoKbps = timeDiffSec > 0
+            ? Math.max(0, Math.round(((totalVideoBytes - (prevStatsRef.current.bytesSent || 0)) * 8) / (timeDiffSec * 1000)))
+            : 0;
+
+          prevStatsRef.current = {
+            bytesReceived: totalAudioBytes,
+            bytesSent: totalVideoBytes,
+            timestamp: now,
+          };
+
+          const totalPackets = totalPacketsReceived + totalPacketsLost;
+          const packetLossPct = totalPackets > 0
+            ? parseFloat(((totalPacketsLost / totalPackets) * 100).toFixed(1))
+            : 0;
+
+          // Quality rating calculation
+          let qRating: 'EXCELLENT' | 'GOOD' | 'POOR' | 'BAD' = 'EXCELLENT';
+          let qualityGrade: 'GOOD' | 'POOR' | 'BAD' = 'GOOD';
+
+          if (currentRtt > 400 || packetLossPct > 15) {
+            qRating = 'BAD';
+            qualityGrade = 'BAD';
+          } else if (currentRtt > 200 || packetLossPct > 5) {
+            qRating = 'POOR';
+            qualityGrade = 'POOR';
+          } else if (currentRtt > 100 || packetLossPct > 2) {
+            qRating = 'GOOD';
+            qualityGrade = 'GOOD';
           } else {
-            setConnectionQuality('GOOD');
+            qRating = 'EXCELLENT';
+            qualityGrade = 'GOOD';
+          }
+
+          setConnectionQuality(qualityGrade);
+          setCallStats({
+            audioBitrate: Math.max(16, audioKbps),
+            videoBitrate: Math.max(0, videoKbps),
+            packetLoss: packetLossPct,
+            rtt: currentRtt,
+            jitter: currentJitter,
+            quality: qRating,
+            resolution: frameWidth > 0 ? `${frameWidth}x${frameHeight}` : undefined,
+            frameRate: framesPerSec > 0 ? framesPerSec : undefined,
+          });
+
+          // ── Dynamic Network Adaptation (Adaptive Bitrate Control) ─────────
+          const videoSenders = pc.getSenders().filter(s => s.track?.kind === 'video');
+          for (const sender of videoSenders) {
+            try {
+              const params = sender.getParameters();
+              if (params.encodings && params.encodings.length > 0) {
+                if (packetLossPct > 15 || currentRtt > 350) {
+                  // Degrade video maxBitrate to 250 kbps under bad network
+                  params.encodings[0].maxBitrate = 250000;
+                  console.warn('[WebRTC Adaptation] Network degraded: capping video maxBitrate to 250kbps');
+                } else if (packetLossPct < 5 && currentRtt < 150) {
+                  // Restore video maxBitrate to 1.5 Mbps for 720p HD
+                  params.encodings[0].maxBitrate = 1500000;
+                }
+                await sender.setParameters(params);
+              }
+            } catch (e) {}
           }
         } catch (err) {
           console.error('[WebRTC] Error getting stats:', err);
         }
       });
-    }, 5000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [callStatus]);
 
@@ -749,17 +1062,21 @@ export const useWebRTC = (options: WebRTCOptions) => {
     localStream,
     remoteStreams,
     callStatus,
+    callDuration,
     isMuted,
     isCameraOff,
+    isSpeakerOn,
     mediaError,
     remoteMediaStates,
     connectionQuality,
+    callStats,
     startCall,
     answerCall,
     endCall,
     rejectCall,
     toggleMute,
     toggleCamera,
+    toggleSpeaker,
     flipCamera,
   };
 };

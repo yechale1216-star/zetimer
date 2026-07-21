@@ -5,75 +5,125 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCallHistory = exports.logCall = void 0;
 const db_1 = __importDefault(require("../config/db"));
-const logCall = async (data) => {
-    // Create a call session for this activity
-    const session = await db_1.default.callSession.create({
+/**
+ * Create a complete call log entry including a CallSession record and
+ * a CallHistory record for the initiating user. All new fields are stored.
+ */
+const logCall = async (params) => {
+    const now = new Date();
+    // Create (or upsert by callId) the session record
+    let session;
+    if (params.callId) {
+        session = await db_1.default.callSession.upsert({
+            where: { callId: params.callId },
+            create: {
+                callId: params.callId,
+                schoolId: params.schoolId,
+                conversationId: params.conversationId,
+                type: params.type,
+                status: params.status,
+                startTime: now,
+                answerTime: params.answerTime,
+                endTime: params.endTime ?? now,
+                duration: params.duration ?? 0,
+                disconnectReason: params.disconnectReason,
+                networkQuality: params.networkQuality,
+                participants: {
+                    create: [
+                        { userId: params.userId, schoolId: params.schoolId },
+                        { userId: params.recipientId, schoolId: params.schoolId },
+                    ],
+                },
+            },
+            update: {
+                status: params.status,
+                endTime: params.endTime ?? now,
+                duration: params.duration ?? 0,
+                answerTime: params.answerTime,
+                disconnectReason: params.disconnectReason,
+                networkQuality: params.networkQuality,
+            },
+        });
+    }
+    else {
+        session = await db_1.default.callSession.create({
+            data: {
+                schoolId: params.schoolId,
+                conversationId: params.conversationId,
+                type: params.type,
+                status: params.status,
+                startTime: now,
+                answerTime: params.answerTime,
+                endTime: params.endTime ?? now,
+                duration: params.duration ?? 0,
+                disconnectReason: params.disconnectReason,
+                networkQuality: params.networkQuality,
+                participants: {
+                    create: [
+                        { userId: params.userId, schoolId: params.schoolId },
+                        { userId: params.recipientId, schoolId: params.schoolId },
+                    ],
+                },
+            },
+        });
+    }
+    // Log CallHistory for the caller
+    const historyEntry = await db_1.default.callHistory.create({
         data: {
-            schoolId: data.schoolId,
-            type: data.type,
-            status: 'COMPLETED',
-            startTime: new Date(),
-            endTime: new Date(),
-            participants: {
-                create: [
-                    { userId: data.userId, schoolId: data.schoolId },
-                    { userId: data.recipientId, schoolId: data.schoolId }
-                ]
-            }
-        }
-    });
-    // Log the initiation for the caller
-    return await db_1.default.callHistory.create({
-        data: {
-            schoolId: data.schoolId,
-            userId: data.userId,
+            callId: params.callId,
+            schoolId: params.schoolId,
+            userId: params.userId,
+            recipientId: params.recipientId,
             callSessionId: session.id,
-            type: data.type,
-            status: data.status,
-            duration: data.duration || 0,
+            type: params.type,
+            status: params.status,
+            duration: params.duration ?? 0,
+            answerTime: params.answerTime,
+            endTime: params.endTime ?? now,
+            disconnectReason: params.disconnectReason,
         },
         include: {
-            user: true,
+            user: { select: { id: true, full_name: true, profile_photo: true } },
             callSession: {
                 include: {
                     participants: {
                         include: {
-                            user: true
-                        }
-                    }
-                }
-            }
-        }
+                            user: { select: { id: true, full_name: true, profile_photo: true, role: true } },
+                        },
+                    },
+                },
+            },
+        },
     });
+    return historyEntry;
 };
 exports.logCall = logCall;
-const getCallHistory = async (schoolId, userId) => {
+/**
+ * Fetch call history for a user within their school,
+ * ordered by most recent first.
+ */
+const getCallHistory = async (schoolId, userId, limit = 50) => {
     return await db_1.default.callHistory.findMany({
         where: {
             schoolId,
-            ...(userId ? { userId } : {})
+            ...(userId ? { OR: [{ userId }, { recipientId: userId }] } : {}),
         },
         include: {
-            user: true,
+            user: { select: { id: true, full_name: true, profile_photo: true, role: true } },
             callSession: {
                 include: {
                     participants: {
                         include: {
                             user: {
-                                select: {
-                                    full_name: true,
-                                    role: true,
-                                    profile_photo: true
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                                select: { id: true, full_name: true, profile_photo: true, role: true },
+                            },
+                        },
+                    },
+                },
+            },
         },
-        orderBy: {
-            createdAt: 'desc'
-        }
+        orderBy: { createdAt: 'desc' },
+        take: limit,
     });
 };
 exports.getCallHistory = getCallHistory;

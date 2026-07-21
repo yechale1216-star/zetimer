@@ -312,14 +312,26 @@ export const pinMessage = async (req: AuthenticatedRequest, res: Response) => {
     });
     if (!message) return res.status(404).json({ error: 'Message not found' });
 
-    const member = await prisma.conversationMember.findFirst({
-      where: {
-        conversationId: message.conversationId,
-        userId,
-        role: { in: ['OWNER', 'ADMIN'] },
-      },
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: message.conversationId },
     });
-    if (!member) return res.status(403).json({ error: 'Only admins can pin messages' });
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+
+    if (conversation.isGroup) {
+      const member = await prisma.conversationMember.findFirst({
+        where: {
+          conversationId: message.conversationId,
+          userId,
+          role: { in: ['OWNER', 'ADMIN'] },
+        },
+      });
+      if (!member) return res.status(403).json({ error: 'Only admins can pin messages in groups' });
+    } else {
+      const member = await prisma.conversationMember.findFirst({
+        where: { conversationId: message.conversationId, userId },
+      });
+      if (!member) return res.status(403).json({ error: 'Not a member of this conversation' });
+    }
 
     await prisma.pinnedMessage.upsert({
       where: {
@@ -348,14 +360,26 @@ export const unpinMessage = async (req: AuthenticatedRequest, res: Response) => 
     const message = await prisma.message.findFirst({ where: { id: messageId, schoolId } });
     if (!message) return res.status(404).json({ error: 'Message not found' });
 
-    const member = await prisma.conversationMember.findFirst({
-      where: {
-        conversationId: message.conversationId,
-        userId,
-        role: { in: ['OWNER', 'ADMIN'] },
-      },
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: message.conversationId },
     });
-    if (!member) return res.status(403).json({ error: 'Only admins can unpin messages' });
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+
+    if (conversation.isGroup) {
+      const member = await prisma.conversationMember.findFirst({
+        where: {
+          conversationId: message.conversationId,
+          userId,
+          role: { in: ['OWNER', 'ADMIN'] },
+        },
+      });
+      if (!member) return res.status(403).json({ error: 'Only admins can unpin messages in groups' });
+    } else {
+      const member = await prisma.conversationMember.findFirst({
+        where: { conversationId: message.conversationId, userId },
+      });
+      if (!member) return res.status(403).json({ error: 'Not a member of this conversation' });
+    }
 
     await prisma.pinnedMessage.deleteMany({
       where: { conversationId: message.conversationId, messageId },

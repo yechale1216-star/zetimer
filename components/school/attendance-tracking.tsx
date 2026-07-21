@@ -82,10 +82,10 @@ export function AttendanceTracking() {
     setIsTeacher(user?.role === "teacher")
     loadStudents()
 
-    // Background polling for "instant" updates (every 10 seconds)
+    // Background polling for "instant" updates (every 30 seconds)
     const pollInterval = setInterval(() => {
       loadAttendanceForDate(true)
-    }, 10000)
+    }, 30000)
 
     return () => clearInterval(pollInterval)
   }, [])
@@ -102,10 +102,13 @@ export function AttendanceTracking() {
     setIsLoading(true)
     try {
       const user = authService.getCurrentUser()
-      const studentsData = await db.getStudents()
-      
+
       if (user?.role === "teacher") {
-        const assignmentsData = await db.getTeacherAssignments(user.schoolId, user.teacherId || user.id)
+        // Parallel fetch: students + teacher assignments fire simultaneously
+        const [studentsData, assignmentsData] = await Promise.all([
+          db.getStudents(),
+          db.getTeacherAssignments(user.schoolId, user.teacherId || user.id),
+        ])
         const classes = assignmentsData || []
 
         const allFilteredStudents = studentsData.filter((student: Student) => {
@@ -137,6 +140,8 @@ export function AttendanceTracking() {
           `[v0] Loaded ${allFilteredStudents.length} students for attendance from ${classes.length} assigned classes`,
         )
       } else {
+        // Admin / school_admin path: simpler single fetch
+        const studentsData = await db.getStudents()
         setStudents(studentsData)
       }
     } catch (error: any) {

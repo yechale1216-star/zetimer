@@ -3,6 +3,7 @@ import { Server as HttpServer } from 'http';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { sendPushNotification, sendCallNotification, sendCallCancellation, sendMessageNotification } from './services/notification.service';
+import { logCall } from './services/call.service';
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-long-enough';
@@ -101,6 +102,10 @@ export const activeCalls = new Map<string, {
   offer: any;
   type: string;
   profile: any;
+  conversationId?: string;
+  schoolId?: string;
+  startTime: number;       // unix ms — when call_user was first received
+  answerTime?: number;     // unix ms — when callee answered
   timestamp: number;
   timeoutHandle?: NodeJS.Timeout;
 }>();
@@ -364,17 +369,43 @@ export const initSocket = (server: HttpServer) => {
           select: { id: true, senderId: true, conversationId: true },
         });
         if (!message) return;
-        if (message.senderId !== tenant.userId) return;
 
-        await prisma.message.update({
-          where: { id: data.messageId },
-          data: { isDeleted: true, content: null },
-        });
+        // Allow sender to delete their own, admins/owners can delete anyone's
+        if (message.senderId !== tenant.userId) {
+          const member = await prisma.conversationMember.findFirst({
+            where: {
+              conversationId: message.conversationId,
+              userId: tenant.userId,
+              role: { in: ['OWNER', 'ADMIN'] },
+            },
+          });
+          if (!member) return;
+        }
 
-        io.to(data.conversationId).emit('message_deleted', {
-          messageId: data.messageId,
-          conversationId: data.conversationId,
-        });
+        const deleteForEveryone = data.deleteForEveryone !== false;
+
+        if (deleteForEveryone) {
+          await prisma.message.update({
+            where: { id: data.messageId },
+            data: { isDeleted: true, content: null },
+          });
+
+          io.to(data.conversationId).emit('message_deleted', {
+            messageId: data.messageId,
+            conversationId: data.conversationId,
+          });
+        } else {
+          // Delete for me: only notify current socket (or other sockets of this user)
+          socket.emit('message_deleted_for_me', {
+            messageId: data.messageId,
+            conversationId: data.conversationId,
+          });
+          // Emit to other devices of the same user
+          emitToUserExcept(io, tenant.userId, socket.id, 'message_deleted_for_me', {
+            messageId: data.messageId,
+            conversationId: data.conversationId,
+          });
+        }
       } catch (err) {
         console.error('[Socket] delete_message error:', err);
       }
@@ -420,11 +451,29 @@ export const initSocket = (server: HttpServer) => {
         return;
       }
       try {
-        const membership = await prisma.conversationMember.findFirst({
-          where: { conversationId: data.conversationId, userId: tenant.userId },
-          select: { id: true },
+        const conversation = await prisma.conversation.findUnique({
+          where: { id: data.conversationId },
+          select: { isGroup: true },
         });
-        if (!membership) return;
+        if (!conversation) return;
+
+        if (conversation.isGroup) {
+          const member = await prisma.conversationMember.findFirst({
+            where: {
+              conversationId: data.conversationId,
+              userId: tenant.userId,
+              role: { in: ['OWNER', 'ADMIN'] },
+            },
+            select: { id: true },
+          });
+          if (!member) return;
+        } else {
+          const member = await prisma.conversationMember.findFirst({
+            where: { conversationId: data.conversationId, userId: tenant.userId },
+            select: { id: true },
+          });
+          if (!member) return;
+        }
 
         const existing = await prisma.pinnedMessage.findUnique({
           where: { conversationId_messageId: { conversationId: data.conversationId, messageId: data.messageId } },
@@ -524,6 +573,32 @@ export const initSocket = (server: HttpServer) => {
 
       const callId = data.callId || `call-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+      // ── BUSY detection ────────────────────────────────────────────────────
+      // If the callee already has an active ringing/in-progress call, tell the
+      // caller immediately instead of ringing a second time.
+      const alreadyBusy = Array.from(activeCalls.values()).some(
+        c => c.to === data.to || c.from === data.to
+      );
+      if (alreadyBusy) {
+        console.log(`[Socket] call_user: ${data.to} is busy, notifying caller.`);
+        socket.emit('call_busy', { callId, from: data.to, to: data.from });
+        // Log a BUSY call history entry for the caller
+        const busySchoolId = callerInfo?.schoolId || targetUser.schoolId || tenant.schoolId;
+        if (busySchoolId) {
+          logCall({
+            callId, schoolId: busySchoolId,
+            userId: data.from, recipientId: data.to,
+            conversationId: data.conversationId,
+            type: data.type || 'VOICE', status: 'BUSY',
+            endTime: new Date(), duration: 0,
+            disconnectReason: 'BUSY',
+          }).catch(() => {});
+        }
+        return;
+      }
+
+      const callStartTime = Date.now();
+
       // Server-side timeout: auto-cancel after 45 seconds if unanswered
       const timeoutHandle = setTimeout(() => {
         const call = activeCalls.get(callId);
@@ -533,8 +608,26 @@ export const initSocket = (server: HttpServer) => {
           emitToUser(io, call.from, 'call_missed', { callId, reason: 'NO_ANSWER' });
           // Notify callee to stop ringing
           emitToUser(io, call.to, 'call_ended', { from: call.from, callId, reason: 'MISSED' });
+
+          // Persist MISSED call history
+          if (call.schoolId) {
+            logCall({
+              callId,
+              schoolId: call.schoolId,
+              userId: call.from,
+              recipientId: call.to,
+              conversationId: call.conversationId,
+              type: call.type,
+              status: 'MISSED',
+              endTime: new Date(),
+              duration: 0,
+              disconnectReason: 'MISSED',
+            }).catch(() => {});
+          }
         }
       }, 45000);
+
+      const resolvedSchoolId = targetUser.schoolId || callerInfo?.schoolId || tenant.schoolId;
 
       activeCalls.set(callId, {
         callId,
@@ -543,7 +636,10 @@ export const initSocket = (server: HttpServer) => {
         offer: data.offer,
         type: data.type || 'VOICE',
         profile: data.profile,
-        timestamp: Date.now(),
+        conversationId: data.conversationId,
+        schoolId: resolvedSchoolId,
+        startTime: callStartTime,
+        timestamp: callStartTime,
         timeoutHandle,
       });
 
@@ -570,23 +666,6 @@ export const initSocket = (server: HttpServer) => {
           callType: (data.type || 'VOICE') as 'VOICE' | 'VIDEO',
           serverUrl,
         });
-      }
-
-      const resolvedSchoolId = targetUser.schoolId || callerInfo?.schoolId;
-      if (resolvedSchoolId) {
-        (prisma as any).callSession?.create({
-          data: {
-            schoolId: resolvedSchoolId,
-            type: data.type,
-            status: 'RINGING',
-            participants: {
-              create: [
-                { userId: data.from, schoolId: resolvedSchoolId },
-                { userId: data.to, schoolId: resolvedSchoolId }
-              ]
-            }
-          }
-        }).catch(() => {});
       }
     });
 
@@ -636,6 +715,12 @@ export const initSocket = (server: HttpServer) => {
       // Stop ringing on all OTHER devices of the answerer (multi-device sync)
       emitToUserExcept(io, data.from, socket.id, 'call_stop_ringing', { callId: data.callId });
 
+      // Record answer time in activeCalls (used for duration calculation at end)
+      const callEntryForAnswer = data.callId ? activeCalls.get(data.callId) : null;
+      if (callEntryForAnswer) {
+        callEntryForAnswer.answerTime = Date.now();
+      }
+
       // Clean up call state
       const callEntry = data.callId ? activeCalls.get(data.callId) : null;
       if (data.callId && callEntry) {
@@ -679,11 +764,22 @@ export const initSocket = (server: HttpServer) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
 
-      // Notify caller
-      emitToUser(io, data.to, 'call_rejected', { from: data.from });
+      // Notify caller the call was declined
+      emitToUser(io, data.to, 'call_rejected', { from: data.from, callId: data.callId });
 
       // Stop ringing on all devices of the callee (they explicitly rejected)
       emitToUserExcept(io, data.from, socket.id, 'call_stop_ringing', { callId: data.callId });
+
+      // Collect call metadata from activeCalls before deletion
+      let rejectedCall = data.callId ? activeCalls.get(data.callId) : null;
+      if (!rejectedCall) {
+        for (const call of activeCalls.values()) {
+          if ((call.from === data.from && call.to === data.to) || (call.from === data.to && call.to === data.from)) {
+            rejectedCall = call;
+            break;
+          }
+        }
+      }
 
       // Clean up call state
       if (data.callId) {
@@ -700,15 +796,35 @@ export const initSocket = (server: HttpServer) => {
       }
 
       // Cancel native ringing on target's devices
-      const targetUser = await prisma.user.findUnique({ where: { id: data.to }, select: { pushToken: true } });
-      if (targetUser?.pushToken) {
-        sendCallCancellation(targetUser.pushToken, data.callId || '');
+      const targetUserForReject = await prisma.user.findUnique({ where: { id: data.to }, select: { pushToken: true } });
+      if (targetUserForReject?.pushToken) {
+        sendCallCancellation(targetUserForReject.pushToken, data.callId || '');
       }
 
-      if (data.conversationId) {
+      const rejectNow = new Date();
+      const callSchoolId = rejectedCall?.schoolId || tenant.schoolId;
+
+      // Persist DECLINED history
+      if (callSchoolId) {
+        logCall({
+          callId: data.callId,
+          schoolId: callSchoolId,
+          userId: data.from,          // callee who rejected
+          recipientId: data.to,       // original caller
+          conversationId: data.conversationId || rejectedCall?.conversationId,
+          type: data.type || rejectedCall?.type || 'VOICE',
+          status: 'DECLINED',
+          endTime: rejectNow,
+          duration: 0,
+          disconnectReason: 'DECLINED',
+        }).catch(err => console.warn('[Socket] reject logCall error:', err));
+      }
+
+      const rejectConvId = data.conversationId || rejectedCall?.conversationId;
+      if (rejectConvId) {
         const msg = await prisma.message.create({
           data: {
-            conversationId: data.conversationId,
+            conversationId: rejectConvId,
             senderId: data.from,
             schoolId: tenant.schoolId,
             content: data.reason === 'MISSED' ? 'Missed Call' : 'Declined Call',
@@ -716,7 +832,7 @@ export const initSocket = (server: HttpServer) => {
             metadata: { reason: data.reason || 'DECLINED' }
           }
         });
-        io.to(data.conversationId).emit('new_message', msg);
+        io.to(rejectConvId).emit('new_message', msg);
       }
     });
 
@@ -725,7 +841,7 @@ export const initSocket = (server: HttpServer) => {
       const tenant = socketData.get(socket.id);
       if (!tenant) return;
 
-      emitToUser(io, data.to, 'call_ended', { from: data.from });
+      emitToUser(io, data.to, 'call_ended', { from: data.from, callId: data.callId });
 
       // Clean up call state
       if (data.callId) {
@@ -745,6 +861,32 @@ export const initSocket = (server: HttpServer) => {
       const targetUser = await prisma.user.findUnique({ where: { id: data.to }, select: { pushToken: true } });
       if (targetUser?.pushToken) {
         sendCallCancellation(targetUser.pushToken, data.callId || '');
+      }
+
+      // Persist full call history
+      const now = new Date();
+      const durationSecs = typeof data.duration === 'number' ? Math.round(data.duration) : 0;
+      const answerTime = data.answerTime ? new Date(data.answerTime) : undefined;
+      const callStatus = data.reason === 'CANCELLED' ? 'CANCELLED'
+        : data.reason === 'MISSED' ? 'MISSED'
+        : durationSecs > 0 ? 'ANSWERED'
+        : 'CANCELLED';
+
+      if (tenant.schoolId) {
+        logCall({
+          callId: data.callId,
+          schoolId: data.schoolId || tenant.schoolId,
+          userId: data.from,
+          recipientId: data.to,
+          conversationId: data.conversationId,
+          type: data.type || 'VOICE',
+          status: callStatus,
+          duration: durationSecs,
+          answerTime,
+          endTime: now,
+          disconnectReason: data.reason || 'ENDED',
+          networkQuality: data.networkQuality,
+        }).catch(err => console.warn('[Socket] end_call logCall error:', err));
       }
 
       if (data.conversationId) {

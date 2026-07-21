@@ -35,18 +35,26 @@ export class RequestError extends Error {
 export interface FetchOptions extends RequestInit {
   /** Request timeout in milliseconds. Defaults to 20_000 (20 s). */
   timeoutMs?: number
+  /** Number of retry attempts for network/server failures. Defaults to 2 for GET, 0 for mutations. */
+  retries?: number
+  /** Initial delay before first retry in ms. Defaults to 400. */
+  retryDelayMs?: number
 }
 
 /**
- * Enhanced `fetch` wrapper with timeout and structured errors.
- * Throws `RequestError` on any failure (offline, timeout, HTTP error, etc.)
- * so callers can distinguish between error types consistently.
+ * Enhanced `fetch` wrapper with timeout, retry logic with exponential backoff, and structured errors.
  */
 export async function fetchWithTimeout(
   url: string,
   options: FetchOptions = {},
 ): Promise<Response> {
-  const { timeoutMs = 20_000, ...fetchOptions } = options
+  const isGet = !options.method || options.method.toUpperCase() === "GET"
+  const {
+    timeoutMs = 20_000,
+    retries = isGet ? 2 : 0,
+    retryDelayMs = 400,
+    ...fetchOptions
+  } = options
 
   // 1. Bail early if we are definitely offline
   if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -56,39 +64,66 @@ export async function fetchWithTimeout(
     )
   }
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let attempt = 0
+  let lastError: any = null
 
-  try {
-    const response = await fetch(url, {
-      ...fetchOptions,
-      signal: controller.signal,
-    })
-    clearTimeout(timer)
-    return response
-  } catch (err: any) {
-    clearTimeout(timer)
+  while (attempt <= retries) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
 
-    if (err?.name === "AbortError") {
+    try {
+      const response = await fetch(url, {
+        ...fetchOptions,
+        signal: controller.signal,
+      })
+      clearTimeout(timer)
+
+      // Retry on transient 502, 503, 504 server errors if attempts remain
+      if (!response.ok && [502, 503, 504].includes(response.status) && attempt < retries) {
+        attempt++
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs * Math.pow(2, attempt - 1)))
+        continue
+      }
+
+      return response
+    } catch (err: any) {
+      clearTimeout(timer)
+      lastError = err
+
+      if (err?.name === "AbortError") {
+        if (attempt < retries) {
+          attempt++
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs * Math.pow(2, attempt - 1)))
+          continue
+        }
+        throw new RequestError(
+          "The request took too long. Please try again.",
+          "timeout",
+        )
+      }
+
+      if (attempt < retries) {
+        attempt++
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs * Math.pow(2, attempt - 1)))
+        continue
+      }
+
+      // Network error (no connection, DNS failure, CORS, etc.)
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new RequestError(
+          "No internet connection. Please check your network and try again.",
+          "offline",
+        )
+      }
+
       throw new RequestError(
-        "The request took too long. Please try again.",
-        "timeout",
+        err?.message || "An unexpected network error occurred.",
+        "unknown",
       )
     }
-
-    // Network error (no connection, DNS failure, CORS, etc.)
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      throw new RequestError(
-        "No internet connection. Please check your network and try again.",
-        "offline",
-      )
-    }
-
-    throw new RequestError(
-      err?.message || "An unexpected network error occurred.",
-      "unknown",
-    )
   }
+
+  throw lastError || new RequestError("Request failed after retries", "unknown")
 }
 
 /**

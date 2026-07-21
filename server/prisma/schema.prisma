@@ -602,19 +602,25 @@ model MessageReaction {
 }
 
 model CallSession {
-  id             String            @id @default(uuid())
-  schoolId       String?
-  conversationId String?
-  type           String            @default("VOICE")
-  status         String            @default("ONGOING")
-  startTime      DateTime          @default(now())
-  endTime        DateTime?
-  createdAt      DateTime          @default(now())
-  history        CallHistory[]
-  participants   CallParticipant[]
-  school         School?           @relation(fields: [schoolId], references: [id])
+  id               String            @id @default(uuid())
+  callId           String?           @unique // signaling callId from client
+  schoolId         String?
+  conversationId   String?
+  type             String            @default("VOICE")
+  status           String            @default("ONGOING")
+  startTime        DateTime          @default(now())
+  answerTime       DateTime?
+  endTime          DateTime?
+  duration         Int?              // seconds, filled on end
+  disconnectReason String?           // ENDED | CANCELLED | MISSED | DECLINED | FAILED | BUSY
+  networkQuality   String?           // GOOD | POOR | BAD (from initiator stats)
+  createdAt        DateTime          @default(now())
+  history          CallHistory[]
+  participants     CallParticipant[]
+  school           School?           @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
+  @@index([callId])
 }
 
 model CallParticipant {
@@ -633,19 +639,26 @@ model CallParticipant {
 }
 
 model CallHistory {
-  id            String      @id @default(uuid())
-  schoolId      String?
-  userId        String
-  callSessionId String
-  type          String
-  status        String
-  duration      Int?
-  createdAt     DateTime    @default(now())
-  callSession   CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
-  school        School?     @relation(fields: [schoolId], references: [id])
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String      @id @default(uuid())
+  schoolId         String?
+  callId           String?     // matches CallSession.callId
+  userId           String      // caller
+  recipientId      String?     // callee
+  callSessionId    String
+  type             String
+  status           String
+  duration         Int?
+  answerTime       DateTime?
+  endTime          DateTime?
+  disconnectReason String?
+  createdAt        DateTime    @default(now())
+  callSession      CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+  school           School?     @relation(fields: [schoolId], references: [id])
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([schoolId])
+  @@index([userId])
+  @@index([callId])
 }
 
 model PendingRegistration {

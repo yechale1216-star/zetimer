@@ -35,26 +35,14 @@ export function StartupLoadingScreen() {
   useEffect(() => {
     if (!mounted) return;
 
-    // Minimum display time for branded loading screen (1.5 seconds)
-    const minDisplayTime = 1500;
-    const startTime = Date.now();
-
-    const checkStateAndTransit = () => {
-      if (sessionReady) {
-        const elapsedTime = Date.now() - startTime;
-        const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
-
-        setTimeout(() => {
-          setIsFadingOut(true);
-          // Allow fade-out transition to complete (500ms) before unmounting
-          setTimeout(() => {
-            setIsVisible(false);
-          }, 500);
-        }, remainingTime);
-      }
-    };
-
-    checkStateAndTransit();
+    if (sessionReady) {
+      // Fade out as soon as sessionReady is true
+      setIsFadingOut(true);
+      const timer = setTimeout(() => {
+        setIsVisible(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
   }, [sessionReady, mounted]);
 
   if (!isVisible) return null;

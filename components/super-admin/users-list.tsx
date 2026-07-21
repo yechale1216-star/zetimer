@@ -32,9 +32,11 @@ export function UsersList({ searchQuery, roleFilter }: UsersListProps) {
   const itemsPerPage = 10
 
   useEffect(() => {
+    const controller = new AbortController()
+
     const fetchUsers = async () => {
       try {
-        setLoading(true)
+        if (users.length === 0) setLoading(true)
         const params = new URLSearchParams({
           q: searchQuery,
           role: roleFilter,
@@ -44,7 +46,8 @@ export function UsersList({ searchQuery, roleFilter }: UsersListProps) {
         const response = await fetch(`${getApiUrl()}/api/super-admin/users?${params}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('attendance_token')}`
-          }
+          },
+          signal: controller.signal
         })
         const result = await response.json()
         if (result.success) {
@@ -54,14 +57,19 @@ export function UsersList({ searchQuery, roleFilter }: UsersListProps) {
           throw new Error(result.error || 'Failed to fetch users')
         }
       } catch (err: any) {
-        setError(err.message)
+        if (err.name !== "AbortError") {
+          setError(err.message)
+        }
       } finally {
         setLoading(false)
       }
     }
 
     const timer = setTimeout(fetchUsers, 300)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
   }, [searchQuery, roleFilter, page])
 
   const getRoleColor = (role: string) => {

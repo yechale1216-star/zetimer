@@ -343,6 +343,16 @@ export function MessagingCenter() {
         isDeleted: m.isDeleted,
         editedAt: m.editedAt,
         metadata: m.metadata || null,
+        isPinned: m.isPinned || false,
+        replyTo: m.replyTo
+          ? {
+              id: m.replyTo.id,
+              content: m.replyTo.content,
+              senderName: m.replyTo.sender?.full_name || 'Unknown',
+              type: m.replyTo.type || 'TEXT',
+            }
+          : null,
+        forwardedFrom: m.forwardedFrom || null,
       }));
 
       // Store messages keyed by conversationId — never mixed
@@ -716,14 +726,33 @@ export function MessagingCenter() {
         socket.emit('edit_message', { ...data, conversationId: activeConversationId });
         break;
       case 'delete': {
-        // Optimistic local update: mark as deleted immediately
         const delId = data.messageId;
+        const deleteForEveryone = data.deleteForEveryone !== false; // default true for 'delete' action
+        // Optimistic local update: mark as deleted immediately
         setMessagesByConversation(prev => {
           const msgs = prev[activeConversationId!];
           if (!msgs) return prev;
-          return { ...prev, [activeConversationId!]: msgs.map(m => m.id === delId ? { ...m, isDeleted: true, content: null } : m) };
+          const updated = msgs.map(m => m.id === delId ? { ...m, isDeleted: true, content: null } : m);
+          cacheMessages(activeConversationId!, updated).catch(() => {});
+          return { ...prev, [activeConversationId!]: updated };
         });
-        socket.emit('delete_message', { messageId: delId, conversationId: activeConversationId });
+        socket.emit('delete_message', {
+          messageId: delId,
+          conversationId: activeConversationId,
+          deleteForEveryone,
+        });
+        break;
+      }
+      // Delete for Me: only removes from local state, no socket broadcast
+      case 'delete_for_me': {
+        const delId = data.messageId;
+        const currentMsgs = messagesByConversation[activeConversationId!] || [];
+        const filteredMsgs = currentMsgs.filter(m => m.id !== delId);
+        setMessagesByConversation(prev => ({
+          ...prev,
+          [activeConversationId!]: filteredMsgs
+        }));
+        cacheMessages(activeConversationId!, filteredMsgs).catch(() => {});
         break;
       }
       case 'pin': {
@@ -888,6 +917,16 @@ export function MessagingCenter() {
         isMe: message.senderId === currentUser?.id,
         tempId: message.tempId,
         metadata: message.metadata || null,
+        isPinned: message.isPinned || false,
+        replyTo: message.replyTo
+          ? {
+              id: message.replyTo.id,
+              content: message.replyTo.content,
+              senderName: message.replyTo.sender?.full_name || 'Unknown',
+              type: message.replyTo.type || 'TEXT',
+            }
+          : null,
+        forwardedFrom: message.forwardedFrom || null,
       };
 
       // Append ONLY to the correct conversation bucket
@@ -995,6 +1034,20 @@ export function MessagingCenter() {
         return {
           ...prev,
           [data.conversationId]: msgs.map(m => m.id === data.messageId ? { ...m, isDeleted: true, content: null } : m)
+        };
+      });
+    };
+
+    const handleMessageDeletedForMe = (data: { messageId: string, conversationId: string }) => {
+      setMessagesByConversation(prev => {
+        const msgs = prev[data.conversationId];
+        if (!msgs) return prev;
+        const filtered = msgs.filter(m => m.id !== data.messageId);
+        // Update IndexedDB cache
+        cacheMessages(data.conversationId, filtered).catch(() => {});
+        return {
+          ...prev,
+          [data.conversationId]: filtered
         };
       });
     };
@@ -1154,6 +1207,7 @@ export function MessagingCenter() {
     socket.on('user_offline', handleUserOffline);
     socket.on('message_edited', handleMessageEdited);
     socket.on('message_deleted', handleMessageDeleted);
+    socket.on('message_deleted_for_me', handleMessageDeletedForMe);
     socket.on('reaction_updated', handleReactionUpdated);
     socket.on('message_error', handleMessageError);
     socket.on('user_typing', handleUserTyping);
@@ -1171,6 +1225,7 @@ export function MessagingCenter() {
       socket.off('user_offline', handleUserOffline);
       socket.off('message_edited', handleMessageEdited);
       socket.off('message_deleted', handleMessageDeleted);
+      socket.off('message_deleted_for_me', handleMessageDeletedForMe);
       socket.off('reaction_updated', handleReactionUpdated);
       socket.off('message_error', handleMessageError);
       socket.off('user_typing', handleUserTyping);

@@ -383,22 +383,50 @@ public class CallService extends Service {
 
         // Directly launch IncomingCallActivity as a fallback for devices that
         // throttle the fullScreenIntent (e.g. some Android 12+ OEM skins)
+        // ONLY if the screen/device is locked.
+        boolean isLocked = false;
         try {
-            Intent directIntent = new Intent(this, IncomingCallActivity.class);
-            directIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_NO_USER_ACTION
-                    | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            directIntent.putExtra("callId",       pendingCallId);
-            directIntent.putExtra("callerId",     pendingCallerId);
-            directIntent.putExtra("callerName",   pendingCallerName);
-            directIntent.putExtra("callerAvatar", pendingCallerAvatar);
-            directIntent.putExtra("callType",     pendingCallType);
-            directIntent.putExtra("serverUrl",    pendingServerUrl);
-            startActivity(directIntent);
-            Log.d(TAG, "Direct launch of IncomingCallActivity succeeded");
+            android.app.KeyguardManager km = (android.app.KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (km != null && km.isKeyguardLocked()) {
+                isLocked = true;
+            }
+            if (pm != null) {
+                boolean isInteractive;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+                    isInteractive = pm.isInteractive();
+                } else {
+                    //noinspection deprecation
+                    isInteractive = pm.isScreenOn();
+                }
+                if (!isInteractive) {
+                    isLocked = true;
+                }
+            }
         } catch (Exception e) {
-            Log.w(TAG, "Direct launch of IncomingCallActivity failed (expected in some background states)", e);
+            Log.e(TAG, "Error checking screen/keyguard lock state", e);
+        }
+
+        if (isLocked) {
+            try {
+                Intent directIntent = new Intent(this, IncomingCallActivity.class);
+                directIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_NO_USER_ACTION
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                directIntent.putExtra("callId",       pendingCallId);
+                directIntent.putExtra("callerId",     pendingCallerId);
+                directIntent.putExtra("callerName",   pendingCallerName);
+                directIntent.putExtra("callerAvatar", pendingCallerAvatar);
+                directIntent.putExtra("callType",     pendingCallType);
+                directIntent.putExtra("serverUrl",    pendingServerUrl);
+                startActivity(directIntent);
+                Log.d(TAG, "Direct launch of IncomingCallActivity succeeded because screen/device is locked.");
+            } catch (Exception e) {
+                Log.w(TAG, "Direct launch of IncomingCallActivity failed (expected in some background states)", e);
+            }
+        } else {
+            Log.d(TAG, "Device is interactive/unlocked, keeping only the popup HUN (skipping direct full-screen activity launch)");
         }
     }
 

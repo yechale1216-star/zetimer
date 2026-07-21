@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Send, Paperclip, Smile, MoreVertical, Phone, Video, ChevronLeft,
   Check, CheckCheck, Reply, Forward, Trash2, Heart, Search, X, Clock,
   Pin, Copy, FileText, FileJson, FileType, Music, Play, ExternalLink,
   Download, Globe, FileArchive, Mic, MicOff, StopCircle, ImageIcon, File as FileIcon,
   Info, Bell, RotateCw, PhoneIncoming, PhoneMissed, PhoneOff, PhoneCall,
-  ArrowUpRight, ArrowDownLeft, PhoneOutgoing
+  ArrowUpRight, ArrowDownLeft, PhoneOutgoing, Edit
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -38,6 +38,7 @@ import { useLanguage } from '@/lib/context/language-context';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSuspension } from '@/lib/context/suspension-context';
 import { Badge } from '@/components/ui/badge';
+import { MessageActionSheet } from '@/components/messaging/message-action-sheet';
 
 interface Message {
   id: string;
@@ -56,6 +57,14 @@ interface Message {
   }[];
   isDeleted?: boolean;
   editedAt?: Date | string | null;
+  isPinned?: boolean;
+  replyTo?: {
+    id: string;
+    content: string | null;
+    senderName: string;
+    type: string;
+  } | null;
+  forwardedFrom?: string | null;
 }
 
 interface ChatWindowProps {
@@ -102,7 +111,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
   const [editTarget, setEditTarget] = useState<Message | null>(null);
+  // Legacy delete dialog state (kept for desktop ContextMenu path)
   const [deleteConfirmMessage, setDeleteConfirmMessage] = useState<Message | null>(null);
+  // Telegram-style bottom sheet state
+  const [actionSheetMessage, setActionSheetMessage] = useState<Message | null>(null);
   const [uploads, setUploads] = useState<Record<string, { progress: number; controller: AbortController; fileData?: { file: File; type: string; preview: string }; text?: string }>>({});
 
   const handleCancelUpload = (tempId: string) => {
@@ -507,7 +519,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
 
     // Case 1: Just text
     if (!currentFile) {
-      onSendMessage(currentInput);
+      onSendMessage(currentInput, { replyToId: replyTarget?.id || undefined });
       return;
     }
 
@@ -605,7 +617,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
         toast.success('Copied to clipboard');
         break;
       case 'delete_confirm':
+        // Desktop ContextMenu path — open the legacy simple dialog
         setDeleteConfirmMessage(message);
+        break;
+      case 'long_press':
+        // Mobile path — open Telegram-style bottom sheet
+        setActionSheetMessage(message);
         break;
       case 'select':
         setIsSelectionMode(true);
@@ -1323,7 +1340,52 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
 
       <ImagePreviewListener onPreview={setPreviewImage} />
 
-      {/* Delete Confirmation Dialog */}
+      {/* Telegram-style Message Action Bottom Sheet (mobile long-press) */}
+      <MessageActionSheet
+        message={actionSheetMessage}
+        isOpen={!!actionSheetMessage}
+        onClose={() => setActionSheetMessage(null)}
+        canDeleteForEveryone={actionSheetMessage?.isMe ?? false}
+        onCopy={() => {
+          navigator.clipboard.writeText(actionSheetMessage?.content || '');
+          toast.success('Copied to clipboard');
+        }}
+        onReply={() => {
+          if (actionSheetMessage) setReplyTarget(actionSheetMessage);
+          setEditTarget(null);
+        }}
+        onEdit={() => {
+          if (actionSheetMessage) {
+            setEditTarget(actionSheetMessage);
+            setReplyTarget(null);
+            setInputValue(actionSheetMessage.content || '');
+          }
+        }}
+        onPin={() => {
+          if (actionSheetMessage) {
+            onAction?.('pin', {
+              messageId: actionSheetMessage.id,
+              isPinned: !!(actionSheetMessage as any).isPinned,
+              content: actionSheetMessage.content,
+              senderName: (actionSheetMessage as any).senderName,
+            });
+          }
+        }}
+        onForward={() => {
+          if (actionSheetMessage) onAction?.('forward', { message: actionSheetMessage });
+        }}
+        onDelete={(deleteForEveryone) => {
+          if (actionSheetMessage) {
+            if (deleteForEveryone) {
+              onAction?.('delete', { messageId: actionSheetMessage.id, deleteForEveryone: true });
+            } else {
+              onAction?.('delete_for_me', { messageId: actionSheetMessage.id });
+            }
+          }
+        }}
+      />
+
+      {/* Desktop Delete Confirmation Dialog (from ContextMenu) */}
       <AnimatePresence>
         {deleteConfirmMessage && (
           <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4">
@@ -1341,25 +1403,40 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
               className="relative z-10 bg-background rounded-3xl border border-border shadow-2xl w-full max-w-sm overflow-hidden"
             >
               <div className="p-5 border-b border-border/50">
-                <h3 className="font-bold text-base text-foreground">Delete Message?</h3>
-                <p className="text-xs text-muted-foreground mt-1">This message will be removed from the conversation.</p>
+                <h3 className="font-bold text-base text-foreground">Delete this message?</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {deleteConfirmMessage.isMe
+                    ? 'Choose who to delete this message for.'
+                    : 'This will remove the message from your view.'}
+                </p>
               </div>
-              {deleteConfirmMessage.attachments && deleteConfirmMessage.attachments.length > 0 && (
-                <div className="px-5 pt-3">
-                  <p className="text-xs text-muted-foreground/60 italic">Also deletes attached file(s).</p>
-                </div>
-              )}
               <div className="p-4 flex flex-col gap-2">
+                {deleteConfirmMessage.isMe && (
+                  <Button
+                    variant="destructive"
+                    className="w-full rounded-2xl h-11 font-bold"
+                    onClick={() => {
+                      onAction?.('delete', { messageId: deleteConfirmMessage.id, deleteForEveryone: true });
+                      setDeleteConfirmMessage(null);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete for Everyone
+                  </Button>
+                )}
                 <Button
-                  variant="destructive"
+                  variant={deleteConfirmMessage.isMe ? 'outline' : 'destructive'}
                   className="w-full rounded-2xl h-11 font-bold"
                   onClick={() => {
-                    onAction?.('delete', { messageId: deleteConfirmMessage.id });
+                    if (deleteConfirmMessage.isMe) {
+                      onAction?.('delete_for_me', { messageId: deleteConfirmMessage.id });
+                    } else {
+                      onAction?.('delete_for_me', { messageId: deleteConfirmMessage.id });
+                    }
                     setDeleteConfirmMessage(null);
                   }}
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  {deleteConfirmMessage.isMe ? 'Delete for Me' : <><Trash2 className="h-4 w-4 mr-2" />Delete</>}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1999,6 +2076,39 @@ const MessageBubble = React.memo(({
     (!message.content || message.content === 'Image' || message.content === 'Video' || message.content === 'File')) ||
     message.type === 'VIDEO_MESSAGE' || message.type === 'VIDEO' || message.type === 'IMAGE' || isEmojiOnly);
 
+  // ── Long-press detection for mobile ──────────────────────────────────────
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+
+  const startLongPress = useCallback((e: React.TouchEvent) => {
+    // Record position to detect drag vs press
+    touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    longPressTimer.current = setTimeout(() => {
+      if (!message.status || message.status !== 'sending') {
+        // Haptic feedback on devices that support it
+        if (typeof navigator !== 'undefined' && (navigator as any).vibrate) {
+          (navigator as any).vibrate(30);
+        }
+        handleAction('long_press');
+      }
+    }, 500);
+  }, [message.status]); // eslint-disable-line
+
+  const cancelLongPress = useCallback((e?: React.TouchEvent) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartPos.current) return;
+    const dx = Math.abs(e.touches[0].clientX - touchStartPos.current.x);
+    const dy = Math.abs(e.touches[0].clientY - touchStartPos.current.y);
+    // Cancel if scrolling / swiping
+    if (dx > 10 || dy > 10) cancelLongPress();
+  }, [cancelLongPress]);
+
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
   };
@@ -2022,6 +2132,10 @@ const MessageBubble = React.memo(({
         isLastInGroup && "mb-2",
         isSelectionMode && "cursor-pointer"
       )}
+      onTouchStart={startLongPress}
+      onTouchEnd={cancelLongPress}
+      onTouchMove={handleTouchMove}
+      onTouchCancel={cancelLongPress}
     >
       {!isMe && isGroup && isLastInGroup && (
         <div className="flex items-center gap-2 mb-1 px-1">
@@ -2071,6 +2185,54 @@ const MessageBubble = React.memo(({
                   wordBreak: 'break-word',
                 }}
               >
+                {/* ── Forwarded tag ─────────────────────────────────── */}
+                {(message as any).forwardedFrom && !message.isDeleted && (
+                  <div className={cn(
+                    "flex items-center gap-1 text-[10px] font-medium mb-1.5",
+                    isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+                  )}>
+                    <Forward className="h-3 w-3" />
+                    <span>Forwarded</span>
+                  </div>
+                )}
+
+                {/* ── Reply-to quote preview ────────────────────────── */}
+                {(message as any).replyTo && !message.isDeleted && (
+                  <div className={cn(
+                    "flex items-stretch gap-0 mb-1.5 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity",
+                    isMe
+                      ? "bg-white/15 border border-white/20"
+                      : "bg-primary/8 border border-primary/20"
+                  )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const el = document.getElementById(`msg-${(message as any).replyTo?.id}`);
+                      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }}
+                  >
+                    <div className={cn(
+                      "w-1 shrink-0",
+                      isMe ? "bg-white/60" : "bg-primary"
+                    )} />
+                    <div className="px-2 py-1.5 min-w-0 flex-1">
+                      <p className={cn(
+                        "text-[11px] font-bold truncate",
+                        isMe ? "text-primary-foreground/90" : "text-primary"
+                      )}>
+                        {(message as any).replyTo?.senderName || 'Unknown'}
+                      </p>
+                      <p className={cn(
+                        "text-[12px] truncate",
+                        isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+                      )}>
+                        {(message as any).replyTo?.content ||
+                          ((message as any).replyTo?.type === 'IMAGE' ? '📷 Photo'
+                            : (message as any).replyTo?.type === 'VIDEO' ? '🎥 Video'
+                            : '📎 File')}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {hasAttachments && (
                   <div className={cn(
                     "flex flex-col gap-1",
@@ -2146,43 +2308,48 @@ const MessageBubble = React.memo(({
                 )}
               </div>
             </ContextMenuTrigger>
-            <ContextMenuContent className="w-56 rounded-xl border-none shadow-xl p-2">
-              {!message.isDeleted && (
-                <ContextMenuItem onClick={() => handleAction('copy')} className="rounded-lg h-10 gap-3">
-                  <Copy className="h-4 w-4" />
+            <ContextMenuContent className="w-56 rounded-2xl border-border/50 shadow-2xl p-1.5 animate-in fade-in zoom-in-95 duration-200">
+              {!message.isDeleted && message.content && (
+                <ContextMenuItem onClick={() => handleAction('copy')} className="rounded-xl h-10 gap-3 font-medium">
+                  <Copy className="h-4 w-4 text-primary" />
                   {t('copy_text')}
                 </ContextMenuItem>
               )}
-              <ContextMenuItem onClick={() => handleAction('reply')} className="rounded-lg h-10 gap-3" disabled={!!message.isDeleted}>
-                <Reply className="h-4 w-4" />
-                {t('reply')}
-              </ContextMenuItem>
-              {isMe && !message.isDeleted && (
-                <ContextMenuItem onClick={() => handleAction('edit_start')} className="rounded-lg h-10 gap-3">
-                  <MoreVertical className="h-4 w-4" />
+              {!message.isDeleted && (
+                <ContextMenuItem onClick={() => handleAction('reply')} className="rounded-xl h-10 gap-3 font-medium">
+                  <Reply className="h-4 w-4 text-primary" />
+                  {t('reply')}
+                </ContextMenuItem>
+              )}
+              {isMe && !message.isDeleted && message.type === 'TEXT' && (
+                <ContextMenuItem onClick={() => handleAction('edit_start')} className="rounded-xl h-10 gap-3 font-medium">
+                  <Edit className="h-4 w-4 text-primary" />
                   Edit Message
                 </ContextMenuItem>
               )}
-              <ContextMenuItem
-                onClick={() => handleAction('pin', { isPinned: !!(message as any).isPinned, content: message.content, senderName: (message as any).senderName })}
-                className="rounded-lg h-10 gap-3"
-              >
-                <Pin className="h-4 w-4" />
-                {(message as any).isPinned ? 'Unpin Message' : 'Pin Message'}
-              </ContextMenuItem>
               {!message.isDeleted && (
-                <ContextMenuItem onClick={() => handleAction('forward')} className="rounded-lg h-10 gap-3">
-                  <Forward className="h-4 w-4" />
+                <ContextMenuItem
+                  onClick={() => handleAction('pin', { isPinned: !!(message as any).isPinned, content: message.content, senderName: (message as any).senderName })}
+                  className="rounded-xl h-10 gap-3 font-medium"
+                >
+                  {(message as any).isPinned
+                    ? <><Pin className="h-4 w-4 text-primary" />Unpin Message</>
+                    : <><Pin className="h-4 w-4 text-primary" />Pin Message</>}
+                </ContextMenuItem>
+              )}
+              {!message.isDeleted && (
+                <ContextMenuItem onClick={() => handleAction('forward')} className="rounded-xl h-10 gap-3 font-medium">
+                  <Forward className="h-4 w-4 text-primary" />
                   {t('forward')}
                 </ContextMenuItem>
               )}
               <ContextMenuSeparator className="my-1 bg-border/50" />
               <ContextMenuItem
                 onClick={() => handleAction('delete_confirm')}
-                className="rounded-lg h-10 gap-3 text-destructive focus:text-destructive"
+                className="rounded-xl h-10 gap-3 text-destructive focus:bg-destructive/10 focus:text-destructive font-medium"
               >
                 <Trash2 className="h-4 w-4" />
-                {t('delete')}
+                {isMe ? 'Delete' : 'Delete for Me'}
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>

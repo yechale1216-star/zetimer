@@ -125,7 +125,7 @@ publicParentRouter.get('/schools', parentController.listParentSchools);
 publicParentRouter.post('/login', parentController.loginParent);
 app.use('/api/parent', publicParentRouter);
 app.post('/api/calls/public-reject', async (req, res) => {
-    const { callId } = req.body;
+    const { callId, message } = req.body;
     if (!callId) {
         return res.status(400).json({ error: 'Missing callId' });
     }
@@ -179,10 +179,42 @@ app.post('/api/calls/public-reject', async (req, res) => {
                 if (io) {
                     io.to(conversation.id).emit('new_message', msg);
                 }
+                // If a message was sent as a rejection response, save and broadcast it
+                if (message && typeof message === 'string' && message.trim().length > 0) {
+                    const textMsg = await prisma.message.create({
+                        data: {
+                            conversationId: conversation.id,
+                            senderId: call.to,
+                            schoolId: conversation.schoolId,
+                            content: message,
+                            type: 'TEXT'
+                        },
+                        include: { sender: { select: { id: true, full_name: true, profile_photo: true } } }
+                    });
+                    if (io) {
+                        io.to(conversation.id).emit('new_message', textMsg);
+                    }
+                    // Send FCM message notification to notify the caller (who is now the recipient of the message)
+                    const callerUser = await prisma.user.findUnique({
+                        where: { id: call.from },
+                        select: { pushToken: true }
+                    });
+                    if (callerUser?.pushToken) {
+                        const { sendMessageNotification } = await Promise.resolve().then(() => __importStar(require('./services/notification.service')));
+                        await sendMessageNotification(callerUser.pushToken, {
+                            conversationId: conversation.id,
+                            senderId: call.to,
+                            senderName: textMsg.sender.full_name,
+                            senderAvatar: textMsg.sender.profile_photo || '',
+                            messagePreview: textMsg.content || '',
+                            messageType: 'TEXT',
+                        });
+                    }
+                }
             }
         }
         catch (err) {
-            console.error('[PublicReject] Failed to log decline in DB:', err);
+            console.error('[PublicReject] Failed to log decline/message in DB:', err);
         }
     }
     res.status(200).json({ success: true });

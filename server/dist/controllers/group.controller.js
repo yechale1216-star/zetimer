@@ -304,15 +304,29 @@ const pinMessage = async (req, res) => {
         });
         if (!message)
             return res.status(404).json({ error: 'Message not found' });
-        const member = await db_1.default.conversationMember.findFirst({
-            where: {
-                conversationId: message.conversationId,
-                userId,
-                role: { in: ['OWNER', 'ADMIN'] },
-            },
+        const conversation = await db_1.default.conversation.findUnique({
+            where: { id: message.conversationId },
         });
-        if (!member)
-            return res.status(403).json({ error: 'Only admins can pin messages' });
+        if (!conversation)
+            return res.status(404).json({ error: 'Conversation not found' });
+        if (conversation.isGroup) {
+            const member = await db_1.default.conversationMember.findFirst({
+                where: {
+                    conversationId: message.conversationId,
+                    userId,
+                    role: { in: ['OWNER', 'ADMIN'] },
+                },
+            });
+            if (!member)
+                return res.status(403).json({ error: 'Only admins can pin messages in groups' });
+        }
+        else {
+            const member = await db_1.default.conversationMember.findFirst({
+                where: { conversationId: message.conversationId, userId },
+            });
+            if (!member)
+                return res.status(403).json({ error: 'Not a member of this conversation' });
+        }
         await db_1.default.pinnedMessage.upsert({
             where: {
                 conversationId_messageId: {
@@ -339,15 +353,29 @@ const unpinMessage = async (req, res) => {
         const message = await db_1.default.message.findFirst({ where: { id: messageId, schoolId } });
         if (!message)
             return res.status(404).json({ error: 'Message not found' });
-        const member = await db_1.default.conversationMember.findFirst({
-            where: {
-                conversationId: message.conversationId,
-                userId,
-                role: { in: ['OWNER', 'ADMIN'] },
-            },
+        const conversation = await db_1.default.conversation.findUnique({
+            where: { id: message.conversationId },
         });
-        if (!member)
-            return res.status(403).json({ error: 'Only admins can unpin messages' });
+        if (!conversation)
+            return res.status(404).json({ error: 'Conversation not found' });
+        if (conversation.isGroup) {
+            const member = await db_1.default.conversationMember.findFirst({
+                where: {
+                    conversationId: message.conversationId,
+                    userId,
+                    role: { in: ['OWNER', 'ADMIN'] },
+                },
+            });
+            if (!member)
+                return res.status(403).json({ error: 'Only admins can unpin messages in groups' });
+        }
+        else {
+            const member = await db_1.default.conversationMember.findFirst({
+                where: { conversationId: message.conversationId, userId },
+            });
+            if (!member)
+                return res.status(403).json({ error: 'Not a member of this conversation' });
+        }
         await db_1.default.pinnedMessage.deleteMany({
             where: { conversationId: message.conversationId, messageId },
         });

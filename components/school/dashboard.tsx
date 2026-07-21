@@ -110,7 +110,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
 
   const loadDashboardData = async (isBackground = false) => {
-    if (!isBackground) setIsLoading(true)
+    if (!isBackground && !rawData) setIsLoading(true)
     setFetchError(null)
     try {
       // Safety net: never fetch if schoolId is missing — all API calls would

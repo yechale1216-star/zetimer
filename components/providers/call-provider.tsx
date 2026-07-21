@@ -15,7 +15,21 @@ import { useSocket } from '@/components/providers/socket-provider';
 interface CallContextType {
   initiateCall: (toId: string, type: 'VOICE' | 'VIDEO', profile: any) => void;
   endCall: () => void;
-  status: 'IDLE' | 'RINGING' | 'CONNECTING' | 'CONNECTED';
+  status:
+    | 'IDLE'
+    | 'RINGING'
+    | 'CONNECTING'
+    | 'CONNECTED'
+    | 'RECONNECTING'
+    | 'DECLINED'
+    | 'MISSED'
+    | 'CANCELLED'
+    | 'FAILED'
+    | 'BUSY';
+  callDuration: number;
+  isSpeakerOn: boolean;
+  toggleSpeaker: () => void;
+  callStats?: any;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -512,13 +526,23 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       { id: toId, name: profile.name, avatar: profile.avatar }
     ]);
     const callerProfile = { name: currentUser?.name || 'Unknown User', avatar: currentUser?.profile_photo || '' };
-    webrtc.startCall(toId, type, callerProfile);
+    webrtc.startCall(toId, type, callerProfile, currentUser?.schoolId);
   };
 
   const activeCaller = participants.find(p => !p.isLocal);
 
   return (
-    <CallContext.Provider value={{ initiateCall, endCall: webrtc.endCall, status: webrtc.callStatus }}>
+    <CallContext.Provider
+      value={{
+        initiateCall,
+        endCall: webrtc.endCall,
+        status: webrtc.callStatus,
+        callDuration: webrtc.callDuration,
+        isSpeakerOn: webrtc.isSpeakerOn,
+        toggleSpeaker: webrtc.toggleSpeaker,
+        callStats: webrtc.callStats,
+      }}
+    >
       {children}
 
       {/* Global Modals */}
@@ -535,9 +559,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         <CallOverlay
           status={isWaitingForOffer || webrtc.callStatus === 'IDLE' ? 'CONNECTING' : webrtc.callStatus}
           type={callType}
-
           isMuted={webrtc.isMuted}
           isCameraOff={webrtc.isCameraOff}
+          isSpeakerOn={webrtc.isSpeakerOn}
           localStream={webrtc.localStream}
           remoteStreams={webrtc.remoteStreams}
           remoteMediaStates={webrtc.remoteMediaStates}
@@ -547,7 +571,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           onToggleMute={webrtc.toggleMute}
           onToggleCamera={webrtc.toggleCamera}
           onFlipCamera={webrtc.flipCamera}
+          onToggleSpeaker={webrtc.toggleSpeaker}
           connectionQuality={webrtc.connectionQuality}
+          duration={webrtc.callDuration}
+          callStats={webrtc.callStats}
         />
       )}
     </CallContext.Provider>

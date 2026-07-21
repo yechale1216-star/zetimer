@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   PhoneOff, Mic, MicOff, Video, VideoOff,
   Maximize2, Minimize2, Volume2, SwitchCamera,
-  PhoneCall, SignalHigh
+  PhoneCall, SignalHigh, AlertTriangle, AlertCircle, CheckCircle, XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -19,11 +19,23 @@ interface Participant {
   isLocal?: boolean;
 }
 
+import { CallStats } from '@/lib/hooks/use-webrtc';
+
 interface CallOverlayProps {
-  status: 'RINGING' | 'CONNECTING' | 'CONNECTED';
+  status:
+    | 'RINGING'
+    | 'CONNECTING'
+    | 'CONNECTED'
+    | 'RECONNECTING'
+    | 'DECLINED'
+    | 'MISSED'
+    | 'CANCELLED'
+    | 'FAILED'
+    | 'BUSY';
   type: 'VOICE' | 'VIDEO';
   isMuted: boolean;
   isCameraOff: boolean;
+  isSpeakerOn?: boolean;
   localStream: MediaStream | null;
   remoteStreams: Record<string, MediaStream>;
   remoteMediaStates: Record<string, { isCameraOff: boolean; isMuted: boolean }>;
@@ -33,7 +45,10 @@ interface CallOverlayProps {
   onToggleMute: () => void;
   onToggleCamera: () => void;
   onFlipCamera?: () => void;
+  onToggleSpeaker?: () => void;
   connectionQuality?: 'GOOD' | 'POOR' | 'BAD';
+  duration?: number;
+  callStats?: CallStats;
 }
 
 // ── Stable video element that attaches the stream via ref ────────────────────
@@ -155,6 +170,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
   type,
   isMuted,
   isCameraOff,
+  isSpeakerOn = false,
   localStream,
   remoteStreams,
   remoteMediaStates,
@@ -164,20 +180,30 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
   onToggleMute,
   onToggleCamera,
   onFlipCamera,
+  onToggleSpeaker,
   connectionQuality = 'GOOD',
+  duration = 0,
+  callStats,
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
-  const [callTime, setCallTime] = useState(0);
   const [showControls, setShowControls] = useState(true);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [dotCount, setDotCount] = useState(0);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (status === 'CONNECTED') {
-      interval = setInterval(() => setCallTime(t => t + 1), 1000);
+    let dotInterval: NodeJS.Timeout;
+    if (status === 'CONNECTING' || status === 'RINGING' || status === 'RECONNECTING') {
+      dotInterval = setInterval(() => {
+        setDotCount((prev) => (prev + 1) % 4);
+      }, 500);
     }
-    return () => clearInterval(interval);
+    return () => clearInterval(dotInterval);
   }, [status]);
+
+  const getAnimatedStatus = (baseText: string) => {
+    return baseText + '.'.repeat(dotCount);
+  };
 
   // Auto-hide controls in video call after inactivity
   useEffect(() => {
@@ -210,6 +236,9 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
     .slice(0, 2)
     .toUpperCase();
 
+  // ── Helper: check if we are in an end-call terminal state ───────────────────
+  const isTerminalState = ['DECLINED', 'MISSED', 'CANCELLED', 'FAILED', 'BUSY'].includes(status);
+
   // ── Minimized bubble ─────────────────────────────────────────────────────────
   if (isMinimized) {
     return (
@@ -231,7 +260,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
             </Avatar>
             <span className="text-[10px] text-white/70 text-center px-2 truncate w-full">{caller.name}</span>
             {status === 'CONNECTED' && (
-              <span className="text-[10px] text-green-400 font-mono">{formatTime(callTime)}</span>
+              <span className="text-[10px] text-green-400 font-mono">{formatTime(duration)}</span>
             )}
           </div>
         )}
@@ -249,6 +278,48 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
         >
           <PhoneOff className="h-4 w-4 text-white" />
         </button>
+      </motion.div>
+    );
+  }
+
+  // ── Terminal state full-screen card overlay ────────────────────────────────
+  if (isTerminalState) {
+    const getTerminalUI = () => {
+      switch (status) {
+        case 'DECLINED':
+          return { icon: <PhoneOff className="h-12 w-12 text-red-400" />, label: 'Call Declined' };
+        case 'MISSED':
+          return { icon: <AlertCircle className="h-12 w-12 text-slate-400" />, label: 'Missed Call' };
+        case 'CANCELLED':
+          return { icon: <XCircle className="h-12 w-12 text-slate-400" />, label: 'Call Cancelled' };
+        case 'BUSY':
+          return { icon: <AlertTriangle className="h-12 w-12 text-yellow-400 animate-pulse" />, label: 'User is Busy' };
+        case 'FAILED':
+        default:
+          return { icon: <XCircle className="h-12 w-12 text-red-500" />, label: 'Call Failed' };
+      }
+    };
+    const { icon, label } = getTerminalUI();
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[120] bg-slate-950/95 flex flex-col items-center justify-center gap-6"
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', damping: 20 }}
+          className="flex flex-col items-center gap-4 bg-white/5 border border-white/10 backdrop-blur-xl p-8 rounded-3xl w-72 shadow-2xl text-center"
+        >
+          {icon}
+          <div>
+            <h3 className="text-white text-xl font-bold">{label}</h3>
+            <p className="text-white/40 text-xs mt-1">{caller.name}</p>
+          </div>
+        </motion.div>
       </motion.div>
     );
   }
@@ -277,6 +348,33 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
         if (isShowingVideo) return null;
         return <AudioStream key={p.id} stream={stream} />;
       })}
+
+      {/* ── Reconnecting Ambient Banner ─────────────────────────────── */}
+      <AnimatePresence>
+        {status === 'RECONNECTING' && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="absolute top-4 left-4 right-4 z-40 bg-amber-500/90 text-white rounded-2xl shadow-xl px-4 py-3 flex items-center justify-between backdrop-blur-lg border border-amber-400/25"
+          >
+            <div className="flex items-center gap-3">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                className="h-5 w-5 border-2 border-white border-t-transparent rounded-full"
+              />
+              <div>
+                <p className="text-sm font-semibold tracking-wide">Connecting...</p>
+                <p className="text-[10px] text-white/70">Weak connection or switching networks</p>
+              </div>
+            </div>
+            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold animate-pulse">
+              Reconnecting
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Background ─────────────────────────────────────────────── */}
       <div className="absolute inset-0 z-0" style={{ pointerEvents: 'none' }}>
@@ -315,7 +413,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
             initial={type === 'VIDEO' ? { opacity: 0 } : {}}
             animate={{ opacity: 1 }}
             exit={type === 'VIDEO' ? { opacity: 0 } : {}}
-            className="relative z-20 flex items-center justify-between px-5 pt-5 pb-2"
+            className="relative z-20 flex items-center justify-between px-5 pt-5 pb-2 animate-fade-in"
           >
             <button
               onClick={() => setIsMinimized(true)}
@@ -324,35 +422,46 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
               <Minimize2 className="h-6 w-6" />
             </button>
 
-            {/* Center: Timer or status */}
-            <div className="flex flex-col items-center min-w-[80px]">
-              {status === 'CONNECTED' ? (
+            {/* Center: Timer & Interactive Live Stats Badge */}
+            <button
+              onClick={() => setShowStatsModal(prev => !prev)}
+              className="flex flex-col items-center min-w-[100px] hover:opacity-90 transition-opacity active:scale-95 cursor-pointer focus:outline-none"
+            >
+              {status === 'CONNECTED' || status === 'RECONNECTING' ? (
                 <>
                   <span className="text-white/40 text-[10px] uppercase tracking-[0.25em] font-semibold flex items-center gap-1.5">
                     <SignalHigh className={cn(
                       "h-3 w-3",
                       connectionQuality === 'BAD' ? "text-red-500 animate-pulse" :
                       connectionQuality === 'POOR' ? "text-yellow-400" :
-                      "text-green-450"
+                      "text-green-500"
                     )} />
-                    {connectionQuality === 'BAD' ? 'Bad Call' :
-                     connectionQuality === 'POOR' ? 'Weak Connection' :
-                     'Encrypted'}
+                    {callStats?.quality === 'EXCELLENT' ? 'HD Crystal' :
+                     connectionQuality === 'BAD' ? 'Bad Call' :
+                     connectionQuality === 'POOR' ? 'Weak Signal' :
+                     'HD Encrypted'}
                   </span>
-                  <span className="text-white font-mono text-base font-bold">{formatTime(callTime)}</span>
+                  <span className="text-white font-mono text-base font-bold">{formatTime(duration)}</span>
                 </>
               ) : (
                 <div className="flex items-center gap-2">
                   <StatusDot />
                   <span className="text-white/60 text-xs font-medium">
-                    {status === 'RINGING' ? 'Ringing' : 'Connecting'}
+                    {status === 'RINGING' ? getAnimatedStatus('Ringing') : getAnimatedStatus('Calling')}
                   </span>
                 </div>
               )}
-            </div>
+            </button>
 
-            <button className="p-2 text-white active:scale-90 transition-transform drop-shadow-md">
-              <Volume2 className="h-6 w-6" />
+            {/* Speaker icon in the top right for video mode or as toggle */}
+            <button
+              onClick={onToggleSpeaker}
+              className={cn(
+                "p-2 text-white active:scale-90 transition-transform drop-shadow-md rounded-full",
+                isSpeakerOn && "bg-white/10"
+              )}
+            >
+              <Volume2 className={cn("h-6 w-6", isSpeakerOn && "text-green-400")} />
             </button>
           </motion.div>
         )}
@@ -407,13 +516,18 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
 
           <div className="text-center">
             <h2 className="text-white text-3xl md:text-4xl font-light tracking-wide">{caller.name}</h2>
-            <p className="text-white/50 text-sm mt-2 uppercase tracking-widest">
-              {status === 'CONNECTED'
-                ? 'In Call'
-                : status === 'RINGING'
-                ? 'Ringing...'
-                : 'Connecting...'}
-            </p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              {status !== 'CONNECTED' && status !== 'RECONNECTING' && <StatusDot />}
+              <p className="text-white/50 text-sm uppercase tracking-widest">
+                {status === 'CONNECTED'
+                  ? 'In Call'
+                  : status === 'RECONNECTING'
+                  ? 'Reconnecting'
+                  : status === 'RINGING'
+                  ? getAnimatedStatus('Ringing')
+                  : getAnimatedStatus('Calling')}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -431,7 +545,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
               <div className="flex items-center justify-center gap-2 mt-2">
                 <StatusDot />
                 <p className="text-white/60 text-sm">
-                  {status === 'RINGING' ? 'Ringing...' : status === 'CONNECTING' ? 'Connecting...' : 'Waiting for video...'}
+                  {status === 'RINGING' ? getAnimatedStatus('Ringing') : status === 'CONNECTING' ? getAnimatedStatus('Calling') : 'Waiting for video...'}
                 </p>
               </div>
             </div>
@@ -471,8 +585,65 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
         </>
       )}
 
-      {/* ── Voice spacer ────────────────────────────────────────────── */}
-      {type === 'VOICE' && <div className="flex-1" />}
+      {/* ── Technical Live Call Stats Modal / Overlay ──────────────── */}
+      <AnimatePresence>
+        {showStatsModal && callStats && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -20 }}
+            className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 border border-white/15 backdrop-blur-2xl rounded-2xl p-4 shadow-2xl w-80 text-white font-sans"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
+              <div className="flex items-center gap-2">
+                <SignalHigh className="h-4 w-4 text-green-400" />
+                <span className="text-xs font-bold tracking-wider uppercase">Live Call Metrics</span>
+              </div>
+              <button
+                onClick={() => setShowStatsModal(false)}
+                className="text-white/50 hover:text-white text-xs font-bold px-1.5 py-0.5 rounded bg-white/10"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-white/5 p-2 rounded-lg border border-white/5">
+                <span className="text-white/40 block text-[10px] uppercase font-semibold">Audio Bitrate</span>
+                <span className="text-green-400 font-mono font-bold text-sm">{callStats.audioBitrate} kbps</span>
+              </div>
+              <div className="bg-white/5 p-2 rounded-lg border border-white/5">
+                <span className="text-white/40 block text-[10px] uppercase font-semibold">Video Bitrate</span>
+                <span className="text-blue-400 font-mono font-bold text-sm">{callStats.videoBitrate} kbps</span>
+              </div>
+              <div className="bg-white/5 p-2 rounded-lg border border-white/5">
+                <span className="text-white/40 block text-[10px] uppercase font-semibold">Packet Loss</span>
+                <span className={cn(
+                  "font-mono font-bold text-sm",
+                  callStats.packetLoss > 10 ? "text-red-400" : callStats.packetLoss > 3 ? "text-yellow-400" : "text-emerald-400"
+                )}>
+                  {callStats.packetLoss}%
+                </span>
+              </div>
+              <div className="bg-white/5 p-2 rounded-lg border border-white/5">
+                <span className="text-white/40 block text-[10px] uppercase font-semibold">Round Trip (RTT)</span>
+                <span className="text-purple-300 font-mono font-bold text-sm">{callStats.rtt} ms</span>
+              </div>
+              <div className="bg-white/5 p-2 rounded-lg border border-white/5 col-span-2 flex items-center justify-between">
+                <div>
+                  <span className="text-white/40 block text-[10px] uppercase font-semibold">Jitter / Codec</span>
+                  <span className="text-white/80 font-mono text-xs">{callStats.jitter} ms (Opus HD)</span>
+                </div>
+                {callStats.resolution && (
+                  <div className="text-right">
+                    <span className="text-white/40 block text-[10px] uppercase font-semibold">Resolution</span>
+                    <span className="text-green-400 font-mono text-xs font-bold">{callStats.resolution}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Controls ────────────────────────────────────────────────── */}
       <AnimatePresence>
@@ -517,7 +688,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
                   whileTap={{ scale: 0.88 }}
                   onClick={onToggleMute}
                   className={cn(
-                    'h-13 w-13 md:h-14 md:w-14 h-[52px] w-[52px] rounded-full flex items-center justify-center transition-all',
+                    'h-[52px] w-[52px] md:h-14 md:w-14 rounded-full flex items-center justify-center transition-all',
                     isMuted ? 'bg-white text-slate-900' : 'bg-white/15 text-white hover:bg-white/25'
                   )}
                 >
@@ -527,9 +698,13 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
                 {/* Speaker */}
                 <motion.button
                   whileTap={{ scale: 0.88 }}
-                  className="h-[52px] w-[52px] rounded-full bg-white/15 text-white flex items-center justify-center hover:bg-white/25 transition-all"
+                  onClick={onToggleSpeaker}
+                  className={cn(
+                    'h-[52px] w-[52px] md:h-14 md:w-14 rounded-full flex items-center justify-center transition-all',
+                    isSpeakerOn ? 'bg-white text-slate-900' : 'bg-white/15 text-white hover:bg-white/25'
+                  )}
                 >
-                  <Volume2 className="h-5 w-5 md:h-6 md:w-6" />
+                  <Volume2 className={cn("h-5 w-5 md:h-6 md:w-6", isSpeakerOn && "text-green-500")} />
                 </motion.button>
 
                 {/* Divider */}

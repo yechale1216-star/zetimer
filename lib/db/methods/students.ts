@@ -1,15 +1,13 @@
-"use client"
-
 import { API_URL } from "@/lib/api-config"
 import type { Student } from "../types"
 import { apiFetch } from "@/lib/utils/fetch-with-timeout"
+import { queryCache } from "@/lib/utils/query-cache"
 
 export async function getNextStudentId(headers: any): Promise<string> {
   const result = await apiFetch<{ success: boolean; data: string }>(
     `${API_URL}/api/students/auto/next-id`,
     {
       headers,
-      cache: 'no-store'
     }
   )
   return result.data
@@ -17,17 +15,20 @@ export async function getNextStudentId(headers: any): Promise<string> {
 
 export async function getStudents(headers: any, schoolId: string): Promise<Student[]> {
   if (!schoolId) return []
-  const result = await apiFetch<{ success: boolean; data: any[] }>(
-    `${API_URL}/api/students?_t=${Date.now()}`,
-    { 
-      headers,
-      cache: 'no-store'
-    }
+  return queryCache.fetch(
+    `students_${schoolId}`,
+    async () => {
+      const result = await apiFetch<{ success: boolean; data: any[] }>(
+        `${API_URL}/api/students`,
+        { headers }
+      )
+      return result.data.map((s: any) => ({
+        ...s,
+        schoolId: schoolId,
+      }))
+    },
+    { staleTime: 60_000 }
   )
-  return result.data.map((s: any) => ({
-    ...s,
-    schoolId: schoolId,
-  }))
 }
 
 export async function addStudent(headers: any, schoolId: string, student: Partial<Student>): Promise<Student> {
@@ -40,6 +41,7 @@ export async function addStudent(headers: any, schoolId: string, student: Partia
       body: JSON.stringify(student),
     }
   )
+  queryCache.invalidate(`students_${schoolId}`)
   return {
     ...result.data,
     schoolId: schoolId,
@@ -55,6 +57,7 @@ export async function updateStudent(headers: any, id: string, data: Partial<Stud
       body: JSON.stringify(data),
     }
   )
+  queryCache.invalidate("students_")
 }
 
 export async function deleteStudent(headers: any, id: string): Promise<void> {
@@ -65,4 +68,5 @@ export async function deleteStudent(headers: any, id: string): Promise<void> {
       headers,
     }
   )
+  queryCache.invalidate("students_")
 }

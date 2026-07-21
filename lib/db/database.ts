@@ -1,5 +1,3 @@
-"use client"
-
 import { BaseDatabase } from "./base"
 import * as students from "./methods/students"
 import * as attendance from "./methods/attendance"
@@ -10,6 +8,7 @@ import * as settings from "./methods/settings"
 import type { Student, AttendanceRecord, TeacherAssignment } from "./types"
 import { API_URL } from "@/lib/api-config"
 import { apiFetch } from "@/lib/utils/fetch-with-timeout"
+import { queryCache } from "@/lib/utils/query-cache"
 
 export type { Student, AttendanceRecord, TeacherAssignment }
 
@@ -148,7 +147,12 @@ class Database extends BaseDatabase {
 
   // ─── SETTINGS ─────────────────────────────────────────────────────────────
   async getSettings(): Promise<any> {
-    return settings.getSettings(this.getApiHeaders(), this.getSchoolId())
+    const schoolId = this.getSchoolId() || "default"
+    return queryCache.fetch(
+      `settings_${schoolId}`,
+      async () => settings.getSettings(this.getApiHeaders(), this.getSchoolId()),
+      { staleTime: 120_000 }
+    )
   }
 
   async updateSettings(settingsData: any): Promise<void> {
@@ -175,6 +179,7 @@ class Database extends BaseDatabase {
         }),
       }
     )
+    queryCache.invalidate(`settings_${schoolId}`)
   }
 
   async resetSettings(): Promise<void> {
@@ -293,36 +298,48 @@ class Database extends BaseDatabase {
 
   // ─── ACADEMIC ENTITIES ────────────────────────────────────────────────────
   async getGrades(): Promise<any[]> {
-    const result = await apiFetch<{ success: boolean; data: any[] }>(
-      `${API_URL}/api/schools/me/grades?_t=${Date.now()}`,
-      { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      }
+    const schoolId = this.getSchoolId() || "default"
+    return queryCache.fetch(
+      `grades_${schoolId}`,
+      async () => {
+        const result = await apiFetch<{ success: boolean; data: any[] }>(
+          `${API_URL}/api/schools/me/grades`,
+          { headers: this.getApiHeaders() }
+        )
+        return result.data
+      },
+      { staleTime: 300_000 }
     )
-    return result.data
   }
 
   async getSections(): Promise<any[]> {
-    const result = await apiFetch<{ success: boolean; data: any[] }>(
-      `${API_URL}/api/schools/me/sections?_t=${Date.now()}`,
-      { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      }
+    const schoolId = this.getSchoolId() || "default"
+    return queryCache.fetch(
+      `sections_${schoolId}`,
+      async () => {
+        const result = await apiFetch<{ success: boolean; data: any[] }>(
+          `${API_URL}/api/schools/me/sections`,
+          { headers: this.getApiHeaders() }
+        )
+        return result.data
+      },
+      { staleTime: 300_000 }
     )
-    return result.data
   }
 
   async getStreams(): Promise<any[]> {
-    const result = await apiFetch<{ success: boolean; data: any[] }>(
-      `${API_URL}/api/schools/me/streams?_t=${Date.now()}`,
-      { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      }
+    const schoolId = this.getSchoolId() || "default"
+    return queryCache.fetch(
+      `streams_${schoolId}`,
+      async () => {
+        const result = await apiFetch<{ success: boolean; data: any[] }>(
+          `${API_URL}/api/schools/me/streams`,
+          { headers: this.getApiHeaders() }
+        )
+        return result.data
+      },
+      { staleTime: 300_000 }
     )
-    return result.data
   }
 
   async getUserByEmail(email: string): Promise<any> {

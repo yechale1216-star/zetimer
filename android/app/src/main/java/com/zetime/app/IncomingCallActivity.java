@@ -3,9 +3,11 @@ package com.zetime.app;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -14,6 +16,8 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.util.Log;
@@ -142,6 +146,7 @@ public class IncomingCallActivity extends Activity {
         imgAvatar             = findViewById(R.id.iv_avatar_photo); // optional ImageView for real photo
         Button   btnAccept    = findViewById(R.id.btn_accept);
         Button   btnDecline   = findViewById(R.id.btn_decline);
+        Button   btnMessage   = findViewById(R.id.btn_message);
         pulseRing1 = findViewById(R.id.pulse_ring_1);
         pulseRing2 = findViewById(R.id.pulse_ring_2);
 
@@ -176,9 +181,17 @@ public class IncomingCallActivity extends Activity {
             Log.d(TAG, "User tapped Decline");
             stopCallServiceRinging();
             cancelCallNotification();
-            sendDeclineToServer();
+            sendDeclineToServer(null);
             finish();
         });
+
+        // ── Message actions ──────────────────────────────────────────────────
+        if (btnMessage != null) {
+            btnMessage.setOnClickListener(v -> {
+                Log.d(TAG, "User tapped Message");
+                showMessageActionsDialog();
+            });
+        }
     }
 
     private String buildInitials(String name) {
@@ -301,7 +314,7 @@ public class IncomingCallActivity extends Activity {
         }
     }
 
-    private void sendDeclineToServer() {
+    private void sendDeclineToServer(final String messageText) {
         if (serverUrl == null || callId == null) return;
         final String fCallId    = callId;
         final String fServerUrl = serverUrl;
@@ -314,7 +327,15 @@ public class IncomingCallActivity extends Activity {
                 conn.setDoOutput(true);
                 conn.setConnectTimeout(8000);
                 conn.setReadTimeout(8000);
-                String body = "{\"callId\":\"" + fCallId + "\"}";
+                
+                String body;
+                if (messageText != null && !messageText.trim().isEmpty()) {
+                    String escapedMsg = messageText.replace("\"", "\\\"");
+                    body = "{\"callId\":\"" + fCallId + "\",\"message\":\"" + escapedMsg + "\"}";
+                } else {
+                    body = "{\"callId\":\"" + fCallId + "\"}";
+                }
+                
                 conn.getOutputStream().write(body.getBytes("utf-8"));
                 Log.d(TAG, "Decline POST response: " + conn.getResponseCode());
                 conn.disconnect();
@@ -322,6 +343,81 @@ public class IncomingCallActivity extends Activity {
                 Log.e(TAG, "Error sending decline", e);
             }
         }).start();
+    }
+
+    private void showMessageActionsDialog() {
+        final String[] options = {
+            "Can't talk now. What's up?",
+            "I'll call you right back.",
+            "I'll call you later.",
+            "Can you call me later?",
+            "Write custom message..."
+        };
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert);
+        builder.setTitle("Reply with Message");
+        builder.setItems(options, (dialog, which) -> {
+            if (which == options.length - 1) {
+                showCustomMessageDialog();
+            } else {
+                String msg = options[which];
+                declineWithQuickReply(msg);
+            }
+        });
+        builder.setNegativeButton("Cancel", null);
+        
+        AlertDialog dialog = builder.create();
+        // Since this activity is shown when locked, ensure the dialog's window inherits proper lock screen properties
+        if (dialog.getWindow() != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(true);
+            }
+            dialog.getWindow().addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            );
+        }
+        dialog.show();
+    }
+
+    private void showCustomMessageDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert);
+        builder.setTitle("Custom Message");
+        
+        final EditText input = new EditText(this);
+        input.setHint("Type your message here...");
+        input.setTextColor(Color.WHITE);
+        
+        int paddingPx = (int) (16 * getResources().getDisplayMetrics().density);
+        FrameLayout container = new FrameLayout(this);
+        container.setPadding(paddingPx, paddingPx, paddingPx, paddingPx);
+        container.addView(input);
+        
+        builder.setView(container);
+        builder.setPositiveButton("Send", (dialog, which) -> {
+            String msg = input.getText().toString().trim();
+            if (!msg.isEmpty()) {
+                declineWithQuickReply(msg);
+            }
+        });
+        builder.setNegativeButton("Cancel", null);
+        
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            );
+        }
+        dialog.show();
+    }
+
+    private void declineWithQuickReply(String messageText) {
+        Log.d(TAG, "Declining call with quick reply message");
+        stopCallServiceRinging();
+        cancelCallNotification();
+        sendDeclineToServer(messageText);
+        finish();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

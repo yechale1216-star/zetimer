@@ -138,7 +138,7 @@ export function StudentManagement() {
   }, [students, searchTerm, gradeFilter, streamFilter, sectionFilter, isTeacher])
 
   const loadStudents = async (isBackground = false) => {
-    if (!isBackground) setIsLoading(true)
+    if (!isBackground && students.length === 0) setIsLoading(true)
     try {
       const user = authService.getCurrentUser()
       const studentsData = await db.getStudents()

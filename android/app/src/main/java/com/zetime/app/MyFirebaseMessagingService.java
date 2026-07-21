@@ -56,16 +56,33 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         super.onMessageReceived(remoteMessage);
         Log.d(TAG, "FCM from: " + remoteMessage.getFrom());
 
-        Map<String, String> data = remoteMessage.getData();
+        // Copy map to ensure it is mutable so we can safely inject fallback values
+        Map<String, String> data = new java.util.HashMap<>(remoteMessage.getData());
         Log.d(TAG, "FCM payload: " + data);
         
         // Log diagnostics to aid in troubleshooting HUN suppression
         logNotificationDiagnostics();
 
-        if (data.isEmpty()) return;
-
         String type = data.get("type");
-        if (type == null) return;
+        String title = data.get("title");
+        String body = data.get("body");
+
+        if (remoteMessage.getNotification() != null) {
+            if (title == null) title = remoteMessage.getNotification().getTitle();
+            if (body == null) body = remoteMessage.getNotification().getBody();
+        }
+
+        if (type == null) {
+            if ((title != null && !title.isEmpty()) || (body != null && !body.isEmpty())) {
+                type = "general";
+                data.put("type", type);
+                if (data.get("title") == null) data.put("title", title);
+                if (data.get("body") == null) data.put("body", body);
+            } else {
+                Log.d(TAG, "FCM payload is empty/missing type and notification details, ignoring.");
+                return;
+            }
+        }
 
         switch (type) {
             case "incoming_call":
@@ -120,15 +137,14 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         if (body  == null) body  = "You have a new update";
         if (type  == null) type  = "general";
 
-        // Suppress native system tray display if app is currently in foreground
+        // Post directly to JS if app is currently in foreground, but do NOT suppress native system tray display
         if (isAppInForeground() && MainActivity.getInstance() != null) {
-            Log.d(TAG, "App is in foreground. Suppressing system tray display and posting directly to JS.");
+            Log.d(TAG, "App is in foreground. Posting directly to JS without suppressing system tray display.");
             com.getcapacitor.JSObject notifData = new com.getcapacitor.JSObject();
             for (Map.Entry<String, String> entry : data.entrySet()) {
                 notifData.put(entry.getKey(), entry.getValue());
             }
             MainActivity.getInstance().postForegroundNotification(notifData);
-            return;
         }
 
         NotificationManager nm = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);

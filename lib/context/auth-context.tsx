@@ -185,7 +185,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPermissionsLoading(true)
     }
 
-    console.log(`[AuthContext][validateSession] START | userId: ${currentUser?.id} | role: ${currentUser?.role} | email: ${currentUser?.email}`)
+    // EAGER SWR HYDRATION:
+    // If we have a cached user and features, hydrate React state immediately
+    // so sessionReady becomes true in 0ms, unblocking rendering and splash screen.
+    setUser(currentUser)
+    setSessionId(storedSessionId)
+    if (cachedFeaturesStr) {
+      try { setFeatures(JSON.parse(cachedFeaturesStr)) } catch { setFeatures([]) }
+    } else {
+      setFeatures([])
+    }
+    setAuthLoading(false)
+    setPermissionsLoading(false)
 
     // FRESH LOGIN GUARD:
     // If a fresh login just happened, we already have the correct, server-confirmed
@@ -198,97 +209,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear the marker so future validate calls work normally
       localStorage.removeItem(FRESH_LOGIN_KEY)
       localStorage.removeItem("_zt_login_role")
-
-      if (!currentUser) {
-        setAuthLoading(false)
-        setPermissionsLoading(false)
-        return
-      }
-      // Use the cached user (which has the correct role from login) and
-      // set React state immediately without hitting the profile endpoint.
-      setUser(currentUser)
-      setSessionId(storedSessionId)
-      setAuthLoading(false)
-
-      // Still need to load features
-      if (currentUser.role === "super_admin" || currentUser.role === "parent") {
-        setFeatures([])
-        localStorage.setItem("attendance_features", JSON.stringify([]))
-        setPermissionsLoading(false)
-        return
-      }
-
-      const schoolIdForFeatures = currentUser.schoolId
-      if (!schoolIdForFeatures) {
-        setFeatures([])
-        setPermissionsLoading(false)
-        return
-      }
-
-      try {
-        const headers: Record<string, string> = { "Content-Type": "application/json" }
-        if (token) headers["Authorization"] = `Bearer ${token}`
-
-        const featRes = await fetch(`${getApiUrl()}/api/subscriptions/schools/${schoolIdForFeatures}/features`, {
-          headers,
-          credentials: 'include'
-        })
-        if (featRes.ok) {
-          const featJson = await featRes.json()
-          if (featJson.success && Array.isArray(featJson.data)) {
-            setFeatures(featJson.data)
-            localStorage.setItem("attendance_features", JSON.stringify(featJson.data))
-          } else {
-            setFeatures([])
-          }
-        } else {
-          setFeatures([])
-        }
-      } catch {
-        setFeatures(cachedFeaturesStr ? JSON.parse(cachedFeaturesStr) : [])
-      } finally {
-        setPermissionsLoading(false)
-      }
       return
     }
     setError(null)
 
-    // 1. Verify / fetch profile from backend
+    // Build common request headers once
+    const schoolId = localStorage.getItem("x-school-id") || currentUser?.schoolId || ""
+    const profileHeaders: Record<string, string> = { "Content-Type": "application/json" }
+    if (token) profileHeaders["Authorization"] = `Bearer ${token}`
+    if (schoolId) profileHeaders["x-school-id"] = schoolId
+
+    // Situational Role Inference — only apply when NOT on a login/neutral page
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : pathname
+    if (currentPath.startsWith('/parent')) profileHeaders["x-requested-role"] = 'parent'
+    else if (currentPath.startsWith('/school/teacher')) profileHeaders["x-requested-role"] = 'teacher'
+    else if (currentPath.startsWith('/school/admin')) profileHeaders["x-requested-role"] = 'school_admin'
+    else if (currentPath.startsWith('/super-admin')) profileHeaders["x-requested-role"] = 'super_admin'
+
+    // PARALLEL REVALIDATION:
+    // Profile and features are independent — fire both network requests simultaneously.
+    // This halves the background revalidation time compared to sequential awaits.
+    const needsFeatures = currentUser?.role !== "super_admin" && currentUser?.role !== "parent" && !!currentUser?.schoolId
+    const featuresSchoolId = currentUser?.schoolId || schoolId
+
+    const profilePromise = fetch(`${getApiUrl()}/api/users/profile`, {
+      headers: profileHeaders,
+      cache: 'no-store',
+      credentials: 'include'
+    })
+
+    const featuresPromise = needsFeatures
+      ? fetch(`${getApiUrl()}/api/subscriptions/schools/${featuresSchoolId}/features`, {
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+          credentials: 'include'
+        })
+      : Promise.resolve(null)
+
+    console.log(`[AuthContext][validateSession] Parallel revalidation | path: ${currentPath} | role: ${profileHeaders['x-requested-role'] || 'none'}`)
+
+    // Resolve profile
     try {
-      const schoolId = localStorage.getItem("x-school-id") || currentUser?.schoolId || ""
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      }
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`
-      }
-      if (schoolId) {
-        headers["x-school-id"] = schoolId
-      }
-
-      // Situational Role Inference — only apply when NOT on a login/neutral page
-      const currentPath = typeof window !== "undefined" ? window.location.pathname : pathname
-      if (currentPath.startsWith('/parent')) {
-        headers["x-requested-role"] = 'parent';
-      } else if (currentPath.startsWith('/school/teacher')) {
-        headers["x-requested-role"] = 'teacher';
-      } else if (currentPath.startsWith('/school/admin')) {
-        headers["x-requested-role"] = 'school_admin';
-      } else if (currentPath.startsWith('/super-admin')) {
-        headers["x-requested-role"] = 'super_admin';
-      }
-
-      console.log(`[AuthContext][validateSession] Fetching profile | path: ${currentPath} | x-requested-role: ${headers['x-requested-role'] || 'none'}`)
-      const profileRes = await fetch(`${getApiUrl()}/api/users/profile`, { 
-        headers,
-        cache: 'no-store',
-        credentials: 'include'
-      })
+      let profileRes = await profilePromise
 
       if (profileRes.status === 401) {
         console.warn("[AuthContext][validateSession] Token invalid (401) — checking if Bearer token can recover session")
-        // On Android APK, WebView may not send cross-origin HTTP-only cookies.
-        // If we have a Bearer token in localStorage, try an explicit re-request with it.
         if (token) {
           try {
             const retryHeaders: Record<string, string> = {
@@ -296,17 +260,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               "Authorization": `Bearer ${token}`,
             }
             if (schoolId) retryHeaders["x-school-id"] = schoolId
-            if (headers["x-requested-role"]) retryHeaders["x-requested-role"] = headers["x-requested-role"]
+            if (profileHeaders["x-requested-role"]) retryHeaders["x-requested-role"] = profileHeaders["x-requested-role"]
 
             const retryRes = await fetch(`${getApiUrl()}/api/users/profile`, {
               headers: retryHeaders,
               cache: 'no-store',
-              // Do NOT send credentials here — we want the explicit Bearer token only
             })
 
             if (retryRes.ok) {
               console.log("[AuthContext][validateSession] Bearer-token retry succeeded — session recovered")
-              // Re-assign profileRes to the retried response so the code below can process it normally
               const retryJson = await retryRes.json()
               if (retryJson.success && retryJson.data) {
                 const dbUser = retryJson.data
@@ -328,24 +290,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setError(null)
                 localStorage.setItem("attendance_current_user", JSON.stringify(updatedUser))
                 currentUser = updatedUser
-                // Fall through to features fetch below
               } else {
-                // Retry response was ok but data malformed — use cached user silently
                 setUser(currentUser)
                 setSessionId(storedSessionId)
                 setError(null)
               }
               setAuthLoading(false)
-              // Continue to features fetch
             } else {
-              // Both cookie-based and Bearer requests returned 401 — token truly expired
               console.warn("[AuthContext][validateSession] Bearer retry also failed — token truly expired")
               logout("/login?reason=expired")
               return
             }
           } catch (retryErr) {
             console.warn("[AuthContext][validateSession] Bearer retry threw error:", retryErr)
-            // Network error during retry — use cached user, don't show error
             setUser(currentUser)
             setSessionId(storedSessionId)
             setAuthLoading(false)
@@ -353,94 +310,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return
           }
         } else {
-          // No Bearer token at all — truly unauthorized
           console.warn("[AuthContext][validateSession] No Bearer token and cookie failed — session expired")
           logout("/login?reason=expired")
           return
         }
-      }
-
-      if (!profileRes.ok) {
+      } else if (!profileRes.ok) {
         throw new Error(`Profile fetch returned status ${profileRes.status}`)
-      }
-
-      const profileJson = await profileRes.json()
-      if (profileJson.success && profileJson.data) {
-        const dbUser = profileJson.data
-
-        // With HTTP-Only cookies, the browser guarantees the token matches the session.
-        // If a mismatch occurs (e.g., cross-tab login), we gracefully resync to the new user.
-        if (currentUser && dbUser.id !== currentUser.id) {
-          console.info(`[AuthContext][validateSession] Session updated from ${currentUser.id} to ${dbUser.id} — resyncing user data.`)
-          
-          // Rehydrate the currentUser base reference
-          currentUser = {
-            id: dbUser.id,
-            email: dbUser.email,
-            phone: dbUser.phone || "",
-            name: dbUser.full_name || dbUser.name,
-            role: dbUser.role,
-            schoolId: dbUser.schoolId || dbUser.school_id || "",
-            schoolName: dbUser.schoolName || "",
-            schoolLogo: dbUser.schoolLogo || "",
-            teacherId: dbUser.teacher_id || "",
-            isSuperAdmin: dbUser.role === "super_admin",
-            profile_photo: dbUser.profile_photo || "",
-            onboardingCompleted: dbUser.onboardingCompleted ?? false,
-          }
-        }
-
-        // ROLE PROTECTION: if the DB returns a different role than what the user
-        // currently has AND they are on a neutral/login page, preserve the cached role.
-        const currentPath2 = typeof window !== "undefined" ? window.location.pathname : pathname
-        const isOnNeutralPage = !currentPath2.startsWith('/parent') &&
-          !currentPath2.startsWith('/school/teacher') &&
-          !currentPath2.startsWith('/school/admin') &&
-          !currentPath2.startsWith('/super-admin')
-
-        let resolvedRole = dbUser.role || currentUser!.role
-        if (isOnNeutralPage && currentUser!.role && dbUser.role && currentUser!.role !== dbUser.role) {
-          console.warn(`[AuthContext][validateSession] Role mismatch on neutral page — preserving cached role '${currentUser!.role}' over DB role '${dbUser.role}'`)
-          resolvedRole = currentUser!.role
-        }
-
-        if (currentUser!.role && dbUser.role && currentUser!.role !== dbUser.role) {
-          console.warn(`[AuthContext][validateSession] Role: cached='${currentUser!.role}' db='${dbUser.role}' resolved='${resolvedRole}'`)
-        }
-
-        const updatedUser: User = {
-          ...currentUser!,
-          name: dbUser.full_name || dbUser.name || currentUser!.name,
-          email: dbUser.email || currentUser!.email,
-          phone: dbUser.phone || currentUser!.phone || "",
-          profile_photo: dbUser.profile_photo || currentUser!.profile_photo || "",
-          role: resolvedRole,
-          schoolId: dbUser.schoolId || dbUser.school_id || currentUser!.schoolId,
-          schoolName: dbUser.schoolName || currentUser!.schoolName || "",
-          schoolLogo: dbUser.schoolLogo || currentUser!.schoolLogo || "",
-          onboardingCompleted: dbUser.onboardingCompleted ?? currentUser!.onboardingCompleted,
-          isVerified: dbUser.isVerified ?? dbUser.is_verified ?? currentUser!.isVerified ?? false,
-        }
-
-        console.log(`[AuthContext][validateSession] Profile loaded | userId: ${updatedUser.id} | finalRole: ${updatedUser.role}`)
-        setUser(updatedUser)
-        setSessionId(storedSessionId)
-        localStorage.setItem("attendance_current_user", JSON.stringify(updatedUser))
-        if (updatedUser.schoolId) {
-          localStorage.setItem("x-school-id", updatedUser.schoolId)
-        }
-        currentUser = updatedUser
       } else {
-        throw new Error("Profile API returned success: false")
+        const profileJson = await profileRes.json()
+        if (profileJson.success && profileJson.data) {
+          const dbUser = profileJson.data
+
+          if (currentUser && dbUser.id !== currentUser.id) {
+            console.info(`[AuthContext][validateSession] Session updated from ${currentUser.id} to ${dbUser.id} — resyncing user data.`)
+            currentUser = {
+              id: dbUser.id,
+              email: dbUser.email,
+              phone: dbUser.phone || "",
+              name: dbUser.full_name || dbUser.name,
+              role: dbUser.role,
+              schoolId: dbUser.schoolId || dbUser.school_id || "",
+              schoolName: dbUser.schoolName || "",
+              schoolLogo: dbUser.schoolLogo || "",
+              teacherId: dbUser.teacher_id || "",
+              isSuperAdmin: dbUser.role === "super_admin",
+              profile_photo: dbUser.profile_photo || "",
+              onboardingCompleted: dbUser.onboardingCompleted ?? false,
+            }
+          }
+
+          const currentPath2 = typeof window !== "undefined" ? window.location.pathname : pathname
+          const isOnNeutralPage = !currentPath2.startsWith('/parent') &&
+            !currentPath2.startsWith('/school/teacher') &&
+            !currentPath2.startsWith('/school/admin') &&
+            !currentPath2.startsWith('/super-admin')
+
+          let resolvedRole = dbUser.role || currentUser!.role
+          if (isOnNeutralPage && currentUser!.role && dbUser.role && currentUser!.role !== dbUser.role) {
+            console.warn(`[AuthContext][validateSession] Role mismatch on neutral page — preserving cached role '${currentUser!.role}' over DB role '${dbUser.role}'`)
+            resolvedRole = currentUser!.role
+          }
+          if (currentUser!.role && dbUser.role && currentUser!.role !== dbUser.role) {
+            console.warn(`[AuthContext][validateSession] Role: cached='${currentUser!.role}' db='${dbUser.role}' resolved='${resolvedRole}'`)
+          }
+
+          const updatedUser: User = {
+            ...currentUser!,
+            name: dbUser.full_name || dbUser.name || currentUser!.name,
+            email: dbUser.email || currentUser!.email,
+            phone: dbUser.phone || currentUser!.phone || "",
+            profile_photo: dbUser.profile_photo || currentUser!.profile_photo || "",
+            role: resolvedRole,
+            schoolId: dbUser.schoolId || dbUser.school_id || currentUser!.schoolId,
+            schoolName: dbUser.schoolName || currentUser!.schoolName || "",
+            schoolLogo: dbUser.schoolLogo || currentUser!.schoolLogo || "",
+            onboardingCompleted: dbUser.onboardingCompleted ?? currentUser!.onboardingCompleted,
+            isVerified: dbUser.isVerified ?? dbUser.is_verified ?? currentUser!.isVerified ?? false,
+          }
+
+          console.log(`[AuthContext][validateSession] Profile loaded | userId: ${updatedUser.id} | finalRole: ${updatedUser.role}`)
+          setUser(updatedUser)
+          setSessionId(storedSessionId)
+          localStorage.setItem("attendance_current_user", JSON.stringify(updatedUser))
+          if (updatedUser.schoolId) localStorage.setItem("x-school-id", updatedUser.schoolId)
+          currentUser = updatedUser
+        } else {
+          throw new Error("Profile API returned success: false")
+        }
       }
     } catch (err) {
       console.warn("[AuthContext][validateSession] Profile fetch failed:", err)
-      // Transition gracefully using cached user if available
       if (currentUser) {
         console.log("[AuthContext][validateSession] Using cached user due to profile fetch failure")
         setUser(currentUser)
         setSessionId(storedSessionId)
-        setError(null) // Do NOT block the user when cached session is available
+        setError(null)
       } else {
         setError("Network or server connection failed. Please retry.")
       }
@@ -448,7 +392,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthLoading(false)
     }
 
-    // 2. Fetch permissions / features
+    // Resolve features (was already in-flight while profile was resolving)
     if (currentUser) {
       if (currentUser.role === "super_admin" || currentUser.role === "parent") {
         setFeatures([])
@@ -457,22 +401,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const schoolId = currentUser.schoolId
-      if (!schoolId) {
+      if (!currentUser.schoolId) {
         setFeatures([])
         setPermissionsLoading(false)
         return
       }
 
       try {
-        console.log(`[AuthContext][validateSession] Fetching features for school: ${schoolId}`)
-        const featRes = await fetch(`${getApiUrl()}/api/subscriptions/schools/${schoolId}/features`, {
-          headers: { "Authorization": `Bearer ${token}` },
-          credentials: 'include'
-        })
-
-        if (!featRes.ok) {
-          throw new Error(`Features fetch returned status ${featRes.status}`)
+        const featRes = await featuresPromise
+        if (!featRes || !featRes.ok) {
+          throw new Error(`Features fetch returned status ${featRes?.status ?? 'null'}`)
         }
 
         const featJson = await featRes.json()
@@ -485,8 +423,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.warn("[AuthContext][validateSession] Features fetch failed, falling back to cached features:", err)
-        // Fall back to cached features if available, otherwise default to empty array.
-        // DO NOT show a blocking error screen under any circumstance.
         if (cachedFeaturesStr) {
           try {
             setFeatures(JSON.parse(cachedFeaturesStr))
@@ -497,7 +433,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setFeatures([])
         }
-        setError(null) // Clear error to keep the dashboard accessible
+        setError(null)
       } finally {
         setPermissionsLoading(false)
       }

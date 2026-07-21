@@ -947,6 +947,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                   currentUser={currentUser}
                   uploadState={uploads[message.id]}
                   onCancelUpload={handleCancelUpload}
+                  isMobile={isMobile}
                 />
               );
               i++;
@@ -2065,6 +2066,7 @@ const MessageBubble = React.memo(({
   currentUser,
   uploadState,
   onCancelUpload,
+  isMobile,
 }: {
   message: Message,
   isLastInGroup: boolean,
@@ -2077,7 +2079,8 @@ const MessageBubble = React.memo(({
   onAction?: (action: string, data: any) => void,
   currentUser: any,
   uploadState?: { progress: number },
-  onCancelUpload?: (tempId: string) => void
+  onCancelUpload?: (tempId: string) => void,
+  isMobile?: boolean
 }) => {
   const isMe = message.isMe;
   const hasAttachments = message.attachments && message.attachments.length > 0;
@@ -2186,187 +2189,323 @@ const MessageBubble = React.memo(({
             wordBreak: 'break-word',
           }}
         >
-          <ContextMenu>
-            <ContextMenuTrigger>
-              <div
-                className={cn(
-                  "select-text w-full relative",
-                  isMediaOnly ? "leading-[0]" : ""
+          {isMobile ? (
+            <div
+              className={cn(
+                "select-text w-full relative",
+                isMediaOnly ? "leading-[0]" : ""
+              )}
+              style={{
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
+              }}
+            >
+              {/* ── Forwarded tag ─────────────────────────────────── */}
+              {(message as any).forwardedFrom && !message.isDeleted && (
+                <div className={cn(
+                  "flex items-center gap-1 text-[10px] font-medium mb-1.5",
+                  isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+                )}>
+                  <Forward className="h-3 w-3" />
+                  <span>Forwarded</span>
+                </div>
+              )}
+
+              {/* ── Reply-to quote preview ────────────────────────── */}
+              {(message as any).replyTo && !message.isDeleted && (
+                <div className={cn(
+                  "flex items-stretch gap-0 mb-1.5 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity",
+                  isMe
+                    ? "bg-white/15 border border-white/20"
+                    : "bg-primary/8 border border-primary/20"
                 )}
-                style={{
-                  whiteSpace: 'pre-wrap',
-                  overflowWrap: 'anywhere',
-                  wordBreak: 'break-word',
-                }}
-              >
-                {/* ── Forwarded tag ─────────────────────────────────── */}
-                {(message as any).forwardedFrom && !message.isDeleted && (
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const el = document.getElementById(`msg-${(message as any).replyTo?.id}`);
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                >
                   <div className={cn(
-                    "flex items-center gap-1 text-[10px] font-medium mb-1.5",
-                    isMe ? "text-primary-foreground/70" : "text-muted-foreground"
-                  )}>
-                    <Forward className="h-3 w-3" />
-                    <span>Forwarded</span>
+                    "w-1 shrink-0",
+                    isMe ? "bg-white/60" : "bg-primary"
+                  )} />
+                  <div className="px-2 py-1.5 min-w-0 flex-1">
+                    <p className={cn(
+                      "text-[11px] font-bold truncate",
+                      isMe ? "text-primary-foreground/90" : "text-primary"
+                    )}>
+                      {(message as any).replyTo?.senderName || 'Unknown'}
+                    </p>
+                    <p className={cn(
+                      "text-[12px] truncate",
+                      isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+                    )}>
+                      {(message as any).replyTo?.content ||
+                        ((message as any).replyTo?.type === 'IMAGE' ? '📷 Photo'
+                          : (message as any).replyTo?.type === 'VIDEO' ? '🎥 Video'
+                          : '📎 File')}
+                    </p>
                   </div>
-                )}
+                </div>
+              )}
+              {hasAttachments && (
+                <div className={cn(
+                  "flex flex-col gap-1",
+                  isMediaOnly ? "-m-1" : "mb-1 -mx-2 -mt-1"
+                )}>
+                  {message.attachments!.map((file, idx) => (
+                    <AttachmentRenderer
+                      key={idx}
+                      file={file}
+                      onImageClick={(url) => (window as any).showImagePreview?.(url)}
+                      isCompact={isMediaOnly}
+                      isMe={isMe}
+                      status={message.status}
+                      uploadState={uploadState}
+                      onCancelUpload={() => onCancelUpload?.(message.id)}
+                    />
+                  ))}
+                </div>
+              )}
+              {message.content && (!isMediaOnly || isEmojiOnly) && message.content !== 'File' && (
+                <div className={cn(
+                  "pb-4",
+                  hasAttachments ? "mt-2" : "",
+                  isEmojiOnly ? "text-5xl pb-1" : ""
+                )}>
+                  {(() => {
+                    const urlRegex = /((https?:\/\/[^\s]+)|(www\.[^\s]+))/g;
+                    const parts = message.content.split(urlRegex);
+                    let firstLinkFound = false;
 
-                {/* ── Reply-to quote preview ────────────────────────── */}
-                {(message as any).replyTo && !message.isDeleted && (
-                  <div className={cn(
-                    "flex items-stretch gap-0 mb-1.5 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity",
-                    isMe
-                      ? "bg-white/15 border border-white/20"
-                      : "bg-primary/8 border border-primary/20"
-                  )}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const el = document.getElementById(`msg-${(message as any).replyTo?.id}`);
-                      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }}
-                  >
-                    <div className={cn(
-                      "w-1 shrink-0",
-                      isMe ? "bg-white/60" : "bg-primary"
-                    )} />
-                    <div className="px-2 py-1.5 min-w-0 flex-1">
-                      <p className={cn(
-                        "text-[11px] font-bold truncate",
-                        isMe ? "text-primary-foreground/90" : "text-primary"
-                      )}>
-                        {(message as any).replyTo?.senderName || 'Unknown'}
-                      </p>
-                      <p className={cn(
-                        "text-[12px] truncate",
-                        isMe ? "text-primary-foreground/70" : "text-muted-foreground"
-                      )}>
-                        {(message as any).replyTo?.content ||
-                          ((message as any).replyTo?.type === 'IMAGE' ? '📷 Photo'
-                            : (message as any).replyTo?.type === 'VIDEO' ? '🎥 Video'
-                            : '📎 File')}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {hasAttachments && (
-                  <div className={cn(
-                    "flex flex-col gap-1",
-                    isMediaOnly ? "-m-1" : "mb-1 -mx-2 -mt-1"
-                  )}>
-                    {message.attachments!.map((file, idx) => (
-                      <AttachmentRenderer
-                        key={idx}
-                        file={file}
-                        onImageClick={(url) => (window as any).showImagePreview?.(url)}
-                        isCompact={isMediaOnly}
-                        isMe={isMe}
-                        status={message.status}
-                        uploadState={uploadState}
-                        onCancelUpload={() => onCancelUpload?.(message.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-                {message.content && (!isMediaOnly || isEmojiOnly) && message.content !== 'File' && (
-                  <div className={cn(
-                    "pb-4",
-                    hasAttachments ? "mt-2" : "",
-                    isEmojiOnly ? "text-5xl pb-1" : ""
-                  )}>
-                    {(() => {
-                      const urlRegex = /((https?:\/\/[^\s]+)|(www\.[^\s]+))/g;
-                      const parts = message.content.split(urlRegex);
-                      let firstLinkFound = false;
+                    const matches = Array.from(message.content.matchAll(urlRegex));
+                    if (matches.length === 0) return message.content;
 
-                      const matches = Array.from(message.content.matchAll(urlRegex));
-                      if (matches.length === 0) return message.content;
-
-                      let lastIdx = 0;
-                      const result = [];
-                      matches.forEach((match, i) => {
-                        if (match.index! > lastIdx) {
-                          result.push(message.content.substring(lastIdx, match.index));
-                        }
-
-                        const url = match[0];
-                        const href = url.startsWith('http') ? url : `https://${url}`;
-                        const showPreview = !firstLinkFound;
-                        firstLinkFound = true;
-
-                        result.push(
-                          <React.Fragment key={`link-${i}`}>
-                            <a
-                              href={href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={cn(
-                                "underline decoration-2 underline-offset-2 hover:opacity-80 transition-opacity font-bold break-all",
-                                message.isMe ? "text-white" : "text-primary"
-                              )}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {url}
-                            </a>
-                            {showPreview && <LinkPreview url={href} />}
-                          </React.Fragment>
-                        );
-                        lastIdx = match.index! + url.length;
-                      });
-
-                      if (lastIdx < message.content.length) {
-                        result.push(message.content.substring(lastIdx));
+                    let lastIdx = 0;
+                    const result = [];
+                    matches.forEach((match, i) => {
+                      if (match.index! > lastIdx) {
+                        result.push(message.content.substring(lastIdx, match.index));
                       }
 
-                      return result;
-                    })()}
-                  </div>
-                )}
-              </div>
-            </ContextMenuTrigger>
-            <ContextMenuContent className="w-56 rounded-2xl border-border/50 shadow-2xl p-1.5 animate-in fade-in zoom-in-95 duration-200">
-              {!message.isDeleted && message.content && (
-                <ContextMenuItem onClick={() => handleAction('copy')} className="rounded-xl h-10 gap-3 font-medium">
-                  <Copy className="h-4 w-4 text-primary" />
-                  {t('copy_text')}
-                </ContextMenuItem>
+                      const url = match[0];
+                      const href = url.startsWith('http') ? url : `https://${url}`;
+                      const showPreview = !firstLinkFound;
+                      firstLinkFound = true;
+
+                      result.push(
+                        <React.Fragment key={`link-${i}`}>
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={cn(
+                              "underline decoration-2 underline-offset-2 hover:opacity-80 transition-opacity font-bold break-all",
+                              message.isMe ? "text-white" : "text-primary"
+                            )}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {url}
+                          </a>
+                          {showPreview && <LinkPreview url={href} />}
+                        </React.Fragment>
+                      );
+                      lastIdx = match.index! + url.length;
+                    });
+
+                    if (lastIdx < message.content.length) {
+                      result.push(message.content.substring(lastIdx));
+                    }
+
+                    return result;
+                  })()}
+                </div>
               )}
-              {!message.isDeleted && (
-                <ContextMenuItem onClick={() => handleAction('reply')} className="rounded-xl h-10 gap-3 font-medium">
-                  <Reply className="h-4 w-4 text-primary" />
-                  {t('reply')}
-                </ContextMenuItem>
-              )}
-              {isMe && !message.isDeleted && message.type === 'TEXT' && (
-                <ContextMenuItem onClick={() => handleAction('edit_start')} className="rounded-xl h-10 gap-3 font-medium">
-                  <Edit className="h-4 w-4 text-primary" />
-                  Edit Message
-                </ContextMenuItem>
-              )}
-              {!message.isDeleted && (
-                <ContextMenuItem
-                  onClick={() => handleAction('pin', { isPinned: !!(message as any).isPinned, content: message.content, senderName: (message as any).senderName })}
-                  className="rounded-xl h-10 gap-3 font-medium"
+            </div>
+          ) : (
+            <ContextMenu>
+              <ContextMenuTrigger>
+                <div
+                  className={cn(
+                    "select-text w-full relative",
+                    isMediaOnly ? "leading-[0]" : ""
+                  )}
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'anywhere',
+                    wordBreak: 'break-word',
+                  }}
                 >
-                  {(message as any).isPinned
-                    ? <><Pin className="h-4 w-4 text-primary" />Unpin Message</>
-                    : <><Pin className="h-4 w-4 text-primary" />Pin Message</>}
+                  {/* ── Forwarded tag ─────────────────────────────────── */}
+                  {(message as any).forwardedFrom && !message.isDeleted && (
+                    <div className={cn(
+                      "flex items-center gap-1 text-[10px] font-medium mb-1.5",
+                      isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+                    )}>
+                      <Forward className="h-3 w-3" />
+                      <span>Forwarded</span>
+                    </div>
+                  )}
+
+                  {/* ── Reply-to quote preview ────────────────────────── */}
+                  {(message as any).replyTo && !message.isDeleted && (
+                    <div className={cn(
+                      "flex items-stretch gap-0 mb-1.5 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity",
+                      isMe
+                        ? "bg-white/15 border border-white/20"
+                        : "bg-primary/8 border border-primary/20"
+                    )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const el = document.getElementById(`msg-${(message as any).replyTo?.id}`);
+                        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }}
+                    >
+                      <div className={cn(
+                        "w-1 shrink-0",
+                        isMe ? "bg-white/60" : "bg-primary"
+                      )} />
+                      <div className="px-2 py-1.5 min-w-0 flex-1">
+                        <p className={cn(
+                          "text-[11px] font-bold truncate",
+                          isMe ? "text-primary-foreground/90" : "text-primary"
+                        )}>
+                          {(message as any).replyTo?.senderName || 'Unknown'}
+                        </p>
+                        <p className={cn(
+                          "text-[12px] truncate",
+                          isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+                        )}>
+                          {(message as any).replyTo?.content ||
+                            ((message as any).replyTo?.type === 'IMAGE' ? '📷 Photo'
+                              : (message as any).replyTo?.type === 'VIDEO' ? '🎥 Video'
+                              : '📎 File')}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {hasAttachments && (
+                    <div className={cn(
+                      "flex flex-col gap-1",
+                      isMediaOnly ? "-m-1" : "mb-1 -mx-2 -mt-1"
+                    )}>
+                      {message.attachments!.map((file, idx) => (
+                        <AttachmentRenderer
+                          key={idx}
+                          file={file}
+                          onImageClick={(url) => (window as any).showImagePreview?.(url)}
+                          isCompact={isMediaOnly}
+                          isMe={isMe}
+                          status={message.status}
+                          uploadState={uploadState}
+                          onCancelUpload={() => onCancelUpload?.(message.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {message.content && (!isMediaOnly || isEmojiOnly) && message.content !== 'File' && (
+                    <div className={cn(
+                      "pb-4",
+                      hasAttachments ? "mt-2" : "",
+                      isEmojiOnly ? "text-5xl pb-1" : ""
+                    )}>
+                      {(() => {
+                        const urlRegex = /((https?:\/\/[^\s]+)|(www\.[^\s]+))/g;
+                        const parts = message.content.split(urlRegex);
+                        let firstLinkFound = false;
+
+                        const matches = Array.from(message.content.matchAll(urlRegex));
+                        if (matches.length === 0) return message.content;
+
+                        let lastIdx = 0;
+                        const result = [];
+                        matches.forEach((match, i) => {
+                          if (match.index! > lastIdx) {
+                            result.push(message.content.substring(lastIdx, match.index));
+                          }
+
+                          const url = match[0];
+                          const href = url.startsWith('http') ? url : `https://${url}`;
+                          const showPreview = !firstLinkFound;
+                          firstLinkFound = true;
+
+                          result.push(
+                            <React.Fragment key={`link-${i}`}>
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={cn(
+                                  "underline decoration-2 underline-offset-2 hover:opacity-80 transition-opacity font-bold break-all",
+                                  message.isMe ? "text-white" : "text-primary"
+                                )}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {url}
+                              </a>
+                              {showPreview && <LinkPreview url={href} />}
+                            </React.Fragment>
+                          );
+                          lastIdx = match.index! + url.length;
+                        });
+
+                        if (lastIdx < message.content.length) {
+                          result.push(message.content.substring(lastIdx));
+                        }
+
+                        return result;
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="w-56 rounded-2xl border-border/50 shadow-2xl p-1.5 animate-in fade-in zoom-in-95 duration-200">
+                {!message.isDeleted && message.content && (
+                  <ContextMenuItem onClick={() => handleAction('copy')} className="rounded-xl h-10 gap-3 font-medium">
+                    <Copy className="h-4 w-4 text-primary" />
+                    {t('copy_text')}
+                  </ContextMenuItem>
+                )}
+                {!message.isDeleted && (
+                  <ContextMenuItem onClick={() => handleAction('reply')} className="rounded-xl h-10 gap-3 font-medium">
+                    <Reply className="h-4 w-4 text-primary" />
+                    {t('reply')}
+                  </ContextMenuItem>
+                )}
+                {isMe && !message.isDeleted && message.type === 'TEXT' && (
+                  <ContextMenuItem onClick={() => handleAction('edit_start')} className="rounded-xl h-10 gap-3 font-medium">
+                    <Edit className="h-4 w-4 text-primary" />
+                    Edit Message
+                  </ContextMenuItem>
+                )}
+                {!message.isDeleted && (
+                  <ContextMenuItem
+                    onClick={() => handleAction('pin', { isPinned: !!(message as any).isPinned, content: message.content, senderName: (message as any).senderName })}
+                    className="rounded-xl h-10 gap-3 font-medium"
+                  >
+                    {(message as any).isPinned
+                      ? <><Pin className="h-4 w-4 text-primary" />Unpin Message</>
+                      : <><Pin className="h-4 w-4 text-primary" />Pin Message</>}
+                  </ContextMenuItem>
+                )}
+                {!message.isDeleted && (
+                  <ContextMenuItem onClick={() => handleAction('forward')} className="rounded-xl h-10 gap-3 font-medium">
+                    <Forward className="h-4 w-4 text-primary" />
+                    {t('forward')}
+                  </ContextMenuItem>
+                )}
+                <ContextMenuSeparator className="my-1 bg-border/50" />
+                <ContextMenuItem
+                  onClick={() => handleAction('delete_confirm')}
+                  className="rounded-xl h-10 gap-3 text-destructive focus:bg-destructive/10 focus:text-destructive font-medium"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {isMe ? 'Delete' : 'Delete for Me'}
                 </ContextMenuItem>
-              )}
-              {!message.isDeleted && (
-                <ContextMenuItem onClick={() => handleAction('forward')} className="rounded-xl h-10 gap-3 font-medium">
-                  <Forward className="h-4 w-4 text-primary" />
-                  {t('forward')}
-                </ContextMenuItem>
-              )}
-              <ContextMenuSeparator className="my-1 bg-border/50" />
-              <ContextMenuItem
-                onClick={() => handleAction('delete_confirm')}
-                className="rounded-xl h-10 gap-3 text-destructive focus:bg-destructive/10 focus:text-destructive font-medium"
-              >
-                <Trash2 className="h-4 w-4" />
-                {isMe ? 'Delete' : 'Delete for Me'}
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
+              </ContextMenuContent>
+            </ContextMenu>
+          )}
 
           <div className={cn(
             "flex items-center gap-1 text-[10px]",

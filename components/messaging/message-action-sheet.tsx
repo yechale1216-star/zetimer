@@ -245,35 +245,16 @@ export const MessageActionSheet: React.FC<MessageActionSheetProps> = ({
 
 // ── Individual action row ────────────────────────────────────────────────────
 const ActionButton = ({ action }: { action: ActionItem }) => {
-  const [pressed, setPressed] = useState(false);
-
   return (
     <button
       className={cn(
-        'w-full flex items-center gap-4 px-5 py-3.5 text-left transition-colors duration-100 relative overflow-hidden select-none',
+        'w-full flex items-center gap-4 px-5 py-3.5 text-left transition-colors duration-150 relative overflow-hidden select-none active:scale-[0.98]',
         action.isDestructive
           ? 'text-destructive hover:bg-destructive/8 active:bg-destructive/15'
-          : 'text-foreground hover:bg-secondary/60 active:bg-secondary',
-        pressed && 'scale-[0.98]'
+          : 'text-foreground hover:bg-secondary/60 active:bg-secondary'
       )}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => { setPressed(false); action.onClick(); }}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
+      onClick={action.onClick}
     >
-      {/* Ripple effect */}
-      {pressed && (
-        <motion.span
-          initial={{ scale: 0, opacity: 0.3 }}
-          animate={{ scale: 4, opacity: 0 }}
-          transition={{ duration: 0.4 }}
-          className={cn(
-            'absolute inset-0 m-auto w-12 h-12 rounded-full pointer-events-none',
-            action.isDestructive ? 'bg-destructive/20' : 'bg-foreground/10'
-          )}
-        />
-      )}
-
       {/* Icon */}
       <span className={cn(
         'shrink-0',

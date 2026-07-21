@@ -195,6 +195,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Track which message to flash/highlight after scrolling to it
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
+
+  const focusInput = () => {
+    setTimeout(() => textInputRef.current?.focus(), 80);
+  };
 
   useEffect(() => {
     setCurrentUser(authService.getCurrentUser());
@@ -606,11 +614,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
       case 'reply':
         setReplyTarget(message);
         setEditTarget(null);
+        focusInput();
         break;
       case 'edit_start':
         setEditTarget(message);
         setReplyTarget(null);
         setInputValue(message.content);
+        focusInput();
         break;
       case 'copy':
         navigator.clipboard.writeText(message.content || '');
@@ -1346,6 +1356,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
         isOpen={!!actionSheetMessage}
         onClose={() => setActionSheetMessage(null)}
         canDeleteForEveryone={actionSheetMessage?.isMe ?? false}
+        otherPersonName={activeConversation?.isGroup ? undefined : activeConversation?.name}
+        isGroup={!!activeConversation?.isGroup}
         onCopy={() => {
           navigator.clipboard.writeText(actionSheetMessage?.content || '');
           toast.success('Copied to clipboard');
@@ -1353,12 +1365,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
         onReply={() => {
           if (actionSheetMessage) setReplyTarget(actionSheetMessage);
           setEditTarget(null);
+          focusInput();
         }}
         onEdit={() => {
           if (actionSheetMessage) {
             setEditTarget(actionSheetMessage);
             setReplyTarget(null);
             setInputValue(actionSheetMessage.content || '');
+            focusInput();
           }
         }}
         onPin={() => {

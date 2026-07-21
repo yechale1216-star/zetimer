@@ -62,6 +62,7 @@ export function MessagingCenter() {
     messageIds?: string[];
     singleMessage?: any;
   } | null>(null);
+  const [forwardSearchQuery, setForwardSearchQuery] = useState('');
   const [pinnedByConversation, setPinnedByConversation] = useState<Record<string, any>>({}); // conversationId -> pinnedMessage info
 
   const { socket, isConnected } = useSocket();
@@ -702,6 +703,8 @@ export function MessagingCenter() {
               content: msg.content,
               type: msg.type || 'TEXT',
               attachment: msg.attachments?.[0],
+              forwardedFrom: msg.senderName || 'Unknown',
+              forwardedFromId: msg.id,
             });
           }
         }
@@ -715,6 +718,7 @@ export function MessagingCenter() {
       });
     } finally {
       setForwardDialogData(null);
+      setForwardSearchQuery('');
     }
   };
 
@@ -753,6 +757,10 @@ export function MessagingCenter() {
           [activeConversationId!]: filteredMsgs
         }));
         cacheMessages(activeConversationId!, filteredMsgs).catch(() => {});
+        toast({
+          title: "Deleted for you",
+          description: "Message removed from your view",
+        });
         break;
       }
       case 'pin': {
@@ -1439,59 +1447,77 @@ export function MessagingCenter() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setForwardDialogData(null)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => { setForwardDialogData(null); setForwardSearchQuery(''); }}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             />
             <motion.div
               initial={{ scale: 0.95, y: 15, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.95, y: 15, opacity: 0 }}
-              className="bg-background border border-border shadow-2xl rounded-3xl w-full max-w-md overflow-hidden relative z-10 flex flex-col max-h-[80vh]"
+              className="bg-background border border-border/60 shadow-2xl rounded-3xl w-full max-w-md overflow-hidden relative z-10 flex flex-col max-h-[80vh]"
             >
-              <div className="p-5 border-b border-border/50 flex items-center justify-between">
-                <span className="font-bold text-lg tracking-tight text-foreground">Forward Message</span>
-                <Button variant="ghost" size="icon" onClick={() => setForwardDialogData(null)} className="h-8 w-8 rounded-full">
+              <div className="p-5 border-b border-border/40 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-lg tracking-tight text-foreground">Forward Message</h3>
+                  <p className="text-xs text-muted-foreground">Select a chat to send message</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => { setForwardDialogData(null); setForwardSearchQuery(''); }} className="h-8 w-8 rounded-full">
                   <X className="h-5 w-5" />
                 </Button>
               </div>
 
+              {/* Search Box */}
+              <div className="p-3 border-b border-border/30 bg-secondary/20">
+                <input
+                  type="text"
+                  placeholder="Search chats or contacts..."
+                  value={forwardSearchQuery}
+                  onChange={(e) => setForwardSearchQuery(e.target.value)}
+                  className="w-full bg-background border border-border/50 rounded-xl px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 placeholder:text-muted-foreground/60"
+                />
+              </div>
+
               <div className="flex-1 overflow-y-auto p-3 space-y-1">
                 {/* Pinned Saved Messages option */}
-                <button
-                  onClick={() => handleForwardTo('saved-messages')}
-                  className="w-full flex items-center gap-3.5 p-3 rounded-2xl transition-colors hover:bg-emerald-600/10 hover:text-emerald-700 active:scale-[98] text-left group"
-                >
-                  <div className="h-11 w-11 rounded-full bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                    <Bookmark className="h-5 w-5 text-emerald-600 group-hover:text-white transition-colors" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-sm text-foreground group-hover:text-emerald-750 transition-colors">Saved Messages</p>
-                    <p className="text-xs text-muted-foreground/60">Forward to your private notes</p>
-                  </div>
-                </button>
+                {(!forwardSearchQuery || 'saved messages'.includes(forwardSearchQuery.toLowerCase())) && (
+                  <button
+                    onClick={() => handleForwardTo('saved-messages')}
+                    className="w-full flex items-center gap-3.5 p-3 rounded-2xl transition-colors hover:bg-emerald-600/10 hover:text-emerald-700 active:scale-[98] text-left group"
+                  >
+                    <div className="h-11 w-11 rounded-full bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                      <Bookmark className="h-5 w-5 text-emerald-600 group-hover:text-white transition-colors" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-foreground group-hover:text-emerald-750 transition-colors">Saved Messages</p>
+                      <p className="text-xs text-muted-foreground/60">Forward to your private notes</p>
+                    </div>
+                  </button>
+                )}
 
                 <div className="h-px bg-border/40 mx-2 my-1" />
 
-                {conversations.map((conv) => (
-                  <button
-                    key={conv.id}
-                    onClick={() => handleForwardTo(conv.id)}
-                    className="w-full flex items-center gap-3.5 p-3 rounded-2xl transition-colors hover:bg-secondary active:scale-[98] text-left"
-                  >
-                    <Avatar className="h-11 w-11 border border-border/20">
-                      <AvatarImage src={conv.avatar || undefined} />
-                      <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
-                        {conv.name?.slice(0, 2)?.toUpperCase() || 'CH'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p className="font-bold text-sm text-foreground truncate">{conv.name}</p>
-                      <p className="text-xs text-muted-foreground/60 truncate">
-                        {conv.isGroup ? `${conv.members?.length || 0} members` : conv.role || 'Chat'}
-                      </p>
-                    </div>
-                  </button>
-                ))}
+                {conversations
+                  .filter(conv => !forwardSearchQuery || conv.name?.toLowerCase().includes(forwardSearchQuery.toLowerCase()))
+                  .map((conv) => (
+                    <button
+                      key={conv.id}
+                      onClick={() => handleForwardTo(conv.id)}
+                      className="w-full flex items-center gap-3.5 p-3 rounded-2xl transition-colors hover:bg-secondary active:scale-[98] text-left"
+                    >
+                      <Avatar className="h-11 w-11 border border-border/20">
+                        <AvatarImage src={conv.avatar || undefined} />
+                        <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
+                          {conv.name?.slice(0, 2)?.toUpperCase() || 'CH'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm text-foreground truncate">{conv.name}</p>
+                        <p className="text-xs text-muted-foreground/60 truncate">
+                          {conv.isGroup ? `${conv.members?.length || 0} members` : conv.role || 'Chat'}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
               </div>
             </motion.div>
           </div>

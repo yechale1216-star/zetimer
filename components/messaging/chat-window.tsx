@@ -246,7 +246,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
     selectedIds.forEach(id => {
       const msg = messages.find(m => m.id === id);
       if (msg?.isMe) {
-        onAction?.('delete', { messageId: id });
+        onAction?.('delete', { messageId: id, deleteForEveryone: true });
+      } else {
+        onAction?.('delete_for_me', { messageId: id });
       }
     });
     setSelectedIds([]);
@@ -876,10 +878,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
       >
         <DateSeparator date={t("today")} />
         {(() => {
+          const displayMessages = messages.filter(m => !m.isDeleted);
           const rendered: React.ReactNode[] = [];
           let i = 0;
-          while (i < messages.length) {
-            const message = messages[i];
+          while (i < displayMessages.length) {
+            const message = displayMessages[i];
             const isCallType = message.type === 'CALL_VOICE' || message.type === 'CALL_VIDEO' ||
               message.type === 'CALL_MISSED_VOICE' || message.type === 'CALL_MISSED_VIDEO';
 
@@ -889,9 +892,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
               if (isMissed) {
                 let count = 1;
                 while (
-                  i + count < messages.length &&
-                  messages[i + count].type === message.type &&
-                  messages[i + count].senderId === message.senderId
+                  i + count < displayMessages.length &&
+                  displayMessages[i + count].type === message.type &&
+                  displayMessages[i + count].senderId === message.senderId
                 ) count++;
 
                 rendered.push(
@@ -931,7 +934,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
                 i++;
               }
             } else {
-              const isNextSameSender = messages[i + 1]?.senderId === message.senderId;
+              const isNextSameSender = displayMessages[i + 1]?.senderId === message.senderId;
               rendered.push(
                 <MessageBubble
                   key={message.id}

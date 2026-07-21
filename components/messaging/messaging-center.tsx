@@ -732,13 +732,13 @@ export function MessagingCenter() {
       case 'delete': {
         const delId = data.messageId;
         const deleteForEveryone = data.deleteForEveryone !== false; // default true for 'delete' action
-        // Optimistic local update: mark as deleted immediately
+        // Optimistic local update: remove message completely from view
         setMessagesByConversation(prev => {
           const msgs = prev[activeConversationId!];
           if (!msgs) return prev;
-          const updated = msgs.map(m => m.id === delId ? { ...m, isDeleted: true, content: null } : m);
-          cacheMessages(activeConversationId!, updated).catch(() => {});
-          return { ...prev, [activeConversationId!]: updated };
+          const filtered = msgs.filter(m => m.id !== delId);
+          cacheMessages(activeConversationId!, filtered).catch(() => {});
+          return { ...prev, [activeConversationId!]: filtered };
         });
         socket.emit('delete_message', {
           messageId: delId,
@@ -1037,11 +1037,12 @@ export function MessagingCenter() {
       setMessagesByConversation(prev => {
         const msgs = prev[data.conversationId];
         if (!msgs) return prev;
+        const filtered = msgs.filter(m => m.id !== data.messageId);
         // Update IndexedDB cache
-        updateCachedMessage(data.conversationId, data.messageId, m => ({ ...m, isDeleted: true, content: null })).catch(() => {});
+        cacheMessages(data.conversationId, filtered).catch(() => {});
         return {
           ...prev,
-          [data.conversationId]: msgs.map(m => m.id === data.messageId ? { ...m, isDeleted: true, content: null } : m)
+          [data.conversationId]: filtered
         };
       });
     };

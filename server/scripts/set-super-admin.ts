@@ -5,7 +5,7 @@ const prisma = new PrismaClient()
 
 async function main() {
   const email = 'zetime12@gmail.com'
-  const password = 'superadmin'
+  const password = 'superadmin12'
   const hashedPassword = bcrypt.hashSync(password, 10)
 
   console.log(`Setting up super admin: ${email}...`)

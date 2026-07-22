@@ -550,8 +550,10 @@ model Message {
 
   @@index([conversationId])
   @@index([conversationId, createdAt])   // message pagination — avoids full-table sort
+  @@index([conversationId, createdAt, id]) // composite index for cursor-based pagination
   @@index([schoolId, conversationId])    // tenant-scoped conversation message fetch
   @@index([senderId])
+  @@index([createdAt])
   @@index([schoolId])
 }
 

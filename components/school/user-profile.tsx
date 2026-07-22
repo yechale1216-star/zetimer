@@ -16,21 +16,29 @@ export function UserProfile() {
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<any>({})
 
+  // Normalize user object so full_name is always populated (User interface stores 'name')
+  const normalizeUser = (u: any) => ({
+    ...u,
+    full_name: u.full_name || u.name || "",
+  })
+
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
         // First get from localStorage for immediate display
         const cachedUser = authService.getCurrentUser()
         if (cachedUser) {
-          setUser(cachedUser)
-          setFormData(cachedUser)
+          const normalized = normalizeUser(cachedUser)
+          setUser(normalized)
+          setFormData(normalized)
         }
 
         // Then refresh from server for latest data
         const freshUser = await authService.refreshUserProfile()
         if (freshUser) {
-          setUser(freshUser)
-          setFormData(freshUser)
+          const normalized = normalizeUser(freshUser)
+          setUser(normalized)
+          setFormData(normalized)
           
           if (freshUser.schoolId) {
             const schoolData = await db.getSettings()
@@ -107,6 +115,7 @@ export function UserProfile() {
         updatePayload.password_hash = formData.password
       }
 
+      // Use the generic user update endpoint — works for admin, teacher, and super_admin
       await db.updateTeacher(user.id, updatePayload)
       
       // Update local user session in localStorage so they remain authenticated with new credentials
@@ -124,6 +133,8 @@ export function UserProfile() {
       // Clear password inputs from form
       setFormData((prev: any) => ({
         ...prev,
+        full_name: updatePayload.full_name,
+        email: updatePayload.email,
         password: "",
         confirmPassword: ""
       }))
@@ -297,7 +308,7 @@ export function UserProfile() {
               <Button
                 onClick={() => {
                   setIsEditing(false)
-                  setFormData(user)
+                  setFormData(normalizeUser(user))
                 }}
                 variant="outline"
                 className="px-6"

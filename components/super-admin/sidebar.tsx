@@ -19,6 +19,7 @@ import {
   LogOut,
   Bell,
   Lock,
+  User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/utils'
 import { useAuth } from '@/lib/context/auth-context'
@@ -75,6 +76,11 @@ const navigationItems = [
     label: 'Roles & Permissions',
     href: '/super-admin/rbac',
     icon: Lock,
+  },
+  {
+    label: 'My Profile',
+    href: '/super-admin/profile',
+    icon: User,
   },
   {
     label: 'Settings',
@@ -146,17 +152,18 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
         {/* Bottom Section */}
         <div className="p-4 border-t border-border space-y-2">
-          <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary">
+          <Link href="/super-admin/profile" className="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary hover:bg-muted transition-colors group">
             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 text-primary font-bold text-xs">
               <span className="typography-label">
                 {user?.name ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : 'SA'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="typography-label text-foreground truncate">{user?.name || 'Super Admin'}</p>
+              <p className="typography-label text-foreground truncate group-hover:text-primary transition-colors">{user?.name || 'Super Admin'}</p>
               <p className="typography-helper text-muted-foreground truncate">{user?.email || 'admin@zetime.io'}</p>
             </div>
-          </div>
+            <User className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+          </Link>
 
           <button
             onClick={handleLogout}

@@ -107,10 +107,39 @@ export async function cacheMessages(conversationId: string, messages: any[]): Pr
   try {
     const db = await openDB()
     const tx = db.transaction(MESSAGES_STORE, "readwrite")
-    await idbPut(tx.objectStore(MESSAGES_STORE), { conversationId, messages, updatedAt: Date.now() })
+    // Cap at 200 recent messages per conversation for persistent storage
+    const trimmed = messages.length > 200 ? messages.slice(-200) : messages
+    await idbPut(tx.objectStore(MESSAGES_STORE), { conversationId, messages: trimmed, updatedAt: Date.now() })
     await txComplete(tx)
   } catch (err) {
     console.warn("[MessageCache] cacheMessages failed:", err)
+  }
+}
+
+/**
+ * Prepend older messages (fetched via cursor pagination) to an existing conversation cache.
+ */
+export async function prependCachedMessages(conversationId: string, olderMessages: any[]): Promise<void> {
+  try {
+    const db = await openDB()
+    const tx = db.transaction(MESSAGES_STORE, "readwrite")
+    const store = tx.objectStore(MESSAGES_STORE)
+
+    const record = await idbGet<{ conversationId: string; messages: any[]; updatedAt: number }>(
+      store, conversationId
+    )
+
+    const existing = record?.messages ?? []
+    const existingIds = new Set(existing.map((m: any) => m.id))
+    const filteredOlder = olderMessages.filter((m: any) => !existingIds.has(m.id))
+    
+    const combined = [...filteredOlder, ...existing]
+    const trimmed = combined.length > 250 ? combined.slice(-250) : combined
+
+    await idbPut(store, { conversationId, messages: trimmed, updatedAt: Date.now() })
+    await txComplete(tx)
+  } catch (err) {
+    console.warn("[MessageCache] prependCachedMessages failed:", err)
   }
 }
 
@@ -310,7 +339,47 @@ export async function incrementOutboxRetries(tempId: string): Promise<void> {
   }
 }
 
-// ─── Cleanup ─────────────────────────────────────────────────────────────────
+/** Prune old cached conversation message entries (older than 14 days or exceeding 50 conversations). */
+export async function pruneOldCache(maxDays = 14, maxConversations = 50): Promise<void> {
+  try {
+    const db = await openDB()
+    if (!db.objectStoreNames.contains(MESSAGES_STORE)) return
+
+    const tx = db.transaction(MESSAGES_STORE, "readwrite")
+    const store = tx.objectStore(MESSAGES_STORE)
+
+    const req = store.getAll()
+    req.onsuccess = async () => {
+      const records: { conversationId: string; messages: any[]; updatedAt: number }[] = req.result || []
+      const now = Date.now()
+      const maxAgeMs = maxDays * 24 * 60 * 60 * 1000
+
+      // Filter records older than maxDays
+      const toDelete: string[] = []
+      records.forEach((rec) => {
+        if (rec.updatedAt && now - rec.updatedAt > maxAgeMs) {
+          toDelete.push(rec.conversationId)
+        }
+      })
+
+      // If still exceeding maxConversations, delete oldest
+      const remaining = records.filter(r => !toDelete.includes(r.conversationId))
+      if (remaining.length > maxConversations) {
+        remaining.sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))
+        const excessCount = remaining.length - maxConversations
+        for (let i = 0; i < excessCount; i++) {
+          toDelete.push(remaining[i].conversationId)
+        }
+      }
+
+      for (const convId of toDelete) {
+        store.delete(convId)
+      }
+    }
+  } catch (err) {
+    console.warn("[MessageCache] pruneOldCache failed:", err)
+  }
+}
 
 /** Clear all cached data (called on logout). */
 export async function clearMessageCache(): Promise<void> {

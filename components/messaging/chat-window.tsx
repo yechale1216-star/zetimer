@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils/utils';
-// MessageWindowSkeleton removed — replaced with Telegram-style thin progress bar
+import { MessageWindowSkeleton } from '@/components/messaging/skeletons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +33,7 @@ import { Logo } from '@/components/logo';
 import { useCall } from '@/components/providers/call-provider';
 import { authService } from '@/lib/auth/auth';
 import { supabase } from '@/lib/utils/supabase';
+import { fileTransferManager } from '@/lib/utils/file-transfer-manager';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/context/language-context';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -84,6 +85,9 @@ interface ChatWindowProps {
   onAction?: (action: string, data: any) => void;
   isLoading?: boolean;
   pinnedMessage?: { messageId: string; content?: string; senderName?: string; type?: string } | null;
+  onLoadOlderMessages?: () => void;
+  hasMoreOlderMessages?: boolean;
+  isLoadingOlderMessages?: boolean;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
@@ -96,6 +100,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   onAction,
   isLoading,
   pinnedMessage,
+  onLoadOlderMessages,
+  hasMoreOlderMessages,
+  isLoadingOlderMessages,
 }) => {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
@@ -261,14 +268,26 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const isNearBottomRef = useRef(true);
+  const prevScrollInfoRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const isPrependingRef = useRef(false);
 
-  // Track whether the user is near the bottom of the scroll container
+  // Track whether the user is near the bottom or top of the scroll container
   const handleScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     isNearBottomRef.current = distFromBottom < 120;
     setShowScrollBtn(distFromBottom > 200);
+
+    // Infinite scroll up trigger: near top (< 120px)
+    if (el.scrollTop < 120 && hasMoreOlderMessages && !isLoadingOlderMessages && onLoadOlderMessages) {
+      prevScrollInfoRef.current = {
+        scrollHeight: el.scrollHeight,
+        scrollTop: el.scrollTop,
+      };
+      isPrependingRef.current = true;
+      onLoadOlderMessages();
+    }
 
     const currentScrollY = el.scrollTop;
     const lastScroll = parseInt(el.dataset.lastScroll || '0', 10);
@@ -286,8 +305,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
   };
 
-  // When messages change: scroll smoothly only if already near bottom
+  // When messages change: adjust scroll position if prepending older items, or scroll to bottom if near bottom
   useEffect(() => {
+    const el = scrollRef.current;
+    if (el && isPrependingRef.current && prevScrollInfoRef.current) {
+      const heightDiff = el.scrollHeight - prevScrollInfoRef.current.scrollHeight;
+      el.scrollTop = prevScrollInfoRef.current.scrollTop + heightDiff;
+      isPrependingRef.current = false;
+      prevScrollInfoRef.current = null;
+      return;
+    }
+
     if (isNearBottomRef.current) {
       scrollToBottom('smooth');
     }
@@ -583,6 +611,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
         replaceTempId: fileTempId, // ← replace the local preview, not add a new message
       });
       
+      // Cleanup uploads state upon success
       setUploads(prev => {
         const next = { ...prev };
         delete next[fileTempId];
@@ -600,13 +629,20 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
       } else {
         console.error('Error sending message:', error);
         toast.error('Failed to upload file. Please try again.');
+        onAction?.('upload_failed', { messageId: fileTempId });
+        // Retain the file metadata for retry, but reset controller/abort state
+        setUploads(prev => {
+          if (!prev[fileTempId]) return prev;
+          return {
+            ...prev,
+            [fileTempId]: {
+              ...prev[fileTempId],
+              progress: 0,
+              failed: true,
+            }
+          };
+        });
       }
-    } finally {
-      setUploads(prev => {
-        const next = { ...prev };
-        delete next[fileTempId];
-        return next;
-      });
     }
   };
 
@@ -876,10 +912,24 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 space-y-4 relative z-10 scrollbar-hide"
       >
-        <DateSeparator date={t("today")} />
-        {(() => {
-          const displayMessages = messages.filter(m => !m.isDeleted);
-          const rendered: React.ReactNode[] = [];
+        {/* Spinner when fetching older messages */}
+        {isLoadingOlderMessages && (
+          <div className="flex justify-center py-2">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-secondary/80 backdrop-blur text-xs text-muted-foreground shadow-sm animate-pulse">
+              <RotateCw className="h-3.5 w-3.5 animate-spin text-primary" />
+              <span>Loading older messages...</span>
+            </div>
+          </div>
+        )}
+        {/* Initial chat loading skeleton */}
+        {isLoading && messages.length === 0 ? (
+          <MessageWindowSkeleton />
+        ) : (
+          <>
+            <DateSeparator date={t("today")} />
+            {(() => {
+              const displayMessages = messages.filter(m => !m.isDeleted);
+              const rendered: React.ReactNode[] = [];
           let i = 0;
           while (i < displayMessages.length) {
             const message = displayMessages[i];
@@ -958,6 +1008,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
           }
           return rendered;
         })()}
+          </>
+        )}
         {/* Invisible anchor element always at the very bottom */}
         <div ref={messagesEndRef} className="h-0 w-full" />
       </div>
@@ -1782,6 +1834,68 @@ const UploadProgressOverlay = ({
   );
 };
 
+interface CircularProgressProps {
+  progress: number;
+  status: 'idle' | 'pending' | 'transferring' | 'completed' | 'failed';
+  onClick?: (e: React.MouseEvent) => void;
+  size?: number;
+  strokeWidth?: number;
+  completedIcon?: React.ReactNode;
+}
+
+const CircularProgress: React.FC<CircularProgressProps> = ({
+  progress,
+  status,
+  onClick,
+  size = 40,
+  strokeWidth = 2.5,
+  completedIcon,
+}) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (Math.max(0, Math.min(progress, 100)) / 100) * circumference;
+
+  return (
+    <div
+      onClick={onClick}
+      className="relative flex items-center justify-center shrink-0 cursor-pointer select-none rounded-full hover:scale-105 active:scale-95 transition-transform bg-primary/10 dark:bg-slate-800/40"
+      style={{ width: size, height: size }}
+    >
+      <svg className="absolute inset-0 -rotate-90 w-full h-full">
+        {/* Background track circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          className="stroke-primary/10 fill-none"
+          strokeWidth={strokeWidth}
+        />
+        {/* Foreground animated progress circle */}
+        {(status === 'transferring' || status === 'pending') && (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            className="stroke-primary fill-none transition-[stroke-dashoffset] duration-150"
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+          />
+        )}
+      </svg>
+      {/* Icon Overlay inside circle */}
+      <div className="z-10 flex items-center justify-center text-primary">
+        {status === 'idle' && <Download className="h-4 w-4 text-primary" />}
+        {status === 'pending' && <Clock className="h-4 w-4 animate-pulse text-primary" />}
+        {status === 'transferring' && <X className="h-4 w-4 text-primary stroke-[2.5]" />}
+        {status === 'failed' && <RotateCw className="h-4 w-4 text-destructive animate-spin-reverse" />}
+        {status === 'completed' && (completedIcon || <FileText className="h-4 w-4 text-primary" />)}
+      </div>
+    </div>
+  );
+};
+
 const AttachmentRenderer = ({
   file: rawFile,
   onImageClick,
@@ -1790,6 +1904,7 @@ const AttachmentRenderer = ({
   status,
   uploadState,
   onCancelUpload,
+  onRetryUpload,
 }: {
   file: any;
   onImageClick: (url: string) => void;
@@ -1798,6 +1913,7 @@ const AttachmentRenderer = ({
   status?: string;
   uploadState?: { progress: number };
   onCancelUpload?: () => void;
+  onRetryUpload?: () => void;
 }) => {
   const file = rawFile.create ? rawFile.create : rawFile;
   const isImage = file.type?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.url);
@@ -1806,13 +1922,75 @@ const AttachmentRenderer = ({
   const isSending = status === 'sending';
   const isUploading = isSending && uploadState && uploadState.progress < 100;
 
+  const [downloadState, setDownloadState] = useState<{
+    progress: number;
+    loaded: number;
+    total: number;
+    status: 'idle' | 'pending' | 'transferring' | 'completed' | 'failed';
+    localUrl?: string;
+  }>({
+    progress: 0,
+    loaded: 0,
+    total: 0,
+    status: 'idle',
+  });
+
+  useEffect(() => {
+    if (isImage || isVideo || isSending) return;
+
+    // Check Cache on mount
+    fileTransferManager.checkCache(file.url).then(cachedUrl => {
+      if (cachedUrl) {
+        setDownloadState({
+          progress: 100,
+          loaded: file.size || 0,
+          total: file.size || 0,
+          status: 'completed',
+          localUrl: cachedUrl,
+        });
+      }
+    });
+
+    // Subscribe to transfer manager progress updates
+    const unsubscribe = fileTransferManager.subscribe(file.url, (state) => {
+      setDownloadState(state);
+    });
+
+    return () => unsubscribe();
+  }, [file.url, file.size, isImage, isVideo, isSending]);
+
+  const handleDownloadAction = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSending) return;
+
+    if (downloadState.status === 'completed' && downloadState.localUrl) {
+      window.open(downloadState.localUrl, '_blank');
+    } else if (downloadState.status === 'transferring' || downloadState.status === 'pending') {
+      fileTransferManager.cancelDownload(file.url);
+    } else {
+      try {
+        await fileTransferManager.downloadFile(file.url, file.name);
+      } catch (err) {
+        console.error('[Download error]', err);
+      }
+    }
+  };
+
   const getFileIcon = (url: string) => {
-    if (url.endsWith('.pdf')) return <FileText className="h-6 w-6 text-red-500" />;
-    if (url.match(/\.(docx|doc|rtf)$/)) return <FileText className="h-6 w-6 text-blue-500" />;
-    if (url.match(/\.(xlsx|xls|csv)$/)) return <FileType className="h-6 w-6 text-emerald-500" />;
-    if (url.match(/\.(pptx|ppt)$/)) return <FileType className="h-6 w-6 text-orange-500" />;
-    if (url.match(/\.(zip|rar|7z|tar|gz)$/)) return <FileArchive className="h-6 w-6 text-yellow-600" />;
-    return <Paperclip className="h-6 w-6 text-primary" />;
+    if (url.endsWith('.pdf')) return <FileText className="h-5 w-5 text-red-500" />;
+    if (url.match(/\.(docx|doc|rtf)$/)) return <FileText className="h-5 w-5 text-blue-500" />;
+    if (url.match(/\.(xlsx|xls|csv)$/)) return <FileType className="h-5 w-5 text-emerald-500" />;
+    if (url.match(/\.(pptx|ppt)$/)) return <FileType className="h-5 w-5 text-orange-500" />;
+    if (url.match(/\.(zip|rar|7z|tar|gz)$/)) return <FileArchive className="h-5 w-5 text-yellow-600" />;
+    return <Paperclip className="h-5 w-5 text-primary" />;
+  };
+
+  const formatSize = (bytes?: number) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   if (isImage) {
@@ -1902,99 +2080,155 @@ const AttachmentRenderer = ({
     );
   }
 
+  const isFailed = status === 'failed';
+
   return (
-    <div className={cn(
-      "bg-background/40 dark:bg-slate-800/40 border border-border/10 flex items-center gap-4 hover:bg-background/60 transition-all cursor-pointer group backdrop-blur-sm shadow-sm relative",
-      isCompact ? "rounded-lg p-3" : "rounded-xl p-3"
-    )}
+    <div
+      className={cn(
+        "bg-background/40 dark:bg-slate-800/40 border border-border/10 flex items-center gap-4 hover:bg-background/60 transition-all cursor-pointer group backdrop-blur-sm shadow-sm relative",
+        isCompact ? "rounded-lg p-3" : "rounded-xl p-3"
+      )}
       onClick={(e) => {
-        if (isSending) return;
-        e.stopPropagation();
-        const viewerUrl = file.url.endsWith('.pdf')
-          ? file.url
-          : `https://docs.google.com/viewer?url=${encodeURIComponent(file.url)}`;
-        window.open(viewerUrl, '_blank');
-      }}>
-      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform relative">
+        if (isFailed) {
+          e.stopPropagation();
+          onRetryUpload?.();
+        } else {
+          handleDownloadAction(e);
+        }
+      }}
+    >
+      <div className="shrink-0 relative">
         {isUploading ? (
-          <div className="relative flex items-center justify-center">
-            <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-            <span className="absolute text-[8px] font-bold text-primary">
-              {Math.min(Math.round(uploadState?.progress || 0), 99)}
-            </span>
-          </div>
+          <CircularProgress
+            progress={uploadState?.progress || 0}
+            status="transferring"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancelUpload?.();
+            }}
+          />
+        ) : isFailed ? (
+          <CircularProgress
+            progress={0}
+            status="failed"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRetryUpload?.();
+            }}
+          />
         ) : (
-          getFileIcon(file.url)
+          <CircularProgress
+            progress={downloadState.progress}
+            status={downloadState.status}
+            onClick={handleDownloadAction}
+            completedIcon={getFileIcon(file.url)}
+          />
         )}
       </div>
+
       <div className="flex-1 min-w-0">
         <p className="typography-label truncate group-hover:text-primary transition-colors">{file.name || "Document"}</p>
-        <div className="flex items-center gap-2 mt-0.5">
+        <div className="flex items-center gap-2 mt-0.5 text-xs">
           {isUploading ? (
-            <div className="flex flex-col gap-1 w-full mt-1">
-              <div className="flex items-center justify-between text-[9px] font-bold text-primary">
-                <span>Uploading...</span>
-                <span>{(uploadState?.progress || 0).toFixed(1)}%</span>
-              </div>
-              <div className="h-1 bg-primary/10 rounded-full overflow-hidden w-28">
-                <div
-                  className="h-full bg-primary transition-all duration-150"
-                  style={{ width: `${uploadState?.progress || 0}%` }}
-                />
-              </div>
-            </div>
-          ) : (
-            <>
-              <p className="typography-label text-[10px] opacity-70 uppercase">
-                {file.url.split('.').pop() || 'FILE'}
-              </p>
+            <span className="text-[10px] font-medium text-primary/80">
+              Uploading... {Math.round(uploadState?.progress || 0)}% • {formatSize(((uploadState?.progress || 0) * file.size) / 100)} / {formatSize(file.size)}
+            </span>
+          ) : isFailed ? (
+            <span className="text-[10px] font-medium text-destructive/80">
+              Upload failed • {formatSize(file.size)} • Tap to retry
+            </span>
+          ) : downloadState.status === 'transferring' ? (
+            <span className="text-[10px] font-medium text-primary/80">
+              Downloading... {Math.round(downloadState.progress)}% • {formatSize(downloadState.loaded)} / {formatSize(downloadState.total || file.size)}
+            </span>
+          ) : downloadState.status === 'completed' ? (
+            <span className="text-[10px] font-medium text-muted-foreground/80 flex items-center gap-1.5">
+              <span className="uppercase">{file.url.split('.').pop() || 'FILE'}</span>
               <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-              <p className="text-[10px] opacity-70">
-                {file.size ? (file.size / 1024 / 1024).toFixed(2) + ' MB' : 'Download'}
-              </p>
-            </>
+              <span>{formatSize(file.size)}</span>
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+              <span className="text-green-500 font-bold">Cached</span>
+            </span>
+          ) : downloadState.status === 'failed' ? (
+            <span className="text-[10px] font-medium text-destructive/80">
+              Download failed • {formatSize(file.size)} • Tap to retry
+            </span>
+          ) : (
+            <span className="text-[10px] font-medium text-muted-foreground/80 flex items-center gap-1.5">
+              <span className="uppercase">{file.url.split('.').pop() || 'FILE'}</span>
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+              <span>{formatSize(file.size)}</span>
+            </span>
           )}
         </div>
       </div>
-      {isUploading ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0 h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
-          onClick={(e) => {
-            e.stopPropagation();
-            onCancelUpload?.();
-          }}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      ) : (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0 h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
-          onClick={async (e) => {
-            e.stopPropagation();
-            try {
-              const response = await fetch(file.url);
-              const blob = await response.blob();
-              const url = window.URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = file.name || 'document';
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              window.URL.revokeObjectURL(url);
-            } catch (error) {
-              console.error('Download failed:', error);
-              window.open(file.url, '_blank');
-            }
-          }}
-        >
-          <Download className="h-4 w-4" />
-        </Button>
-      )}
+
+      <div className="shrink-0">
+        {isUploading ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancelUpload?.();
+            }}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        ) : isFailed ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRetryUpload?.();
+            }}
+          >
+            <RotateCw className="h-4 w-4" />
+          </Button>
+        ) : downloadState.status === 'transferring' || downloadState.status === 'pending' ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              fileTransferManager.cancelDownload(file.url);
+            }}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        ) : downloadState.status === 'completed' ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground"
+            onClick={handleDownloadAction}
+          >
+            <ExternalLink className="h-4 w-4" />
+          </Button>
+        ) : downloadState.status === 'failed' ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors text-destructive"
+            onClick={handleDownloadAction}
+          >
+            <RotateCw className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground"
+            onClick={handleDownloadAction}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 };
@@ -2267,6 +2501,7 @@ const MessageBubble = React.memo(({
                       status={message.status}
                       uploadState={uploadState}
                       onCancelUpload={() => onCancelUpload?.(message.id)}
+                      onRetryUpload={() => handleAction('retry_upload')}
                     />
                   ))}
                 </div>
@@ -2403,6 +2638,7 @@ const MessageBubble = React.memo(({
                           status={message.status}
                           uploadState={uploadState}
                           onCancelUpload={() => onCancelUpload?.(message.id)}
+                          onRetryUpload={() => handleAction('retry_upload')}
                         />
                       ))}
                     </div>

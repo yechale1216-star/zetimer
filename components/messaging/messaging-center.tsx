@@ -29,6 +29,7 @@ import {
   enqueueOutboxMessage,
   getOutboxMessages,
   removeOutboxMessage,
+  prependCachedMessages,
   type OutboxMessage,
 } from '@/lib/utils/message-cache';
 
@@ -52,6 +53,10 @@ export function MessagingCenter() {
   const [activeConversationData, setActiveConversationData] = useState<any>(null);
   
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, any[]>>({});
+  const [paginationByConversation, setPaginationByConversation] = useState<
+    Record<string, { nextCursor: string | null; hasMore: boolean; isLoadingOlder: boolean }>
+  >({});
+  const staleTimeMapRef = useRef<Record<string, number>>({});
   // isFetchingMessages only drives the thin progress bar — never a blocking skeleton
   const [isFetchingMessages, setIsFetchingMessages] = useState(false);
   const [isLoadingSidebar, setIsLoadingSidebar] = useState(true);
@@ -293,7 +298,6 @@ export function MessagingCenter() {
         const cached = await getCachedMessages(conversationId);
         if (cached && cached.length > 0) {
           setMessagesByConversation(prev => {
-            // Don't overwrite if React state already has messages (e.g. from socket)
             if (prev[conversationId]?.length > 0) return prev;
             return { ...prev, [conversationId]: cached };
           });
@@ -304,7 +308,13 @@ export function MessagingCenter() {
       }
     }
 
-    // ── Step 2: Fetch from server in background (if online) ──
+    // ── Step 2: Stale-while-revalidate check (30s stale window) ──
+    const lastFetch = staleTimeMapRef.current[conversationId] || 0;
+    const isStale = Date.now() - lastFetch > 30000;
+    if (!isStale && hasInMemory) {
+      return;
+    }
+
     if (typeof window !== 'undefined' && !navigator.onLine) {
       console.log('[Messaging] Offline — using cached messages only');
       return;
@@ -316,7 +326,7 @@ export function MessagingCenter() {
       setIsFetchingMessages(true);
     }
     try {
-      const res = await fetch(`${API_URL}/api/messages/${conversationId}`, {
+      const res = await fetch(`${API_URL}/api/messages/${conversationId}?limit=30`, {
         headers: getAuthHeaders(),
       });
 
@@ -327,6 +337,9 @@ export function MessagingCenter() {
 
       const data = await res.json();
       const msgs: any[] = data.messages ? data.messages : (Array.isArray(data) ? data : []);
+      const nextCursor: string | null = data.nextCursor ?? null;
+      const hasMore: boolean = Boolean(data.hasMore ?? data.hasNextPage);
+
       if (!msgs.length && !Array.isArray(data)) return;
 
       const formatted = msgs.map(m => ({
@@ -356,8 +369,29 @@ export function MessagingCenter() {
         forwardedFrom: m.forwardedFrom || null,
       }));
 
-      // Store messages keyed by conversationId — never mixed
-      setMessagesByConversation(prev => ({ ...prev, [conversationId]: formatted }));
+      // Store messages keyed by conversationId & merge with any pending optimistic items
+      setMessagesByConversation(prev => {
+        const existing = prev[conversationId] || [];
+        const optimistic = existing.filter(m => m.id.startsWith('temp-') || m.status === 'sending');
+        
+        const mergedMap = new Map<string, any>();
+        formatted.forEach(m => mergedMap.set(m.id, m));
+        optimistic.forEach(m => mergedMap.set(m.id, m));
+        
+        const mergedList = Array.from(mergedMap.values());
+        return { ...prev, [conversationId]: mergedList };
+      });
+
+      // Update cursor pagination metadata & stale timestamp
+      setPaginationByConversation(prev => ({
+        ...prev,
+        [conversationId]: {
+          nextCursor,
+          hasMore,
+          isLoadingOlder: false,
+        },
+      }));
+      staleTimeMapRef.current[conversationId] = Date.now();
 
       // ── Persist to IndexedDB for offline access ──
       cacheMessages(conversationId, formatted).catch(() => {});
@@ -369,6 +403,96 @@ export function MessagingCenter() {
       }
     }
   }, [messagesByConversation, language]);
+
+  // ── Load older messages (Cursor Pagination for Infinite Scroll) ─────────────
+  const loadOlderMessages = useCallback(async (conversationId: string) => {
+    const pag = paginationByConversation[conversationId];
+    if (!pag || !pag.hasMore || !pag.nextCursor || pag.isLoadingOlder) {
+      return;
+    }
+
+    setPaginationByConversation(prev => ({
+      ...prev,
+      [conversationId]: { ...prev[conversationId], isLoadingOlder: true },
+    }));
+
+    try {
+      const res = await fetch(
+        `${API_URL}/api/messages/${conversationId}?cursor=${pag.nextCursor}&limit=30`,
+        { headers: getAuthHeaders() }
+      );
+
+      if (!res.ok) {
+        setPaginationByConversation(prev => ({
+          ...prev,
+          [conversationId]: { ...prev[conversationId], isLoadingOlder: false },
+        }));
+        return;
+      }
+
+      const data = await res.json();
+      const olderMsgs: any[] = data.messages ? data.messages : [];
+      const newNextCursor: string | null = data.nextCursor ?? null;
+      const newHasMore: boolean = Boolean(data.hasMore ?? data.hasNextPage);
+
+      const formattedOlder = olderMsgs.map(m => ({
+        id: m.id,
+        senderId: m.senderId,
+        senderName: m.sender?.full_name || 'Unknown',
+        senderAvatar: m.sender?.profile_photo,
+        content: m.content,
+        timestamp: formatLocalizedTime(m.createdAt, language),
+        status: m.readBy && m.readBy.length > 0 ? 'read' : 'sent',
+        type: m.type || 'TEXT',
+        attachments: m.attachments,
+        isMe: m.senderId === userRef.current?.id,
+        reactions: m.reactions || [],
+        isDeleted: m.isDeleted,
+        editedAt: m.editedAt,
+        metadata: m.metadata || null,
+        isPinned: m.isPinned || false,
+        replyTo: m.replyTo
+          ? {
+              id: m.replyTo.id,
+              content: m.replyTo.content,
+              senderName: m.replyTo.sender?.full_name || 'Unknown',
+              type: m.replyTo.type || 'TEXT',
+            }
+          : null,
+        forwardedFrom: m.forwardedFrom || null,
+      }));
+
+      // Prepend older messages to state without duplicates
+      setMessagesByConversation(prev => {
+        const current = prev[conversationId] || [];
+        const currentIds = new Set(current.map(m => m.id));
+        const filteredOlder = formattedOlder.filter(m => !currentIds.has(m.id));
+        return {
+          ...prev,
+          [conversationId]: [...filteredOlder, ...current],
+        };
+      });
+
+      // Update pagination metadata
+      setPaginationByConversation(prev => ({
+        ...prev,
+        [conversationId]: {
+          nextCursor: newNextCursor,
+          hasMore: newHasMore,
+          isLoadingOlder: false,
+        },
+      }));
+
+      // Persist prepended items to IndexedDB
+      prependCachedMessages(conversationId, formattedOlder).catch(() => {});
+    } catch (err) {
+      console.error('[Messaging] Error fetching older messages:', err);
+      setPaginationByConversation(prev => ({
+        ...prev,
+        [conversationId]: { ...prev[conversationId], isLoadingOlder: false },
+      }));
+    }
+  }, [paginationByConversation, language]);
 
   // Re-fetch conversations when network recovers (messages only — no full refetch)
   useEffect(() => {

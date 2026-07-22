@@ -82,10 +82,30 @@ export const getSavedMessages = async (req: AuthenticatedRequest, res: Response)
       take: take + 1,
       ...(cursor ? { skip: 1, cursor: { id: String(cursor) } } : {}),
       orderBy: { createdAt: 'desc' },
-      include: {
+      select: {
+        id: true,
+        conversationId: true,
+        senderId: true,
+        content: true,
+        type: true,
+        createdAt: true,
+        updatedAt: true,
+        editedAt: true,
+        isDeleted: true,
+        replyToId: true,
+        forwardedFromId: true,
+        attachments: true,
+        metadata: true,
         sender: { select: { id: true, full_name: true, profile_photo: true } },
-        reactions: true,
-        replyTo: true,
+        reactions: { select: { id: true, userId: true, emoji: true } },
+        replyTo: {
+          select: {
+            id: true,
+            content: true,
+            type: true,
+            sender: { select: { full_name: true } },
+          },
+        },
       },
     });
 

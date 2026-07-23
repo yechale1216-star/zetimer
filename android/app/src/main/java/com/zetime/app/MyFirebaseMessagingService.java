@@ -131,7 +131,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         String conversationId = data.get("conversationId");
         String studentId      = data.get("studentId");
         String schoolId       = data.get("schoolId");
-        String schoolLogoUrl  = data.get("schoolLogoUrl");
+        String schoolName     = data.get("schoolName");
         String tag            = data.get("tag");
         
         if (title == null) title = "Zetime Alert";
@@ -243,26 +243,9 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                     : (studentId != null) ? Math.abs(studentId.hashCode()) 
                     : (int) System.currentTimeMillis();
 
-        // ── Task 1: School Logo as Large Icon ──────────────────────────────────
-        // Show the school logo on the right side of the notification (largeIcon).
-        // We post the initial notification immediately, then update it async with the logo.
-        if (schoolLogoUrl != null && !schoolLogoUrl.isEmpty()) {
-            final NotificationCompat.Builder finalBuilder = builder;
-            final String finalLogoUrl = schoolLogoUrl;
-            final int finalNotifId = notifId;
-            new Thread(() -> {
-                try {
-                    java.net.URL url = new java.net.URL(finalLogoUrl);
-                    android.graphics.Bitmap logoBitmap = android.graphics.BitmapFactory.decodeStream(
-                            (java.io.InputStream) url.openConnection().getContent());
-                    if (logoBitmap != null) {
-                        finalBuilder.setLargeIcon(logoBitmap);
-                        nm.notify(finalNotifId, finalBuilder.build());
-                    }
-                } catch (Exception e) {
-                    Log.w(TAG, "Could not load school logo for notification large icon: " + e.getMessage());
-                }
-            }).start();
+        // If schoolName is passed in data, set it as subText / header for clarity
+        if (schoolName != null && !schoolName.isEmpty()) {
+            builder.setSubText(schoolName);
         }
 
         nm.notify(notifId, builder.build());

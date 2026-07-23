@@ -98,16 +98,13 @@ export const markAttendance = async (data: any, schoolId: string) => {
         include: { parent: true }
       });
 
-      // Fetch school logo once for all parent pushes via settings
+      // Fetch school name once for all parent pushes
       const school = await prisma.school.findUnique({
         where: { id: schoolId },
-        select: {
-          settings: {
-            select: { school_logo: true }
-          }
-        }
+        select: { name: true }
       });
-      const schoolLogoUrl = school?.settings?.school_logo || undefined;
+      const schoolName = school?.name || undefined;
+      const notifTitle = schoolName ? `[${schoolName}] ${title}` : title;
 
       for (const link of parentLinks) {
         if (link.parent && link.parent.pushToken) {
@@ -123,12 +120,12 @@ export const markAttendance = async (data: any, schoolId: string) => {
 
           await sendCategoryNotification(link.parent.pushToken, {
             type: typePush,
-            title,
+            title: notifTitle,
             body: message,
             route: `/parent/attendance`,
             studentId: student.id,
             schoolId,
-            schoolLogoUrl,
+            schoolName,
             tag: `attendance-${student.id}`
           }).catch((err: any) => {
             console.error(`Failed to dispatch push to parent ${link.parentId}:`, err);

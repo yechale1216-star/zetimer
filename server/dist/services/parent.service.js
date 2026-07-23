@@ -356,16 +356,14 @@ const postAnnouncement = async (schoolId, data) => {
         const uniqueParents = Array.from(new Map(parentLinks
             .filter(l => l.parent !== null)
             .map(l => [l.parentId, l.parent])).values());
-        // Fetch school logo once for all parent pushes via settings
+        // Fetch school name once for all parent pushes
         const schoolRecord = await db_1.default.school.findUnique({
             where: { id: schoolId },
-            select: {
-                settings: {
-                    select: { school_logo: true }
-                }
-            }
+            select: { name: true }
         });
-        const schoolLogoUrl = schoolRecord?.settings?.school_logo || undefined;
+        const schoolName = schoolRecord?.name || undefined;
+        const baseTitle = data.title || 'New Announcement';
+        const notifTitle = schoolName ? `[${schoolName}] ${baseTitle}` : baseTitle;
         for (const parent of uniqueParents) {
             if (parent && parent.pushToken) {
                 // Check parent preferences only if phone is set
@@ -379,11 +377,11 @@ const postAnnouncement = async (schoolId, data) => {
                 }
                 await sendCategoryNotification(parent.pushToken, {
                     type: 'new_announcement',
-                    title: data.title || 'New Announcement',
+                    title: notifTitle,
                     body: data.message || 'There is a new announcement from school.',
                     route: '/parent/announcements',
                     schoolId,
-                    schoolLogoUrl,
+                    schoolName,
                     tag: 'announcements'
                 }).catch((err) => {
                     console.error(`Failed to send announcement push to parent ${parent.id}:`, err);

@@ -90,16 +90,13 @@ const markAttendance = async (data, schoolId) => {
                 where: { studentId: student.id },
                 include: { parent: true }
             });
-            // Fetch school logo once for all parent pushes via settings
+            // Fetch school name once for all parent pushes
             const school = await db_1.default.school.findUnique({
                 where: { id: schoolId },
-                select: {
-                    settings: {
-                        select: { school_logo: true }
-                    }
-                }
+                select: { name: true }
             });
-            const schoolLogoUrl = school?.settings?.school_logo || undefined;
+            const schoolName = school?.name || undefined;
+            const notifTitle = schoolName ? `[${schoolName}] ${title}` : title;
             for (const link of parentLinks) {
                 if (link.parent && link.parent.pushToken) {
                     // Check preferences only if phone is set
@@ -113,12 +110,12 @@ const markAttendance = async (data, schoolId) => {
                     }
                     await sendCategoryNotification(link.parent.pushToken, {
                         type: typePush,
-                        title,
+                        title: notifTitle,
                         body: message,
                         route: `/parent/attendance`,
                         studentId: student.id,
                         schoolId,
-                        schoolLogoUrl,
+                        schoolName,
                         tag: `attendance-${student.id}`
                     }).catch((err) => {
                         console.error(`Failed to dispatch push to parent ${link.parentId}:`, err);

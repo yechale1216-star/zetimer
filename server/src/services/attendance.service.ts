@@ -98,6 +98,13 @@ export const markAttendance = async (data: any, schoolId: string) => {
         include: { parent: true }
       });
 
+      // Fetch school logo once for all parent pushes
+      const school = await prisma.school.findUnique({
+        where: { id: schoolId },
+        select: { logoUrl: true, name: true }
+      });
+      const schoolLogoUrl = school?.logoUrl || undefined;
+
       for (const link of parentLinks) {
         if (link.parent && link.parent.pushToken) {
           // Check preferences only if phone is set
@@ -117,6 +124,7 @@ export const markAttendance = async (data: any, schoolId: string) => {
             route: `/parent/attendance`,
             studentId: student.id,
             schoolId,
+            schoolLogoUrl,
             tag: `attendance-${student.id}`
           }).catch((err: any) => {
             console.error(`Failed to dispatch push to parent ${link.parentId}:`, err);

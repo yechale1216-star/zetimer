@@ -131,6 +131,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         String conversationId = data.get("conversationId");
         String studentId      = data.get("studentId");
         String schoolId       = data.get("schoolId");
+        String schoolLogoUrl  = data.get("schoolLogoUrl");
         String tag            = data.get("tag");
         
         if (title == null) title = "Zetime Alert";
@@ -241,6 +242,28 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         int notifId = (conversationId != null) ? Math.abs(conversationId.hashCode()) 
                     : (studentId != null) ? Math.abs(studentId.hashCode()) 
                     : (int) System.currentTimeMillis();
+
+        // ── Task 1: School Logo as Large Icon ──────────────────────────────────
+        // Show the school logo on the right side of the notification (largeIcon).
+        // We post the initial notification immediately, then update it async with the logo.
+        if (schoolLogoUrl != null && !schoolLogoUrl.isEmpty()) {
+            final NotificationCompat.Builder finalBuilder = builder;
+            final String finalLogoUrl = schoolLogoUrl;
+            final int finalNotifId = notifId;
+            new Thread(() -> {
+                try {
+                    java.net.URL url = new java.net.URL(finalLogoUrl);
+                    android.graphics.Bitmap logoBitmap = android.graphics.BitmapFactory.decodeStream(
+                            (java.io.InputStream) url.openConnection().getContent());
+                    if (logoBitmap != null) {
+                        finalBuilder.setLargeIcon(logoBitmap);
+                        nm.notify(finalNotifId, finalBuilder.build());
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not load school logo for notification large icon: " + e.getMessage());
+                }
+            }).start();
+        }
 
         nm.notify(notifId, builder.build());
 
@@ -366,7 +389,10 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         PendingIntent declinePI = PendingIntent.getBroadcast(this, 2, declineIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         String callerLabel = callerName != null ? callerName : "Unknown Caller";
+        // Task 2: call type label used for ZeTime branded title
         String callTypeLabel = "VIDEO".equalsIgnoreCase(callType) ? "Video" : "Voice";
+        // Title is the ZeTime branded call type; body is the caller name (no duplicate)
+        String callNotifTitle = "ZeTime " + callTypeLabel + " Call";
 
         // Generate initials bitmap
         android.graphics.Bitmap initialsBitmap = createInitialsBitmap(callerLabel);
@@ -384,9 +410,8 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_CALLS)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("Incoming " + callTypeLabel + " Call")
-                .setContentText(callerLabel)
-                .setSubText("Incoming voice call")
+                .setContentTitle(callNotifTitle)       // "ZeTime Voice Call" / "ZeTime Video Call"
+                .setContentText(callerLabel)            // just the caller name — no duplicate
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setAutoCancel(false)

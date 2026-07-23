@@ -452,7 +452,7 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
           )}>
             <div className="flex items-stretch justify-around h-16 px-2">
               <MobileTabLink href="/parent/dashboard" icon={<LayoutDashboard className="w-5 h-5" />} label={t("dashboard")} active={isActive("/parent/dashboard")} />
-              <MobileTabLink href="/parent/communication" icon={<MessageSquare className="w-5 h-5" />} label={t("communication")} active={isActive("/parent/communication")} badge={unreadCount > 0 ? unreadCount : undefined} />
+              <MobileTabLink href="/parent/communication" icon={<MessageSquare className="w-5 h-5" />} label="Chat" active={isActive("/parent/communication")} badge={unreadCount > 0 ? unreadCount : undefined} />
               <MobileTabLink href="/parent/announcements" icon={<Megaphone className="w-5 h-5" />} label={t("notifications")} active={isActive("/parent/announcements")} />
               <MobileTabLink href="/parent/attendance" icon={<Calendar className="w-5 h-5" />} label={t("attendance")} active={isActive("/parent/attendance")} />
               <MobileTabLink href="/parent/profile" icon={<User className="w-5 h-5" />} label={t("profile")} active={isActive("/parent/profile")} />

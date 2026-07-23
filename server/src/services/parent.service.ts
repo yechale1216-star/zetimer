@@ -354,6 +354,13 @@ export const postAnnouncement = async (schoolId: string, data: any) => {
       ).values()
     );
 
+    // Fetch school logo once for all parent pushes
+    const schoolRecord = await prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { logoUrl: true }
+    });
+    const schoolLogoUrl = schoolRecord?.logoUrl || undefined;
+
     for (const parent of uniqueParents) {
       if (parent && parent.pushToken) {
         // Check parent preferences only if phone is set
@@ -372,6 +379,7 @@ export const postAnnouncement = async (schoolId: string, data: any) => {
           body: data.message || 'There is a new announcement from school.',
           route: '/parent/announcements',
           schoolId,
+          schoolLogoUrl,
           tag: 'announcements'
         }).catch((err: any) => {
           console.error(`Failed to send announcement push to parent ${parent.id}:`, err);

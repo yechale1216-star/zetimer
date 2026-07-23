@@ -216,6 +216,26 @@ export const NativeBridge = {
         console.log('[NativeBridge] Notification tapped:', action);
         const data = action.notification?.data;
         if (data && typeof window !== 'undefined') {
+          // ── Task 3: Auth Guard ──────────────────────────────────────────
+          // If the user is signed out, route them to the /parent/notifications
+          // page which will render the SignedOutWall with a clear "please sign in" message.
+          // We NEVER force-navigate into protected pages when the token is missing.
+          const token = localStorage.getItem('attendance_token');
+          const userStr = localStorage.getItem('attendance_current_user');
+          const isSignedIn = !!(token && userStr);
+
+          if (!isSignedIn) {
+            // Navigate to the notifications page — the page itself will render
+            // the signed-out wall with a clear explanatory message.
+            window.dispatchEvent(new CustomEvent('zetime:navigate', {
+              detail: {
+                type: 'notification_signout_guard',
+                route: '/parent/notifications',
+              }
+            }));
+            return;
+          }
+
           window.dispatchEvent(new CustomEvent('zetime:navigate', {
             detail: {
               type: data.type,

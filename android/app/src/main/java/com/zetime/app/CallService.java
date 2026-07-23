@@ -346,9 +346,8 @@ public class CallService extends Service {
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("Incoming " + callTypeLabel + " Call")
-                .setContentText(callerLabel)
-                .setSubText(subtitleText)
+                .setContentTitle("ZeTime " + callTypeLabel + " Call")  // branded, no duplicate
+                .setContentText(callerLabel)            // only caller name shown in body
                 .setPriority(NotificationCompat.PRIORITY_MAX)         // required for HUN
                 .setCategory(NotificationCompat.CATEGORY_CALL)        // system treats as phone call
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)  // show on lock screen

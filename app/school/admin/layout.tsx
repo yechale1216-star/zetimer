@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Users, User, CheckSquare, BarChart2, BookOpen,
   Settings, LogOut, CreditCard, MessageSquare, Phone, TrendingUp, ShieldBan,
-  X, ChevronRight, Megaphone, HeadphonesIcon
+  X, ChevronRight, Megaphone, HeadphonesIcon, MessageCircle
 } from 'lucide-react'
 import { cn } from "@/lib/utils/utils"
 
@@ -244,7 +244,7 @@ export default function SchoolAdminLayout({
                       <MobileTabLink href="/school/admin/announcements" icon={<Megaphone className="w-5 h-5" />} label="Alerts" active={isActive('/school/admin/announcements')} />
                       <MobileTabLink href="/school/admin/attendance-by-grade" icon={<BarChart2 className="w-5 h-5" />} label="Stats" active={isActive('/school/admin/attendance-by-grade')} />
                       <MobileTabLink href="/school/admin/attendance" icon={<CheckSquare className="w-5 h-5" />} label="Presence" active={isActive('/school/admin/attendance')} />
-                      <MobileTabLink href="/school/admin/settings" icon={<Settings className="w-5 h-5" />} label="Menu" active={isActive('/school/admin/settings')} />
+                      <MobileTabLink href="/school/admin/communication" icon={<MessageCircle className="w-5 h-5" />} label="Chat" active={isActive('/school/admin/communication')} />
                     </div>
                   </nav>
                 )}

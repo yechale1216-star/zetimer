@@ -1,34 +1,217 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { parentDb, type ParentNotification, type ParentPreferences } from "@/lib/db/parent-db"
 import { useLanguage } from "@/lib/context/language-context"
 import { formatLocalizedDate } from "@/lib/utils/date-utils"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { Switch } from "@/components/ui/switch"
 import {
-  Bell,
-  Settings,
-  CheckCheck,
-  Trash2,
-  Smartphone,
-  Mail,
-  Radio,
-  Clock,
-  XCircle,
-  Megaphone,
-  AlertTriangle,
-  Info,
-  X
+  Bell, Settings, CheckCheck, Trash2, BellOff,
+  Smartphone, Mail, Radio, Clock, XCircle, Megaphone,
+  AlertTriangle, Info, UserX, X, ChevronRight,
+  Filter, RefreshCw, GraduationCap, ShieldAlert,
+  LogOut, Loader2
 } from "lucide-react"
 
+// ── Auth guard helper ──────────────────────────────────────────────────────────
+function isLoggedIn(): boolean {
+  if (typeof window === "undefined") return false
+  const token = localStorage.getItem("attendance_token")
+  const user = localStorage.getItem("attendance_current_user")
+  return !!(token && user)
+}
+
+// ── Date grouping helper ───────────────────────────────────────────────────────
+function getDayLabel(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  if (days === 0) return "Today"
+  if (days === 1) return "Yesterday"
+  if (days < 7) return date.toLocaleDateString(undefined, { weekday: "long" })
+  return date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
+}
+
+function groupNotificationsByDay(notifications: ParentNotification[]): { label: string; items: ParentNotification[] }[] {
+  const groups: { [key: string]: ParentNotification[] } = {}
+  for (const n of notifications) {
+    const label = getDayLabel(n.createdAt)
+    if (!groups[label]) groups[label] = []
+    groups[label].push(n)
+  }
+  return Object.entries(groups).map(([label, items]) => ({ label, items }))
+}
+
+// ── Type config map ────────────────────────────────────────────────────────────
+const TYPE_CONFIG: Record<string, {
+  icon: React.ReactNode
+  bg: string
+  border: string
+  badge: string
+  badgeText: string
+  accentBar: string
+}> = {
+  absent: {
+    icon: <XCircle className="w-5 h-5 text-rose-400" />,
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/25",
+    badge: "bg-rose-500/20 text-rose-300 border border-rose-500/30",
+    badgeText: "ABSENT",
+    accentBar: "bg-rose-500",
+  },
+  late: {
+    icon: <Clock className="w-5 h-5 text-amber-400" />,
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/25",
+    badge: "bg-amber-500/20 text-amber-300 border border-amber-500/30",
+    badgeText: "LATE",
+    accentBar: "bg-amber-500",
+  },
+  announcement: {
+    icon: <Megaphone className="w-5 h-5 text-blue-400" />,
+    bg: "bg-blue-500/10",
+    border: "border-blue-500/25",
+    badge: "bg-blue-500/20 text-blue-300 border border-blue-500/30",
+    badgeText: "ANNOUNCEMENT",
+    accentBar: "bg-blue-500",
+  },
+  emergency: {
+    icon: <ShieldAlert className="w-5 h-5 text-red-400" />,
+    bg: "bg-red-600/15",
+    border: "border-red-600/30",
+    badge: "bg-red-600/25 text-red-200 border border-red-600/40",
+    badgeText: "EMERGENCY",
+    accentBar: "bg-red-600",
+  },
+  warning: {
+    icon: <AlertTriangle className="w-5 h-5 text-orange-400" />,
+    bg: "bg-orange-500/10",
+    border: "border-orange-500/25",
+    badge: "bg-orange-500/20 text-orange-300 border border-orange-500/30",
+    badgeText: "WARNING",
+    accentBar: "bg-orange-500",
+  },
+  info: {
+    icon: <Info className="w-5 h-5 text-sky-400" />,
+    bg: "bg-sky-500/10",
+    border: "border-sky-500/25",
+    badge: "bg-sky-500/20 text-sky-300 border border-sky-500/30",
+    badgeText: "INFO",
+    accentBar: "bg-sky-500",
+  },
+}
+
+function getTypeConfig(type: string) {
+  return TYPE_CONFIG[type?.toLowerCase()] ?? {
+    icon: <Bell className="w-5 h-5 text-muted-foreground" />,
+    bg: "bg-muted/20",
+    border: "border-border/20",
+    badge: "bg-muted/30 text-muted-foreground border border-border/20",
+    badgeText: (type || "INFO").toUpperCase(),
+    accentBar: "bg-muted",
+  }
+}
+
+// ── Attendance Status Card ─────────────────────────────────────────────────────
+function AttendanceStatusBanner({ notifications }: { notifications: ParentNotification[] }) {
+  const attendanceNotes = notifications.filter(n =>
+    ["absent", "late", "warning"].includes(n.type.toLowerCase())
+  )
+  if (attendanceNotes.length === 0) return null
+
+  const todayNotes = attendanceNotes.filter(n => getDayLabel(n.createdAt) === "Today")
+  const absentToday = todayNotes.filter(n => n.type === "absent").length
+  const lateToday = todayNotes.filter(n => n.type === "late").length
+  const warningToday = todayNotes.filter(n => n.type === "warning").length
+
+  return (
+    <div className="mx-0 mb-3">
+      <div className="bg-[#111a28] border border-slate-800/60 rounded-2xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-6 w-6 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+            <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Today's Attendance Status
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className={`rounded-xl p-3 text-center ${absentToday > 0 ? "bg-rose-500/15 border border-rose-500/30" : "bg-slate-800/50 border border-slate-700/40"}`}>
+            <div className={`text-2xl font-black mb-0.5 ${absentToday > 0 ? "text-rose-400" : "text-slate-500"}`}>
+              {absentToday}
+            </div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-rose-300/70">Absent</div>
+          </div>
+          <div className={`rounded-xl p-3 text-center ${lateToday > 0 ? "bg-amber-500/15 border border-amber-500/30" : "bg-slate-800/50 border border-slate-700/40"}`}>
+            <div className={`text-2xl font-black mb-0.5 ${lateToday > 0 ? "text-amber-400" : "text-slate-500"}`}>
+              {lateToday}
+            </div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-300/70">Late</div>
+          </div>
+          <div className={`rounded-xl p-3 text-center ${warningToday > 0 ? "bg-orange-500/15 border border-orange-500/30" : "bg-slate-800/50 border border-slate-700/40"}`}>
+            <div className={`text-2xl font-black mb-0.5 ${warningToday > 0 ? "text-orange-400" : "text-slate-500"}`}>
+              {warningToday}
+            </div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-orange-300/70">Warning</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Signed-Out Wall ────────────────────────────────────────────────────────────
+function SignedOutWall() {
+  const router = useRouter()
+  return (
+    <div className="min-h-screen bg-[#0a1120] flex flex-col items-center justify-center px-6">
+      <div className="flex flex-col items-center text-center gap-6 max-w-xs">
+        {/* Icon */}
+        <div className="relative">
+          <div className="h-24 w-24 rounded-full bg-slate-800/60 border border-slate-700/50 flex items-center justify-center shadow-2xl">
+            <UserX className="h-10 w-10 text-slate-400" />
+          </div>
+          <div className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
+            <ShieldAlert className="h-4 w-4 text-amber-400" />
+          </div>
+        </div>
+
+        {/* Message */}
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold text-slate-100">
+            You're signed out
+          </h2>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            You received a notification but you are currently not signed in to your Zetime account. Please sign in to view your notifications.
+          </p>
+        </div>
+
+        {/* CTA */}
+        <button
+          onClick={() => router.push("/login")}
+          className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] transition-all rounded-2xl font-bold text-white text-sm shadow-lg shadow-emerald-900/30"
+        >
+          <LogOut className="h-4 w-4 rotate-180" />
+          Sign In to View Notifications
+        </button>
+
+        <p className="text-xs text-slate-600 px-4">
+          Your notifications will appear here once you sign in with your parent account.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 export default function ParentNotifications() {
   const { t, language } = useLanguage()
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [signedOut, setSignedOut] = useState(false)
   const [notificationsList, setNotificationsList] = useState<ParentNotification[]>([])
   const [preferences, setPreferences] = useState<ParentPreferences>({
     smsAlerts: true,
@@ -36,20 +219,35 @@ export default function ParentNotifications() {
     pushAlerts: true
   })
   const [activeTab, setActiveTab] = useState<"inbox" | "preferences">("inbox")
+  const [filterType, setFilterType] = useState<"all" | "absent" | "late" | "announcement" | "emergency" | "warning">("all")
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // 1. Initial Load
+  // ── Task 3: Auth Check ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const loggedIn = isLoggedIn()
+    if (!loggedIn) {
+      setSignedOut(true)
+      setAuthChecked(true)
+      setIsLoading(false)
+      return
+    }
+    setAuthChecked(true)
+    loadData()
+  }, [])
+
+  const fetchNotificationsList = useCallback(async (phone: string) => {
+    const list = await parentDb.getNotifications(phone)
+    setNotificationsList(list)
+  }, [])
+
   const loadData = async () => {
     const userStr = localStorage.getItem("attendance_current_user")
     if (userStr) {
       try {
         const user = JSON.parse(userStr)
         setCurrentUser(user)
-
-        // Fetch notifications
         await fetchNotificationsList(user.phone)
-
-        // Fetch channel preferences
         const prefs = await parentDb.getPreferences(user.phone)
         if (prefs) setPreferences(prefs)
       } catch (e) {
@@ -59,53 +257,34 @@ export default function ParentNotifications() {
     setIsLoading(false)
   }
 
-  const fetchNotificationsList = async (phone: string) => {
-    const list = await parentDb.getNotifications(phone)
-    setNotificationsList(list)
-  }
-
   useEffect(() => {
-    loadData()
+    if (!authChecked || signedOut) return
+    const handler = () => { setIsLoading(true); loadData() }
+    window.addEventListener("studentChanged", handler)
+    return () => window.removeEventListener("studentChanged", handler)
+  }, [authChecked, signedOut])
 
-    const handleStudentChange = () => {
-      setIsLoading(true)
-      loadData()
-    }
-
-    window.addEventListener("studentChanged", handleStudentChange)
-    return () => window.removeEventListener("studentChanged", handleStudentChange)
-  }, [])
-
-  // 2. Mark notification as read
+  // ── Actions ────────────────────────────────────────────────────────────────
   const handleMarkAsRead = async (notificationId: string) => {
     if (!currentUser?.phone) return
     const success = await parentDb.markNotificationAsRead(notificationId)
     if (success) {
-      // Update local state
-      setNotificationsList(prev =>
-        prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
-      )
-      // Trigger header badge refresh
+      setNotificationsList(prev => prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n))
       window.dispatchEvent(new Event("refreshNotifications"))
     }
   }
 
-  // 2.5 Delete notification
   const handleDelete = async (notificationId: string) => {
-    // Optimistically remove from UI immediately
     setNotificationsList(prev => prev.filter(n => n.id !== notificationId))
     window.dispatchEvent(new Event("refreshNotifications"))
-    // Then persist to backend (no phone needed — only notification ID + auth token)
     try {
       await parentDb.deleteNotification(notificationId)
     } catch (err) {
       console.error("[Notifications] Delete error:", err)
-      // Re-fetch to restore list if server delete failed
       if (currentUser?.phone) await fetchNotificationsList(currentUser.phone)
     }
   }
 
-  // 3. Mark all notifications as read
   const handleMarkAllAsRead = async () => {
     if (!currentUser?.phone) return
     const success = await parentDb.markAllNotificationsAsRead(currentUser.phone)
@@ -115,7 +294,13 @@ export default function ParentNotifications() {
     }
   }
 
-  // 4. Update channel preferences toggle
+  const handleRefresh = async () => {
+    if (!currentUser?.phone) return
+    setIsRefreshing(true)
+    await fetchNotificationsList(currentUser.phone)
+    setIsRefreshing(false)
+  }
+
   const handlePreferenceToggle = async (key: keyof ParentPreferences, value: boolean) => {
     if (!currentUser?.phone) return
     const updated = { ...preferences, [key]: value }
@@ -123,64 +308,18 @@ export default function ParentNotifications() {
     await parentDb.updatePreferences(currentUser.phone, updated)
   }
 
-  // Visual notification category indicators
-  const getNotificationIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "absent":
-        return (
-          <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
-            <XCircle className="w-4.5 h-4.5" />
-          </div>
-        )
-      case "late":
-        return (
-          <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-            <Clock className="w-4.5 h-4.5" />
-          </div>
-        )
-      case "announcement":
-        return (
-          <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-            <Megaphone className="w-4.5 h-4.5" />
-          </div>
-        )
-      case "emergency":
-        return (
-          <div className="w-9 h-9 rounded-xl bg-rose-600/20 border border-rose-600/30 flex items-center justify-center text-rose-700 dark:text-rose-300 shrink-0">
-            <AlertTriangle className="w-4.5 h-4.5" />
-          </div>
-        )
-      default:
-        return (
-          <div className="w-9 h-9 rounded-xl bg-muted/40 border border-border/10 flex items-center justify-center text-muted-foreground shrink-0">
-            <Info className="w-4.5 h-4.5" />
-          </div>
-        )
-    }
-  }
-
   const formatNotificationTime = (dateStr: string) => {
     return formatLocalizedDate(dateStr, language, {
-      month: "short",
-      day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     })
   }
 
-  // Returns localized title + message based on notification type and student gender.
-  // For attendance alerts, generates the text from t() keys with gender-specific Amharic variants.
-  // For announcements/emergency, falls back to raw backend strings.
   const localizeNotification = (notification: ParentNotification): { title: string; message: string } => {
     const studentName = notification.student?.fullName?.split(" ")[0] || ""
     const isFemale = notification.student?.gender?.toLowerCase() === "female"
     const suffix = isFemale ? "_f" : ""
-
-    const formattedDate = formatLocalizedDate(notification.createdAt, language, {
-      month: "short",
-      day: "numeric"
-    })
-
+    const formattedDate = formatLocalizedDate(notification.createdAt, language, { month: "short", day: "numeric" })
     switch (notification.type) {
       case "absent":
         return {
@@ -202,186 +341,295 @@ export default function ParentNotifications() {
     }
   }
 
+  // ── Guard: signed-out state ────────────────────────────────────────────────
+  if (!authChecked || (authChecked && signedOut)) {
+    return <SignedOutWall />
+  }
+
   if (isLoading) {
     return <PageSkeleton variant="cards" />
   }
 
   const unreadCount = notificationsList.filter(n => !n.isRead).length
 
-  return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+  // Filter by type
+  const filtered = filterType === "all"
+    ? notificationsList
+    : notificationsList.filter(n => n.type === filterType)
 
-      {/* Page Header */}
-      <div>
-        <h1 className="typography-page-title text-foreground">{t("alerts_config")}</h1>
-        <p className="typography-label text-muted-foreground mt-0.5">{t("notifications_desc")}</p>
+  // Group by day
+  const grouped = groupNotificationsByDay(filtered)
+
+  const filterOptions: { key: typeof filterType; label: string; color: string }[] = [
+    { key: "all", label: "All", color: "text-slate-300 border-slate-700" },
+    { key: "absent", label: "Absent", color: "text-rose-400 border-rose-500/40" },
+    { key: "late", label: "Late", color: "text-amber-400 border-amber-500/40" },
+    { key: "announcement", label: "Announce", color: "text-blue-400 border-blue-500/40" },
+    { key: "emergency", label: "Emergency", color: "text-red-400 border-red-500/40" },
+    { key: "warning", label: "Warning", color: "text-orange-400 border-orange-500/40" },
+  ]
+
+  return (
+    <div className="min-h-screen bg-[#0a1120] text-slate-100">
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-20 bg-[#0c1524]/95 backdrop-blur-xl border-b border-slate-800/60">
+        <div className="px-4 pt-4 pb-0">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h1 className="text-xl font-black text-white tracking-tight">Notifications</h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {unreadCount > 0 ? (
+                  <span className="text-emerald-400 font-semibold">{unreadCount} unread</span>
+                ) : (
+                  <span>All caught up</span>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllAsRead}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/60 border border-slate-700/50 text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 active:scale-95 transition-all"
+                >
+                  <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  Mark all read
+                </button>
+              )}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="h-8 w-8 rounded-xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-center hover:bg-slate-800 active:scale-95 transition-all"
+              >
+                <RefreshCw className={`w-4 h-4 text-slate-400 ${isRefreshing ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* ── Tab Bar ─────────────────────────────────────────────────────── */}
+          <div className="flex gap-1">
+            {[
+              { key: "inbox", icon: <Bell className="w-3.5 h-3.5" />, label: "Inbox" },
+              { key: "preferences", icon: <Settings className="w-3.5 h-3.5" />, label: "Settings" },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key as any)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold transition-all border-b-2 ${
+                  activeTab === tab.key
+                    ? "text-emerald-400 border-emerald-500"
+                    : "text-slate-500 border-transparent hover:text-slate-300"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+                {tab.key === "inbox" && unreadCount > 0 && (
+                  <span className="ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Tabs list layout switcher */}
-      <Tabs
-        defaultValue="inbox"
-        value={activeTab}
-        onValueChange={(val) => setActiveTab(val as any)}
-        className="space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <TabsList className="bg-card/60 backdrop-blur-md border border-border/40 p-1 rounded-2xl">
-            <TabsTrigger value="inbox" className="typography-label gap-1.5 rounded-xl px-4 py-2">
-              <Bell className="w-4 h-4" />
-              <span>{t("notification_inbox")}</span>
-              {unreadCount > 0 && (
-                <span className="typography-label ml-1 px-1.5 py-0.5 text-[9px] rounded-full bg-rose-500 text-white shrink-0">
-                  {unreadCount}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="preferences" className="typography-label gap-1.5 rounded-xl px-4 py-2">
-              <Settings className="w-4 h-4" />
-              <span>{t("channel_preferences")}</span>
-            </TabsTrigger>
-          </TabsList>
+      {/* ── INBOX TAB ────────────────────────────────────────────────────────── */}
+      {activeTab === "inbox" && (
+        <div className="px-4 pb-24 pt-4">
 
-          {activeTab === "inbox" && unreadCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleMarkAllAsRead}
-              className="typography-label gap-1.5 rounded-xl border-border/40 hover:bg-muted"
-            >
-              <CheckCheck className="w-3.5 h-3.5" />
-              <span>{t("mark_all_read")}</span>
-            </Button>
+          {/* Attendance Summary Banner (Task 2) */}
+          <AttendanceStatusBanner notifications={notificationsList} />
+
+          {/* Filter Bar */}
+          {notificationsList.length > 0 && (
+            <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 no-scrollbar">
+              <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              {filterOptions.map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => setFilterType(opt.key)}
+                  className={`shrink-0 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${
+                    filterType === opt.key
+                      ? `${opt.color} bg-slate-800/80`
+                      : "text-slate-500 border-slate-800/60 hover:text-slate-300"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+              <div className="h-20 w-20 rounded-full bg-slate-800/40 border border-slate-700/40 flex items-center justify-center">
+                <BellOff className="h-9 w-9 text-slate-600" />
+              </div>
+              <div>
+                <p className="text-base font-bold text-slate-400">
+                  {filterType === "all" ? "No notifications yet" : `No ${filterType} notifications`}
+                </p>
+                <p className="text-xs text-slate-600 mt-1">
+                  {filterType === "all"
+                    ? "You'll see attendance alerts and school announcements here."
+                    : `Switch to 'All' to see other notifications.`
+                  }
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {grouped.map(({ label, items }) => (
+                <div key={label}>
+                  {/* Day Divider — Task 2 clear date division */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest shrink-0">
+                      {label}
+                    </span>
+                    <div className="flex-1 h-px bg-slate-800/60" />
+                    <span className="text-[10px] text-slate-600 shrink-0">{items.length} alert{items.length !== 1 ? "s" : ""}</span>
+                  </div>
+
+                  {/* Notification Cards */}
+                  <div className="space-y-2">
+                    {items.map((notification) => {
+                      const cfg = getTypeConfig(notification.type)
+                      const { title, message } = localizeNotification(notification)
+                      const hasStudent = notification.student?.fullName
+
+                      return (
+                        <div
+                          key={notification.id}
+                          onClick={() => { if (!notification.isRead) handleMarkAsRead(notification.id) }}
+                          className={`relative overflow-hidden rounded-2xl border transition-all active:scale-[0.99] ${
+                            !notification.isRead
+                              ? `${cfg.bg} ${cfg.border}`
+                              : "bg-[#111a28]/60 border-slate-800/40"
+                          }`}
+                        >
+                          {/* Unread accent bar */}
+                          {!notification.isRead && (
+                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${cfg.accentBar}`} />
+                          )}
+
+                          <div className="p-4 pl-5">
+                            <div className="flex items-start gap-3">
+                              {/* Icon */}
+                              <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${cfg.bg} border ${cfg.border}`}>
+                                {cfg.icon}
+                              </div>
+
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    {/* Type Badge + Student Name */}
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-md tracking-wider uppercase ${cfg.badge}`}>
+                                        {cfg.badgeText}
+                                      </span>
+                                      {hasStudent && (
+                                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                          <GraduationCap className="w-3 h-3" />
+                                          {notification.student!.fullName}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {/* Title */}
+                                    <p className={`text-sm font-bold leading-snug mb-0.5 ${!notification.isRead ? "text-white" : "text-slate-400"}`}>
+                                      {title}
+                                    </p>
+                                    {/* Message */}
+                                    <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
+                                      {message}
+                                    </p>
+                                    {/* Time */}
+                                    <p className="text-[10px] text-slate-600 mt-1.5 font-medium">
+                                      {formatNotificationTime(notification.createdAt)}
+                                    </p>
+                                  </div>
+
+                                  {/* Delete Button */}
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleDelete(notification.id) }}
+                                    className="h-7 w-7 rounded-lg bg-slate-800/50 flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all active:scale-90 shrink-0"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
+      )}
 
-        {/* 1. NOTIFICATIONS INBOX TAB VIEW */}
-        <TabsContent value="inbox" className="outline-none">
-          <Card className="border-border/40 shadow-xl rounded-3xl bg-card/60 backdrop-blur-md overflow-hidden">
-            <CardContent className="p-0 divide-y divide-border/20">
-              {notificationsList.length === 0 ? (
-                <div className="py-20 flex flex-col items-center justify-center text-muted-foreground text-center">
-                  <Bell className="w-12 h-12 text-muted-foreground/30 mb-2" />
-                  <p className="typography-label">{t("no_alerts")}</p>
-                  <span className="typography-label text-[10px] text-muted-foreground/60 mt-1">{t("check_back_alerts")}</span>
-                </div>
-              ) : (
-                notificationsList.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`group p-4 md:p-6 flex gap-4 transition-all relative ${!notification.isRead
-                        ? "bg-emerald-500/5 dark:bg-emerald-500/[0.02]"
-                        : "hover:bg-muted/10"
-                      }`}
-                  >
-                    {!notification.isRead && (
-                      <div className="w-1.5 bg-emerald-600 dark:bg-emerald-500 absolute left-0 top-0 bottom-0 shrink-0" />
-                    )}
+      {/* ── PREFERENCES TAB ──────────────────────────────────────────────────── */}
+      {activeTab === "preferences" && (
+        <div className="px-4 pb-24 pt-5">
+          <div className="mb-4">
+            <h2 className="text-base font-black text-slate-200">Alert Channels</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Choose how you receive attendance alerts</p>
+          </div>
 
-                    {getNotificationIcon(notification.type)}
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          {(() => {
-                            const { title, message } = localizeNotification(notification)
-                            return (
-                              <>
-                                <span className="typography-label text-foreground">{title}</span>
-                                <span className="typography-label block text-[10px] text-muted-foreground mt-0.5">{formatNotificationTime(notification.createdAt)}</span>
-                                <p className="typography-label text-muted-foreground mt-2">{message}</p>
-                              </>
-                            )
-                          })()}
-                        </div>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(notification.id)}
-                          className="h-7 w-7 text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 rounded-md shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-                          title="Dismiss alert"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* 2. CHANNELS PREFERENCES CONFIGURATION TAB VIEW */}
-        <TabsContent value="preferences" className="outline-none animate-in fade-in duration-300">
-          <Card className="border-border/40 shadow-xl rounded-3xl bg-card/60 backdrop-blur-md overflow-hidden">
-            <CardHeader className="border-b border-border/20 py-4 px-6">
-              <CardTitle className="typography-label uppercase text-foreground">{t("notification_channels")}</CardTitle>
-              <CardDescription className="typography-helper">{t("notifications_desc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-
-              {/* SMS Channel toggle */}
-              <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/10 rounded-2xl">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                    <Smartphone className="w-5 h-5" />
+          <div className="space-y-3">
+            {[
+              {
+                key: "smsAlerts" as keyof ParentPreferences,
+                icon: <Smartphone className="w-5 h-5 text-emerald-400" />,
+                iconBg: "bg-emerald-500/15 border-emerald-500/25",
+                title: t("sms_alerts"),
+                desc: t("sms_alert_desc"),
+                value: preferences.smsAlerts,
+              },
+              {
+                key: "emailAlerts" as keyof ParentPreferences,
+                icon: <Mail className="w-5 h-5 text-blue-400" />,
+                iconBg: "bg-blue-500/15 border-blue-500/25",
+                title: t("email_alerts"),
+                desc: t("email_alert_desc"),
+                value: preferences.emailAlerts,
+              },
+              {
+                key: "pushAlerts" as keyof ParentPreferences,
+                icon: <Radio className="w-5 h-5 text-violet-400" />,
+                iconBg: "bg-violet-500/15 border-violet-500/25",
+                title: t("push_alerts"),
+                desc: t("push_alert_desc"),
+                value: preferences.pushAlerts,
+              },
+            ].map(pref => (
+              <div
+                key={pref.key}
+                className="flex items-center justify-between p-4 bg-[#111a28] border border-slate-800/60 rounded-2xl"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-xl border flex items-center justify-center shrink-0 ${pref.iconBg}`}>
+                    {pref.icon}
                   </div>
                   <div>
-                    <p className="typography-label text-foreground">{t("sms_alerts")}</p>
-                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">{t("sms_alert_desc")}</span>
+                    <p className="text-sm font-bold text-slate-200">{pref.title}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{pref.desc}</p>
                   </div>
                 </div>
                 <Switch
-                  checked={preferences.smsAlerts}
-                  onCheckedChange={(checked) => handlePreferenceToggle("smsAlerts", checked)}
-                  className="data-[state=checked]:bg-emerald-600"
+                  checked={Boolean(pref.value)}
+                  onCheckedChange={(checked) => handlePreferenceToggle(pref.key, checked)}
+                  className="data-[state=checked]:bg-emerald-600 shrink-0"
                 />
               </div>
-
-              {/* Email Channel toggle */}
-              <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/10 rounded-2xl">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                    <Mail className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="typography-label text-foreground">{t("email_alerts")}</p>
-                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">{t("email_alert_desc")}</span>
-                  </div>
-                </div>
-                <Switch
-                  checked={preferences.emailAlerts}
-                  onCheckedChange={(checked) => handlePreferenceToggle("emailAlerts", checked)}
-                  className="data-[state=checked]:bg-emerald-600"
-                />
-              </div>
-
-              {/* Push Channel toggle */}
-              <div className="flex items-center justify-between p-4 bg-muted/20 border border-border/10 rounded-2xl">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                    <Radio className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="typography-label text-foreground">{t("push_alerts")}</p>
-                    <span className="typography-label text-[10px] text-muted-foreground mt-0.5">{t("push_alert_desc")}</span>
-                  </div>
-                </div>
-                <Switch
-                  checked={preferences.pushAlerts}
-                  onCheckedChange={(checked) => handlePreferenceToggle("pushAlerts", checked)}
-                  className="data-[state=checked]:bg-emerald-600"
-                />
-              </div>
-
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-      </Tabs>
-
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1166,14 +1166,14 @@ export default function StudentPromotionPage() {
             </div>
 
             {/* WIZARD FLOATING STICKY ACTION BAR */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 dark:bg-slate-900/95 border-t border-slate-100 dark:border-slate-850 flex justify-between items-center gap-4 backdrop-blur-md z-30 md:static md:bg-transparent md:border-none md:p-0 md:shadow-none md:mt-8">
+            <div className="fixed bottom-16 md:bottom-0 left-0 right-0 p-4 bg-white/95 dark:bg-slate-900/95 border-t border-slate-100 dark:border-slate-850 flex justify-between items-center gap-4 backdrop-blur-md z-30 md:static md:bg-transparent md:border-none md:p-0 md:shadow-none md:mt-8">
               <div className="max-w-5xl w-full mx-auto flex justify-between gap-4">
                 {/* Back button */}
                 {currentStep > 1 ? (
                   <Button 
                     variant="outline" 
                     onClick={handleBack} 
-                    className="h-12 md:h-14 rounded-2xl font-bold px-6 text-slate-650 shrink-0 border-slate-200 dark:border-slate-800 hover:bg-slate-50"
+                    className="h-14 md:h-14 rounded-2xl font-bold px-6 text-slate-650 shrink-0 border-slate-200 dark:border-slate-800 hover:bg-slate-50 text-base"
                   >
                     Back
                   </Button>
@@ -1187,15 +1187,15 @@ export default function StudentPromotionPage() {
                   <Button 
                     onClick={handleNext} 
                     disabled={isNextDisabled}
-                    className="flex-1 md:flex-none md:w-60 h-12 md:h-14 rounded-2xl text-sm font-black shadow-lg shadow-primary/20 transform transition-all active:scale-[0.98]"
+                    className="flex-1 md:flex-none md:w-60 h-14 md:h-14 rounded-2xl text-base font-black shadow-lg shadow-primary/20 transform transition-all active:scale-[0.98]"
                   >
-                    Next Step <ChevronRight className="w-4 h-4 ml-1.5" />
+                    Next Step <ChevronRight className="w-5 h-5 ml-1.5" />
                   </Button>
                 ) : (
                   <Button 
                     onClick={executePromotion} 
                     disabled={isSubmitLoading || !isConfigurationComplete}
-                    className="flex-1 md:flex-none md:w-60 h-12 md:h-14 rounded-2xl text-sm font-black shadow-lg shadow-primary/20 transform transition-all active:scale-[0.98]"
+                    className="flex-1 md:flex-none md:w-60 h-14 md:h-14 rounded-2xl text-base font-black shadow-lg shadow-primary/20 transform transition-all active:scale-[0.98]"
                   >
                     {isSubmitLoading ? "Advancing Students..." : "Confirm & Execute"}
                   </Button>

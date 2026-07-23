@@ -288,6 +288,7 @@ export async function sendCategoryNotification(
     route?: string;
     studentId?: string;
     schoolId?: string;
+    schoolLogoUrl?: string;
     badge?: number;
     tag?: string;
   }
@@ -307,6 +308,7 @@ export async function sendCategoryNotification(
   if (payload.route) dataPayload.route = payload.route;
   if (payload.studentId) dataPayload.studentId = payload.studentId;
   if (payload.schoolId) dataPayload.schoolId = payload.schoolId;
+  if (payload.schoolLogoUrl) dataPayload.schoolLogoUrl = payload.schoolLogoUrl;
   if (payload.badge !== undefined) dataPayload.badge = payload.badge.toString();
   if (payload.tag) dataPayload.tag = payload.tag;
 

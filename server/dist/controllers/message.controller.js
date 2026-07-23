@@ -19,9 +19,23 @@ const getConversations = async (req, res) => {
                     some: { userId },
                 },
             },
-            include: {
+            select: {
+                id: true,
+                name: true,
+                isGroup: true,
+                avatar: true,
+                description: true,
+                groupType: true,
+                isAnnouncement: true,
+                isSavedMessages: true,
+                createdAt: true,
+                updatedAt: true,
                 members: {
-                    include: {
+                    select: {
+                        id: true,
+                        userId: true,
+                        role: true,
+                        isMuted: true,
                         user: {
                             select: {
                                 id: true,
@@ -29,6 +43,7 @@ const getConversations = async (req, res) => {
                                 profile_photo: true,
                                 phone: true,
                                 role: true,
+                                lastActive: true,
                             },
                         },
                     },
@@ -37,7 +52,12 @@ const getConversations = async (req, res) => {
                     where: { schoolId },
                     orderBy: { createdAt: 'desc' },
                     take: 1,
-                    include: {
+                    select: {
+                        id: true,
+                        content: true,
+                        type: true,
+                        createdAt: true,
+                        senderId: true,
                         sender: {
                             select: { full_name: true },
                         },
@@ -56,23 +76,14 @@ const getConversations = async (req, res) => {
 exports.getConversations = getConversations;
 const getMessages = async (req, res) => {
     const { conversationId } = req.params;
-    const { limit = '50', cursor } = req.query;
+    const { limit = '30', cursor } = req.query;
     const schoolId = req.user?.schoolId;
     const userId = req.user?.id;
     if (!schoolId || !userId) {
         return res.status(401).json({ error: 'Unauthorized: School ID missing' });
     }
-    const take = Math.min(Number(limit), 100); // Cap at 100 to protect DB
+    const take = Math.min(Math.max(Number(limit) || 30, 1), 50); // Default 30, cap at 50
     try {
-        // ── Single query — the WHERE { conversationId, schoolId } already:
-        //    1. Scopes to the correct tenant (schoolId)
-        //    2. Restricts to the correct conversation (conversationId)
-        // A separate findFirst for conversation ownership would be a redundant
-        // DB round-trip. If the conversation doesn't exist or belongs to another
-        // school, the message query returns [] — safe and correct.
-        //
-        // We also verify that the requesting user is a member of this conversation
-        // by checking ConversationMember, which is the real access control gate.
         const [membership, messages] = await Promise.all([
             db_1.default.conversationMember.findFirst({
                 where: { conversationId, userId },
@@ -83,32 +94,69 @@ const getMessages = async (req, res) => {
                 take: take + 1, // fetch one extra to determine if there's a next page
                 ...(cursor ? { skip: 1, cursor: { id: String(cursor) } } : {}),
                 orderBy: { createdAt: 'desc' },
-                include: {
+                select: {
+                    id: true,
+                    conversationId: true,
+                    senderId: true,
+                    content: true,
+                    type: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    editedAt: true,
+                    isDeleted: true,
+                    replyToId: true,
+                    forwardedFromId: true,
+                    attachments: true,
+                    metadata: true,
                     sender: {
                         select: {
                             id: true,
                             full_name: true,
                             profile_photo: true,
-                            lastActive: true,
                         },
                     },
-                    readBy: { where: { schoolId } },
-                    reactions: { where: { schoolId } },
-                    replyTo: true,
+                    readBy: {
+                        where: { schoolId, userId: { not: userId } },
+                        take: 1,
+                        select: {
+                            userId: true,
+                        },
+                    },
+                    reactions: {
+                        where: { schoolId },
+                        select: {
+                            id: true,
+                            userId: true,
+                            emoji: true,
+                        },
+                    },
+                    replyTo: {
+                        select: {
+                            id: true,
+                            content: true,
+                            type: true,
+                            sender: {
+                                select: {
+                                    full_name: true,
+                                },
+                            },
+                        },
+                    },
                 },
             }),
         ]);
         if (!membership) {
             return res.status(403).json({ error: 'Forbidden: You are not a member of this conversation' });
         }
-        const hasNextPage = messages.length > take;
-        const page = hasNextPage ? messages.slice(0, take) : messages;
-        const nextCursor = hasNextPage ? page[page.length - 1]?.id : null;
+        const hasMore = messages.length > take;
+        const page = hasMore ? messages.slice(0, take) : messages;
+        const nextCursor = hasMore ? page[page.length - 1]?.id : null;
         // Return in chronological order (oldest first)
         res.status(200).json({
             messages: page.reverse(),
             nextCursor,
-            hasNextPage,
+            hasMore,
+            hasNextPage: hasMore,
         });
     }
     catch (error) {

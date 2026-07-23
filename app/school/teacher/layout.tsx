@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
   LayoutDashboard, LogOut, User, CheckSquare, BarChart2, BookOpen, 
-  MessageSquare, X, ChevronRight, ShieldBan, HeadphonesIcon, Sun, Moon
+  MessageSquare, X, ChevronRight, ShieldBan, HeadphonesIcon, Sun, Moon, Sparkles
 } from 'lucide-react'
 import { useAuth } from '@/lib/context/auth-context'
 import { useSchool } from '@/lib/context/school-context'
@@ -84,12 +84,9 @@ export default function TeacherLayout({
   const isActive = (path: string) => pathname === path
   const isCommunicationPage = pathname?.includes('/communication')
 
-  const handleLogout = () => {
-    clearMessageCache().catch(() => {})
-    clearSchoolContext()
-    logout()
+  const handleLogout = async () => {
+    await logout()
     notifications.info("Logged Out", "You have been successfully logged out")
-    router.push('/login')
   }
 
   if (!mounted) return <PageSkeleton variant="dashboard" />
@@ -100,6 +97,7 @@ export default function TeacherLayout({
     { href: "/school/teacher/attendance", icon: <CheckSquare className="w-5 h-5" />, label: "Attendance" },
     { href: "/school/teacher/classes", icon: <BookOpen className="w-5 h-5" />, label: "Classes" },
     { href: "/school/teacher/reports", icon: <BarChart2 className="w-5 h-5" />, label: "Reports" },
+    { href: "/school/teacher/feedback", icon: <Sparkles className="w-5 h-5" />, label: "Feedback" },
     { href: "/school/teacher/profile", icon: <User className="w-5 h-5" />, label: "Profile" },
   ]
 

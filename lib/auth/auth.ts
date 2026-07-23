@@ -155,15 +155,39 @@ class AuthService {
     }
   }
 
-  async searchParentByPhone(phone: string): Promise<any> {
+  async searchParentByPhone(phone: string, signal?: AbortSignal): Promise<any> {
     try {
+      console.log(`[ParentLookup] Initiating API request for phone: "${phone}"`);
       const res = await fetch(`${API_URL}/api/parent/search?phone=${encodeURIComponent(phone)}`, {
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeaders(),
+        signal,
       });
-      return await res.json();
-    } catch (error) {
-      console.error("[pg] Parent search error:", error);
-      return { success: false, message: "Network error during search" };
+
+      if (res.status === 404) {
+        console.log(`[ParentLookup] API returned 404 Not Found for phone: "${phone}"`);
+        return { success: false, notFound: true, error: false, message: "No parent account found with this phone number." };
+      }
+
+      if (!res.ok) {
+        console.warn(`[ParentLookup] API error ${res.status} ${res.statusText} for phone: "${phone}"`);
+        return { success: false, notFound: false, error: true, message: `Server error (${res.status}): Unable to verify parent account.` };
+      }
+
+      const body = await res.json();
+      if (body.success && body.data) {
+        console.log(`[ParentLookup] API returned existing parent ID: ${body.data.id} for phone: "${phone}"`);
+        return { success: true, data: body.data, notFound: false, error: false };
+      } else {
+        console.log(`[ParentLookup] API returned non-success response for phone: "${phone}"`, body);
+        return { success: false, notFound: true, error: false, message: body.message || "No parent account found." };
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log(`[ParentLookup] Request cancelled/aborted for phone: "${phone}"`);
+        return { success: false, cancelled: true };
+      }
+      console.error("[ParentLookup] Network error during parent search:", error);
+      return { success: false, notFound: false, error: true, message: "Unable to verify the parent account. Please check your connection and try again." };
     }
   }
 
@@ -601,33 +625,15 @@ class AuthService {
 
   async logout(): Promise<void> {
     if (this.isClient()) {
+      // 1. Capture credentials/headers first before clearing local storage
+      let headers: Record<string, string> = {};
       try {
-        const headers = this.getAuthHeaders();
-        await fetch(`${API_URL}/api/auth/logout`, { 
-          method: "POST", 
-          headers,
-          credentials: "include" 
-        });
+        headers = this.getAuthHeaders();
       } catch (e) {
-        console.error("Logout API call failed", e);
+        console.warn("Failed to get auth headers for logout:", e);
       }
 
-      // Stop any ongoing native call services, clear native ringing,
-      // and fully deregister the FCM push token so this device receives
-      // NO notifications or calls after sign-out (security requirement).
-      try {
-        const { NativeBridge } = await import('@/lib/utils/native-bridge');
-        await NativeBridge.endNativeCall();
-        // Delete the Firebase device token first, then clear the stored auth token.
-        // Order matters: deregisterFcmToken also clears auth from SharedPreferences.
-        await NativeBridge.deregisterFcmToken();
-        await NativeBridge.saveAuthToken(""); // Clears sharedPreferences token (belt + suspenders)
-      } catch (e) {
-        console.error("Failed to clean up native call state on logout", e);
-      }
-      
-      // Clear ALL school-scoped keys so that no data leaks to the next login session.
-      // Never rely on components cleaning up after themselves — do it here atomically.
+      // 2. Clear ALL school-scoped and session keys SYNCHRONOUSLY to prevent race conditions on redirects
       const keysToRemove = [
         this.CURRENT_USER_KEY,          // attendance_current_user
         "attendance_token",              // (Legacy) JWT token
@@ -643,6 +649,40 @@ class AuthService {
         SESSION_ID_KEY,                  // session identity nonce — MUST be cleared last
       ]
       keysToRemove.forEach(key => localStorage.removeItem(key))
+
+      // 3. Clear SWR cache synchronously to avoid data leaks
+      try {
+        const { queryCache } = require('@/lib/utils/query-cache');
+        if (queryCache && typeof queryCache.clear === 'function') {
+          queryCache.clear();
+        }
+      } catch (e) {
+        console.error("Failed to clear query cache on logout", e);
+      }
+
+      // 4. Perform background API call and Native Bridge cleanup in parallel
+      const apiCall = fetch(`${API_URL}/api/auth/logout`, { 
+        method: "POST", 
+        headers,
+        credentials: "include" 
+      }).catch(e => {
+        console.error("Logout API call failed", e);
+      });
+
+      const nativeCall = (async () => {
+        try {
+          const { NativeBridge } = await import('@/lib/utils/native-bridge');
+          await NativeBridge.endNativeCall();
+          // Delete the Firebase device token first, then clear the stored auth token.
+          // Order matters: deregisterFcmToken also clears auth from SharedPreferences.
+          await NativeBridge.deregisterFcmToken();
+          await NativeBridge.saveAuthToken(""); // Clears sharedPreferences token (belt + suspenders)
+        } catch (e) {
+          console.error("Failed to clean up native call state on logout", e);
+        }
+      })();
+
+      await Promise.allSettled([apiCall, nativeCall]);
     }
     console.log("[pg] User logged out — all school-scoped localStorage keys and native credentials cleared")
   }

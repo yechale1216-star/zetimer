@@ -40,13 +40,22 @@ export function formatLocalizedDate(
       const ec = toEthiopianDate(date);
       let result = "";
       
+      const getPeriod = (h: number) => {
+        if (h >= 6 && h < 12) return "ጠዋት";
+        if (h >= 12 && h < 18) return "ከሰዓት";
+        if (h >= 18 && h < 24) return "ማታ";
+        return "ሌሊት";
+      };
+
+      const hours24 = date.getHours();
+      const period = getPeriod(hours24);
+      let displayHours = hours24 % 12;
+      displayHours = displayHours ? displayHours : 12;
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+
       // Just Time?
       if (options.hour && options.minute && !options.month && !options.day && !options.year && !options.weekday) {
-        const ampm = date.getHours() >= 12 ? "ከሰዓት" : "ጠዋት";
-        let hours = date.getHours() % 12;
-        hours = hours ? hours : 12;
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${ampm} ${hours}:${minutes}`;
+        return `${period} ${displayHours}:${minutes}`;
       }
 
       if (options.weekday) {
@@ -64,11 +73,7 @@ export function formatLocalizedDate(
         result += ec.year + " ዓ.ም";
       }
       if (options.hour && options.minute) {
-        const ampm = date.getHours() >= 12 ? "ከሰዓት" : "ጠዋት";
-        let hours = date.getHours() % 12;
-        hours = hours ? hours : 12;
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        result += ` ${ampm} ${hours}:${minutes}`;
+        result += ` ${period} ${displayHours}:${minutes}`;
       }
 
       return result.trim().replace(/፣\s*$/, '');

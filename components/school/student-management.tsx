@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Trash2, Edit, Plus, Search, Upload, Download, AlertCircle, Users, CheckCircle2, Clock, ShieldCheck, Eye, X, Calendar, Mail, Phone, GraduationCap, UploadCloud } from "lucide-react"
+import { Trash2, Edit, Plus, Search, Upload, Download, AlertCircle, Users, CheckCircle2, Clock, ShieldCheck, Eye, X, Calendar, Mail, Phone, GraduationCap, UploadCloud, RefreshCw } from "lucide-react"
 import { db, type Student } from "@/lib/db/database"
 import { StudentImportPreview } from "./student-import-preview"
 import { motion, AnimatePresence } from "framer-motion"
@@ -70,24 +70,45 @@ export function StudentManagement() {
     address: "",
   })
 
-  const [isSearchingParent, setIsSearchingParent] = useState(false)
+  type ParentLookupState = 'idle' | 'searching' | 'found' | 'not_found' | 'error';
+  const [parentLookupState, setParentLookupState] = useState<ParentLookupState>('idle')
+  const [parentLookupError, setParentLookupError] = useState<string | null>(null)
   const [foundParent, setFoundParent] = useState<any>(null)
   const [linkExistingParent, setLinkExistingParent] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [showUploadDialog, setShowUploadDialog] = useState(false)
 
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const searchSeqRef = useRef<number>(0)
 
-
-  // Parent Search Trigger (Automatic)
+  // Automatic Debounced Parent Lookup
   useEffect(() => {
+    if (editingStudent) return; // Skip lookup in edit student mode
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
     const cleanPhone = formData.parent_phone.replace(/\s+/g, '');
-    if (cleanPhone.length >= 10 && (cleanPhone.startsWith('+251') || cleanPhone.startsWith('09') || cleanPhone.startsWith('9'))) {
-      handleSearchParent();
+    const isValidPhone = cleanPhone.length >= 10 && (cleanPhone.startsWith('+251') || cleanPhone.startsWith('09') || cleanPhone.startsWith('07') || cleanPhone.startsWith('9') || cleanPhone.startsWith('7'));
+
+    if (isValidPhone) {
+      setParentLookupState('searching');
+      setParentLookupError(null);
+      debounceTimerRef.current = setTimeout(() => {
+        handleSearchParent(formData.parent_phone);
+      }, 400);
     } else {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      setParentLookupState('idle');
       setFoundParent(null);
       setLinkExistingParent(false);
+      setParentLookupError(null);
+      setFormData(prev => ({ ...prev, existingParentId: "" }));
     }
-  }, [formData.parent_phone]);
+
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [formData.parent_phone, editingStudent]);
 
   useEffect(() => {
     const user = authService.getCurrentUser()
@@ -190,7 +211,90 @@ export function StudentManagement() {
     }
   }
 
+  const handleSearchParent = useCallback(async (phoneToSearch?: string) => {
+    const targetPhone = (phoneToSearch !== undefined ? phoneToSearch : formData.parent_phone) || "";
+    const cleanPhone = targetPhone.replace(/\s+/g, "");
+
+    // Abort previous in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log(`[ParentLookup] Aborted previous in-flight request for new search`);
+    }
+
+    if (cleanPhone.length < 10) {
+      setParentLookupState('idle');
+      setFoundParent(null);
+      setLinkExistingParent(false);
+      setParentLookupError(null);
+      setFormData(prev => ({ ...prev, existingParentId: "" }));
+      return;
+    }
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const currentSeq = ++searchSeqRef.current;
+
+    console.log(`[ParentLookup] Starting lookup #${currentSeq} for phone: "${cleanPhone}"`);
+    setParentLookupState('searching');
+    setParentLookupError(null);
+
+    try {
+      const res = await authService.searchParentByPhone(cleanPhone, abortController.signal);
+
+      // Ignore out-of-order responses or cancelled requests
+      if (searchSeqRef.current !== currentSeq) {
+        console.log(`[ParentLookup] Ignoring stale response #${currentSeq}`);
+        return;
+      }
+
+      if (res.cancelled) {
+        console.log(`[ParentLookup] Request #${currentSeq} was cancelled`);
+        return;
+      }
+
+      if (res.success && res.data) {
+        console.log(`[ParentLookup] Parent Found (#${currentSeq}): ${res.data.full_name || res.data.phone}`);
+        setParentLookupState('found');
+        setFoundParent(res.data);
+        setLinkExistingParent(true);
+        setParentLookupError(null);
+        setFormData(prev => ({
+          ...prev,
+          parent_name: res.data.full_name || prev.parent_name,
+          parent_email: res.data.email || prev.parent_email,
+          parent_address: res.data.address || prev.parent_address,
+          existingParentId: res.data.id || ""
+        }));
+      } else if (res.notFound) {
+        console.log(`[ParentLookup] Parent Not Found (#${currentSeq})`);
+        setParentLookupState('not_found');
+        setFoundParent(null);
+        setLinkExistingParent(false);
+        setParentLookupError(null);
+        setFormData(prev => ({ ...prev, existingParentId: "" }));
+      } else if (res.error) {
+        console.warn(`[ParentLookup] Search Failed (#${currentSeq}):`, res.message);
+        setParentLookupState('error');
+        setParentLookupError(res.message || "Unable to verify the parent account. Please check your connection and try again.");
+        setFoundParent(null);
+        setLinkExistingParent(false);
+        setFormData(prev => ({ ...prev, existingParentId: "" }));
+      }
+    } catch (err: any) {
+      if (searchSeqRef.current === currentSeq) {
+        console.error(`[ParentLookup] Exception during search #${currentSeq}:`, err);
+        setParentLookupState('error');
+        setParentLookupError("Unable to verify the parent account. Please check your connection and try again.");
+        setFoundParent(null);
+        setLinkExistingParent(false);
+        setFormData(prev => ({ ...prev, existingParentId: "" }));
+      }
+    }
+  }, [formData.parent_phone]);
+
   const resetForm = () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     setFormData({
       name: "",
       student_id: "...", // Fetching...
@@ -213,6 +317,8 @@ export function StudentManagement() {
     setValidationErrors([])
     setFoundParent(null)
     setLinkExistingParent(false)
+    setParentLookupState('idle')
+    setParentLookupError(null)
   }
 
   const validateForm = () => {
@@ -257,8 +363,6 @@ export function StudentManagement() {
   const handleTakePhoto = async () => {
     try {
       const photoPath = await NativeBridge.takePhoto()
-      // In a real app, you would upload this URI or convert it to a blob
-      // For now, we'll just log it or set it to a preview state
       console.log('Mobile photo taken:', photoPath)
       notifications.success("Success", "Photo captured. In a production build, this would be uploaded to storage.")
     } catch (error: any) {
@@ -270,6 +374,17 @@ export function StudentManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!editingStudent) {
+      if (parentLookupState === 'searching') {
+        notifications.warning("Lookup in Progress", "Please wait for parent account search to complete.");
+        return;
+      }
+      if (parentLookupState === 'error') {
+        notifications.error("Verification Required", "Unable to verify parent account connection. Please retry parent search before saving.");
+        return;
+      }
+    }
 
     if (!validateForm()) {
       return
@@ -340,40 +455,9 @@ export function StudentManagement() {
     setValidationErrors([])
     setFoundParent(null)
     setLinkExistingParent(false)
+    setParentLookupState('idle')
+    setParentLookupError(null)
     setIsAddModalOpen(true)
-  }
-
-  const handleSearchParent = async () => {
-    const cleanPhone = formData.parent_phone.replace(/\s+/g, "")
-    if (cleanPhone.length < 10) return;
-    
-    // Prevent redundant searches if already found for this phone
-    if (foundParent && foundParent.phone === cleanPhone) return;
-
-    setIsSearchingParent(true);
-    try {
-      const res = await authService.searchParentByPhone(cleanPhone);
-      if (res.success && res.data) {
-        setFoundParent(res.data);
-        setLinkExistingParent(true);
-        // Pre-fill form data with found parent info
-        setFormData(prev => ({
-          ...prev,
-          parent_name: res.data.full_name || prev.parent_name,
-          parent_email: res.data.email || prev.parent_email,
-          parent_address: res.data.address || prev.parent_address,
-          existingParentId: res.data.id
-        }));
-      } else {
-        setFoundParent(null);
-        setLinkExistingParent(false);
-        setFormData(prev => ({ ...prev, existingParentId: "" }));
-      }
-    } catch (err) {
-      console.error("Parent search error:", err);
-    } finally {
-      setIsSearchingParent(false);
-    }
   }
 
   const handleDelete = async (e: React.MouseEvent, student: Student) => {
@@ -899,11 +983,26 @@ export function StudentManagement() {
                       <div className="bg-slate-50/50 dark:bg-slate-900/30 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/50 space-y-4">
                         <div className="flex items-center justify-between">
                           <p className="typography-label text-[10px] uppercase text-emerald-600 dark:text-emerald-400">Parent/Guardian Contact</p>
-                          {isSearchingParent && (
-                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground animate-pulse">
-                              <span className="h-2 w-2 bg-emerald-500 rounded-full animate-ping" />
-                              Checking parent directory...
+                          {parentLookupState === 'searching' && (
+                            <div className="flex items-center gap-2 text-[10px] text-emerald-600 dark:text-emerald-400 animate-pulse font-medium">
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              Searching for parent account...
                             </div>
+                          )}
+                          {parentLookupState === 'found' && (
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full">
+                              Account Linked
+                            </span>
+                          )}
+                          {parentLookupState === 'not_found' && (
+                            <span className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold px-2 py-0.5 rounded-full">
+                              New Parent Account
+                            </span>
+                          )}
+                          {parentLookupState === 'error' && (
+                            <span className="text-[10px] bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-bold px-2 py-0.5 rounded-full">
+                              Search Failed
+                            </span>
                           )}
                         </div>
                         
@@ -930,29 +1029,70 @@ export function StudentManagement() {
                                   setFormData((prev) => ({ ...prev, parent_phone: val }))
                                 }}
                                 required
-                                className={`typography-body h-12 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all ${foundParent ? 'border-emerald-500 bg-emerald-50/30' : ''}`}
+                                className={`typography-body h-12 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all ${parentLookupState === 'found' ? 'border-emerald-500 bg-emerald-50/30' : parentLookupState === 'error' ? 'border-rose-400 bg-rose-50/20' : ''}`}
                               />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                  {foundParent ? (
-                                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                  ) : (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-slate-400 hover:text-emerald-500"
-                                      onClick={handleSearchParent}
-                                      disabled={isSearchingParent}
-                                    >
-                                      <Search className="w-4 h-4" />
-                                    </Button>
-                                  )}
-                                </div>
+                              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                {parentLookupState === 'searching' ? (
+                                  <RefreshCw className="w-4 h-4 text-emerald-500 animate-spin mr-2" />
+                                ) : parentLookupState === 'found' ? (
+                                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mr-2" />
+                                ) : parentLookupState === 'error' ? (
+                                  <AlertCircle className="w-5 h-5 text-rose-500 mr-2" />
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-slate-400 hover:text-emerald-500"
+                                    onClick={() => handleSearchParent(formData.parent_phone)}
+                                  >
+                                    <Search className="w-4 h-4" />
+                                  </Button>
+                                )}
                               </div>
-                            <p className="text-[10px] text-muted-foreground italic">Phone number is used for automatic account detection.</p>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground italic">Phone number is used for automatic global parent account detection.</p>
                           </div>
 
-                          {foundParent && !editingStudent ? (
+                          {/* Explicit State Views */}
+                          {parentLookupState === 'searching' && !editingStudent && (
+                            <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 rounded-xl flex items-center gap-3 animate-pulse">
+                              <RefreshCw className="w-5 h-5 text-emerald-600 animate-spin shrink-0" />
+                              <div className="text-xs text-emerald-900 dark:text-emerald-200">
+                                <p className="font-semibold">Searching for parent account...</p>
+                                <p className="text-[10px] opacity-80">Verifying global directory to prevent duplicate account creation.</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {parentLookupState === 'error' && !editingStudent && (
+                            <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/50 rounded-xl space-y-3 animate-in fade-in">
+                              <div className="flex items-start gap-2 text-rose-800 dark:text-rose-200">
+                                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <h4 className="typography-label text-rose-900 dark:text-rose-100 font-semibold">Verification Failed</h4>
+                                  <p className="text-xs mt-1 text-rose-700 dark:text-rose-300">
+                                    {parentLookupError || "Unable to verify the parent account. Please check your connection and try again."}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 pt-1 border-t border-rose-200/50 dark:border-rose-800/50">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 text-xs border-rose-300 hover:bg-rose-100 dark:border-rose-700 dark:hover:bg-rose-900/40 text-rose-800 dark:text-rose-200"
+                                  onClick={() => handleSearchParent(formData.parent_phone)}
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                                  Retry Search
+                                </Button>
+                                <span className="text-[10px] text-rose-600 dark:text-rose-400 italic">Creating a parent is disabled until search succeeds.</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {parentLookupState === 'found' && foundParent && !editingStudent && (
                             <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 rounded-xl space-y-3 relative overflow-hidden animate-in fade-in slide-in-from-top-2">
                               <div className="flex items-center gap-2">
                                 <span className="typography-label p-1 px-2 bg-emerald-600 text-white rounded text-[9px] uppercase">Auto-Detected</span>
@@ -960,7 +1100,7 @@ export function StudentManagement() {
                               </div>
                               
                               <div className="typography-helper grid grid-cols-2 gap-x-4 gap-y-1 text-emerald-900/80 dark:text-emerald-100/80">
-                                <p><span className="typography-label text-emerald-800/60 dark:text-emerald-200/60">Name:</span> <strong>{foundParent.full_name}</strong></p>
+                                <p><span className="typography-label text-emerald-800/60 dark:text-emerald-200/60">Name:</span> <strong>{foundParent.full_name || foundParent.name}</strong></p>
                                 <p><span className="typography-label text-emerald-800/60 dark:text-emerald-200/60">Email:</span> <strong className="truncate block">{foundParent.email}</strong></p>
                                 <p className="col-span-2"><span className="typography-label text-emerald-800/60 dark:text-emerald-200/60">Address:</span> <strong>{foundParent.address || "No address provided"}</strong></p>
                               </div>
@@ -984,82 +1124,82 @@ export function StudentManagement() {
                                 </Select>
                               </div>
                             </div>
-                          ) : (
-                            !isSearchingParent && !editingStudent && formData.parent_phone.replace(/\s+/g, '').length >= 13 && (
-                              <div className="space-y-4 animate-in slide-in-from-top-2 fade-in">
-                                <div className="flex items-center gap-2">
-                                  <span className="typography-label p-1 px-2 bg-amber-500 text-white rounded text-[9px] uppercase">New Profile</span>
-                                  <h4 className="typography-label text-amber-600 dark:text-amber-400 italic">Registering New Parent</h4>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label htmlFor="parent_name" className="typography-label text-slate-600">Parent Full Name *</Label>
-                                    <Input
-                                      id="parent_name"
-                                      placeholder="First and Father Name"
-                                      value={formData.parent_name || ""}
-                                      onChange={(e) => setFormData((prev) => ({ ...prev, parent_name: e.target.value }))}
-                                      required
-                                      className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label htmlFor="relationship" className="typography-label text-slate-600">Relationship *</Label>
-                                    <Select
-                                      value={formData.relationshipType}
-                                      onValueChange={(value) => setFormData((prev) => ({ ...prev, relationshipType: value }))}
-                                    >
-                                      <SelectTrigger id="relationship" className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800">
-                                        <SelectValue placeholder="Select" />
-                                      </SelectTrigger>
-                                      <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800">
-                                        <SelectItem value="Father">Father</SelectItem>
-                                        <SelectItem value="Mother">Mother</SelectItem>
-                                        <SelectItem value="Guardian">Guardian</SelectItem>
-                                        <SelectItem value="Grandparent">Grandparent</SelectItem>
-                                        <SelectItem value="Other">Other</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
+                          )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label htmlFor="parent_email" className="typography-label text-slate-600">Email Address (Optional)</Label>
-                                    <Input
-                                      id="parent_email"
-                                      type="email"
-                                      placeholder="email@example.com"
-                                      value={formData.parent_email || ""}
-                                      onChange={(e) => setFormData((prev) => ({ ...prev, parent_email: e.target.value }))}
-                                      className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label htmlFor="parent_password" className="typography-label text-slate-600">Portal Password *</Label>
-                                    <Input
-                                      id="parent_password"
-                                      type="text"
-                                      placeholder="Temporary password"
-                                      value={formData.parent_password || ""}
-                                      onChange={(e) => setFormData((prev) => ({ ...prev, parent_password: e.target.value }))}
-                                      required={!editingStudent && !foundParent && formData.parent_phone.length >= 13}
-                                      className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                                    />
-                                  </div>
-                                  <div className="space-y-2 md:col-span-2">
-                                    <Label htmlFor="parent_address" className="typography-label text-slate-600">Home Address (Optional)</Label>
-                                    <Input
-                                      id="parent_address"
-                                      placeholder="Location details"
-                                      value={formData.parent_address || ""}
-                                      onChange={(e) => setFormData((prev) => ({ ...prev, parent_address: e.target.value }))}
-                                      className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                                    />
-                                  </div>
+                          {parentLookupState === 'not_found' && !editingStudent && (
+                            <div className="space-y-4 animate-in slide-in-from-top-2 fade-in">
+                              <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl">
+                                <span className="typography-label p-1 px-2 bg-amber-500 text-white rounded text-[9px] uppercase font-bold">New Profile</span>
+                                <h4 className="typography-label text-amber-800 dark:text-amber-200 text-xs italic font-medium">No parent account found. Please fill in parent details below to register a new account.</h4>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="parent_name" className="typography-label text-slate-600">Parent Full Name *</Label>
+                                  <Input
+                                    id="parent_name"
+                                    placeholder="First and Father Name"
+                                    value={formData.parent_name || ""}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, parent_name: e.target.value }))}
+                                    required
+                                    className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="relationship" className="typography-label text-slate-600">Relationship *</Label>
+                                  <Select
+                                    value={formData.relationshipType}
+                                    onValueChange={(value) => setFormData((prev) => ({ ...prev, relationshipType: value }))}
+                                  >
+                                    <SelectTrigger id="relationship" className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800">
+                                      <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-xl border-slate-200 dark:border-slate-800">
+                                      <SelectItem value="Father">Father</SelectItem>
+                                      <SelectItem value="Mother">Mother</SelectItem>
+                                      <SelectItem value="Guardian">Guardian</SelectItem>
+                                      <SelectItem value="Grandparent">Grandparent</SelectItem>
+                                      <SelectItem value="Other">Other</SelectItem>
+                                    </SelectContent>
+                                  </Select>
                                 </div>
                               </div>
-                            )
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="parent_email" className="typography-label text-slate-600">Email Address (Optional)</Label>
+                                  <Input
+                                    id="parent_email"
+                                    type="email"
+                                    placeholder="email@example.com"
+                                    value={formData.parent_email || ""}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, parent_email: e.target.value }))}
+                                    className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="parent_password" className="typography-label text-slate-600">Portal Password *</Label>
+                                  <Input
+                                    id="parent_password"
+                                    type="text"
+                                    placeholder="Temporary password"
+                                    value={formData.parent_password || ""}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, parent_password: e.target.value }))}
+                                    required={parentLookupState === 'not_found' && !editingStudent}
+                                    className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                                  />
+                                </div>
+                                <div className="space-y-2 md:col-span-2">
+                                  <Label htmlFor="parent_address" className="typography-label text-slate-600">Home Address (Optional)</Label>
+                                  <Input
+                                    id="parent_address"
+                                    placeholder="Location details"
+                                    value={formData.parent_address || ""}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, parent_address: e.target.value }))}
+                                    className="typography-body h-11 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                                  />
+                                </div>
+                              </div>
+                            </div>
                           )}
 
                           {editingStudent && (

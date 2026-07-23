@@ -116,12 +116,9 @@ export default function SchoolAdminLayout({
   const isActive = (path: string) => pathname === path
   const isCommunicationPage = pathname?.includes('/communication')
 
-  const handleLogout = () => {
-    clearMessageCache().catch(() => { })
-    clearSchoolContext()
-    logout()
+  const handleLogout = async () => {
+    await logout()
     notifications.info("Logged Out", "You have been successfully logged out")
-    router.push('/login')
   }
 
   if (!isMounted) return null
@@ -139,6 +136,7 @@ export default function SchoolAdminLayout({
     { href: '/school/admin/reports', icon: <BookOpen className="w-5 h-5" />, label: 'Reports', show: true },
     { href: '/school/admin/promotion', icon: <TrendingUp className="w-5 h-5" />, label: 'Promotion', show: true },
     { href: '/school/admin/subscription', icon: <CreditCard className="w-5 h-5" />, label: 'Subscription', show: true },
+    { href: '/school/admin/support', icon: <HeadphonesIcon className="w-5 h-5" />, label: 'Help Desk', show: true },
     { href: '/school/admin/settings', icon: <Settings className="w-5 h-5" />, label: 'Settings', show: true },
     { href: '/school/admin/profile', icon: <User className="w-5 h-5" />, label: 'Profile', show: true },
   ]

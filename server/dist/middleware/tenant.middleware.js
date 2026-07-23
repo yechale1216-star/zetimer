@@ -159,6 +159,8 @@ const subscriptionGuard = async (req, res, next) => {
         '/api/parent/profile', // parent profile updates
         '/api/parent/update-password', // password change
         '/api/auth', // auth flows
+        '/api/schools/support', // help desk & feedback support tickets
+        '/api/super-admin/support', // super admin support tickets
     ];
     if (writeWhitelist.some(path => url.startsWith(path)))
         return next();

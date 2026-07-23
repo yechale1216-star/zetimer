@@ -144,8 +144,8 @@ router.post('/onboarding', authorize(['admin', 'school_admin']), async (req: Aut
 });
 
 
-// ─── Help Desk (Support Tickets) ──────────────────────────────────────────────
-router.get('/support', authorize(['admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+// ─── Help Desk (Support Tickets & Feedback) ──────────────────────────────────────────────
+router.get('/support', authorize(['admin', 'teacher', 'parent', 'student', 'super_admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.user?.schoolId;
     if (!schoolId) return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -160,7 +160,7 @@ router.get('/support', authorize(['admin']), async (req: AuthenticatedRequest, r
   } catch (error) { next(error); }
 });
 
-router.post('/support', authorize(['admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.post('/support', authorize(['admin', 'teacher', 'parent', 'student', 'super_admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const schoolId = req.user?.schoolId;
     const authorId = req.user?.id;

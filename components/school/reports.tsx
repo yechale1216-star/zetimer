@@ -212,29 +212,36 @@ export function Reports() {
             const m = records.find(r => r.session?.toLowerCase() === "morning")
             const a = records.find(r => r.session?.toLowerCase() === "afternoon")
 
+            // Local helpers
             const isP = (s: string | undefined) => s?.toLowerCase() === "present"
             const isL = (s: string | undefined) => s?.toLowerCase() === "late"
             const isE = (s: string | undefined) => s?.toLowerCase() === "excused"
             const isA = (s: string | undefined) => s?.toLowerCase() === "absent"
             const isAtt = (s: string | undefined) => isP(s) || isL(s)
 
-            if (m && a) {
-              if (isP(m.status) && isP(a.status)) {
-                presentDays++
-              } else if (isAtt(m.status) && isAtt(a.status)) {
-                lateDays++
-              } else if (isE(m.status) && isE(a.status)) {
-                excusedDays++
-              } else if (isA(m.status) && isA(a.status)) {
-                absentDays++
-              }
-            } else if (m || a) {
-              const r = m || a
-              if (isP(r.status)) presentDays++
-              else if (isL(r.status)) lateDays++
-              else if (isE(r.status)) excusedDays++
-              else if (isA(r.status)) absentDays++
+            /**
+             * resolveFullDay — strict match rule.
+             * Both sessions must be recorded AND have the exact same status.
+             * Any mismatch or missing session → null (day is not counted).
+             */
+            const resolveFullDay = (ms?: string, as?: string): 'present' | 'late' | 'excused' | 'absent' | null => {
+              if (!ms || !as) return null
+              const mn = ms.toLowerCase()
+              const an = as.toLowerCase()
+              if (mn !== an) return null
+              if (mn === 'present') return 'present'
+              if (mn === 'late')    return 'late'
+              if (mn === 'excused') return 'excused'
+              if (mn === 'absent')  return 'absent'
+              return null
             }
+
+            const fullDayStatus = resolveFullDay(m?.status, a?.status)
+            if (fullDayStatus === 'present')      presentDays++
+            else if (fullDayStatus === 'late')    lateDays++
+            else if (fullDayStatus === 'excused') excusedDays++
+            else if (fullDayStatus === 'absent')  absentDays++
+
             
             if (m) {
               morningTotal++

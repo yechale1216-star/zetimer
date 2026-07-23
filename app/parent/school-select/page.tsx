@@ -7,11 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { GraduationCap, ArrowRight, Loader2, LogOut } from "lucide-react"
 import { authService } from "@/lib/auth/auth"
+import { useAuth } from "@/lib/context/auth-context"
 import { notifications } from "@/lib/utils/notifications"
 
 export default function SchoolSelectPage() {
   const router = useRouter()
   const { availableSchools, switchSchool } = useSchool()
+  const { logout } = useAuth()
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [switchingId, setSwitchingId] = useState<string | null>(null)
 
@@ -40,9 +42,8 @@ export default function SchoolSelectPage() {
     }
   }
 
-  const handleLogout = () => {
-    authService.logout()
-    router.push("/login")
+  const handleLogout = async () => {
+    await logout()
   }
 
   // If no schools found after a moment, maybe refresh or logout

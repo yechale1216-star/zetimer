@@ -422,36 +422,29 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
               <Minimize2 className="h-6 w-6" />
             </button>
 
-            {/* Center: Timer & Interactive Live Stats Badge */}
-            <button
-              onClick={() => setShowStatsModal(prev => !prev)}
-              className="flex flex-col items-center min-w-[100px] hover:opacity-90 transition-opacity active:scale-95 cursor-pointer focus:outline-none"
-            >
-              {status === 'CONNECTED' || status === 'RECONNECTING' ? (
-                <>
-                  <span className="text-white/40 text-[10px] uppercase tracking-[0.25em] font-semibold flex items-center gap-1.5">
-                    <SignalHigh className={cn(
-                      "h-3 w-3",
-                      connectionQuality === 'BAD' ? "text-red-500 animate-pulse" :
-                      connectionQuality === 'POOR' ? "text-yellow-400" :
-                      "text-green-500"
-                    )} />
-                    {callStats?.quality === 'EXCELLENT' ? 'HD Crystal' :
-                     connectionQuality === 'BAD' ? 'Bad Call' :
-                     connectionQuality === 'POOR' ? 'Weak Signal' :
-                     'HD Encrypted'}
-                  </span>
-                  <span className="text-white font-mono text-base font-bold">{formatTime(duration)}</span>
-                </>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <StatusDot />
-                  <span className="text-white/60 text-xs font-medium">
-                    {status === 'RINGING' ? getAnimatedStatus('Ringing') : getAnimatedStatus('Calling')}
-                  </span>
-                </div>
-              )}
-            </button>
+            {/* Center: Timer & Interactive Live Stats Badge (Only shown when connected or reconnecting) */}
+            {status === 'CONNECTED' || status === 'RECONNECTING' ? (
+              <button
+                onClick={() => setShowStatsModal(prev => !prev)}
+                className="flex flex-col items-center min-w-[100px] hover:opacity-90 transition-opacity active:scale-95 cursor-pointer focus:outline-none"
+              >
+                <span className="text-white/40 text-[10px] uppercase tracking-[0.25em] font-semibold flex items-center gap-1.5">
+                  <SignalHigh className={cn(
+                    "h-3 w-3",
+                    connectionQuality === 'BAD' ? "text-red-500 animate-pulse" :
+                    connectionQuality === 'POOR' ? "text-yellow-400" :
+                    "text-green-500"
+                  )} />
+                  {callStats?.quality === 'EXCELLENT' ? 'HD Crystal' :
+                   connectionQuality === 'BAD' ? 'Bad Call' :
+                   connectionQuality === 'POOR' ? 'Weak Signal' :
+                   'HD Encrypted'}
+                </span>
+                <span className="text-white font-mono text-base font-bold">{formatTime(duration)}</span>
+              </button>
+            ) : (
+              <div className="min-w-[100px]" />
+            )}
 
             {/* Speaker icon in the top right for video mode or as toggle */}
             <button
@@ -502,7 +495,7 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
                   : 'border-white/30 ring-[14px] ring-white/5'
               )}
             >
-              <AvatarImage src={caller.avatar} />
+              <AvatarImage src={caller.avatar || (caller as any).profile_photo || (caller as any).avatar_url} className="object-cover" />
               <AvatarFallback
                 className={cn(
                   'text-5xl font-black transition-colors duration-700',
@@ -517,16 +510,16 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
           <div className="text-center">
             <h2 className="text-white text-3xl md:text-4xl font-light tracking-wide">{caller.name}</h2>
             <div className="flex items-center justify-center gap-2 mt-2">
-              {status !== 'CONNECTED' && status !== 'RECONNECTING' && <StatusDot />}
-              <p className="text-white/50 text-sm uppercase tracking-widest">
+              <p className="text-white/60 text-sm uppercase tracking-[0.2em] font-medium flex items-center gap-2">
                 {status === 'CONNECTED'
-                  ? 'In Call'
+                  ? 'IN CALL'
                   : status === 'RECONNECTING'
-                  ? 'Reconnecting'
+                  ? 'RECONNECTING'
                   : status === 'RINGING'
-                  ? getAnimatedStatus('Ringing')
-                  : getAnimatedStatus('Calling')}
+                  ? 'RINGING'
+                  : 'CALLING'}
               </p>
+              {status !== 'CONNECTED' && status !== 'RECONNECTING' && <StatusDot />}
             </div>
           </div>
         </div>
@@ -537,16 +530,16 @@ export const CallOverlay: React.FC<CallOverlayProps> = ({
         <div className="relative z-10 flex-1 flex flex-col items-center justify-center">
           <motion.div className="flex flex-col items-center gap-4">
             <Avatar className="h-28 w-28 border-3 border-white/30 shadow-2xl">
-              <AvatarImage src={caller.avatar} />
+              <AvatarImage src={caller.avatar || (caller as any).profile_photo || (caller as any).avatar_url} className="object-cover" />
               <AvatarFallback className="text-4xl font-black bg-slate-700 text-white">{initials}</AvatarFallback>
             </Avatar>
             <div className="text-center">
               <h1 className="text-white text-3xl font-light tracking-wide">{firstRemote.name}</h1>
               <div className="flex items-center justify-center gap-2 mt-2">
-                <StatusDot />
-                <p className="text-white/60 text-sm">
-                  {status === 'RINGING' ? getAnimatedStatus('Ringing') : status === 'CONNECTING' ? getAnimatedStatus('Calling') : 'Waiting for video...'}
+                <p className="text-white/60 text-sm uppercase tracking-[0.2em] font-medium">
+                  {status === 'RINGING' ? 'RINGING' : status === 'CONNECTING' ? 'CALLING' : 'WAITING FOR VIDEO'}
                 </p>
+                {status !== 'CONNECTED' && <StatusDot />}
               </div>
             </div>
           </motion.div>

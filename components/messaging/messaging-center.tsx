@@ -1538,6 +1538,18 @@ export function MessagingCenter() {
                     onClose={() => setIsInfoPanelOpen(false)}
                     onUpdateRole={handleUpdateRole}
                     onRemoveMember={handleRemoveMember}
+                    onGroupUpdated={(updated) => {
+                      setActiveConversationData(updated);
+                    }}
+                    onLeaveGroup={() => {
+                      setActiveConversationId(null);
+                      setActiveConversationData(null);
+                      setIsInfoPanelOpen(false);
+                      loadData();
+                    }}
+                    onSendMessage={() => {
+                      setIsInfoPanelOpen(false);
+                    }}
                   />
                 )}
                 {isInfoPanelOpen && !activeConversationData?.isGroup && (

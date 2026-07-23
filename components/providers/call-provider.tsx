@@ -65,6 +65,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => { incomingCallRef.current = incomingCallData; }, [incomingCallData]);
   useEffect(() => { isWaitingForOfferRef.current = isWaitingForOffer; }, [isWaitingForOffer]);
 
+  // ── Helper to resolve avatar/profile_photo from various property names ──
+  const getAvatarUrl = (profile: any): string => {
+    if (!profile) return '';
+    return profile.avatar || profile.profile_photo || profile.avatar_url || profile.image || profile.photo || '';
+  };
+
   // ── onIncomingCall: socket 'incoming_call' event ─────────────────────────
   const onIncomingCall = useCallback((data: any) => {
     if (isSuspended) {
@@ -74,19 +80,17 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('[CallProvider] ✅ incoming_call received. callId:', data.callId, '| offer present:', !!data.offer);
 
     const isAnswering = isWaitingForOfferRef.current || !!pendingAnswerRef.current;
+    const incomingAvatar = getAvatarUrl(data.profile);
 
     if (NativeBridge.isNative() && !isAnswering) {
-      // On Android: use the native foreground service (HUN + fullScreenIntent)
-      // instead of the React overlay banner. This makes it behave like Telegram:
-      // the native notification appears immediately even when the app is open.
       console.log('[CallProvider] → Launching native CallService (HUN + IncomingCallActivity)');
       NativeBridge.startNativeRinging(
-        data.profile?.name || 'Unknown User',
+        data.profile?.name || data.profile?.full_name || 'Unknown User',
         data.callId,
         data.from,
         data.type,
         data.serverUrl || '',
-        data.profile?.avatar || ''
+        incomingAvatar
       );
     }
 
@@ -94,7 +98,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCallType(data.type);
     setParticipants(prev => [
       ...prev.filter(p => p.isLocal),
-      { id: data.from, name: data.profile?.name || 'Unknown', avatar: data.profile?.avatar || '' }
+      { id: data.from, name: data.profile?.name || data.profile?.full_name || 'Unknown', avatar: incomingAvatar }
     ]);
   }, [isSuspended]);
 
@@ -520,16 +524,27 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast({ title: 'Portal Read-Only', description: 'Voice and video calls are disabled under school suspension.', variant: 'destructive' });
       return;
     }
+    const targetAvatar = getAvatarUrl(profile);
     setCallType(type);
     setParticipants(prev => [
       ...prev.filter(p => p.isLocal),
-      { id: toId, name: profile.name, avatar: profile.avatar }
+      { id: toId, name: profile.name || profile.full_name || 'Unknown', avatar: targetAvatar }
     ]);
-    const callerProfile = { name: currentUser?.name || 'Unknown User', avatar: currentUser?.profile_photo || '' };
+    const callerProfile = {
+      name: currentUser?.name || (currentUser as any)?.full_name || 'Unknown User',
+      avatar: getAvatarUrl(currentUser)
+    };
     webrtc.startCall(toId, type, callerProfile, currentUser?.schoolId);
   };
 
-  const activeCaller = participants.find(p => !p.isLocal);
+  const remoteParticipant = participants.find(p => !p.isLocal);
+  const activeCaller = remoteParticipant ? {
+    ...remoteParticipant,
+    avatar: remoteParticipant.avatar || getAvatarUrl(incomingCallData?.profile) || getAvatarUrl(incomingCallData?.callerProfile) || ''
+  } : (incomingCallData ? {
+    name: incomingCallData.profile?.name || incomingCallData.profile?.full_name || 'Unknown User',
+    avatar: getAvatarUrl(incomingCallData.profile) || getAvatarUrl(incomingCallData.callerProfile) || ''
+  } : { name: 'Unknown User', avatar: '' });
 
   return (
     <CallContext.Provider

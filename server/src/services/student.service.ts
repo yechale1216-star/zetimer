@@ -112,6 +112,7 @@ export const createStudent = async (data: any, schoolId: string) => {
   });
 
   // Handle Parent User Account creation or linking
+  console.log(`[StudentService] Resolving parent for student enrollment (phone: "${data.parent_phone}")`);
   const parent = await parentService.findOrCreateParentByPhone(data.parent_phone, {
     name: data.parent_name,
     email: data.parent_email,
@@ -120,6 +121,7 @@ export const createStudent = async (data: any, schoolId: string) => {
     schoolId: schoolId
   });
 
+  console.log(`[StudentService] Linking student "${newStudent.fullName}" (${newStudent.id}) to parent "${parent.full_name}" (${parent.id}) with relationship: ${data.relationshipType || 'Guardian'}`);
   await prisma.parentStudentLink.upsert({
     where: {
       parentId_studentId: {

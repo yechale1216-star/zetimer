@@ -539,6 +539,7 @@ export const syncLegacyStudents = async (userId: string, phone: string) => {
  */
 export const findOrCreateParentByPhone = async (phone: string, data: any) => {
   const cleanPhone = normalizePhoneNumber(phone);
+  console.log(`[ParentService] Lookup started for phone: "${phone}" (normalized: "${cleanPhone}")`);
   
   // 1. Try finding by normalized phone first
   let existingUser = await prisma.user.findUnique({
@@ -586,31 +587,53 @@ export const findOrCreateParentByPhone = async (phone: string, data: any) => {
     }
   }
 
+  if (existingUser) {
+    console.log(`[ParentService] Duplicate creation prevented: Existing parent returned (ID: ${existingUser.id}, Phone: ${existingUser.phone})`);
+    return existingUser;
+  }
+
   const hashedPassword = data.password 
     ? await bcrypt.hash(data.password, 10) 
     : await bcrypt.hash('zetime123', 10);
 
   const parentEmail = data.email || `parent-${cleanPhone.replace('+', '')}@zetime.com`;
 
-  // 4. Final Upsert (now much safer)
-  return await prisma.user.upsert({
-    where: { phone: cleanPhone },
-    update: {
-      full_name: data.name || undefined,
-      email: data.email || undefined,
-      address: data.address || undefined,
-    },
-    create: {
-      phone: cleanPhone,
-      email: parentEmail,
-      password_hash: hashedPassword,
-      full_name: data.name || 'Parent',
-      role: 'parent',
-      address: data.address || null,
-      is_active: true,
-      schoolId: data.schoolId || null
+  // 4. Creation with UNIQUE Constraint Violation (P2002) Error Handling & Recovery
+  try {
+    const newParent = await prisma.user.create({
+      data: {
+        phone: cleanPhone,
+        email: parentEmail,
+        password_hash: hashedPassword,
+        full_name: data.name || 'Parent',
+        role: 'parent',
+        address: data.address || null,
+        is_active: true,
+        schoolId: data.schoolId || null
+      }
+    });
+    console.log(`[ParentService] New parent account created successfully (ID: ${newParent.id}, Phone: ${newParent.phone})`);
+    return newParent;
+  } catch (error: any) {
+    // Catch Unique Constraint Violation (Prisma Code P2002)
+    if (error.code === 'P2002' || error.message?.includes('Unique constraint')) {
+      console.warn(`[ParentService] UNIQUE constraint conflict detected during parent creation for phone "${cleanPhone}". Recovering existing record...`);
+      const recoveredParent = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { phone: cleanPhone },
+            { email: parentEmail }
+          ]
+        }
+      });
+      if (recoveredParent) {
+        console.log(`[ParentService] Existing parent returned after UNIQUE constraint conflict (ID: ${recoveredParent.id})`);
+        return recoveredParent;
+      }
     }
-  });
+    console.error(`[ParentService] Failed to create parent for phone "${cleanPhone}":`, error);
+    throw error;
+  }
 };
 
 export const checkParentsExist = async (phones: string[]) => {
@@ -629,6 +652,7 @@ export const checkParentsExist = async (phones: string[]) => {
 
 export const searchParentByPhone = async (phone: string, schoolId: string) => {
   const cleanPhone = phone.replace(/\s+/g, '');
+  console.log(`[ParentService] Search parent lookup started for phone: "${cleanPhone}" (schoolId: ${schoolId})`);
   
   // Create variations of the phone number to search for (Ethiopian context)
   const phoneVariations = [cleanPhone];
@@ -652,6 +676,7 @@ export const searchParentByPhone = async (phone: string, schoolId: string) => {
   });
 
   if (user) {
+    console.log(`[ParentService] Lookup completed: Parent account found in User directory (ID: ${user.id})`);
     return { success: true, data: user };
   }
 
@@ -665,6 +690,7 @@ export const searchParentByPhone = async (phone: string, schoolId: string) => {
   });
 
   if (legacyStudent) {
+    console.log(`[ParentService] Lookup completed: Legacy parent info found in Student table`);
     return {
       success: true,
       data: {
@@ -678,6 +704,7 @@ export const searchParentByPhone = async (phone: string, schoolId: string) => {
     };
   }
 
+  console.log(`[ParentService] Lookup completed: No parent record found for phone "${cleanPhone}"`);
   return { success: false, message: "No parent found with this phone number." };
 };
 

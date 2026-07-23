@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { Search, Settings, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { authService } from '@/lib/auth/auth'
+import { useAuth } from '@/lib/context/auth-context'
 import { useRouter } from 'next/navigation'
 import { ModeToggle } from '@/components/mode-toggle'
 import { NotificationPopover } from '@/components/ui/notification-popover'
@@ -12,10 +12,10 @@ import { NotificationPopover } from '@/components/ui/notification-popover'
 export function TopNav() {
   const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
+  const { logout } = useAuth()
 
-  const handleLogout = () => {
-    authService.logout()
-    router.push('/login')
+  const handleLogout = async () => {
+    await logout()
   }
 
   return (

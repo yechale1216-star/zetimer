@@ -106,12 +106,13 @@ const searchParent = async (req, res, next) => {
         }
         const result = await parentService.searchParentByPhone(phone, schoolId);
         if (!result.success) {
-            return res.status(404).json(result);
+            return res.status(404).json({ success: false, notFound: true, message: result.message || "No parent found with this phone number." });
         }
         res.status(200).json(result);
     }
     catch (error) {
-        res.status(400).json({ success: false, message: error.message || "Failed to search parent." });
+        console.error("[ParentController] searchParent error:", error);
+        res.status(500).json({ success: false, error: true, message: error.message || "Internal server error searching parent." });
     }
 };
 exports.searchParent = searchParent;

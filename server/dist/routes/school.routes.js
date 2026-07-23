@@ -171,8 +171,8 @@ router.post('/onboarding', (0, tenant_middleware_1.authorize)(['admin', 'school_
         next(error);
     }
 });
-// ─── Help Desk (Support Tickets) ──────────────────────────────────────────────
-router.get('/support', (0, tenant_middleware_1.authorize)(['admin']), async (req, res, next) => {
+// ─── Help Desk (Support Tickets & Feedback) ──────────────────────────────────────────────
+router.get('/support', (0, tenant_middleware_1.authorize)(['admin', 'teacher', 'parent', 'student', 'super_admin']), async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;
         if (!schoolId)
@@ -189,7 +189,7 @@ router.get('/support', (0, tenant_middleware_1.authorize)(['admin']), async (req
         next(error);
     }
 });
-router.post('/support', (0, tenant_middleware_1.authorize)(['admin']), async (req, res, next) => {
+router.post('/support', (0, tenant_middleware_1.authorize)(['admin', 'teacher', 'parent', 'student', 'super_admin']), async (req, res, next) => {
     try {
         const schoolId = req.user?.schoolId;
         const authorId = req.user?.id;

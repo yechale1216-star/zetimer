@@ -141,6 +141,7 @@ const createStudent = async (data, schoolId) => {
         }
     });
     // Handle Parent User Account creation or linking
+    console.log(`[StudentService] Resolving parent for student enrollment (phone: "${data.parent_phone}")`);
     const parent = await parentService.findOrCreateParentByPhone(data.parent_phone, {
         name: data.parent_name,
         email: data.parent_email,
@@ -148,6 +149,7 @@ const createStudent = async (data, schoolId) => {
         address: data.parent_address,
         schoolId: schoolId
     });
+    console.log(`[StudentService] Linking student "${newStudent.fullName}" (${newStudent.id}) to parent "${parent.full_name}" (${parent.id}) with relationship: ${data.relationshipType || 'Guardian'}`);
     await db_1.default.parentStudentLink.upsert({
         where: {
             parentId_studentId: {

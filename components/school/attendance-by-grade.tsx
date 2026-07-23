@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Users, UserCheck, UserX, Clock, AlertTriangle, TrendingUp, Download, Table as TableIcon, Clock3 } from "lucide-react"
+import { Users, UserCheck, UserX, Clock, AlertTriangle, TrendingUp, Download, Table as TableIcon, Clock3, Sun, Moon, CalendarDays } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { db } from "@/lib/db/database"
@@ -81,7 +81,33 @@ export function AttendanceByGrade() {
     const isL = (s: string | undefined) => s?.toLowerCase() === "late"
     const isE = (s: string | undefined) => s?.toLowerCase() === "excused"
     const isA = (s: string | undefined) => s?.toLowerCase() === "absent"
-    const isAtt = (s: string | undefined) => isP(s) || isL(s)
+
+    /**
+     * resolveFullDay — strict matching rule.
+     *
+     * A student-day is only counted when BOTH sessions have the EXACT same status:
+     *   present  + present  → present
+     *   late     + late     → late
+     *   excused  + excused  → excused
+     *   absent   + absent   → absent
+     *
+     * Any mixed combination (e.g. present+absent, present+late, excused+absent)
+     * or a day where only one session is recorded → null (not counted in any bucket).
+     */
+    const resolveFullDay = (m?: string, a?: string): 'present' | 'late' | 'excused' | 'absent' | null => {
+      // Both sessions must be recorded
+      if (!m || !a) return null
+      // Normalise
+      const mn = m.toLowerCase()
+      const an = a.toLowerCase()
+      // Only count if they are identical
+      if (mn !== an) return null
+      if (mn === 'present') return 'present'
+      if (mn === 'late')    return 'late'
+      if (mn === 'excused') return 'excused'
+      if (mn === 'absent')  return 'absent'
+      return null
+    }
 
     // 1. Filter students by current Grade/Section/Stream
     const filteredStudents = allStudents.filter(s => {
@@ -100,7 +126,7 @@ export function AttendanceByGrade() {
       records = records.filter(r => !r.session)
     } else {
       records = records.filter(r => !!r.session)
-      // If a specific session is selected (Daily view narrowed)
+      // If a specific session is selected (Morning / Afternoon), narrow records
       if (filters.session !== "total") {
         records = records.filter(r => r.session?.toLowerCase() === filters.session.toLowerCase())
       }
@@ -112,33 +138,25 @@ export function AttendanceByGrade() {
     const isFullDay = filters.session === "total"
 
     if (isSessionBased && isFullDay) {
-      // Group by student + date for Full Day logic
+      // Group by (student_id + date) to pair morning & afternoon sessions
       const grouped: Record<string, { morning?: string; afternoon?: string }> = {}
       records.forEach(r => {
         const key = `${r.student_id}||${r.attendance_date}`
         if (!grouped[key]) grouped[key] = {}
-        if (r.session?.toLowerCase() === "morning") grouped[key].morning = r.status
+        if (r.session?.toLowerCase() === "morning")   grouped[key].morning   = r.status
         else if (r.session?.toLowerCase() === "afternoon") grouped[key].afternoon = r.status
       })
 
       Object.values(grouped).forEach(entry => {
-        const { morning: m, afternoon: a } = entry
-        if (m && a) {
-          if (isP(m) && isP(a)) present++
-          else if (isAtt(m) && isAtt(a)) late++
-          else if (isE(m) && isE(a)) excused++
-          else if (isA(m) && isA(a)) absent++
-        } else if (m || a) {
-          const r = m || a
-          if (isP(r)) present++
-          else if (isL(r)) late++
-          else if (isE(r)) excused++
-          else if (isA(r)) absent++
-        }
+        const status = resolveFullDay(entry.morning, entry.afternoon)
+        if (status === 'present') present++
+        else if (status === 'late')    late++
+        else if (status === 'excused') excused++
+        else if (status === 'absent')  absent++
       })
     } else {
       records.forEach(r => {
-        if (isP(r.status)) present++
+        if (isP(r.status))      present++
         else if (isL(r.status)) late++
         else if (isE(r.status)) excused++
         else if (isA(r.status)) absent++
@@ -155,7 +173,7 @@ export function AttendanceByGrade() {
     // 4. Compute Grade Stats (Detailed Table)
     const gradeMap: Record<string, any> = {}
     
-    // Initialize map with current students to ensure 0-attendance classes show up
+    // Initialize map with all filtered students so 0-attendance classes appear
     filteredStudents.forEach(student => {
       const key = `${student.grade}-${student.section}-${student.stream || ""}`
       if (!gradeMap[key]) {
@@ -170,44 +188,38 @@ export function AttendanceByGrade() {
       gradeMap[key].totalStudents++
     })
 
-    // Process records for grade stats
-    if (isSessionBased && isFullDay) {
-       // Similar grouping but also keep track of student's grade/section/stream
-       const grouped: Record<string, { morning?: string; afternoon?: string; key: string }> = {}
-       records.forEach(r => {
-         const student = allStudents.find(s => s.id === r.student_id)
-         if (!student) return
-         const studentKey = `${student.grade}-${student.section}-${student.stream || ""}`
-         const dayKey = `${r.student_id}||${r.attendance_date}`
-         if (!grouped[dayKey]) grouped[dayKey] = { key: studentKey }
-         if (r.session?.toLowerCase() === "morning") grouped[dayKey].morning = r.status
-         else if (r.session?.toLowerCase() === "afternoon") grouped[dayKey].afternoon = r.status
-       })
+    // Build a lookup: student_id → grade map key (avoids O(n²) find inside loops)
+    const studentKeyMap: Record<string, string> = {}
+    allStudents.forEach(s => {
+      studentKeyMap[s.id] = `${s.grade}-${s.section}-${s.stream || ""}`
+    })
 
-       Object.values(grouped).forEach(entry => {
-         const { morning: m, afternoon: a, key } = entry
-         if (!gradeMap[key]) return
-         if (m && a) {
-           if (isP(m) && isP(a)) gradeMap[key].present++
-           else if (isAtt(m) && isAtt(a)) gradeMap[key].late++
-           else if (isE(m) && isE(a)) gradeMap[key].excused++
-           else if (isA(m) && isA(a)) gradeMap[key].absent++
-         } else if (m || a) {
-           const r = m || a
-           if (isP(r)) gradeMap[key].present++
-           else if (isL(r)) gradeMap[key].late++
-           else if (isE(r)) gradeMap[key].excused++
-           else if (isA(r)) gradeMap[key].absent++
-         }
-       })
+    if (isSessionBased && isFullDay) {
+      // Group by (student_id + date) and resolve full-day status per grade bucket
+      const grouped: Record<string, { morning?: string; afternoon?: string; gradeKey: string }> = {}
+      records.forEach(r => {
+        const gradeKey = studentKeyMap[r.student_id]
+        if (!gradeKey) return
+        const dayKey = `${r.student_id}||${r.attendance_date}`
+        if (!grouped[dayKey]) grouped[dayKey] = { gradeKey }
+        if (r.session?.toLowerCase() === "morning")        grouped[dayKey].morning   = r.status
+        else if (r.session?.toLowerCase() === "afternoon") grouped[dayKey].afternoon = r.status
+      })
+
+      Object.values(grouped).forEach(entry => {
+        const { gradeKey } = entry
+        if (!gradeMap[gradeKey]) return
+        const status = resolveFullDay(entry.morning, entry.afternoon)
+        if (status === 'present')      gradeMap[gradeKey].present++
+        else if (status === 'late')    gradeMap[gradeKey].late++
+        else if (status === 'excused') gradeMap[gradeKey].excused++
+        else if (status === 'absent')  gradeMap[gradeKey].absent++
+      })
     } else {
       records.forEach(r => {
-        const student = allStudents.find(s => s.id === r.student_id)
-        if (!student) return
-        const key = `${student.grade}-${student.section}-${student.stream || ""}`
-        if (!gradeMap[key]) return
-
-        if (isP(r.status)) gradeMap[key].present++
+        const key = studentKeyMap[r.student_id]
+        if (!key || !gradeMap[key]) return
+        if (isP(r.status))      gradeMap[key].present++
         else if (isL(r.status)) gradeMap[key].late++
         else if (isE(r.status)) gradeMap[key].excused++
         else if (isA(r.status)) gradeMap[key].absent++
@@ -225,38 +237,40 @@ export function AttendanceByGrade() {
     // 5. Compute Trends (Chart)
     const trendMap: Record<string, { present: number, total: number }> = {}
     
-    // Init trend map for each day in range
+    // Init trend map for each day in the selected range
     const start = new Date(filters.startDate)
-    const end = new Date(filters.endDate)
+    const end   = new Date(filters.endDate)
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const ds = d.toISOString().split('T')[0]
       trendMap[ds] = { present: 0, total: 0 }
     }
 
     if (isSessionBased && isFullDay) {
-       const grouped: Record<string, { morning?: string; afternoon?: string; date: string }> = {}
-       records.forEach(r => {
-         const dayKey = `${r.student_id}||${r.attendance_date}`
-         if (!grouped[dayKey]) grouped[dayKey] = { date: r.attendance_date }
-         if (r.session?.toLowerCase() === "morning") grouped[dayKey].morning = r.status
-         else if (r.session?.toLowerCase() === "afternoon") grouped[dayKey].afternoon = r.status
-       })
+      // Group by (student_id + date) and count resolved full-day statuses per day
+      const grouped: Record<string, { morning?: string; afternoon?: string; date: string }> = {}
+      records.forEach(r => {
+        const dayKey = `${r.student_id}||${r.attendance_date}`
+        if (!grouped[dayKey]) grouped[dayKey] = { date: r.attendance_date }
+        if (r.session?.toLowerCase() === "morning")        grouped[dayKey].morning   = r.status
+        else if (r.session?.toLowerCase() === "afternoon") grouped[dayKey].afternoon = r.status
+      })
 
-       Object.values(grouped).forEach(entry => {
-         const { morning: m, afternoon: a, date } = entry
-         if (!trendMap[date]) return
-         trendMap[date].total++
-         const countsAsPresent = (m && a) 
-           ? (isAtt(m) && isAtt(a)) || (isE(m) && isE(a))
-           : (isAtt(m || a) || isE(m || a))
-         if (countsAsPresent) trendMap[date].present++
-       })
+      Object.values(grouped).forEach(entry => {
+        const { date } = entry
+        if (!trendMap[date]) return
+        trendMap[date].total++
+        const status = resolveFullDay(entry.morning, entry.afternoon)
+        // For trend rate: present, late, and excused all count as "attended"
+        if (status === 'present' || status === 'late' || status === 'excused') {
+          trendMap[date].present++
+        }
+      })
     } else {
       records.forEach(r => {
         const ds = r.attendance_date
         if (!trendMap[ds]) return
         trendMap[ds].total++
-        if (isAtt(r.status) || isE(r.status)) trendMap[ds].present++
+        if (isP(r.status) || isL(r.status) || isE(r.status)) trendMap[ds].present++
       })
     }
 
@@ -265,6 +279,7 @@ export function AttendanceByGrade() {
       rate: data.total > 0 ? Math.round((data.present / data.total) * 100) : 0
     })).sort((a, b) => a.date.localeCompare(b.date)))
   }
+
 
 
   const handleExport = async () => {
@@ -347,6 +362,39 @@ export function AttendanceByGrade() {
         attendanceMode={settings?.attendanceMode} 
         hideSession={true}
       />
+
+      {/* Session Pill Tabs — only for session-based schools */}
+      {settings?.attendanceMode === 'session_based' && (
+        <div className="flex items-center justify-center">
+          <div className="inline-flex items-center gap-1 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-[20px] shadow-inner border border-slate-200/60 dark:border-slate-700/60 backdrop-blur-sm">
+            {([
+              { value: 'total',     label: 'FULL DAY',  icon: CalendarDays },
+              { value: 'morning',   label: 'MORNING',   icon: Sun },
+              { value: 'afternoon', label: 'AFTERNOON', icon: Moon },
+            ] as const).map(({ value, label, icon: Icon }) => {
+              const isActive = filters.session === value
+              return (
+                <button
+                  key={value}
+                  onClick={() => setFilters(prev => ({ ...prev, session: value }))}
+                  className={cn(
+                    "relative flex items-center gap-2 px-5 py-2.5 rounded-[14px] text-[11px] font-black uppercase tracking-widest transition-all duration-200 select-none",
+                    isActive
+                      ? "bg-violet-600 text-white shadow-md shadow-violet-500/30 scale-105"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-700/50"
+                  )}
+                >
+                  <Icon className={cn("w-3.5 h-3.5", isActive ? "text-white" : "text-slate-400")} />
+                  {label}
+                  {isActive && (
+                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white/70" />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[

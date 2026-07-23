@@ -16,7 +16,7 @@ import { LogOut, User, Menu, GraduationCap, Sun, Moon } from "lucide-react"
 import { useSchoolSettings } from "@/hooks/use-school-settings"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils/utils"
-import { authService } from "@/lib/auth/auth"
+import { useAuth } from "@/lib/context/auth-context"
 import { useSchool } from "@/lib/context/school-context"
 import { NotificationPopover } from "@/components/ui/notification-popover"
 import { useTheme } from "@/components/theme-provider"
@@ -30,30 +30,13 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
   const router = useRouter()
   const { settings } = useSchoolSettings()
   const { activeSchool } = useSchool()
-  const [user, setUser] = React.useState<any>(null)
+  const { user, logout } = useAuth()
   const [logoError, setLogoError] = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
   const { theme, setTheme } = useTheme()
 
   React.useEffect(() => {
     setMounted(true)
-    setUser(authService.getCurrentUser())
-
-    const handleSchoolSwitch = () => {
-      setUser(authService.getCurrentUser())
-      setLogoError(false)
-    }
-
-    const handleProfileUpdate = () => {
-      setUser(authService.getCurrentUser())
-    }
-
-    window.addEventListener("schoolSwitched", handleSchoolSwitch as any)
-    window.addEventListener("userSessionChanged", handleProfileUpdate)
-    return () => {
-      window.removeEventListener("schoolSwitched", handleSchoolSwitch as any)
-      window.removeEventListener("userSessionChanged", handleProfileUpdate)
-    }
   }, [])
 
   const schoolName = activeSchool ? activeSchool.name : (user?.schoolName || "Zetime Portal")
@@ -61,8 +44,7 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
   const logoUrl = schoolLogo || ""
 
   const handleLogout = async () => {
-    await authService.logout()
-    router.push("/login")
+    await logout()
   }
 
   const initials = user?.name

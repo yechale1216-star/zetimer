@@ -20,6 +20,7 @@ import {
   Bell,
   Lock,
   User,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/utils'
 import { useAuth } from '@/lib/context/auth-context'
@@ -63,6 +64,11 @@ const navigationItems = [
     icon: MessageSquare,
   },
   {
+    label: 'Feedback Hub',
+    href: '/super-admin/feedback',
+    icon: Sparkles,
+  },
+  {
     label: 'Communication',
     href: '/super-admin/communication',
     icon: Bell,
@@ -99,9 +105,8 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const router = useRouter()
   const { user, logout } = useAuth()
 
-  const handleLogout = () => {
-    logout()
-    router.push('/login')
+  const handleLogout = async () => {
+    await logout()
   }
 
   return (

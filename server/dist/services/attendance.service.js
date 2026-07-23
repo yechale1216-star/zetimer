@@ -59,9 +59,21 @@ const markAttendance = async (data, schoolId) => {
         try {
             const type = status.toLowerCase() === 'absent' ? 'absent' : 'late';
             const typePush = status.toLowerCase() === 'absent' ? 'absent_arrival' : 'late_arrival';
-            const title = status.toLowerCase() === 'absent' ? 'Absent Alert' : 'Late Arrival Alert';
-            const sessionStr = session ? ` (${session} session)` : '';
-            const message = `${student.fullName} has been marked ${status}${sessionStr} on ${dateStr}.`;
+            const isFemale = student.gender?.toLowerCase() === 'female';
+            const isAbsent = status.toLowerCase() === 'absent';
+            // Construct Amharic notification title and body
+            const title = isAbsent
+                ? (isFemale ? `${student.fullName} ዛሬ ቀርታለች` : `${student.fullName} ዛሬ ቀርቷል`)
+                : (isFemale ? `${student.fullName} ዛሬ ዘግይታለች` : `${student.fullName} ዛሬ ዘግይቷል`);
+            const sessionStrAm = session ? (session.toLowerCase() === 'morning' ? 'የጠዋት ክፍለ ጊዜ' : session.toLowerCase() === 'afternoon' ? 'የከሰዓት ክፍለ ጊዜ' : session) : '';
+            const sessionClauseAm = sessionStrAm ? ` (${sessionStrAm})` : '';
+            const message = isAbsent
+                ? (isFemale
+                    ? `${student.fullName} በ ${dateStr}${sessionClauseAm} ትምህርት ቤት እንዳልቀረበች ምልክት ተደርጓል።`
+                    : `${student.fullName} በ ${dateStr}${sessionClauseAm} ትምህርት ቤት እንዳልቀረበ ምልክት ተደርጓል።`)
+                : (isFemale
+                    ? `${student.fullName} በ ${dateStr}${sessionClauseAm} ዘግይታ ትምህርት ቤት ደርሳለች።`
+                    : `${student.fullName} በ ${dateStr}${sessionClauseAm} ዘግይቶ ትምህርት ቤት ደርሷል።`);
             await db_1.default.parentNotification.create({
                 data: {
                     schoolId,

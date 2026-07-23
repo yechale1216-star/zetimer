@@ -130,7 +130,7 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
                   'border-white/20 ring-[12px] ring-white/5'
                 )}
               >
-                <AvatarImage src={caller.avatar || undefined} className="object-cover" />
+                <AvatarImage src={caller.avatar || (caller as any).profile_photo || (caller as any).avatar_url || (caller as any).image || (caller as any).photo || undefined} className="object-cover" />
                 <AvatarFallback
                   className="text-4xl font-bold bg-gradient-to-br from-slate-700 to-slate-900 text-white"
                 >

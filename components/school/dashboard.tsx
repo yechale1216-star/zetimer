@@ -244,12 +244,28 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     let absentToday = 0
     let excusedToday = 0
 
-    // NEW GRANULAR CLASSIFIER
+    // Status helpers
     const isP = (s: string | undefined) => s?.toLowerCase() === "present"
     const isL = (s: string | undefined) => s?.toLowerCase() === "late"
     const isE = (s: string | undefined) => s?.toLowerCase() === "excused"
     const isA = (s: string | undefined) => s?.toLowerCase() === "absent"
-    const isAtt = (s: string | undefined) => isP(s) || isL(s)
+
+    /**
+     * resolveFullDay — strict match rule.
+     * Both sessions must be recorded AND have the exact same status.
+     * Any mismatch or missing session → null (not counted in any bucket).
+     */
+    const resolveFullDay = (m?: string, a?: string): 'present' | 'late' | 'excused' | 'absent' | null => {
+      if (!m || !a) return null
+      const mn = m.toLowerCase()
+      const an = a.toLowerCase()
+      if (mn !== an) return null
+      if (mn === 'present') return 'present'
+      if (mn === 'late')    return 'late'
+      if (mn === 'excused') return 'excused'
+      if (mn === 'absent')  return 'absent'
+      return null
+    }
 
     if (isSessionBased && sessionFilter === "total") {
       const studentGroups: { [studentId: string]: any[] } = {}
@@ -261,23 +277,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       Object.values(studentGroups).forEach(records => {
         const m = records.find(r => r.session?.toLowerCase() === "morning")
         const a = records.find(r => r.session?.toLowerCase() === "afternoon")
-
-        if (m && a) {
-          if (isP(m.status) && isP(a.status)) {
-            presentToday++
-          } else if (isAtt(m.status) && isAtt(a.status)) {
-            lateToday++
-          } else if (isE(m.status) && isE(a.status)) {
-            excusedToday++
-          } else if (isA(m.status) && isA(a.status)) {
-            absentToday++
-          }
-        }
+        const status = resolveFullDay(m?.status, a?.status)
+        if (status === 'present')      presentToday++
+        else if (status === 'late')    lateToday++
+        else if (status === 'excused') excusedToday++
+        else if (status === 'absent')  absentToday++
       })
     } else {
       presentToday = sessionFilteredToday.filter((a) => a.status?.toLowerCase() === "present").length
-      lateToday = sessionFilteredToday.filter((a) => a.status?.toLowerCase() === "late").length
-      absentToday = sessionFilteredToday.filter((a) => a.status?.toLowerCase() === "absent").length
+      lateToday    = sessionFilteredToday.filter((a) => a.status?.toLowerCase() === "late").length
+      absentToday  = sessionFilteredToday.filter((a) => a.status?.toLowerCase() === "absent").length
       excusedToday = sessionFilteredToday.filter((a) => a.status?.toLowerCase() === "excused").length
     }
 
@@ -370,16 +379,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         else if (sess === "afternoon") dateStudentMap[d][record.student_id].afternoon = record.status
       })
 
-      // Compute Full Day Present rate per date
+      // Compute Full Day attendance rate per date — strict match rule
       Object.entries(dateStudentMap).forEach(([dateStr, studentMap]) => {
-        const totalStudentsOnDay = Object.keys(studentMap).length
-        const fullDayPresent = Object.values(studentMap).filter(
-          (entry) =>
-            entry.morning !== undefined &&
-            entry.afternoon !== undefined &&
-            isPresent(entry.morning) &&
-            isPresent(entry.afternoon)
-        ).length
+        let fullDayPresent = 0
+        let totalStudentsOnDay = 0
+        Object.values(studentMap).forEach(entry => {
+          const status = resolveFullDay(entry.morning, entry.afternoon)
+          if (status !== null) {
+            // Only count student-days where both sessions are recorded with same status
+            totalStudentsOnDay++
+            if (status === 'present' || status === 'late' || status === 'excused') {
+              fullDayPresent++
+            }
+          }
+        })
         if (trendDataMap[dateStr]) {
           trendDataMap[dateStr].fullDayPresent = fullDayPresent
           trendDataMap[dateStr].totalStudents = totalStudentsOnDay

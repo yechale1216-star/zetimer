@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { authService } from "@/lib/auth/auth"
+import { useAuth } from "@/lib/context/auth-context"
 import { notifications } from "@/lib/utils/notifications"
 
 interface HeaderProps {
@@ -10,10 +10,10 @@ interface HeaderProps {
 }
 
 export function Header({ onLogout }: HeaderProps) {
-  const user = authService.getCurrentUser()
+  const { user, logout } = useAuth()
 
   const handleLogout = async () => {
-    await authService.logout()
+    await logout()
     notifications.info("Logged Out", "You have been successfully logged out")
     onLogout()
   }

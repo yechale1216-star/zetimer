@@ -175,21 +175,27 @@ export default function ParentNotifications() {
     const studentName = notification.student?.fullName?.split(" ")[0] || ""
     const isFemale = notification.student?.gender?.toLowerCase() === "female"
     const suffix = isFemale ? "_f" : ""
+
+    const formattedDate = formatLocalizedDate(notification.createdAt, language, {
+      month: "short",
+      day: "numeric"
+    })
+
     switch (notification.type) {
       case "absent":
         return {
           title: t(("alert_absent_title" + suffix) as any, { name: studentName }),
-          message: t(("alert_absent_msg" + suffix) as any, { name: studentName }),
+          message: t(("alert_absent_msg" + suffix) as any, { name: studentName, date: formattedDate }),
         }
       case "late":
         return {
           title: t(("alert_late_title" + suffix) as any, { name: studentName }),
-          message: t(("alert_late_msg" + suffix) as any, { name: studentName }),
+          message: t(("alert_late_msg" + suffix) as any, { name: studentName, date: formattedDate }),
         }
       case "warning":
         return {
           title: t(("alert_warning_title" + suffix) as any, { name: studentName }),
-          message: t(("alert_warning_msg" + suffix) as any, { name: studentName }),
+          message: t(("alert_warning_msg" + suffix) as any, { name: studentName, date: formattedDate }),
         }
       default:
         return { title: notification.title, message: notification.message }

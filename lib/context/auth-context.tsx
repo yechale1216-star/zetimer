@@ -25,7 +25,7 @@ interface AuthContextValue {
   isOnline: boolean
   validateSession: (options?: { forceRefetch?: boolean }) => Promise<void>
   /** Clears all session state. Pass a redirectPath to navigate after logout (default: /login). */
-  logout: (redirectPath?: string) => void
+  logout: (redirectPath?: string) => Promise<void>
   /** Internal: registered by SchoolContext so AuthContext can clear school state
    *  without creating a circular context dependency. */
   registerClearSchoolContext: (fn: () => void) => void
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearSchoolContextRef.current = fn
   }, [])
 
-  const logout = useCallback((redirectPath?: string) => {
+  const logout = useCallback(async (redirectPath?: string) => {
     if (isClient) {
       const prevUser = authService.getCurrentUser()
       console.log(`[AuthContext][LOGOUT] User: ${prevUser?.id} | Role: ${prevUser?.role} | Email: ${prevUser?.email}`)
@@ -90,9 +90,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(FRESH_LOGIN_KEY)
       localStorage.removeItem("_zt_login_role")
     }
-    authService.logout()
+
+    // Await the authService logout so API and Native calls finish before navigation
+    await authService.logout()
+
     // Clear offline message cache on logout
-    clearMessageCache().catch(() => {})
+    try {
+      await clearMessageCache()
+    } catch (e) {
+      console.warn("Failed to clear message cache on logout:", e);
+    }
 
     // ATOMIC STATE CLEAR: wipe ALL in-memory React state synchronously so no
     // stale data can leak into the next user's session — not even for one frame.

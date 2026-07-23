@@ -13,7 +13,7 @@ import { notifications } from "@/lib/utils/notifications"
 export default function SchoolSelectPage() {
   const router = useRouter()
   const { availableSchools, switchSchool, setSchoolsFromLogin } = useSchool()
-  const { authLoading } = useAuth()
+  const { authLoading, logout } = useAuth()
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [switchingId, setSwitchingId] = useState<string | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
@@ -54,27 +54,24 @@ export default function SchoolSelectPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleSelectSchool = async (schoolId: string, role: string) => {
-    setSwitchingId(`${schoolId}-${role}`)
+  const handleSelectSchool = async (schoolId: string, role?: string) => {
+    setSwitchingId(schoolId)
+    // Write school switch intent to bypass validateSession wipin
+    localStorage.setItem("_zt_school_switch", "1")
     const success = await switchSchool(schoolId, role)
     if (success) {
-      // Use a hard redirect (not router.push) so all React contexts re-initialize
-      // cleanly from localStorage after the school switch. SPA navigation keeps stale
-      // context state alive across the route change, causing the old school to remain
-      // in the header and old students to be shown.
-      const token = localStorage.getItem("attendance_token")
-      const userStr = localStorage.getItem("attendance_current_user")
-      const role = userStr ? JSON.parse(userStr).role : "parent"
-      console.log(`[SchoolSelect] Switched successfully. Redirecting (hard) for role: ${role}`)
-
-      if (role === "admin" || role === "school_admin") {
-        const user = userStr ? JSON.parse(userStr) : null
-        window.location.href = user?.onboardingCompleted === false ? "/onboarding" : "/school/admin"
-      } else if (role === "teacher") {
+      notifications.success("School Selected", "Redirecting to your dashboard...")
+      // Set active role for redirection logic
+      const targetRole = role || currentUser?.role || 'parent'
+      
+      // Perform a full reload to let layouts mount fresh with new role context
+      if (targetRole === "admin" || targetRole === "school_admin") {
+        window.location.href = "/school/admin"
+      } else if (targetRole === "teacher") {
         window.location.href = "/school/teacher"
-      } else if (role === "parent") {
+      } else if (targetRole === "parent") {
         window.location.href = "/parent/dashboard"
-      } else if (role === "super_admin") {
+      } else if (targetRole === "super_admin") {
         window.location.href = "/super-admin"
       } else {
         window.location.href = "/parent/dashboard"
@@ -85,9 +82,8 @@ export default function SchoolSelectPage() {
     }
   }
 
-  const handleLogout = () => {
-    authService.logout()
-    router.push("/login")
+  const handleLogout = async () => {
+    await logout()
   }
 
   // Priority order for school data:

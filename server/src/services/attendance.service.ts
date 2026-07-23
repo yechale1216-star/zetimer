@@ -103,8 +103,10 @@ export const markAttendance = async (data: any, schoolId: string) => {
         where: { id: schoolId },
         select: { name: true }
       });
-      const schoolName = school?.name || undefined;
-      const notifTitle = schoolName ? `[${schoolName}] ${title}` : title;
+      const schoolName = school?.name || 'ZeTime School';
+
+      // Human-readable category label shown between school name and message body
+      const categoryLabel = isAbsent ? 'Absent Alert' : 'Late Arrival';
 
       for (const link of parentLinks) {
         if (link.parent && link.parent.pushToken) {
@@ -120,12 +122,13 @@ export const markAttendance = async (data: any, schoolId: string) => {
 
           await sendCategoryNotification(link.parent.pushToken, {
             type: typePush,
-            title: notifTitle,
-            body: message,
+            title: schoolName,       // School name is the notification title
+            body: message,           // Full Amharic message as the body
             route: `/parent/attendance`,
             studentId: student.id,
             schoolId,
             schoolName,
+            categoryLabel,           // Shown as the category subtext in Android
             tag: `attendance-${student.id}`
           }).catch((err: any) => {
             console.error(`Failed to dispatch push to parent ${link.parentId}:`, err);

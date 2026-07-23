@@ -125,13 +125,14 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private void handleGenericNotification(Map<String, String> data) {
         String type           = data.get("type");
-        String title          = data.get("title");
+        String title          = data.get("title");  // Now = school name
         String body           = data.get("body");
         String route          = data.get("route");
         String conversationId = data.get("conversationId");
         String studentId      = data.get("studentId");
         String schoolId       = data.get("schoolId");
         String schoolName     = data.get("schoolName");
+        String categoryLabel  = data.get("categoryLabel");  // e.g. "Absent Alert", "Announcement"
         String tag            = data.get("tag");
         
         if (title == null) title = "Zetime Alert";
@@ -243,8 +244,19 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                     : (studentId != null) ? Math.abs(studentId.hashCode()) 
                     : (int) System.currentTimeMillis();
 
-        // If schoolName is passed in data, set it as subText / header for clarity
-        if (schoolName != null && !schoolName.isEmpty()) {
+        // ── Notification Layout ────────────────────────────────────────────────
+        // title   = School Name (set at top, most prominent line)
+        // subText = Category type ("Absent Alert", "Late Arrival", "Announcement")
+        // body    = The actual message text (expanded via BigTextStyle)
+
+        // Title: prefer title from payload (= school name) else fall back to "ZeTime"
+        String displayTitle = (title != null && !title.isEmpty()) ? title : "ZeTime";
+        builder.setContentTitle(displayTitle);
+
+        // SubText: show category label if provided, else fall back to schoolName or type
+        if (categoryLabel != null && !categoryLabel.isEmpty()) {
+            builder.setSubText(categoryLabel);
+        } else if (schoolName != null && !schoolName.isEmpty()) {
             builder.setSubText(schoolName);
         }
 

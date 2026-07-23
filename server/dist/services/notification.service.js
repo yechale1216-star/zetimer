@@ -274,6 +274,8 @@ async function sendCategoryNotification(token, payload) {
         dataPayload.schoolId = payload.schoolId;
     if (payload.schoolName)
         dataPayload.schoolName = payload.schoolName;
+    if (payload.categoryLabel)
+        dataPayload.categoryLabel = payload.categoryLabel;
     if (payload.badge !== undefined)
         dataPayload.badge = payload.badge.toString();
     if (payload.tag)
@@ -288,7 +290,8 @@ async function sendCategoryNotification(token, payload) {
     }
     const message = {
         notification: {
-            title: payload.title,
+            // Title = school name so parent immediately knows which school sent it
+            title: payload.schoolName || payload.title,
             body: payload.body,
         },
         data: dataPayload,

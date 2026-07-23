@@ -289,6 +289,7 @@ export async function sendCategoryNotification(
     studentId?: string;
     schoolId?: string;
     schoolName?: string;
+    categoryLabel?: string;
     badge?: number;
     tag?: string;
   }
@@ -309,6 +310,7 @@ export async function sendCategoryNotification(
   if (payload.studentId) dataPayload.studentId = payload.studentId;
   if (payload.schoolId) dataPayload.schoolId = payload.schoolId;
   if (payload.schoolName) dataPayload.schoolName = payload.schoolName;
+  if (payload.categoryLabel) dataPayload.categoryLabel = payload.categoryLabel;
   if (payload.badge !== undefined) dataPayload.badge = payload.badge.toString();
   if (payload.tag) dataPayload.tag = payload.tag;
 
@@ -322,7 +324,8 @@ export async function sendCategoryNotification(
 
   const message: Message = {
     notification: {
-      title: payload.title,
+      // Title = school name so parent immediately knows which school sent it
+      title: payload.schoolName || payload.title,
       body: payload.body,
     },
     data: dataPayload,

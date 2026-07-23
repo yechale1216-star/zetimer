@@ -361,9 +361,7 @@ const postAnnouncement = async (schoolId, data) => {
             where: { id: schoolId },
             select: { name: true }
         });
-        const schoolName = schoolRecord?.name || undefined;
-        const baseTitle = data.title || 'New Announcement';
-        const notifTitle = schoolName ? `[${schoolName}] ${baseTitle}` : baseTitle;
+        const schoolName = schoolRecord?.name || 'ZeTime School';
         for (const parent of uniqueParents) {
             if (parent && parent.pushToken) {
                 // Check parent preferences only if phone is set
@@ -377,11 +375,12 @@ const postAnnouncement = async (schoolId, data) => {
                 }
                 await sendCategoryNotification(parent.pushToken, {
                     type: 'new_announcement',
-                    title: notifTitle,
+                    title: schoolName, // School name as title
                     body: data.message || 'There is a new announcement from school.',
                     route: '/parent/announcements',
                     schoolId,
                     schoolName,
+                    categoryLabel: 'Announcement', // Category subtext
                     tag: 'announcements'
                 }).catch((err) => {
                     console.error(`Failed to send announcement push to parent ${parent.id}:`, err);

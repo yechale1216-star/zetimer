@@ -90,6 +90,16 @@ const markAttendance = async (data, schoolId) => {
                 where: { studentId: student.id },
                 include: { parent: true }
             });
+            // Fetch school logo once for all parent pushes via settings
+            const school = await db_1.default.school.findUnique({
+                where: { id: schoolId },
+                select: {
+                    settings: {
+                        select: { school_logo: true }
+                    }
+                }
+            });
+            const schoolLogoUrl = school?.settings?.school_logo || undefined;
             for (const link of parentLinks) {
                 if (link.parent && link.parent.pushToken) {
                     // Check preferences only if phone is set
@@ -108,6 +118,7 @@ const markAttendance = async (data, schoolId) => {
                         route: `/parent/attendance`,
                         studentId: student.id,
                         schoolId,
+                        schoolLogoUrl,
                         tag: `attendance-${student.id}`
                     }).catch((err) => {
                         console.error(`Failed to dispatch push to parent ${link.parentId}:`, err);

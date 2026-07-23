@@ -354,12 +354,16 @@ export const postAnnouncement = async (schoolId: string, data: any) => {
       ).values()
     );
 
-    // Fetch school logo once for all parent pushes
+    // Fetch school logo once for all parent pushes via settings
     const schoolRecord = await prisma.school.findUnique({
       where: { id: schoolId },
-      select: { logoUrl: true }
+      select: {
+        settings: {
+          select: { school_logo: true }
+        }
+      }
     });
-    const schoolLogoUrl = schoolRecord?.logoUrl || undefined;
+    const schoolLogoUrl = schoolRecord?.settings?.school_logo || undefined;
 
     for (const parent of uniqueParents) {
       if (parent && parent.pushToken) {

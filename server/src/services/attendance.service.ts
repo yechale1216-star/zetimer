@@ -98,12 +98,16 @@ export const markAttendance = async (data: any, schoolId: string) => {
         include: { parent: true }
       });
 
-      // Fetch school logo once for all parent pushes
+      // Fetch school logo once for all parent pushes via settings
       const school = await prisma.school.findUnique({
         where: { id: schoolId },
-        select: { logoUrl: true, name: true }
+        select: {
+          settings: {
+            select: { school_logo: true }
+          }
+        }
       });
-      const schoolLogoUrl = school?.logoUrl || undefined;
+      const schoolLogoUrl = school?.settings?.school_logo || undefined;
 
       for (const link of parentLinks) {
         if (link.parent && link.parent.pushToken) {

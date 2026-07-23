@@ -272,6 +272,8 @@ async function sendCategoryNotification(token, payload) {
         dataPayload.studentId = payload.studentId;
     if (payload.schoolId)
         dataPayload.schoolId = payload.schoolId;
+    if (payload.schoolLogoUrl)
+        dataPayload.schoolLogoUrl = payload.schoolLogoUrl;
     if (payload.badge !== undefined)
         dataPayload.badge = payload.badge.toString();
     if (payload.tag)

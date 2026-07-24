@@ -29,7 +29,7 @@ export function UserProfile() {
 
   const loadUserProfile = async () => {
     try {
-      const currentUser = authService.getCurrentUser()
+      const currentUser = authService.getCurrentUser() as any
       if (currentUser) {
         setUser(normalizeUser(currentUser))
         setFormData({
@@ -38,7 +38,7 @@ export function UserProfile() {
           phone: currentUser.phone || "",
           profile_photo: currentUser.profile_photo || "",
         })
-        const schoolDetails = await db.getSchoolDetails()
+        const schoolDetails = await db.getSettings()
         setSchool(schoolDetails)
       }
     } catch (error) {

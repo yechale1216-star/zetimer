@@ -20,7 +20,7 @@ export default function TermsPage() {
           <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-500/20">
             <Scale className="w-8 h-8" />
           </div>
-          <h1 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-none">Terms of <br /><span className="text-indigo-600">Service.</span></h1>
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-[1.15]">Terms of <br /><span className="text-indigo-600">Service.</span></h1>
           <p className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-relaxed">System Agreement &middot; Last updated: June 13, 2026</p>
         </div>
 

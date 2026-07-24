@@ -73,81 +73,114 @@ export default function HomePage() {
 
       <main className="relative z-10">
         {/* HERO SECTION */}
-        <section className="pt-16 pb-24 md:pt-24 md:pb-32 text-center px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-          <div className="space-y-6 max-w-4xl mx-auto">
-            {/* New Feature Pill */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-bold text-indigo-600 dark:text-indigo-400">
-              <Sparkles className="w-4 h-4" />
-              <span>NEW: Complete Student Discipline Management Module Live</span>
-              <ChevronRight className="w-3.5 h-3.5 opacity-70" />
-            </div>
+        <section className="pt-10 pb-20 md:pt-16 md:pb-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
+            
+            {/* Left Content Column */}
+            <div className="flex-1 text-center lg:text-left space-y-6 max-w-2xl">
+              {/* Pill Badge */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                </span>
+                The Bridge Between Home & School
+              </div>
 
-            {/* Main Headline */}
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.15] text-slate-900 dark:text-white">
-              The Digital Standard for <br className="hidden sm:inline" />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-400 dark:to-purple-400">
-                Connected Educational SaaS
-              </span>
-            </h1>
+              {/* Main Headline */}
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-slate-900 dark:text-white">
+                Modern School <span className="text-blue-600 dark:text-blue-400 italic">Attendance Management</span> & Communication Platform.
+              </h1>
 
-            {/* Subtitle */}
-            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed font-medium">
-              Zetime unifies School Administration, Attendance Tracking, Student Discipline Records, and Real-Time Parent Communication into one multi-tenant platform.
-            </p>
+              {/* Subtitle */}
+              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                The professional platform for schools to master precision attendance management and real-time analytics, while bridging the communication gap between parents and staff through high-priority messaging.
+              </p>
 
-            {/* Action Buttons */}
-            <div className="pt-4 flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button
-                asChild
-                size="lg"
-                className="h-13 px-8 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-base shadow-xl shadow-blue-500/25 transition-all hover:scale-105"
-              >
-                <Link href="/login?signup=true">
-                  Start 14-Day Free Trial
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Link>
-              </Button>
+              {/* Action Button & Trust Avatars */}
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
+                <Button
+                  asChild
+                  size="lg"
+                  className="h-12 px-7 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-xl shadow-blue-500/25 transition-all hover:scale-105"
+                >
+                  <Link href="/login?signup=true">
+                    Join Your School
+                  </Link>
+                </Button>
 
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="h-13 px-8 rounded-2xl border-slate-300 dark:border-slate-800 font-bold text-base hover:bg-slate-100 dark:hover:bg-slate-900"
-              >
-                <Link href="/login">Sign In to Dashboard</Link>
-              </Button>
-            </div>
-
-            {/* Hero Image Showcase */}
-            <div className="pt-10 max-w-5xl mx-auto">
-              <div className="relative group rounded-3xl p-2 bg-gradient-to-b from-blue-500/20 via-indigo-500/10 to-transparent border border-slate-200 dark:border-slate-800/80 shadow-2xl overflow-hidden backdrop-blur-xl">
-                <div className="absolute inset-0 bg-blue-600/5 blur-3xl rounded-3xl -z-10"></div>
-                <img
-                  src="/zetime_branding_professional.png"
-                  alt="Zetime Professional Platform Showcase"
-                  className="w-full h-auto rounded-2xl object-cover shadow-lg border border-slate-200/50 dark:border-slate-800/50 transition-transform duration-700 group-hover:scale-[1.01]"
-                />
+                <div className="flex items-center -space-x-2 pl-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 bg-slate-200 overflow-hidden shadow-sm">
+                      <img src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="User" className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                  <div className="pl-4 text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                    Trusted by 2k+ Families
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Platform Stats */}
-            <div className="pt-12 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-3xl mx-auto border-t border-slate-200/60 dark:border-slate-800/60">
-              <div>
-                <p className="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400">99.9%</p>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">Uptime Reliability</p>
+            {/* Right Image Showcase Column (Matching Screenshot) */}
+            <div className="flex-1 w-full max-w-2xl">
+              <div className="relative group">
+                <div className="absolute -inset-4 bg-gradient-to-r from-blue-600/30 to-indigo-600/30 rounded-[40px] blur-3xl opacity-20 dark:opacity-40 group-hover:opacity-60 transition duration-1000"></div>
+                <div className="relative rounded-[32px] overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.12)] dark:shadow-2xl border border-white/60 dark:border-white/10 bg-white/40 dark:bg-white/10 backdrop-blur-2xl transition-transform duration-700 group-hover:scale-[1.01]">
+                  <img
+                    src="/zetime_branding_professional.png"
+                    alt="Zetime Communication Dashboard"
+                    className="w-full aspect-[4/3] object-cover opacity-95"
+                  />
+                  
+                  {/* Floating Analytics Card (Bottom Left) */}
+                  <div className="absolute bottom-6 left-6 p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-xl border border-white/20 dark:border-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                        <BarChart3 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Analytics</div>
+                        <div className="text-xl font-black text-slate-900 dark:text-white">+24% Efficiency</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Floating Notification Box (Top Right) */}
+                  <div className="absolute top-6 right-6 p-3 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-lg border border-white/20 dark:border-white/5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-tight">High Priority</div>
+                        <div className="text-[11px] font-extrabold text-slate-900 dark:text-white">Emergency Announcement</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl sm:text-3xl font-black text-indigo-600 dark:text-indigo-400">100%</p>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">Multi-Tenant Isolation</p>
-              </div>
-              <div>
-                <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">PWA</p>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">Offline Capability</p>
-              </div>
-              <div>
-                <p className="text-2xl sm:text-3xl font-black text-purple-600 dark:text-purple-400">Instant</p>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">Push Notifications</p>
-              </div>
+            </div>
+
+          </div>
+
+          {/* Platform Stats Row */}
+          <div className="mt-16 pt-10 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-4xl mx-auto border-t border-slate-200/60 dark:border-slate-800/60 text-center">
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400">99.9%</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">Uptime Reliability</p>
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-indigo-600 dark:text-indigo-400">100%</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">Multi-Tenant Isolation</p>
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">PWA</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">Offline Capability</p>
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-purple-600 dark:text-purple-400">Instant</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">Push Notifications</p>
             </div>
           </div>
         </section>

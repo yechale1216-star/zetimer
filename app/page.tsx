@@ -89,7 +89,9 @@ export default function HomePage() {
 
               {/* Main Headline */}
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-slate-900 dark:text-white">
-                Modern School <span className="text-blue-600 dark:text-blue-400 italic">Attendance Management</span> & Communication Platform.
+                Modern School <br className="hidden sm:inline" />
+                <span className="text-blue-600 dark:text-blue-400 italic">Attendance & Communication</span> <br className="hidden sm:inline" />
+                Platform.
               </h1>
 
               {/* Subtitle */}
@@ -122,7 +124,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right Image Showcase Column (Matching Screenshot) */}
+            {/* Right Image Showcase Column (Clean, Unobscured Image) */}
             <div className="flex-1 w-full max-w-2xl">
               <div className="relative group">
                 <div className="absolute -inset-4 bg-gradient-to-r from-blue-600/30 to-indigo-600/30 rounded-[40px] blur-3xl opacity-20 dark:opacity-40 group-hover:opacity-60 transition duration-1000"></div>
@@ -132,32 +134,6 @@ export default function HomePage() {
                     alt="Zetime Communication Dashboard"
                     className="w-full aspect-[4/3] object-cover opacity-95"
                   />
-                  
-                  {/* Floating Analytics Card (Bottom Left) */}
-                  <div className="absolute bottom-6 left-6 p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-xl border border-white/20 dark:border-white/5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                        <BarChart3 className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Analytics</div>
-                        <div className="text-xl font-black text-slate-900 dark:text-white">+24% Efficiency</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Floating Notification Box (Top Right) */}
-                  <div className="absolute top-6 right-6 p-3 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-lg border border-white/20 dark:border-white/5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                        <Sparkles className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-tight">High Priority</div>
-                        <div className="text-[11px] font-extrabold text-slate-900 dark:text-white">Emergency Announcement</div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

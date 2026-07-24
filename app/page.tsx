@@ -123,8 +123,8 @@ export default function HomePage() {
               <div className="relative group rounded-3xl p-2 bg-gradient-to-b from-blue-500/20 via-indigo-500/10 to-transparent border border-slate-200 dark:border-slate-800/80 shadow-2xl overflow-hidden backdrop-blur-xl">
                 <div className="absolute inset-0 bg-blue-600/5 blur-3xl rounded-3xl -z-10"></div>
                 <img
-                  src="/school-hero.png"
-                  alt="Zetime School Management Ecosystem Showcase"
+                  src="/zetime_branding_professional.png"
+                  alt="Zetime Professional Platform Showcase"
                   className="w-full h-auto rounded-2xl object-cover shadow-lg border border-slate-200/50 dark:border-slate-800/50 transition-transform duration-700 group-hover:scale-[1.01]"
                 />
               </div>

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
   LayoutDashboard, LogOut, User, CheckSquare, BarChart2, BookOpen, 
-  MessageSquare, X, ChevronRight, ShieldBan, HeadphonesIcon, Sun, Moon, Sparkles
+  MessageSquare, X, ChevronRight, ShieldBan, HeadphonesIcon, Sun, Moon, Sparkles, ShieldAlert
 } from 'lucide-react'
 import { useAuth } from '@/lib/context/auth-context'
 import { useSchool } from '@/lib/context/school-context'
@@ -97,6 +97,7 @@ export default function TeacherLayout({
     { href: "/school/teacher/attendance", icon: <CheckSquare className="w-5 h-5" />, label: "Attendance" },
     { href: "/school/teacher/classes", icon: <BookOpen className="w-5 h-5" />, label: "Classes" },
     { href: "/school/teacher/reports", icon: <BarChart2 className="w-5 h-5" />, label: "Reports" },
+    { href: "/school/teacher/discipline", icon: <ShieldAlert className="w-5 h-5" />, label: "Discipline" },
     { href: "/school/teacher/feedback", icon: <Sparkles className="w-5 h-5" />, label: "Feedback" },
     { href: "/school/teacher/profile", icon: <User className="w-5 h-5" />, label: "Profile" },
   ]

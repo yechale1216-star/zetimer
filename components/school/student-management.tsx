@@ -23,8 +23,9 @@ import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { DataStateView } from "@/components/ui/data-state-view"
 import { MobileCard, MobileCardList } from "@/components/ui/mobile-card"
 import { NativeBridge } from "@/lib/utils/native-bridge"
-import { Camera } from "lucide-react"
+import { Camera, ShieldAlert } from "lucide-react"
 import { cn } from "@/lib/utils/utils"
+import { DisciplineApi, StudentDiscipline } from "@/lib/discipline-service"
 
 
 
@@ -37,6 +38,20 @@ export function StudentManagement() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [studentDisciplines, setStudentDisciplines] = useState<StudentDiscipline[]>([])
+  const [isLoadingDisciplines, setIsLoadingDisciplines] = useState(false)
+
+  useEffect(() => {
+    if (selectedStudent?.id) {
+      setIsLoadingDisciplines(true);
+      DisciplineApi.getIncidents({ studentId: selectedStudent.id, limit: 20 })
+        .then((res) => setStudentDisciplines(res.items || []))
+        .catch((err) => console.error('Error fetching student disciplines:', err))
+        .finally(() => setIsLoadingDisciplines(false));
+    } else {
+      setStudentDisciplines([]);
+    }
+  }, [selectedStudent]);
   const [showSuccess, setShowSuccess] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [importPreviewData, setImportPreviewData] = useState<any[] | null>(null)
@@ -1669,6 +1684,39 @@ export function StudentManagement() {
                       </span>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Discipline Record Summary */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Discipline & Conduct</p>
+                  <Badge variant="outline" className="text-[10px]">
+                    {studentDisciplines.length} Record(s)
+                  </Badge>
+                </div>
+                <div className="rounded-2xl border border-slate-100 dark:border-slate-900 p-4 bg-slate-50/60 dark:bg-slate-900/40 space-y-3">
+                  {isLoadingDisciplines ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">Loading discipline history...</p>
+                  ) : studentDisciplines.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">No discipline incidents recorded for this student.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                      {studentDisciplines.map((inc) => (
+                        <div key={inc.id} className="p-2.5 border rounded-xl bg-white dark:bg-slate-950 text-xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900 dark:text-slate-100">{inc.title}</span>
+                            <Badge variant="outline" className="text-[9px]">{inc.severity}</Badge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground line-clamp-1">{inc.description}</p>
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
+                            <span>{new Date(inc.date).toLocaleDateString()}</span>
+                            <span className="font-semibold text-indigo-600 dark:text-indigo-400">{inc.status}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

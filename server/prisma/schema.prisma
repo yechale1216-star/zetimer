@@ -171,6 +171,8 @@ model School {
   subscription         SchoolSubscription?
   supportTickets       SupportTicket[]
   userNotifications    UserNotification[]
+  disciplines          StudentDiscipline[]
+  disciplineCategories DisciplineCategory[]
 }
 
 model User {
@@ -206,6 +208,8 @@ model User {
   parentStudents             ParentStudentLink[]
   school                     School?              @relation(fields: [schoolId], references: [id])
   notifications              UserNotification[]
+  reportedDisciplines        StudentDiscipline[]
+  disciplineFollowUps        DisciplineFollowUp[]
 
   @@index([email])
   @@index([schoolId])
@@ -283,6 +287,7 @@ model Grade {
   fromPromotions StudentPromotion[]  @relation("FromGrade")
   toPromotions   StudentPromotion[]  @relation("ToGrade")
   assignments    TeacherAssignment[]
+  disciplines    StudentDiscipline[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -297,6 +302,7 @@ model Section {
   fromPromotions StudentPromotion[]  @relation("FromSection")
   toPromotions   StudentPromotion[]  @relation("ToSection")
   assignments    TeacherAssignment[]
+  disciplines    StudentDiscipline[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -311,6 +317,7 @@ model Stream {
   fromPromotions StudentPromotion[]  @relation("FromStream")
   toPromotions   StudentPromotion[]  @relation("ToStream")
   assignments    TeacherAssignment[]
+  disciplines    StudentDiscipline[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -336,6 +343,7 @@ model Student {
   attendance          Attendance[]
   parentNotifications ParentNotification[]
   parentStudents      ParentStudentLink[]
+  disciplines         StudentDiscipline[]
   grade               Grade                @relation(fields: [gradeId], references: [id])
   school              School?              @relation(fields: [schoolId], references: [id])
   section             Section              @relation(fields: [sectionId], references: [id])
@@ -771,3 +779,88 @@ model UserNotification {
   @@index([schoolId])
   @@index([userId])
 }
+
+model DisciplineCategory {
+  id          String              @id @default(uuid())
+  schoolId    String?
+  name        String
+  description String?
+  isDefault   Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  school      School?             @relation(fields: [schoolId], references: [id])
+  disciplines StudentDiscipline[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@map("discipline_categories")
+}
+
+model StudentDiscipline {
+  id                        String               @id @default(uuid())
+  schoolId                  String
+  studentId                 String
+  gradeId                   String
+  sectionId                 String
+  streamId                  String?
+  date                      DateTime             @default(now())
+  time                      String?
+  categoryId                String?
+  categoryName              String
+  severity                  String               @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+  title                     String
+  description               String
+  location                  String?
+  reportedById              String?
+  reportedByName            String?
+  witnesses                 Json?
+  evidence                  Json?                // Array of { url, name, type, size }
+  immediateAction           String?
+  parentNotified            Boolean              @default(false)
+  parentNotifiedAt          DateTime?
+  parentAcknowledged        Boolean              @default(false)
+  parentAcknowledgedAt      DateTime?
+  parentAcknowledgementNotes String?
+  followUpDate              DateTime?
+  resolutionNotes           String?
+  status                    String               @default("OPEN") // OPEN, UNDER_REVIEW, RESOLVED, CLOSED
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+
+  school                    School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student                   Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  grade                     Grade                @relation(fields: [gradeId], references: [id])
+  section                   Section              @relation(fields: [sectionId], references: [id])
+  stream                    Stream?              @relation(fields: [streamId], references: [id])
+  reportedBy                User?                @relation(fields: [reportedById], references: [id])
+  category                  DisciplineCategory?  @relation(fields: [categoryId], references: [id])
+  followUps                 DisciplineFollowUp[]
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([gradeId])
+  @@index([sectionId])
+  @@index([status])
+  @@index([severity])
+  @@index([date])
+  @@map("student_disciplines")
+}
+
+model DisciplineFollowUp {
+  id           String            @id @default(uuid())
+  disciplineId String
+  authorId     String?
+  authorName   String?
+  note         String
+  actionTaken  String?
+  statusBefore String?
+  statusAfter  String?
+  createdAt    DateTime          @default(now())
+
+  discipline   StudentDiscipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+  author       User?             @relation(fields: [authorId], references: [id])
+
+  @@index([disciplineId])
+  @@map("discipline_followups")
+}
+

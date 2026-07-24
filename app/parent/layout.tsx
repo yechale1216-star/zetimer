@@ -20,6 +20,7 @@ import {
   Moon,
   Globe,
   Sparkles,
+  ShieldAlert,
 } from "lucide-react"
 import { parentDb } from "@/lib/db/parent-db"
 import { Button } from "@/components/ui/button"
@@ -215,6 +216,7 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
     { href: "/parent/communication", label: t("communication"), icon: <MessageSquare />, badge: unreadCount > 0 ? unreadCount : undefined },
     { href: "/parent/announcements", label: t("notifications"), icon: <Megaphone /> },
     { href: "/parent/attendance", label: t("attendance"), icon: <Calendar /> },
+    { href: "/parent/discipline", label: "Discipline", icon: <ShieldAlert /> },
     { href: "/parent/profile", label: t("profile"), icon: <User /> },
     { href: "/parent/feedback", label: "Feedback", icon: <Sparkles /> },
   ]

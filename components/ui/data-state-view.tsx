@@ -471,7 +471,7 @@ function EmptyView({
               className="bg-[#4f46e5] hover:bg-[#4338ca] text-white font-bold rounded-2xl h-12 w-full max-w-[240px] transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20"
             >
               <Plus className="w-4.5 h-4.5" />
-              {actionText || "+ Add Student"}
+              {actionText || "Add Student"}
             </Button>
           )
         )}
@@ -538,6 +538,7 @@ export function DataStateView({
           crumbsTitle={crumbsTitle}
           onGoBack={onGoBack}
         />
+        <div className="hidden">{children}</div>
       </div>
     )
   }

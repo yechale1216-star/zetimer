@@ -765,8 +765,25 @@ export function StudentManagement() {
         emptyTitle="No Students Yet"
         emptyDescription="There are no students available. Add students to get started."
         crumbsTitle="Students"
-        onEmptyActionClick={() => { resetForm(); setIsAddModalOpen(true); }}
-        emptyActionText="+ Add Student"
+        emptyAction={
+          <div className="flex flex-col sm:flex-row gap-3 w-full max-w-[320px] sm:max-w-md justify-center items-center">
+            <Button
+              onClick={() => { resetForm(); setIsAddModalOpen(true); }}
+              className="bg-[#4f46e5] hover:bg-[#4338ca] text-white font-bold rounded-2xl h-12 w-full sm:w-auto px-6 transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20"
+            >
+              <Plus className="w-4.5 h-4.5" />
+              Add Student
+            </Button>
+            <Button
+              onClick={() => setShowUploadDialog(true)}
+              variant="outline"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 font-bold rounded-2xl h-12 w-full sm:w-auto px-6 transition-all hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98] flex items-center justify-center gap-2 shadow-xs"
+            >
+              <Upload className="w-4.5 h-4.5 text-[#4f46e5]" />
+              Bulk Import
+            </Button>
+          </div>
+        }
         skeletonVariant="table"
       >
         <div className="space-y-8 pb-32">

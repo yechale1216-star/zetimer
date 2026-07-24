@@ -1,5 +1,3 @@
-"use client"
-
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { 
@@ -7,41 +5,19 @@ import {
   ArrowRight, ShieldCheck, 
   CheckCircle2, Globe, Heart
 } from "lucide-react"
-import { ModeToggle } from "@/components/mode-toggle"
-import { Logo } from "@/components/logo"
+import { PublicNavbar } from "@/components/layout/public-navbar"
+import { PublicFooter } from "@/components/layout/public-footer"
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen premium-mesh-gradient text-slate-900 dark:text-slate-100 selection:bg-blue-500/20">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-blue-500/20">
       {/* Animated Background Orbs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/20 dark:bg-blue-600/10 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/20 dark:bg-indigo-600/10 rounded-full blur-[120px] animate-pulse delay-700"></div>
       </div>
 
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 w-full border-b border-white/40 dark:border-white/10 bg-white/40 dark:bg-slate-950/40 backdrop-blur-2xl">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="flex justify-between h-20 items-center">
-            <Logo size="md" withText={true} href="/" />
-            
-            <div className="hidden md:flex items-center gap-8">
-              <Link href="/about" className="text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">About</Link>
-              <Link href="/pricing" className="text-[11px] font-black text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors uppercase tracking-widest">Pricing</Link>
-              <Link href="/terms" className="text-[11px] font-black text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors uppercase tracking-widest">Terms</Link>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="scale-90">
-                <ModeToggle />
-              </div>
-              <Button asChild className="rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-500/20 px-6">
-                <Link href="/login">Sign In</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <PublicNavbar />
 
       <main className="relative z-10">
         {/* Modern About Hero */}
@@ -167,20 +143,7 @@ export default function AboutPage() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="py-12 border-t border-white/40 dark:border-white/10 bg-white/20 dark:bg-slate-950/20 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-8 flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-            <Link href="/about" className="text-blue-600">About</Link>
-            <Link href="/pricing" className="hover:text-blue-600">Pricing</Link>
-            <Link href="/privacy" className="hover:text-blue-600">Privacy</Link>
-            <Link href="/terms" className="hover:text-blue-600">Terms</Link>
-          </div>
-          <p className="text-[10px] font-bold text-slate-500/60 uppercase tracking-[0.3em]">
-            &copy; {new Date().getFullYear()} Zetime &bull; The Digital Standard
-          </p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   )
 }

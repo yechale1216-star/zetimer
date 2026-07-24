@@ -1,29 +1,13 @@
-"use client"
-
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Shield, Lock, ArrowLeft, Globe, Eye } from "lucide-react"
-import { ModeToggle } from "@/components/mode-toggle"
-import { Logo } from "@/components/logo"
+import { PublicNavbar } from "@/components/layout/public-navbar"
+import { PublicFooter } from "@/components/layout/public-footer"
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen premium-mesh-gradient text-slate-900 dark:text-slate-100 selection:bg-blue-500/20">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 w-full border-b border-white/40 dark:border-white/10 bg-white/40 dark:bg-slate-950/40 backdrop-blur-2xl">
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="flex justify-between h-20 items-center">
-            <Logo size="md" withText={true} href="/" />
-            <div className="flex items-center gap-6">
-              <Link href="/about" className="text-[11px] font-black text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors uppercase tracking-widest hidden sm:block">About</Link>
-              <ModeToggle />
-              <Button asChild size="sm" variant="outline" className="rounded-xl border-slate-200 dark:border-white/10 font-bold">
-                <Link href="/login">Login</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-blue-500/20">
+      <PublicNavbar />
 
       <main className="max-w-4xl mx-auto px-8 py-20 relative z-10">
         <Link href="/" className="inline-flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-12 hover:translate-x-[-4px] transition-transform">
@@ -107,13 +91,7 @@ export default function PrivacyPage() {
         </div>
       </main>
 
-      <footer className="py-12 border-t border-white/40 dark:border-white/10 bg-white/20 dark:bg-slate-950/20 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-8 text-center">
-          <p className="text-[10px] font-bold text-slate-500/60 uppercase tracking-[0.3em]">
-            &copy; {new Date().getFullYear()} Zetime &bull; Privacy First Standard
-          </p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   )
 }

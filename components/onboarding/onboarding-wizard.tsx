@@ -104,7 +104,8 @@ export default function OnboardingWizard() {
         return
       }
 
-      setIsVerified(currentUser.isVerified ?? false)
+      // Bypass email verification step until Resend configuration is finalized
+      setIsVerified(true)
     }
   }, [router])
 
@@ -436,8 +437,8 @@ function EmailVerificationGate({ email, onVerified }: { email: string; onVerifie
             )}
           </Button>
 
-          {/* Resend */}
-          <div className="text-center">
+          {/* Resend & Skip */}
+          <div className="text-center space-y-2">
             {canResend ? (
               <button
                 onClick={handleResend}
@@ -452,6 +453,13 @@ function EmailVerificationGate({ email, onVerified }: { email: string; onVerifie
                 Resend available in <span className="font-semibold text-foreground">{countdown}s</span>
               </p>
             )}
+
+            <button
+              onClick={onVerified}
+              className="text-xs text-muted-foreground hover:text-foreground underline block mx-auto pt-2"
+            >
+              Skip verification for now
+            </button>
           </div>
         </div>
 

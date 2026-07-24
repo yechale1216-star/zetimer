@@ -19,6 +19,7 @@ import { authService } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
+import { supabase } from "@/lib/utils/supabase"
 import { Lock, Edit2, Check, Calendar } from "lucide-react"
 
 export function Settings() {
@@ -29,6 +30,7 @@ export function Settings() {
     schoolName: "", 
     schoolLogo: "" 
   })
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [isEditingSchoolInfo, setIsEditingSchoolInfo] = useState(false)
   const [emailConfigPassword, setEmailConfigPassword] = useState("")
   const [isEmailConfigUnlocked, setIsEmailConfigUnlocked] = useState(false)
@@ -38,25 +40,41 @@ export function Settings() {
 
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser()
-    setUser(currentUser)
-    setMounted(true)
     loadSettings()
-    if (currentUser) {
+    const user = authService.getCurrentUser()
+    setCurrentUser(user)
+    setUser(user)
+    setMounted(true)
+    if (user) {
       setSchoolInfo({
-        schoolName: currentUser.schoolName || "",
-        schoolLogo: currentUser.schoolLogo || "",
+        schoolName: user.schoolName || "",
+        schoolLogo: user.schoolLogo || "",
       })
-      if (currentUser.role === "admin" && currentUser.schoolName === "Setup Required") {
+      if (currentUser?.role === "admin" && currentUser?.schoolName === "Setup Required") {
         setIsEditingSchoolInfo(true)
       }
     }
   }, [])
 
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `logo-${Date.now()}.${fileExt}`
+      const filePath = `logos/${fileName}`
+      const { error: uploadError } = await supabase.storage.from('SCHOOL-LOGOS').upload(filePath, file)
+      if (!uploadError) {
+        const { data } = supabase.storage.from('SCHOOL-LOGOS').getPublicUrl(filePath)
+        setSchoolInfo((prev) => ({ ...prev, schoolLogo: data.publicUrl }))
+        notifications.success("Success", "School logo uploaded to Supabase Storage")
+        return
+      }
+    } catch (err) {
+      console.warn("Supabase logo upload error, fallback to local:", err)
+    }
 
     const reader = new FileReader()
     reader.onload = (event) => {

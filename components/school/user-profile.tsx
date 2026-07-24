@@ -8,6 +8,7 @@ import { authService } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
 import { db } from "@/lib/db/database"
+import { supabase } from "@/lib/utils/supabase"
 
 export function UserProfile() {
   const [user, setUser] = useState<any>(null)
@@ -23,42 +24,29 @@ export function UserProfile() {
   })
 
   useEffect(() => {
-    const loadUserProfile = async () => {
-      try {
-        // First get from localStorage for immediate display
-        const cachedUser = authService.getCurrentUser()
-        if (cachedUser) {
-          const normalized = normalizeUser(cachedUser)
-          setUser(normalized)
-          setFormData(normalized)
-        }
-
-        // Then refresh from server for latest data
-        const freshUser = await authService.refreshUserProfile()
-        if (freshUser) {
-          const normalized = normalizeUser(freshUser)
-          setUser(normalized)
-          setFormData(normalized)
-          
-          if (freshUser.schoolId) {
-            const schoolData = await db.getSettings()
-            setSchool(schoolData)
-          }
-        } else if (cachedUser && cachedUser.schoolId) {
-          // Fallback if refresh fails but we have cached schoolId
-          const schoolData = await db.getSettings()
-          setSchool(schoolData)
-        }
-      } catch (error) {
-        console.error("[v0] Error loading profile:", error)
-        notifications.error("Profile Error", "Failed to load profile")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     loadUserProfile()
   }, [])
+
+  const loadUserProfile = async () => {
+    try {
+      const currentUser = authService.getCurrentUser()
+      if (currentUser) {
+        setUser(normalizeUser(currentUser))
+        setFormData({
+          full_name: currentUser.name || currentUser.full_name || "",
+          email: currentUser.email || "",
+          phone: currentUser.phone || "",
+          profile_photo: currentUser.profile_photo || "",
+        })
+        const schoolDetails = await db.getSchoolDetails()
+        setSchool(schoolDetails)
+      }
+    } catch (error) {
+      console.error("Error loading user profile:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev: any) => ({
@@ -67,9 +55,24 @@ export function UserProfile() {
     }))
   }
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `user-${Date.now()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
+      const { error: uploadError } = await supabase.storage.from('AVATARS').upload(filePath, file)
+      if (!uploadError) {
+        const { data } = supabase.storage.from('AVATARS').getPublicUrl(filePath)
+        setFormData((prev: any) => ({ ...prev, profile_photo: data.publicUrl }))
+        notifications.success("Success", "Profile photo uploaded to Supabase Storage")
+        return
+      }
+    } catch (err) {
+      console.warn("Supabase avatar upload error, fallback to local:", err)
+    }
 
     const reader = new FileReader()
     reader.onload = (event) => {

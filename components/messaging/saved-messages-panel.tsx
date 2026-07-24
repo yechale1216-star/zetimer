@@ -122,11 +122,11 @@ export const SavedMessagesPanel: React.FC<SavedMessagesPanelProps> = ({ onClose,
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random()}-${Date.now()}.${fileExt}`;
     const filePath = `chat-attachments/${fileName}`;
-    const { error } = await supabase.storage.from('communication-attachments').upload(filePath, file);
+    const { error } = await supabase.storage.from('COMMUNICATION-ATTACHMENTS').upload(filePath, file);
     if (error) throw error;
-    const { data, error: signError } = await supabase.storage.from('communication-attachments').createSignedUrl(filePath, 315360000);
+    const { data, error: signError } = await supabase.storage.from('COMMUNICATION-ATTACHMENTS').createSignedUrl(filePath, 315360000);
     if (signError || !data?.signedUrl) {
-      const { data: { publicUrl } } = supabase.storage.from('communication-attachments').getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage.from('COMMUNICATION-ATTACHMENTS').getPublicUrl(filePath);
       return publicUrl;
     }
     return data.signedUrl;

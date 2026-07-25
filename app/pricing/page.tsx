@@ -131,7 +131,7 @@ export default function PricingPage() {
            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] mb-4">
               <Shield className="w-3 h-3" /> 14-day free trial · No credit card
             </div>
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.15]">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.2]">
             Simple, Transparent <br />
             <span className="text-blue-600 dark:text-blue-400 italic">Institutional Pricing.</span>
           </h1>

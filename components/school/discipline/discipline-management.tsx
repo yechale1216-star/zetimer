@@ -30,7 +30,13 @@ import {
   Sparkles,
   ExternalLink,
   Check,
-  UserCheck
+  UserCheck,
+  Phone,
+  Mail,
+  Users,
+  GraduationCap,
+  ShieldCheck,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +50,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { getApiUrl } from '@/lib/api-config';
+import { db } from '@/lib/db/database';
 
 import {
   DisciplineApi,
@@ -51,6 +59,23 @@ import {
   DisciplineCategory,
   DisciplineAnalytics
 } from '@/lib/discipline-service';
+
+const DEFAULT_FALLBACK_CATEGORIES: DisciplineCategory[] = [
+  'Late Arrival',
+  'Unexcused Absence',
+  'Uniform Violation',
+  'Classroom Misbehavior',
+  'Disrespect',
+  'Bullying',
+  'Fighting',
+  'Cheating',
+  'Phone Misuse',
+  'Property Damage',
+  'Theft',
+  'Smoking',
+  'Violence',
+  'Other'
+].map((name) => ({ id: name, schoolId: '', name, isDefault: true }));
 
 interface DisciplineManagementProps {
   userRole?: 'school_admin' | 'teacher' | 'super_admin';
@@ -66,18 +91,24 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [analytics, setAnalytics] = useState<DisciplineAnalytics | null>(null);
-  const [categories, setCategories] = useState<DisciplineCategory[]>([]);
+  const [categories, setCategories] = useState<DisciplineCategory[]>(DEFAULT_FALLBACK_CATEGORIES);
   
   // Filter States
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [streamFilter, setStreamFilter] = useState('ALL');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   
   // Students List for Wizard
   const [students, setStudents] = useState<any[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [previewStudent, setPreviewStudent] = useState<any | null>(null);
+  const [showStudentResults, setShowStudentResults] = useState(false);
+  const [studentSearchSubmitted, setStudentSearchSubmitted] = useState(false);
 
   // Modal States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -88,6 +119,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryDesc, setNewCategoryDesc] = useState('');
   const [previewAttachment, setPreviewAttachment] = useState<{ url: string; name: string; type: string } | null>(null);
+  const [isSubmittingIncident, setIsSubmittingIncident] = useState(false);
   
   // Follow-up state inside detail
   const [followUpNote, setFollowUpNote] = useState('');
@@ -127,7 +159,10 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
         search,
         severity: severityFilter === 'ALL' ? undefined : severityFilter,
         status: statusFilter === 'ALL' ? undefined : statusFilter,
-        categoryName: categoryFilter === 'ALL' ? undefined : categoryFilter
+        categoryName: categoryFilter === 'ALL' ? undefined : categoryFilter,
+        streamId: streamFilter === 'ALL' ? undefined : streamFilter,
+        startDate: startDateFilter || undefined,
+        endDate: endDateFilter || undefined
       });
       setIncidents(res.items);
       setTotal(res.total);
@@ -142,19 +177,24 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
   const fetchAnalyticsAndCategories = async () => {
     try {
       const [ana, cats] = await Promise.all([
-        DisciplineApi.getAnalytics(),
-        DisciplineApi.getCategories()
+        DisciplineApi.getAnalytics().catch(() => null),
+        DisciplineApi.getCategories().catch(() => [])
       ]);
-      setAnalytics(ana);
-      setCategories(cats);
+      if (ana) setAnalytics(ana);
+      if (cats && Array.isArray(cats) && cats.length > 0) {
+        setCategories(cats);
+      } else {
+        setCategories(DEFAULT_FALLBACK_CATEGORIES);
+      }
     } catch (err) {
       console.error('Error fetching analytics/categories:', err);
+      setCategories(DEFAULT_FALLBACK_CATEGORIES);
     }
   };
 
   useEffect(() => {
     fetchIncidents();
-  }, [page, severityFilter, statusFilter, categoryFilter]);
+  }, [page, severityFilter, statusFilter, categoryFilter, streamFilter, startDateFilter, endDateFilter]);
 
   useEffect(() => {
     fetchAnalyticsAndCategories();
@@ -166,9 +206,17 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
     fetchIncidents();
   };
 
-  // Fetch students for wizard step 1
-  const fetchStudents = async (query = '') => {
+  // On-demand student search for wizard Step 1
+  const fetchStudents = async (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
+    // Clear old results immediately so stale results never show
+    setStudents([]);
     setIsLoadingStudents(true);
+    setShowStudentResults(true);
+    setStudentSearchSubmitted(true);
+
     try {
       const token = localStorage.getItem('attendance_token');
       const schoolId = localStorage.getItem('x-school-id');
@@ -177,23 +225,48 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
       if (token) headers['Authorization'] = `Bearer ${token}`;
       if (schoolId) headers['x-school-id'] = schoolId;
 
-      const res = await fetch(`${apiUrl}/api/students?limit=50&search=${encodeURIComponent(query)}`, { headers });
+      const res = await fetch(
+        `${apiUrl}/api/students?search=${encodeURIComponent(trimmed)}&limit=20`,
+        { headers }
+      );
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('application/json')) {
+        setStudents([]);
+        return;
+      }
       const data = await res.json();
-      if (data.students) setStudents(data.students);
-      else if (data.data) setStudents(data.data);
-      else setStudents([]);
+      const rawList: any[] = data.students || data.data || [];
+
+      // Client-side double filter — ensures results always match what user typed
+      const lowerQ = trimmed.toLowerCase();
+      const filtered = rawList.filter((s) => {
+        const name = (s.fullName || s.name || '').toLowerCase();
+        const id = (s.student_id || '').toLowerCase();
+        return name.includes(lowerQ) || id.includes(lowerQ);
+      });
+
+      setStudents(filtered);
     } catch (err) {
       console.error('Error loading students:', err);
+      setStudents([]);
     } finally {
       setIsLoadingStudents(false);
     }
   };
 
+  // Debounced auto-search as user types
   useEffect(() => {
-    if (isCreateOpen && createStep === 1) {
-      fetchStudents(studentSearch);
+    if (!studentSearchSubmitted) return;
+    if (!studentSearch.trim()) {
+      setStudents([]);
+      setShowStudentResults(false);
+      return;
     }
-  }, [isCreateOpen, createStep, studentSearch]);
+    setStudents([]); // clear immediately before debounce fires
+    const t = setTimeout(() => fetchStudents(studentSearch), 400);
+    return () => clearTimeout(t);
+  }, [studentSearch]);
+
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -243,6 +316,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
       return;
     }
 
+    setIsSubmittingIncident(true);
     try {
       const witnesses = formData.witnessesText
         ? formData.witnessesText.split(',').map((w) => w.trim()).filter(Boolean)
@@ -291,6 +365,8 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
       fetchAnalyticsAndCategories();
     } catch (err: any) {
       toast.error(err.message || 'Failed to save incident');
+    } finally {
+      setIsSubmittingIncident(false);
     }
   };
 
@@ -442,28 +518,28 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pb-20 max-w-7xl mx-auto">
       {/* Top Header Card */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 rounded-2xl shadow-xl">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-indigo-500/20 rounded-xl border border-indigo-400/30">
-              <ShieldAlert className="w-7 h-7 text-indigo-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Student Discipline Module</h1>
-              <p className="text-sm text-slate-300">
-                Track, investigate, manage, and communicate student conduct and behavioral incidents
-              </p>
-            </div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/80 dark:bg-slate-900/80 p-6 md:p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm backdrop-blur-xl">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3.5 bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-2xl border border-indigo-500/20">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+              Student Discipline & Conduct
+            </h1>
+            <p className="text-xs md:text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
+              Track, investigate, log, and communicate student conduct and behavioral reports across the school
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             onClick={exportToCSV}
             variant="outline"
-            className="bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white"
+            className="rounded-2xl font-bold text-xs h-11 px-5 border-slate-200 dark:border-slate-800"
           >
             <Download className="w-4 h-4 mr-2" />
             Export CSV
@@ -474,7 +550,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
               setCreateStep(1);
               setIsCreateOpen(true);
             }}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg shadow-indigo-600/30"
+            className="rounded-2xl font-bold text-xs h-11 px-5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-md shadow-indigo-500/20 border-none"
           >
             <Plus className="w-4 h-4 mr-2" />
             Report Incident
@@ -483,18 +559,18 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
       </div>
 
       {/* Main Tabs Navigation */}
-      <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full">
-        <TabsList className="bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
-          <TabsTrigger value="incidents" className="gap-2">
+      <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full space-y-6">
+        <TabsList className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 inline-flex">
+          <TabsTrigger value="incidents" className="rounded-xl font-bold text-xs h-9 px-4 gap-2">
             <ClipboardList className="w-4 h-4" />
             Incidents Directory
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="gap-2">
+          <TabsTrigger value="analytics" className="rounded-xl font-bold text-xs h-9 px-4 gap-2">
             <BarChart3 className="w-4 h-4" />
             Dashboard & Analytics
           </TabsTrigger>
           {userRole === 'school_admin' && (
-            <TabsTrigger value="categories" className="gap-2">
+            <TabsTrigger value="categories" className="rounded-xl font-bold text-xs h-9 px-4 gap-2">
               <Layers className="w-4 h-4" />
               Custom Categories
             </TabsTrigger>
@@ -502,94 +578,94 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
         </TabsList>
 
         {/* TAB 1: INCIDENTS DIRECTORY */}
-        <TabsContent value="incidents" className="space-y-6 mt-6">
+        <TabsContent value="incidents" className="space-y-6 mt-6 focus-visible:outline-none">
           {/* Quick Metrics Header Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <Card className="border shadow-sm">
-              <CardContent className="p-4 flex items-center justify-between">
+            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl">
+              <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">Total Incidents</p>
-                  <p className="text-2xl font-bold mt-1">{analytics?.total || 0}</p>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Total Incidents</p>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white mt-1">{analytics?.total || 0}</p>
                 </div>
-                <div className="p-2.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 rounded-lg">
-                  <ShieldAlert className="w-5 h-5" />
+                <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-600">
+                  <ShieldAlert className="w-6 h-6" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border shadow-sm">
-              <CardContent className="p-4 flex items-center justify-between">
+            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl">
+              <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">Open Cases</p>
-                  <p className="text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400">
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Open Cases</p>
+                  <p className="text-3xl font-black text-amber-600 dark:text-amber-400 mt-1">
                     {analytics?.openCases || 0}
                   </p>
                 </div>
-                <div className="p-2.5 bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 rounded-lg">
-                  <Clock className="w-5 h-5" />
+                <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-600">
+                  <Clock className="w-6 h-6" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border shadow-sm">
-              <CardContent className="p-4 flex items-center justify-between">
+            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl">
+              <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">Resolved Cases</p>
-                  <p className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Resolved Cases</p>
+                  <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
                     {analytics?.resolvedCases || 0}
                   </p>
                 </div>
-                <div className="p-2.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 rounded-lg">
-                  <CheckCircle2 className="w-5 h-5" />
+                <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600">
+                  <CheckCircle2 className="w-6 h-6" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border shadow-sm">
-              <CardContent className="p-4 flex items-center justify-between">
+            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl">
+              <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">Critical Cases</p>
-                  <p className="text-2xl font-bold mt-1 text-rose-600 dark:text-rose-400">
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Critical Cases</p>
+                  <p className="text-3xl font-black text-rose-600 dark:text-rose-400 mt-1">
                     {analytics?.criticalCases || 0}
                   </p>
                 </div>
-                <div className="p-2.5 bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400 rounded-lg">
-                  <AlertOctagon className="w-5 h-5" />
+                <div className="p-3 rounded-2xl bg-rose-500/10 text-rose-600">
+                  <AlertOctagon className="w-6 h-6" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border shadow-sm col-span-2 md:col-span-1">
-              <CardContent className="p-4 flex items-center justify-between">
+            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl col-span-2 md:col-span-1">
+              <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">This Month</p>
-                  <p className="text-2xl font-bold mt-1 text-indigo-600 dark:text-indigo-400">
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">This Month</p>
+                  <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
                     {analytics?.thisMonth || 0}
                   </p>
                 </div>
-                <div className="p-2.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 rounded-lg">
-                  <Calendar className="w-5 h-5" />
+                <div className="p-3 rounded-2xl bg-blue-500/10 text-blue-600">
+                  <Calendar className="w-6 h-6" />
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Search & Filter Bar */}
-          <Card className="border shadow-sm p-4">
+          <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl p-5">
             <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-3">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <Input
                   placeholder="Search student, student ID, incident title, or reporter..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
+                  className="pl-10 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 h-11 rounded-2xl text-sm font-medium"
                 />
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
                 <Select value={severityFilter} onValueChange={(val) => setSeverityFilter(val)}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-[140px] h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-xs">
                     <SelectValue placeholder="Severity" />
                   </SelectTrigger>
                   <SelectContent>
@@ -602,7 +678,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                 </Select>
 
                 <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val)}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-[140px] h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-xs">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -615,7 +691,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                 </Select>
 
                 <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val)}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[180px] h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-xs">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -628,7 +704,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                   </SelectContent>
                 </Select>
 
-                <Button type="submit" variant="secondary">
+                <Button type="submit" variant="secondary" className="h-11 rounded-2xl px-5 font-bold text-xs">
                   <Filter className="w-4 h-4 mr-2" />
                   Filter
                 </Button>
@@ -637,96 +713,99 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
           </Card>
 
           {/* Incidents Data Table */}
-          <Card className="border shadow-sm overflow-hidden">
+          <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl overflow-hidden">
             {isLoading ? (
               <div className="p-8 space-y-4">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-12 w-full rounded-md" />
+                  <Skeleton key={i} className="h-14 w-full rounded-2xl" />
                 ))}
               </div>
             ) : incidents.length === 0 ? (
-              <div className="p-12 text-center">
-                <ShieldAlert className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
-                <h3 className="text-lg font-semibold">No Discipline Records Found</h3>
-                <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+              <div className="py-20 text-center space-y-3 px-4">
+                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto">
+                  <ShieldAlert className="w-8 h-8 text-slate-400/60" />
+                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase tracking-tight">No Discipline Records Found</h3>
+                <p className="text-xs text-slate-400 font-medium max-w-sm mx-auto">
                   There are no incidents matching your current search and filter criteria.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 dark:bg-slate-900 border-b text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <thead className="bg-slate-50/80 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                     <tr>
-                      <th className="px-4 py-3">Student</th>
-                      <th className="px-4 py-3">Grade & Section</th>
-                      <th className="px-4 py-3">Incident Title & Category</th>
-                      <th className="px-4 py-3">Severity</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3">Parent Notified</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
+                      <th className="px-6 py-4">Student</th>
+                      <th className="px-6 py-4">Grade & Section</th>
+                      <th className="px-6 py-4">Incident Title & Category</th>
+                      <th className="px-6 py-4">Severity</th>
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4">Date</th>
+                      <th className="px-6 py-4">Parent Notified</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {incidents.map((inc) => (
-                      <tr key={inc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors">
-                        <td className="px-4 py-3.5 font-medium">
+                      <tr key={inc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
+                        <td className="px-6 py-4 font-medium">
                           <div>
-                            <p className="font-semibold text-slate-900 dark:text-slate-100">
+                            <p className="font-bold text-slate-900 dark:text-white text-sm">
                               {inc.student?.fullName}
                             </p>
-                            <p className="text-xs text-muted-foreground font-mono">
+                            <p className="text-[11px] text-slate-400 font-mono">
                               ID: {inc.student?.student_id}
                             </p>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-muted-foreground">
+                        <td className="px-6 py-4 text-slate-500 font-medium text-xs">
                           {inc.grade?.name || 'Grade'} - {inc.section?.name || 'Section'}
                         </td>
-                        <td className="px-4 py-3.5">
-                          <p className="font-medium text-slate-900 dark:text-slate-100">{inc.title}</p>
-                          <span className="inline-block mt-0.5 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-slate-900 dark:text-white text-xs">{inc.title}</p>
+                          <span className="inline-block mt-1 text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-lg border border-indigo-500/20">
                             {inc.categoryName}
                           </span>
                         </td>
-                        <td className="px-4 py-3.5">{getSeverityBadge(inc.severity)}</td>
-                        <td className="px-4 py-3.5">{getStatusBadge(inc.status)}</td>
-                        <td className="px-4 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
+                        <td className="px-6 py-4">{getSeverityBadge(inc.severity)}</td>
+                        <td className="px-6 py-4">{getStatusBadge(inc.status)}</td>
+                        <td className="px-6 py-4 text-xs font-medium text-slate-500 whitespace-nowrap">
                           {new Date(inc.date).toLocaleDateString()}
-                          <span className="block text-[11px] opacity-75">{inc.time}</span>
+                          <span className="block text-[10px] text-slate-400">{inc.time}</span>
                         </td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-6 py-4">
                           {inc.parentAcknowledged ? (
-                            <Badge variant="outline" className="border-emerald-500 text-emerald-600 gap-1 text-[11px]">
+                            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 gap-1 text-[10px] font-bold rounded-xl">
                               <UserCheck className="w-3 h-3" /> Acknowledged
                             </Badge>
                           ) : inc.parentNotified ? (
-                            <Badge variant="outline" className="border-indigo-400 text-indigo-600 text-[11px]">
+                            <Badge variant="outline" className="border-indigo-500/30 bg-indigo-500/10 text-indigo-600 text-[10px] font-bold rounded-xl">
                               Sent
                             </Badge>
                           ) : (
-                            <Badge variant="secondary" className="text-[11px]">Pending</Badge>
+                            <Badge variant="secondary" className="text-[10px] font-bold rounded-xl">Pending</Badge>
                           )}
                         </td>
-                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                        <td className="px-6 py-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               size="sm"
                               variant="ghost"
+                              className="rounded-xl font-bold text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
                               onClick={() => {
                                 setSelectedIncident(inc);
                                 setFollowUpStatus(inc.status);
                                 setIsDetailOpen(true);
                               }}
                             >
-                              <Eye className="w-4 h-4 mr-1 text-indigo-600" />
+                              <Eye className="w-4 h-4 mr-1.5" />
                               Details
                             </Button>
                             {userRole === 'school_admin' && (
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                className="rounded-xl text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                                 onClick={() => handleDeleteIncident(inc.id)}
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -743,8 +822,8 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="p-4 border-t flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
+              <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-medium">
+                <span className="text-slate-400">
                   Showing page {page} of {totalPages} ({total} total records)
                 </span>
                 <div className="flex items-center gap-2">
@@ -753,6 +832,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                     size="sm"
                     disabled={page <= 1}
                     onClick={() => setPage((p) => p - 1)}
+                    className="rounded-xl font-bold text-xs"
                   >
                     <ChevronLeft className="w-4 h-4 mr-1" />
                     Previous
@@ -762,6 +842,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                     size="sm"
                     disabled={page >= totalPages}
                     onClick={() => setPage((p) => p + 1)}
+                    className="rounded-xl font-bold text-xs"
                   >
                     Next
                     <ChevronRight className="w-4 h-4 ml-1" />
@@ -773,30 +854,33 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
         </TabsContent>
 
         {/* TAB 2: ANALYTICS DASHBOARD */}
-        <TabsContent value="analytics" className="space-y-6 mt-6">
+        <TabsContent value="analytics" className="space-y-6 mt-6 focus-visible:outline-none">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Top Categories Card */}
-            <Card className="border shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-100 dark:border-slate-800 rounded-3xl shadow-sm">
+              <CardHeader className="p-6">
+                <CardTitle className="text-base font-black uppercase tracking-tight flex items-center gap-2 text-slate-900 dark:text-white">
+                  <Sparkles className="w-4 h-4 text-indigo-500" />
                   Incidents by Category
                 </CardTitle>
-                <CardDescription>Breakdown of discipline types</CardDescription>
+                <CardDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">Breakdown of discipline types</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {analytics?.byCategory?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No data available</p>
+              <CardContent className="px-6 pb-6 space-y-3">
+                {!analytics?.byCategory || analytics.byCategory.length === 0 ? (
+                  <div className="py-8 text-center space-y-2">
+                    <Sparkles className="w-6 h-6 text-slate-400 mx-auto opacity-40" />
+                    <p className="text-xs text-slate-400 font-medium">No category breakdown data yet</p>
+                  </div>
                 ) : (
-                  analytics?.byCategory?.map((item) => (
-                    <div key={item.name} className="space-y-1">
-                      <div className="flex justify-between text-xs font-medium">
-                        <span>{item.name}</span>
-                        <span className="text-muted-foreground">{item.value}</span>
+                  analytics.byCategory.map((item) => (
+                    <div key={item.name} className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-slate-800 dark:text-slate-200">{item.name}</span>
+                        <span className="text-slate-400 font-mono">{item.value}</span>
                       </div>
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
                         <div
-                          className="bg-indigo-600 h-full rounded-full"
+                          className="bg-indigo-600 h-full rounded-full transition-all duration-500"
                           style={{
                             width: `${Math.min(100, (item.value / (analytics?.total || 1)) * 100)}%`
                           }}
@@ -809,25 +893,28 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
             </Card>
 
             {/* Repeat Offenders Card */}
-            <Card className="border shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-100 dark:border-slate-800 rounded-3xl shadow-sm">
+              <CardHeader className="p-6">
+                <CardTitle className="text-base font-black uppercase tracking-tight flex items-center gap-2 text-slate-900 dark:text-white">
                   <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  Students with Repeated Incidents
+                  Repeated Incidents
                 </CardTitle>
-                <CardDescription>Students requiring intervention</CardDescription>
+                <CardDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">Students requiring intervention</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {analytics?.repeatOffenders?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No repeat offenders recorded</p>
+              <CardContent className="px-6 pb-6 space-y-3">
+                {!analytics?.repeatOffenders || analytics.repeatOffenders.length === 0 ? (
+                  <div className="py-8 text-center space-y-2">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto opacity-50" />
+                    <p className="text-xs text-slate-400 font-medium">No repeat offenders recorded</p>
+                  </div>
                 ) : (
-                  analytics?.repeatOffenders?.map((item) => (
-                    <div key={item.student.id} className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900 rounded-lg border">
+                  analytics.repeatOffenders.map((item) => (
+                    <div key={item.student.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
                       <div>
-                        <p className="font-semibold text-xs">{item.student.fullName}</p>
-                        <p className="text-[11px] text-muted-foreground">ID: {item.student.student_id}</p>
+                        <p className="font-bold text-xs text-slate-900 dark:text-white">{item.student.fullName}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">ID: {item.student.student_id}</p>
                       </div>
-                      <Badge variant="destructive" className="font-bold">
+                      <Badge variant="destructive" className="font-bold rounded-xl text-[10px]">
                         {item.count} Incidents
                       </Badge>
                     </div>
@@ -837,62 +924,103 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
             </Card>
 
             {/* Top Reporting Teachers Card */}
-            <Card className="border shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <User className="w-4 h-4 text-blue-600" />
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-100 dark:border-slate-800 rounded-3xl shadow-sm">
+              <CardHeader className="p-6">
+                <CardTitle className="text-base font-black uppercase tracking-tight flex items-center gap-2 text-slate-900 dark:text-white">
+                  <User className="w-4 h-4 text-blue-500" />
                   Top Reporting Staff
                 </CardTitle>
-                <CardDescription>Staff members reporting incidents</CardDescription>
+                <CardDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">Staff members reporting incidents</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {analytics?.topReporters?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No data available</p>
+              <CardContent className="px-6 pb-6 space-y-3">
+                {!analytics?.topReporters || analytics.topReporters.length === 0 ? (
+                  <div className="py-8 text-center space-y-2">
+                    <User className="w-6 h-6 text-slate-400 mx-auto opacity-40" />
+                    <p className="text-xs text-slate-400 font-medium">No staff reports logged yet</p>
+                  </div>
                 ) : (
-                  analytics?.topReporters?.map((rep) => (
-                    <div key={rep.name} className="flex items-center justify-between text-xs p-2 rounded bg-slate-50 dark:bg-slate-900">
-                      <span className="font-medium">{rep.name}</span>
-                      <Badge variant="secondary">{rep.count} reports</Badge>
+                  analytics.topReporters.map((rep) => (
+                    <div key={rep.name} className="flex items-center justify-between text-xs p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                      <span className="font-bold text-slate-900 dark:text-white">{rep.name}</span>
+                      <Badge variant="secondary" className="font-bold rounded-xl text-[10px]">{rep.count} reports</Badge>
                     </div>
                   ))
                 )}
               </CardContent>
             </Card>
           </div>
+
+          {/* Monthly Trend Bar Chart Card */}
+          <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl p-6">
+            <CardHeader className="p-0 pb-4">
+              <CardTitle className="text-lg font-black uppercase tracking-tight flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-indigo-600" />
+                Monthly Discipline Incident Trend
+              </CardTitle>
+              <CardDescription className="text-xs font-medium">Incident distribution over time across months</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 pt-4">
+              {!analytics?.monthlyMap || Object.keys(analytics.monthlyMap).length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-8">No monthly trend data logged yet.</p>
+              ) : (
+                <div className="flex items-end gap-3 h-48 pt-6 border-b border-slate-100 dark:border-slate-800 px-2 overflow-x-auto">
+                  {Object.entries(analytics.monthlyMap).map(([month, count]) => {
+                    const maxVal = Math.max(...Object.values(analytics.monthlyMap), 1);
+                    const heightPct = Math.max(12, Math.round((count / maxVal) * 100));
+                    return (
+                      <div key={month} className="flex-1 flex flex-col items-center gap-2 group min-w-[40px]">
+                        <span className="text-[10px] font-bold font-mono text-slate-400 group-hover:text-indigo-600">{count}</span>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800/80 rounded-t-xl overflow-hidden flex items-end h-32">
+                          <div
+                            className="w-full bg-gradient-to-t from-indigo-600 to-violet-500 rounded-t-xl group-hover:from-indigo-500 group-hover:to-violet-400 transition-all duration-300"
+                            style={{ height: `${heightPct}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">{month}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* TAB 3: CUSTOM CATEGORIES (Admin Only) */}
         {userRole === 'school_admin' && (
-          <TabsContent value="categories" className="space-y-6 mt-6">
-            <Card className="border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
+          <TabsContent value="categories" className="space-y-6 mt-6 focus-visible:outline-none">
+            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl">
+              <CardHeader className="p-6 flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg font-semibold">Discipline Categories</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-xl font-black uppercase tracking-tight">Discipline Categories</CardTitle>
+                  <CardDescription className="text-xs font-medium">
                     Manage default and custom discipline categories for your school
                   </CardDescription>
                 </div>
-                <Button onClick={() => setIsCategoryModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-500">
+                <Button
+                  onClick={() => setIsCategoryModalOpen(true)}
+                  className="rounded-2xl font-bold text-xs h-11 px-5 bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Custom Category
                 </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6 pt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {categories.map((cat) => (
                     <div
                       key={cat.id || cat.name}
-                      className="p-4 border rounded-xl bg-slate-50/50 dark:bg-slate-900/50 flex items-start justify-between"
+                      className="p-5 border border-slate-100 dark:border-slate-800 rounded-3xl bg-white dark:bg-slate-950 flex items-start justify-between"
                     >
                       <div>
                         <div className="flex items-center gap-2">
                           <Tag className="w-4 h-4 text-indigo-600" />
-                          <h4 className="font-semibold text-sm">{cat.name}</h4>
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white">{cat.name}</h4>
                         </div>
                         {cat.description && (
-                          <p className="text-xs text-muted-foreground mt-1">{cat.description}</p>
+                          <p className="text-xs text-slate-500 font-medium mt-1">{cat.description}</p>
                         )}
-                        <span className="inline-block mt-2 text-[10px] uppercase font-bold text-slate-500">
+                        <span className="inline-block mt-3 text-[9px] uppercase font-black tracking-wider text-slate-400">
                           {cat.isDefault ? 'Standard Default' : 'School Custom'}
                         </span>
                       </div>
@@ -901,7 +1029,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/40"
+                          className="rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                           onClick={() => handleDeleteCategory(cat.id)}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -917,22 +1045,54 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
       </Tabs>
 
       {/* CREATE INCIDENT MULTI-STEP WIZARD MODAL */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog
+        open={isCreateOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            // Reset wizard state on close
+            setCreateStep(1);
+            setStudentSearch('');
+            setStudents([]);
+            setPreviewStudent(null);
+            setShowStudentResults(false);
+            setStudentSearchSubmitted(false);
+            setFormData({
+              studentId: '',
+              selectedStudentName: '',
+              selectedStudentGrade: '',
+              date: new Date().toISOString().split('T')[0],
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+              categoryName: 'Classroom Misbehavior',
+              categoryId: '',
+              severity: 'LOW',
+              title: '',
+              description: '',
+              location: '',
+              witnessesText: '',
+              immediateAction: '',
+              evidence: [],
+              parentNotified: true,
+              followUpDate: ''
+            });
+          }
+          setIsCreateOpen(open);
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-slate-100 dark:border-slate-800 shadow-2xl p-6 md:p-8">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-indigo-600" />
+            <DialogTitle className="flex items-center gap-2 text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+              <ShieldAlert className="w-6 h-6 text-indigo-600" />
               Report Discipline Incident (Step {createStep} of 5)
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs font-medium">
               Follow the wizard to file an official discipline report and notify parents
             </DialogDescription>
           </DialogHeader>
 
           {/* Step Indicator Progress Bar */}
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden my-2">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden my-3">
             <div
-              className="bg-indigo-600 h-full transition-all duration-300"
+              className="bg-indigo-600 h-full transition-all duration-300 rounded-full"
               style={{ width: `${(createStep / 5) * 100}%` }}
             />
           </div>
@@ -940,45 +1100,187 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
           {/* STEP 1: STUDENT SELECTION */}
           {createStep === 1 && (
             <div className="space-y-4 py-2">
-              <Label className="text-sm font-semibold">Step 1: Select Student</Label>
-              <Input
-                placeholder="Search student by name or student ID..."
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-              />
+              <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Step 1: Search & Confirm Student</Label>
 
-              {isLoadingStudents ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">Loading students...</div>
-              ) : students.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">No students found</div>
-              ) : (
-                <div className="max-h-60 overflow-y-auto border rounded-lg divide-y">
-                  {students.map((st) => (
-                    <div
-                      key={st.id}
+              {/* Search Row */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    placeholder="Type student name or ID number..."
+                    value={studentSearch}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setStudentSearch(val);
+                      // Always clear stale results immediately — never show old data
+                      setStudents([]);
+                      if (previewStudent) setPreviewStudent(null);
+                      if (!val.trim()) {
+                        setShowStudentResults(false);
+                        setStudentSearchSubmitted(false);
+                      } else {
+                        setShowStudentResults(true);
+                        setStudentSearchSubmitted(true);
+                      }
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); fetchStudents(studentSearch); }}}
+                    className="pl-10 h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-semibold text-sm"
+                    autoFocus
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => fetchStudents(studentSearch)}
+                  disabled={!studentSearch.trim() || isLoadingStudents}
+                  className="h-11 px-5 rounded-2xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white text-xs shrink-0"
+                >
+                  {isLoadingStudents ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                </Button>
+              </div>
+
+              {/* Search Results Dropdown */}
+              {showStudentResults && !previewStudent && (
+                <div className="border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                  {isLoadingStudents ? (
+                    <div className="flex items-center justify-center gap-2 py-8 text-xs font-bold text-slate-400">
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Searching students...
+                    </div>
+                  ) : students.length === 0 ? (
+                    <div className="py-8 text-center space-y-2">
+                      <Search className="w-6 h-6 text-slate-300 mx-auto" />
+                      <p className="text-xs font-bold text-slate-400">No students found for <span className="text-slate-600 dark:text-slate-300">"{studentSearch}"</span></p>
+                      <p className="text-[11px] text-slate-400">Try a different name, or student ID number</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-52 overflow-y-auto">
+                      {students.map((st) => (
+                        <div
+                          key={st.id}
+                          onClick={() => {
+                            setPreviewStudent(st);
+                            setShowStudentResults(false);
+                          }}
+                          className="flex items-center gap-3 p-3.5 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors group"
+                        >
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-400 to-violet-600 flex items-center justify-center shrink-0 shadow">
+                            <span className="text-sm font-black text-white">{(st.fullName || st.name || '?').charAt(0).toUpperCase()}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-slate-900 dark:text-white truncate">{st.fullName || st.name}</p>
+                            <p className="text-[11px] text-slate-400 font-mono">
+                              ID: {st.student_id} · {st.grade?.name || st.grade || ''} {st.section?.name || st.section || ''}
+                              {(st.stream?.name || st.stream) ? ` · Stream ${st.stream?.name || st.stream}` : ''}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Full Student Profile Card (same layout as Student Management profile) */}
+              {previewStudent && (
+                <div className="border border-indigo-200 dark:border-indigo-800 rounded-3xl overflow-hidden shadow-lg">
+                  {/* Profile Header */}
+                  <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 pt-5 pb-4">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 rounded-t-3xl" />
+                    <button
+                      type="button"
+                      onClick={() => { setPreviewStudent(null); setShowStudentResults(true); }}
+                      className="absolute top-3.5 right-3.5 text-white/50 hover:text-white transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <div className="flex items-center gap-3 pr-8">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-400 to-violet-600 flex items-center justify-center shadow-lg shrink-0">
+                        <span className="text-xl font-black text-white">{(previewStudent.fullName || previewStudent.name || '?').charAt(0).toUpperCase()}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-base font-black text-white truncate">{previewStudent.fullName || previewStudent.name}</h3>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-white/50 bg-white/10 px-2 py-0.5 rounded-full border border-white/10">Student</span>
+                          <code className="text-[11px] font-mono text-indigo-400 bg-indigo-400/10 border border-indigo-400/20 px-2 py-0.5 rounded-full">{previewStudent.student_id}</code>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Quick chips */}
+                    <div className="flex gap-2 mt-3 flex-wrap">
+                      {[
+                        { label: previewStudent.grade?.name || previewStudent.grade || '—', sub: 'Grade' },
+                        { label: previewStudent.section?.name || previewStudent.section || '—', sub: 'Section' },
+                        { label: previewStudent.gender || '—', sub: 'Gender' },
+                        ...((previewStudent.stream?.name || previewStudent.stream) ? [{ label: previewStudent.stream?.name || previewStudent.stream, sub: 'Stream' }] : []),
+                      ].map((chip) => (
+                        <div key={chip.sub} className="flex flex-col items-center bg-white/8 border border-white/10 rounded-xl px-3 py-1.5 min-w-[54px]">
+                          <span className="text-[11px] font-black text-white/90 leading-none">{chip.label}</span>
+                          <span className="text-[9px] font-bold uppercase text-white/40 tracking-widest mt-0.5">{chip.sub}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Profile Body */}
+                  <div className="bg-white dark:bg-slate-950 p-4 space-y-3">
+                    {/* Student Details */}
+                    <div className="rounded-2xl border border-slate-100 dark:border-slate-900 overflow-hidden divide-y divide-slate-100 dark:divide-slate-900">
+                      {[
+                        { icon: <Calendar className="w-3.5 h-3.5 opacity-50" />, label: 'Date of Birth', value: previewStudent.date_of_birth || 'Not set' },
+                        ...(previewStudent.address ? [{ icon: <GraduationCap className="w-3.5 h-3.5 opacity-50" />, label: 'Address', value: previewStudent.address }] : []),
+                      ].map((row) => (
+                        <div key={row.label} className="flex justify-between items-center px-3.5 py-2.5 bg-slate-50/60 dark:bg-slate-900/40">
+                          <span className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">{row.icon}{row.label}</span>
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 text-right max-w-[55%] truncate">{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Parent / Guardian */}
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 px-0.5 pt-1">Parent / Guardian</p>
+                    <div className="rounded-2xl border border-slate-100 dark:border-slate-900 overflow-hidden divide-y divide-slate-100 dark:divide-slate-900">
+                      {[
+                        { icon: <Users className="w-3.5 h-3.5 opacity-50" />, label: 'Name', value: previewStudent.parent_name },
+                        { icon: <Phone className="w-3.5 h-3.5 opacity-50" />, label: 'Phone', value: previewStudent.parent_phone },
+                        { icon: <Mail className="w-3.5 h-3.5 opacity-50" />, label: 'Email', value: previewStudent.parent_email || 'No email' },
+                        { icon: <ShieldCheck className="w-3.5 h-3.5 opacity-50" />, label: 'Relationship', value: previewStudent.relationshipType || 'Guardian' },
+                      ].map((row) => (
+                        <div key={row.label} className="flex justify-between items-center px-3.5 py-2.5 bg-slate-50/60 dark:bg-slate-900/40">
+                          <span className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">{row.icon}{row.label}</span>
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 text-right max-w-[55%] truncate">{row.value || 'N/A'}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Confirm Button */}
+                    <Button
+                      type="button"
                       onClick={() => {
+                        const st = previewStudent;
                         setFormData((prev) => ({
                           ...prev,
                           studentId: st.id,
-                          selectedStudentName: st.fullName,
-                          selectedStudentGrade: `${st.grade?.name || ''} - ${st.section?.name || ''}`
+                          selectedStudentName: st.fullName || st.name,
+                          selectedStudentGrade: `${st.grade?.name || st.grade || ''} – ${st.section?.name || st.section || ''}${(st.stream?.name || st.stream) ? ` · Stream ${st.stream?.name || st.stream}` : ''}`
                         }));
+                        setCreateStep(2);
                       }}
-                      className={`p-3 text-sm cursor-pointer flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${
-                        formData.studentId === st.id ? 'bg-indigo-50 dark:bg-indigo-950/60 border-l-4 border-indigo-600 font-semibold' : ''
-                      }`}
+                      className="w-full h-11 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm gap-2"
                     >
-                      <div>
-                        <p className="text-slate-900 dark:text-slate-100 font-medium">{st.fullName}</p>
-                        <p className="text-xs text-muted-foreground font-mono">
-                          ID: {st.student_id} | Class: {st.grade?.name || ''} {st.section?.name || ''}
-                        </p>
-                      </div>
-                      {formData.studentId === st.id && (
-                        <CheckCircle2 className="w-5 h-5 text-indigo-600" />
-                      )}
-                    </div>
-                  ))}
+                      <CheckCircle2 className="w-4 h-4" />
+                      Confirm – Use This Student
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* No search yet - idle hint */}
+              {!showStudentResults && !previewStudent && (
+                <div className="py-8 text-center space-y-2">
+                  <Search className="w-8 h-8 text-slate-200 dark:text-slate-700 mx-auto" />
+                  <p className="text-xs font-bold text-slate-400">Search by student name or ID to begin</p>
+                  <p className="text-[11px] text-slate-400">e.g. "Abel Tesfaye" or "STU-2024-001"</p>
                 </div>
               )}
             </div>
@@ -987,39 +1289,42 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
           {/* STEP 2: INCIDENT DETAILS */}
           {createStep === 2 && (
             <div className="space-y-4 py-2">
-              <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg text-xs border">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">Selected Student: </span>
-                {formData.selectedStudentName} ({formData.selectedStudentGrade})
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl text-xs border border-slate-100 dark:border-slate-800">
+                <span className="font-bold text-slate-500 uppercase tracking-wider block mb-1">Selected Student</span>
+                <span className="font-black text-slate-900 dark:text-white text-sm">{formData.selectedStudentName}</span> ({formData.selectedStudentGrade})
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Date</Label>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Date</Label>
                   <Input
                     type="date"
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label>Time</Label>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Time</Label>
                   <Input
                     type="text"
                     placeholder="e.g. 10:25 AM"
                     value={formData.time}
                     onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                    className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Category</Label>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Category</Label>
                   <Select
                     value={formData.categoryName}
                     onValueChange={(val) => {
-                      const matched = categories.find((c) => c.name === val);
+                      const activeCats = categories.length > 0 ? categories : DEFAULT_FALLBACK_CATEGORIES;
+                      const matched = activeCats.find((c) => c.name === val);
                       setFormData({
                         ...formData,
                         categoryName: val,
@@ -1027,11 +1332,11 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                       });
                     }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm">
                       <SelectValue placeholder="Select Category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((c) => (
+                      {(categories.length > 0 ? categories : DEFAULT_FALLBACK_CATEGORIES).map((c) => (
                         <SelectItem key={c.id || c.name} value={c.name}>
                           {c.name}
                         </SelectItem>
@@ -1040,13 +1345,13 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                   </Select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label>Severity Level</Label>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Severity Level</Label>
                   <Select
                     value={formData.severity}
                     onValueChange={(val: any) => setFormData({ ...formData, severity: val })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm">
                       <SelectValue placeholder="Select Severity" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1059,40 +1364,43 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label>Incident Title *</Label>
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Incident Title *</Label>
                 <Input
                   placeholder="e.g. Disrespectful behavior towards teacher during class"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label>Detailed Description *</Label>
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Detailed Description *</Label>
                 <Textarea
                   placeholder="Provide complete facts, student statements, and observation context..."
-                  rows={4}
+                  className="min-h-[120px] rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-sm font-medium"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Incident Location</Label>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Incident Location</Label>
                   <Input
                     placeholder="e.g. Science Lab B"
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Witnesses (comma separated)</Label>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Witnesses (comma separated)</Label>
                   <Input
                     placeholder="e.g. Mr. Abebe, Sara T."
                     value={formData.witnessesText}
                     onChange={(e) => setFormData({ ...formData, witnessesText: e.target.value })}
+                    className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm"
                   />
                 </div>
               </div>
@@ -1102,12 +1410,12 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
           {/* STEP 3: EVIDENCE ATTACHMENTS */}
           {createStep === 3 && (
             <div className="space-y-4 py-2">
-              <Label className="text-sm font-semibold">Attach Evidence (Images, PDF, Video, Documents)</Label>
-              <p className="text-xs text-muted-foreground">
+              <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Attach Evidence Files</Label>
+              <p className="text-xs text-slate-400 font-medium">
                 Upload photos of physical evidence, handwritten notes, or PDF records.
               </p>
 
-              <div className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
+              <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-950/50 transition-colors">
                 <input
                   type="file"
                   multiple
@@ -1118,30 +1426,30 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                 />
                 <label htmlFor="evidence-upload-input" className="cursor-pointer">
                   <Paperclip className="w-8 h-8 text-indigo-600 mx-auto mb-2" />
-                  <p className="text-sm font-medium">Click to upload evidence files</p>
-                  <p className="text-xs text-muted-foreground mt-1">Supports PNG, JPG, PDF, MP4 up to 50MB</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">Click to upload evidence files</p>
+                  <p className="text-xs text-slate-400 mt-1">Supports PNG, JPG, PDF, MP4 up to 50MB</p>
                 </label>
               </div>
 
-              {isUploading && <p className="text-xs text-indigo-600 animate-pulse">Attaching files...</p>}
+              {isUploading && <p className="text-xs font-bold text-indigo-600 animate-pulse text-center">Attaching files...</p>}
 
               {formData.evidence.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-muted-foreground">Attached Files ({formData.evidence.length})</h4>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">Attached Files ({formData.evidence.length})</h4>
                   <div className="space-y-2">
                     {formData.evidence.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2.5 border rounded-lg bg-slate-50 dark:bg-slate-900 text-xs">
+                      <div key={idx} className="flex items-center justify-between p-3 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950 text-xs">
                         <div className="flex items-center gap-2 truncate">
                           <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
-                          <span className="truncate font-medium">{file.name}</span>
+                          <span className="truncate font-bold text-slate-900 dark:text-white">{file.name}</span>
                         </div>
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/40 h-7 w-7"
+                          className="rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 h-8 w-8"
                           onClick={() => handleRemoveEvidence(idx)}
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4" />
                         </Button>
                       </div>
                     ))}
@@ -1149,12 +1457,13 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                 </div>
               )}
 
-              <div className="space-y-1.5 pt-2">
-                <Label>Immediate Action Taken</Label>
+              <div className="space-y-2 pt-2">
+                <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Immediate Action Taken</Label>
                 <Input
                   placeholder="e.g. Student sent to homeroom counselor / temporary removal from lab"
                   value={formData.immediateAction}
                   onChange={(e) => setFormData({ ...formData, immediateAction: e.target.value })}
+                  className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm"
                 />
               </div>
             </div>
@@ -1163,32 +1472,34 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
           {/* STEP 4: PARENT NOTIFICATION */}
           {createStep === 4 && (
             <div className="space-y-4 py-2">
-              <Label className="text-sm font-semibold">Step 4: Parent Notification Options</Label>
+              <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Step 4: Parent Notification Options</Label>
 
-              <div className="p-4 border rounded-xl bg-slate-50 dark:bg-slate-900 space-y-3">
+              <div className="p-5 border border-slate-100 dark:border-slate-800 rounded-3xl bg-white dark:bg-slate-950 space-y-3">
                 <div className="flex items-start space-x-3">
                   <Checkbox
                     id="notify-parent-check"
                     checked={formData.parentNotified}
                     onCheckedChange={(checked) => setFormData({ ...formData, parentNotified: Boolean(checked) })}
+                    className="mt-1 rounded-lg"
                   />
                   <div>
-                    <label htmlFor="notify-parent-check" className="text-sm font-semibold cursor-pointer">
+                    <label htmlFor="notify-parent-check" className="text-sm font-bold text-slate-900 dark:text-white cursor-pointer">
                       Send Instant Push & Portal Notification to Linked Parent
                     </label>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-slate-400 font-medium mt-1">
                       Parents will receive a push notification on Zetime Parent app detailing this report and will be prompted to acknowledge receipt.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-1.5 pt-2">
-                <Label>Scheduled Follow-up Date (Optional)</Label>
+              <div className="space-y-2 pt-2">
+                <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Scheduled Follow-up Date (Optional)</Label>
                 <Input
                   type="date"
                   value={formData.followUpDate}
                   onChange={(e) => setFormData({ ...formData, followUpDate: e.target.value })}
+                  className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm"
                 />
               </div>
             </div>
@@ -1197,81 +1508,105 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
           {/* STEP 5: REVIEW & SAVE */}
           {createStep === 5 && (
             <div className="space-y-4 py-2">
-              <h3 className="text-sm font-semibold border-b pb-2">Step 5: Review & Save Incident Report</h3>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 border-b border-slate-100 dark:border-slate-800 pb-2">
+                Step 5: Review & Save Incident Report
+              </h3>
 
               <div className="space-y-3 text-xs">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-900">
-                    <span className="text-muted-foreground block">Student</span>
-                    <span className="font-semibold">{formData.selectedStudentName}</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                    <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Student</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{formData.selectedStudentName}</span>
                   </div>
-                  <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-900">
-                    <span className="text-muted-foreground block">Severity</span>
+                  <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                    <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Severity</span>
                     {getSeverityBadge(formData.severity)}
                   </div>
-                  <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-900">
-                    <span className="text-muted-foreground block">Category</span>
-                    <span className="font-semibold">{formData.categoryName}</span>
+                  <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                    <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Category</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{formData.categoryName}</span>
                   </div>
-                  <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-900">
-                    <span className="text-muted-foreground block">Date & Time</span>
-                    <span className="font-semibold">{formData.date} at {formData.time}</span>
+                  <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                    <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Date & Time</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{formData.date} at {formData.time}</span>
                   </div>
                 </div>
 
-                <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-900">
-                  <span className="text-muted-foreground block font-semibold mb-1">Title</span>
-                  <p className="text-slate-900 dark:text-slate-100 font-medium">{formData.title}</p>
+                <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                  <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Title</span>
+                  <p className="text-slate-900 dark:text-white font-bold">{formData.title}</p>
                 </div>
 
-                <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-900">
-                  <span className="text-muted-foreground block font-semibold mb-1">Description</span>
-                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{formData.description}</p>
+                <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                  <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Description</span>
+                  <p className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{formData.description}</p>
                 </div>
               </div>
             </div>
           )}
 
           {/* Dialog Navigation Buttons */}
-          <DialogFooter className="flex items-center justify-between gap-2 pt-4 border-t">
+          <DialogFooter className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
             {createStep > 1 ? (
-              <Button variant="outline" onClick={() => setCreateStep((s) => s - 1)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (createStep === 2) {
+                    // Going back to Step 1 – restore search + preview
+                    setPreviewStudent(null);
+                    setShowStudentResults(students.length > 0);
+                    setFormData((p) => ({ ...p, studentId: '', selectedStudentName: '', selectedStudentGrade: '' }));
+                  }
+                  setCreateStep((s) => s - 1);
+                }}
+                className="rounded-2xl font-bold text-xs h-11 px-5"
+              >
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Back
               </Button>
             ) : <div />}
 
-            {createStep < 5 ? (
+            {/* Step 1 has no Next – confirmation is handled by the card button */}
+            {createStep > 1 && createStep < 5 ? (
               <Button
                 onClick={() => {
-                  if (createStep === 1 && !formData.studentId) {
-                    toast.error('Please select a student first');
-                    return;
-                  }
                   if (createStep === 2 && (!formData.title || !formData.description)) {
                     toast.error('Please provide a title and description');
                     return;
                   }
                   setCreateStep((s) => s + 1);
                 }}
-                className="bg-indigo-600 hover:bg-indigo-500"
+                className="rounded-2xl font-bold text-xs h-11 px-6 bg-indigo-600 hover:bg-indigo-700 text-white"
               >
                 Next
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
-            ) : (
-              <Button onClick={handleCreateIncidentSubmit} className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">
-                <Check className="w-4 h-4 mr-1" />
-                Submit Incident Report
+            ) : createStep === 5 ? (
+              <Button
+                onClick={handleCreateIncidentSubmit}
+                disabled={isSubmittingIncident}
+                className="rounded-2xl font-bold text-xs h-11 px-6 bg-emerald-600 hover:bg-emerald-700 text-white transition-all disabled:opacity-75 disabled:cursor-not-allowed min-w-[180px]"
+              >
+                {isSubmittingIncident ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Submitting Report...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-1.5" />
+                    Submit Incident Report
+                  </>
+                )}
               </Button>
-            )}
+            ) : <div />}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* INCIDENT DETAIL DRAWER / MODAL */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-slate-100 dark:border-slate-800 shadow-2xl p-6 md:p-8">
           {selectedIncident && (
             <div className="space-y-6">
               <DialogHeader>
@@ -1280,26 +1615,27 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                     {getSeverityBadge(selectedIncident.severity)}
                     {getStatusBadge(selectedIncident.status)}
                   </div>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs font-mono text-slate-400">
                     ID: {selectedIncident.id.slice(0, 8)}
                   </span>
                 </div>
-                <DialogTitle className="text-xl font-bold mt-2">
+                <DialogTitle className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight mt-2">
                   {selectedIncident.title}
                 </DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground">
-                  Reported by <span className="font-semibold text-slate-900 dark:text-slate-100">{selectedIncident.reportedByName || 'Staff'}</span> on {new Date(selectedIncident.date).toLocaleDateString()} at {selectedIncident.time}
+                <DialogDescription className="text-xs font-medium text-slate-500">
+                  Reported by <span className="font-bold text-slate-900 dark:text-slate-100">{selectedIncident.reportedByName || 'Staff'}</span> on {new Date(selectedIncident.date).toLocaleDateString()} at {selectedIncident.time}
                 </DialogDescription>
               </DialogHeader>
 
               {/* Status Update Quick Bar (Admin / Teacher) */}
-              <div className="p-3 bg-slate-100 dark:bg-slate-900 rounded-xl flex items-center justify-between text-xs">
-                <span className="font-medium text-muted-foreground">Change Incident Status:</span>
-                <div className="flex items-center gap-2">
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <span className="font-bold text-slate-500 uppercase tracking-wider">Change Status:</span>
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     size="sm"
                     variant={selectedIncident.status === 'OPEN' ? 'default' : 'outline'}
                     onClick={() => handleStatusChange('OPEN')}
+                    className="rounded-xl font-bold text-xs h-8"
                   >
                     Open
                   </Button>
@@ -1307,6 +1643,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                     size="sm"
                     variant={selectedIncident.status === 'UNDER_REVIEW' ? 'default' : 'outline'}
                     onClick={() => handleStatusChange('UNDER_REVIEW')}
+                    className="rounded-xl font-bold text-xs h-8"
                   >
                     Under Review
                   </Button>
@@ -1314,6 +1651,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                     size="sm"
                     variant={selectedIncident.status === 'RESOLVED' ? 'default' : 'outline'}
                     onClick={() => handleStatusChange('RESOLVED')}
+                    className="rounded-xl font-bold text-xs h-8"
                   >
                     Resolved
                   </Button>
@@ -1321,6 +1659,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                     size="sm"
                     variant={selectedIncident.status === 'CLOSED' ? 'default' : 'outline'}
                     onClick={() => handleStatusChange('CLOSED')}
+                    className="rounded-xl font-bold text-xs h-8"
                   >
                     Closed
                   </Button>
@@ -1328,55 +1667,59 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
               </div>
 
               {/* Detailed Student & Incident Metadata Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 border rounded-lg">
-                  <span className="text-muted-foreground block">Student</span>
-                  <span className="font-semibold">{selectedIncident.student?.fullName}</span>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
+                <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                  <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Student</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{selectedIncident.student?.fullName}</span>
                 </div>
-                <div className="p-3 border rounded-lg">
-                  <span className="text-muted-foreground block">Student ID</span>
-                  <span className="font-mono">{selectedIncident.student?.student_id}</span>
+                <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                  <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Student ID</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-300">{selectedIncident.student?.student_id}</span>
                 </div>
-                <div className="p-3 border rounded-lg">
-                  <span className="text-muted-foreground block">Grade & Section</span>
-                  <span>{selectedIncident.grade?.name} {selectedIncident.section?.name}</span>
+                <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                  <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Grade & Section</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{selectedIncident.grade?.name} {selectedIncident.section?.name}</span>
                 </div>
-                <div className="p-3 border rounded-lg">
-                  <span className="text-muted-foreground block">Category</span>
-                  <span className="font-semibold text-indigo-600">{selectedIncident.categoryName}</span>
+                <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                  <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Stream (11/12)</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{selectedIncident.stream?.name || 'General / N/A'}</span>
+                </div>
+                <div className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950">
+                  <span className="text-slate-400 font-black uppercase text-[9px] block mb-1">Category</span>
+                  <span className="font-bold text-indigo-600">{selectedIncident.categoryName}</span>
                 </div>
               </div>
 
               {/* Description */}
-              <div className="p-4 border rounded-xl bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Detailed Description</h4>
-                <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
+              <div className="p-5 border border-slate-100 dark:border-slate-800 rounded-3xl bg-white dark:bg-slate-950 space-y-2">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Detailed Description</h4>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
                   {selectedIncident.description}
                 </p>
               </div>
 
               {/* Actions & Immediate Response */}
               {selectedIncident.immediateAction && (
-                <div className="p-3 border border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-xl space-y-1">
-                  <h4 className="text-xs font-semibold text-indigo-900 dark:text-indigo-300">Immediate Action Taken</h4>
-                  <p className="text-xs text-indigo-800 dark:text-indigo-200">{selectedIncident.immediateAction}</p>
+                <div className="p-4 border border-indigo-500/20 bg-indigo-500/10 rounded-2xl space-y-1">
+                  <h4 className="text-xs font-bold text-indigo-900 dark:text-indigo-300">Immediate Action Taken</h4>
+                  <p className="text-xs text-indigo-800 dark:text-indigo-200 font-medium">{selectedIncident.immediateAction}</p>
                 </div>
               )}
 
               {/* Evidence Attachments */}
               {selectedIncident.evidence && Array.isArray(selectedIncident.evidence) && selectedIncident.evidence.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evidence Attachments ({selectedIncident.evidence.length})</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Evidence Attachments ({selectedIncident.evidence.length})</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {selectedIncident.evidence.map((att: any, idx: number) => (
                       <div
                         key={idx}
                         onClick={() => setPreviewAttachment(att)}
-                        className="p-3 border rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors flex items-center gap-2 text-xs"
+                        className="p-3.5 border border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-950 hover:border-indigo-300 dark:hover:border-indigo-800 cursor-pointer transition-all flex items-center gap-2 text-xs"
                       >
                         <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
-                        <span className="truncate font-medium">{att.name}</span>
-                        <ExternalLink className="w-3.5 h-3.5 ml-auto text-muted-foreground shrink-0" />
+                        <span className="truncate font-bold text-slate-900 dark:text-white">{att.name}</span>
+                        <ExternalLink className="w-3.5 h-3.5 ml-auto text-slate-400 shrink-0" />
                       </div>
                     ))}
                   </div>
@@ -1384,23 +1727,23 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
               )}
 
               {/* Parent Acknowledgement Status Box */}
-              <div className="p-4 border rounded-xl bg-slate-50 dark:bg-slate-900 space-y-2">
+              <div className="p-5 border border-slate-100 dark:border-slate-800 rounded-3xl bg-white dark:bg-slate-950 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Parent Acknowledgement</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Parent Acknowledgement</span>
                   {selectedIncident.parentAcknowledged ? (
-                    <Badge className="bg-emerald-600 text-white">Acknowledged</Badge>
+                    <Badge className="bg-emerald-600 text-white font-bold rounded-xl text-[10px]">Acknowledged</Badge>
                   ) : (
-                    <Badge variant="outline">Pending Parent Acknowledgment</Badge>
+                    <Badge variant="outline" className="font-bold rounded-xl text-[10px]">Pending Parent Acknowledgment</Badge>
                   )}
                 </div>
 
                 {selectedIncident.parentAcknowledged && (
-                  <div className="text-xs space-y-1 border-t pt-2 mt-2">
-                    <p className="text-muted-foreground">
+                  <div className="text-xs space-y-1 border-t border-slate-100 dark:border-slate-800 pt-3 mt-3">
+                    <p className="text-slate-400 font-medium">
                       Acknowledged on: {new Date(selectedIncident.parentAcknowledgedAt!).toLocaleString()}
                     </p>
                     {selectedIncident.parentAcknowledgementNotes && (
-                      <p className="italic text-slate-800 dark:text-slate-200">
+                      <p className="italic text-slate-800 dark:text-slate-200 font-medium">
                         &quot;{selectedIncident.parentAcknowledgementNotes}&quot;
                       </p>
                     )}
@@ -1410,33 +1753,33 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
 
               {/* Follow-up Timeline & New Entry */}
               <div className="space-y-3 pt-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Follow-up History & Actions</h4>
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Follow-up History & Actions</h4>
 
                 {selectedIncident.followUps && selectedIncident.followUps.length > 0 && (
-                  <div className="space-y-3 max-h-48 overflow-y-auto border rounded-xl p-3 divide-y">
+                  <div className="space-y-3 max-h-48 overflow-y-auto border border-slate-100 dark:border-slate-800 rounded-2xl p-4 divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-950">
                     {selectedIncident.followUps.map((fu) => (
-                      <div key={fu.id} className="pt-2 first:pt-0 text-xs space-y-1">
-                        <div className="flex items-center justify-between font-medium">
-                          <span>{fu.authorName || 'Staff'}</span>
-                          <span className="text-muted-foreground">{new Date(fu.createdAt).toLocaleString()}</span>
+                      <div key={fu.id} className="pt-3 first:pt-0 text-xs space-y-1">
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="text-slate-900 dark:text-white">{fu.authorName || 'Staff'}</span>
+                          <span className="text-slate-400 text-[10px]">{new Date(fu.createdAt).toLocaleString()}</span>
                         </div>
-                        <p className="text-slate-700 dark:text-slate-300">{fu.note}</p>
+                        <p className="text-slate-700 dark:text-slate-300 font-medium">{fu.note}</p>
                       </div>
                     ))}
                   </div>
                 )}
 
                 {/* Add Follow-up Form */}
-                <div className="p-3 border rounded-xl bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
+                <div className="p-4 border border-slate-100 dark:border-slate-800 rounded-3xl bg-white dark:bg-slate-950 space-y-3">
                   <Textarea
                     placeholder="Add follow-up note or resolution details..."
-                    rows={2}
+                    className="min-h-[70px] rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-xs font-medium"
                     value={followUpNote}
                     onChange={(e) => setFollowUpNote(e.target.value)}
                   />
                   <div className="flex items-center justify-between">
                     <Select value={followUpStatus} onValueChange={(v) => setFollowUpStatus(v)}>
-                      <SelectTrigger className="w-[160px] h-8 text-xs">
+                      <SelectTrigger className="w-[160px] h-9 text-xs rounded-xl font-bold bg-white dark:bg-slate-950">
                         <SelectValue placeholder="Update Status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1451,14 +1794,32 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                       size="sm"
                       onClick={handleAddFollowUpSubmit}
                       disabled={isSubmittingFollowUp || !followUpNote.trim()}
-                      className="bg-indigo-600 hover:bg-indigo-500"
+                      className="rounded-xl font-bold text-xs h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white"
                     >
-                      <Send className="w-3.5 h-3.5 mr-1" />
+                      <Send className="w-3.5 h-3.5 mr-1.5" />
                       Add Note
                     </Button>
                   </div>
                 </div>
               </div>
+
+              {/* System Audit Log History */}
+              {selectedIncident.auditLogs && selectedIncident.auditLogs.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">System Audit Trail ({selectedIncident.auditLogs.length})</h4>
+                  <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-100 dark:border-slate-800 rounded-2xl p-3 bg-slate-50/50 dark:bg-slate-950/50">
+                    {selectedIncident.auditLogs.map((log) => (
+                      <div key={log.id} className="flex items-center justify-between text-xs p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                          <span className="font-bold text-slate-800 dark:text-slate-200">{log.action}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono">{new Date(log.created_at).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
@@ -1466,34 +1827,42 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
 
       {/* CATEGORY MANAGEMENT MODAL */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-slate-100 dark:border-slate-800 shadow-2xl p-6 md:p-8">
           <DialogHeader>
-            <DialogTitle>Add Custom Discipline Category</DialogTitle>
-            <DialogDescription>Create a custom discipline classification for your school</DialogDescription>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white">
+              Add Custom Discipline Category
+            </DialogTitle>
+            <DialogDescription className="text-xs font-medium">
+              Create a custom discipline classification for your school
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <Label>Category Name *</Label>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Category Name *</Label>
               <Input
                 placeholder="e.g. Lab Safety Violation"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
+                className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm"
               />
             </div>
-            <div className="space-y-1">
-              <Label>Description (Optional)</Label>
+            <div className="space-y-2">
+              <Label className="text-xs font-black uppercase tracking-wider text-slate-500">Description (Optional)</Label>
               <Input
                 placeholder="Short description..."
                 value={newCategoryDesc}
                 onChange={(e) => setNewCategoryDesc(e.target.value)}
+                className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold text-sm"
               />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCategoryModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateCategory} className="bg-indigo-600 hover:bg-indigo-500">
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setIsCategoryModalOpen(false)} className="rounded-2xl font-bold text-xs h-11 px-5">
+              Cancel
+            </Button>
+            <Button onClick={handleCreateCategory} className="rounded-2xl font-bold text-xs h-11 px-6 bg-indigo-600 hover:bg-indigo-700 text-white">
               Save Category
             </Button>
           </DialogFooter>
@@ -1502,18 +1871,18 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
 
       {/* EVIDENCE PREVIEW MODAL */}
       <Dialog open={!!previewAttachment} onOpenChange={() => setPreviewAttachment(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-slate-100 dark:border-slate-800 shadow-2xl p-6">
           <DialogHeader>
-            <DialogTitle>{previewAttachment?.name}</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">{previewAttachment?.name}</DialogTitle>
           </DialogHeader>
 
           <div className="py-4">
             {previewAttachment?.type?.startsWith('image/') ? (
-              <img src={previewAttachment.url} alt={previewAttachment.name} className="max-h-[60vh] mx-auto rounded-lg object-contain" />
+              <img src={previewAttachment.url} alt={previewAttachment.name} className="max-h-[60vh] mx-auto rounded-2xl object-contain shadow-lg" />
             ) : previewAttachment?.type?.startsWith('video/') ? (
-              <video src={previewAttachment.url} controls className="max-h-[60vh] w-full rounded-lg" />
+              <video src={previewAttachment.url} controls className="max-h-[60vh] w-full rounded-2xl shadow-lg" />
             ) : (
-              <iframe src={previewAttachment?.url} className="w-full h-[60vh] rounded-lg border" title={previewAttachment?.name} />
+              <iframe src={previewAttachment?.url} className="w-full h-[60vh] rounded-2xl border border-slate-100 dark:border-slate-800" title={previewAttachment?.name} />
             )}
           </div>
         </DialogContent>

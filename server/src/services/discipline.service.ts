@@ -107,22 +107,29 @@ async function getTeacherAssignments(userId: string, schoolId: string) {
 export class DisciplineService {
   /**
    * Seed default categories for a school if none exist.
+   * Uses upsert-style logic so missing defaults are added even if some already exist.
    */
   static async ensureDefaultCategories(schoolId: string) {
     const existing = await prisma.disciplineCategory.findMany({
-      where: { schoolId }
+      where: { schoolId },
+      select: { name: true }
     });
-    if (existing.length === 0) {
-      const data = DEFAULT_DISCIPLINE_CATEGORIES.map(name => ({
-        schoolId,
-        name,
-        isDefault: true
-      }));
+
+    const existingNames = new Set(existing.map(c => c.name));
+
+    const missing = DEFAULT_DISCIPLINE_CATEGORIES.filter(name => !existingNames.has(name));
+
+    if (missing.length > 0) {
       await prisma.disciplineCategory.createMany({
-        data,
+        data: missing.map(name => ({
+          schoolId,
+          name,
+          isDefault: true
+        })),
         skipDuplicates: true
       });
     }
+
     return prisma.disciplineCategory.findMany({
       where: { schoolId },
       orderBy: { name: 'asc' }
@@ -140,11 +147,25 @@ export class DisciplineService {
    * Create a custom category for a school.
    */
   static async createCategory(schoolId: string, name: string, description?: string) {
+    const trimmedName = name.trim();
+    if (!trimmedName) throw new Error('Category name is required');
+
+    const existing = await prisma.disciplineCategory.findFirst({
+      where: {
+        schoolId,
+        name: { equals: trimmedName, mode: 'insensitive' }
+      }
+    });
+
+    if (existing) {
+      throw new Error(`Category "${trimmedName}" already exists`);
+    }
+
     return prisma.disciplineCategory.create({
       data: {
         schoolId,
-        name,
-        description,
+        name: trimmedName,
+        description: description?.trim() || null,
         isDefault: false
       }
     });
@@ -204,12 +225,28 @@ export class DisciplineService {
       }
     }
 
-    // Reporter name
+    // Reporter user validation
     const reporterUser = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { full_name: true }
+      select: { id: true, full_name: true }
     });
-    const reportedByName = reporterUser?.full_name || user.email;
+    const reportedById = reporterUser ? reporterUser.id : null;
+    const reportedByName = reporterUser?.full_name || user.email || 'Staff';
+
+    // Safe Category ID resolution (prevents Foreign Key constraint failures when categoryId is a name or dummy string)
+    let validCategoryId: string | null = null;
+    if (data.categoryId) {
+      const catById = await prisma.disciplineCategory.findFirst({
+        where: { id: data.categoryId, schoolId }
+      });
+      if (catById) validCategoryId = catById.id;
+    }
+    if (!validCategoryId && data.categoryName) {
+      const catByName = await prisma.disciplineCategory.findFirst({
+        where: { name: data.categoryName, schoolId }
+      });
+      if (catByName) validCategoryId = catByName.id;
+    }
 
     const incident = await prisma.studentDiscipline.create({
       data: {
@@ -220,13 +257,13 @@ export class DisciplineService {
         streamId: student.streamId,
         date: data.date ? new Date(data.date) : new Date(),
         time: data.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        categoryId: data.categoryId || null,
-        categoryName: data.categoryName,
-        severity: data.severity,
+        categoryId: validCategoryId,
+        categoryName: data.categoryName || 'General Incident',
+        severity: data.severity || 'LOW',
         title: data.title,
         description: data.description,
         location: data.location || null,
-        reportedById: user.id,
+        reportedById,
         reportedByName,
         witnesses: data.witnesses ? (data.witnesses as any) : undefined,
         evidence: data.evidence ? (data.evidence as any) : undefined,
@@ -248,9 +285,9 @@ export class DisciplineService {
     await prisma.disciplineFollowUp.create({
       data: {
         disciplineId: incident.id,
-        authorId: user.id,
+        authorId: reportedById,
         authorName: reportedByName,
-        note: `Incident created with status OPEN and severity ${data.severity}.`,
+        note: `Incident created with status OPEN and severity ${data.severity || 'LOW'}.`,
         actionTaken: data.immediateAction || 'Incident reported',
         statusBefore: null,
         statusAfter: 'OPEN'
@@ -473,7 +510,20 @@ export class DisciplineService {
       });
     }
 
-    return incident;
+    const auditLogs = await prisma.auditLog.findMany({
+      where: {
+        schoolId: user.schoolId,
+        entity_type: 'DISCIPLINE',
+        entity_id: incidentId
+      },
+      orderBy: { created_at: 'desc' },
+      take: 20
+    });
+
+    return {
+      ...incident,
+      auditLogs
+    };
   }
 
   /**

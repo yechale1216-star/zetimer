@@ -168,7 +168,7 @@ export default function HomePage() {
               <Badge variant="outline" className="text-xs font-bold uppercase tracking-widest border-blue-500/30 text-blue-600 dark:text-blue-400">
                 Complete Ecosystem
               </Badge>
-              <h2 className="text-3xl sm:text-5xl font-black tracking-tight">
+              <h2 className="text-2xl sm:text-4xl font-black tracking-tight">
                 Built for Modern Schools & Empowered Families
               </h2>
               <p className="text-slate-600 dark:text-slate-400 text-base font-medium">

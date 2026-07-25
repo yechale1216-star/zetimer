@@ -8,7 +8,8 @@ export const getStudents = async (req: AuthenticatedRequest, res: Response, next
     if (!schoolId) {
       return res.status(401).json({ success: false, message: 'School ID context missing' });
     }
-    const students = await studentService.getAllStudents(schoolId);
+    const search = req.query.search as string | undefined;
+    const students = await studentService.getAllStudents(schoolId, search);
     res.status(200).json({ success: true, data: students });
   } catch (error) {
     next(error);

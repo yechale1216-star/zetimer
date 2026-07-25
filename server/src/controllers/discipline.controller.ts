@@ -18,14 +18,14 @@ export class DisciplineController {
     try {
       const schoolId = req.user!.schoolId;
       const { name, description } = req.body;
-      if (!name) {
+      if (!name || !name.trim()) {
         return res.status(400).json({ success: false, message: 'Category name is required' });
       }
       const category = await DisciplineService.createCategory(schoolId, name, description);
       return res.status(201).json({ success: true, data: category });
     } catch (error: any) {
       console.error('[DisciplineController] createCategory error:', error);
-      return res.status(500).json({ success: false, message: error.message || 'Failed to create category' });
+      return res.status(400).json({ success: false, message: error.message || 'Failed to create category' });
     }
   }
 

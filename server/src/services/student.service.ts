@@ -14,19 +14,32 @@ const mapStudentToFlat = (student: any) => {
   };
 };
 
-export const getAllStudents = async (schoolId: string) => {
+export const getAllStudents = async (schoolId: string, search?: string) => {
   if (!schoolId) throw new Error('School ID is required');
-  
+
+  const where: any = { schoolId };
+
+  if (search && search.trim()) {
+    const term = search.trim();
+    where.OR = [
+      { fullName: { contains: term, mode: 'insensitive' } },
+      { student_id: { contains: term, mode: 'insensitive' } },
+    ];
+  }
+
   const students = await prisma.student.findMany({
-    where: { schoolId: schoolId },
+    where,
     include: {
       grade: true,
       section: true,
       stream: true
-    }
+    },
+    take: 20,
+    orderBy: { fullName: 'asc' }
   });
   return students.map(mapStudentToFlat);
 };
+
 
 export const getNextStudentId = async (schoolId: string) => {
   const idPrefix = 'STU';

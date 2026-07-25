@@ -28,7 +28,7 @@ export default function AboutPage() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] mb-4">
               <Globe className="w-3 h-3" /> Our Global Mission
             </div>
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.15]">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.2]">
               Redefining the <span className="text-blue-600 dark:text-blue-400 italic">Connected School</span> Experience.
             </h1>
             <p className="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed font-medium">
@@ -66,7 +66,7 @@ export default function AboutPage() {
         {/* Vision Detail Section */}
         <section className="py-32 max-w-7xl mx-auto px-8 grid md:grid-cols-2 gap-20 items-center">
           <div className="space-y-8">
-            <h2 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-none">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-snug">
               A Future Without <br />
               <span className="text-blue-600 dark:text-blue-400">Administrative Burden.</span>
             </h2>
@@ -103,7 +103,7 @@ export default function AboutPage() {
             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-500/20 via-transparent to-transparent"></div>
           </div>
           <div className="max-w-7xl mx-auto px-8 relative z-10 text-center space-y-12">
-            <h2 className="text-3xl font-black uppercase tracking-widest opacity-60">Security & Integrity</h2>
+            <h2 className="text-2xl font-black uppercase tracking-widest opacity-60">Security & Integrity</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               <TrustBadge 
                 icon={<ShieldCheck className="w-6 h-6" />}
@@ -131,7 +131,7 @@ export default function AboutPage() {
 
         {/* CTA */}
         <section className="py-32 px-8 text-center space-y-8">
-          <h2 className="text-4xl md:text-6xl font-black tracking-tight text-slate-900 dark:text-white">
+          <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
             Ready to <span className="text-blue-600 dark:text-blue-400">Join Us?</span>
           </h2>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

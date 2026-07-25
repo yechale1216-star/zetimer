@@ -49,6 +49,7 @@ export interface StudentDiscipline {
   stream?: { id: string; name: string } | null;
   reportedBy?: { id: string; full_name: string; email: string; role: string } | null;
   followUps?: DisciplineFollowUp[];
+  auditLogs?: { id: string; action: string; user_id?: string; old_values?: any; new_values?: any; created_at: string }[];
 }
 
 export interface DisciplineFollowUp {
@@ -95,11 +96,32 @@ function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
+async function handleResponse(res: Response, defaultErrorMsg: string) {
+  const contentType = res.headers.get('content-type') || '';
+  if (!res.ok) {
+    let errorMsg = defaultErrorMsg;
+    if (contentType.includes('application/json')) {
+      try {
+        const data = await res.json();
+        errorMsg = data.message || data.error || defaultErrorMsg;
+      } catch {
+        // Ignore JSON parse error on non-ok response
+      }
+    }
+    throw new Error(errorMsg);
+  }
+
+  if (!contentType.includes('application/json')) {
+    throw new Error('Received non-JSON response from server');
+  }
+
+  return await res.json();
+}
+
 export const DisciplineApi = {
   async getCategories(): Promise<DisciplineCategory[]> {
     const res = await fetch(`${API_URL}/api/discipline/categories`, { headers: getAuthHeaders() });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to fetch categories');
+    const data = await handleResponse(res, 'Failed to fetch categories');
     return data.data || [];
   },
 
@@ -109,8 +131,7 @@ export const DisciplineApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ name, description })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to create category');
+    const data = await handleResponse(res, 'Failed to create category');
     return data.data;
   },
 
@@ -119,8 +140,7 @@ export const DisciplineApi = {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to delete category');
+    await handleResponse(res, 'Failed to delete category');
   },
 
   async getIncidents(params: Record<string, any> = {}): Promise<{
@@ -137,15 +157,13 @@ export const DisciplineApi = {
       }
     });
     const res = await fetch(`${API_URL}/api/discipline?${query.toString()}`, { headers: getAuthHeaders() });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to fetch incidents');
+    const data = await handleResponse(res, 'Failed to fetch incidents');
     return data;
   },
 
   async getIncidentById(id: string): Promise<StudentDiscipline> {
     const res = await fetch(`${API_URL}/api/discipline/${id}`, { headers: getAuthHeaders() });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to fetch incident detail');
+    const data = await handleResponse(res, 'Failed to fetch incident detail');
     return data.data;
   },
 
@@ -155,8 +173,7 @@ export const DisciplineApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to create incident');
+    const data = await handleResponse(res, 'Failed to create incident');
     return data.data;
   },
 
@@ -166,8 +183,7 @@ export const DisciplineApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to update incident');
+    const data = await handleResponse(res, 'Failed to update incident');
     return data.data;
   },
 
@@ -176,8 +192,7 @@ export const DisciplineApi = {
       method: 'DELETE',
       headers: getAuthHeaders()
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to delete incident');
+    await handleResponse(res, 'Failed to delete incident');
   },
 
   async acknowledgeIncident(id: string, notes?: string): Promise<StudentDiscipline> {
@@ -186,8 +201,7 @@ export const DisciplineApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ notes })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to acknowledge incident');
+    const data = await handleResponse(res, 'Failed to acknowledge incident');
     return data.data;
   },
 
@@ -197,15 +211,13 @@ export const DisciplineApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to add follow-up');
+    const data = await handleResponse(res, 'Failed to add follow-up');
     return data.data;
   },
 
   async getAnalytics(): Promise<DisciplineAnalytics> {
     const res = await fetch(`${API_URL}/api/discipline/analytics`, { headers: getAuthHeaders() });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to fetch analytics');
+    const data = await handleResponse(res, 'Failed to fetch analytics');
     return data.data;
   }
 };

@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-blue-500/20">
             <Shield className="w-8 h-8" />
           </div>
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-[1.15]">Privacy <br /><span className="text-blue-600">Protocol.</span></h1>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-[1.2]">Privacy <br /><span className="text-blue-600">Protocol.</span></h1>
           <p className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Last updated: June 13, 2026</p>
         </div>
 

@@ -220,7 +220,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
     try {
       const token = localStorage.getItem('attendance_token');
       const schoolId = localStorage.getItem('x-school-id');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://zetime-backend.onrender.com';
+      const apiUrl = getApiUrl();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       if (schoolId) headers['x-school-id'] = schoolId;

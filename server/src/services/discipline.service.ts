@@ -404,19 +404,17 @@ export class DisciplineService {
 
     if (query.search) {
       const s = query.search.trim();
-      where.AND = [
-        where.AND || {},
-        {
-          OR: [
-            { title: { contains: s, mode: 'insensitive' } },
-            { description: { contains: s, mode: 'insensitive' } },
-            { categoryName: { contains: s, mode: 'insensitive' } },
-            { reportedByName: { contains: s, mode: 'insensitive' } },
-            { student: { fullName: { contains: s, mode: 'insensitive' } } },
-            { student: { student_id: { contains: s, mode: 'insensitive' } } }
-          ]
-        }
-      ];
+      if (!where.AND) where.AND = [];
+      where.AND.push({
+        OR: [
+          { title: { contains: s, mode: 'insensitive' } },
+          { description: { contains: s, mode: 'insensitive' } },
+          { categoryName: { contains: s, mode: 'insensitive' } },
+          { reportedByName: { contains: s, mode: 'insensitive' } },
+          { student: { fullName: { contains: s, mode: 'insensitive' } } },
+          { student: { student_id: { contains: s, mode: 'insensitive' } } }
+        ]
+      });
     }
 
     const orderByField = query.sortBy || 'createdAt';
@@ -821,11 +819,13 @@ export class DisciplineService {
       gradeCounts[gradeName] = (gradeCounts[gradeName] || 0) + 1;
 
       // Repeat offenders
-      const sKey = inc.student.id;
-      if (!studentCounts[sKey]) {
-        studentCounts[sKey] = { student: inc.student, count: 0 };
+      if (inc.student) {
+        const sKey = inc.student.id;
+        if (!studentCounts[sKey]) {
+          studentCounts[sKey] = { student: inc.student, count: 0 };
+        }
+        studentCounts[sKey].count += 1;
       }
-      studentCounts[sKey].count += 1;
 
       // Reporter
       const rName = inc.reportedByName || 'Unknown';

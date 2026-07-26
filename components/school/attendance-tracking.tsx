@@ -643,21 +643,47 @@ export function AttendanceTracking() {
   return (
     <div className="space-y-6 pb-24">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1 pt-2 md:pt-4">
         <div>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+          <h1 className="text-lg md:text-xl font-black text-slate-900 dark:text-white uppercase tracking-normal">
             Attendance
           </h1>
           <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
             Student Daily Status
           </p>
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Segmented control for Grid vs Table views */}
+          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl h-11 border border-slate-200/60 dark:border-slate-700/60 w-full sm:w-auto justify-center sm:justify-start">
+            <Button
+              variant={uiType === "card_based" ? "default" : "ghost"}
+              onClick={() => setUiType("card_based")}
+              size="sm"
+              className={cn(
+                "h-9 rounded-lg px-4 text-[10px] uppercase font-black tracking-widest flex-1 sm:flex-none",
+                uiType === "card_based" && "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+              )}
+            >
+              Grid
+            </Button>
+            <Button
+              variant={uiType === "tabular" ? "default" : "ghost"}
+              onClick={() => setUiType("tabular")}
+              size="sm"
+              className={cn(
+                "h-9 rounded-lg px-4 text-[10px] uppercase font-black tracking-widest flex-1 sm:flex-none",
+                uiType === "tabular" && "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+              )}
+            >
+              Table
+            </Button>
+          </div>
+
           <Button 
             onClick={exportAttendanceToCSV} 
             disabled={filteredStudents.length === 0} 
             variant="outline"
-            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
+            className="flex-1 sm:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
           >
             <Download className="w-4 h-4 mr-2" />
             CSV
@@ -665,36 +691,10 @@ export function AttendanceTracking() {
           <Button
             onClick={saveAttendance}
             disabled={isSaving}
-            className="hidden md:flex h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest px-6 shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
+            className="hidden lg:flex h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest px-6 shadow-lg shadow-blue-500/20 active:scale-95 transition-all animate-in fade-in zoom-in-95 duration-200"
           >
             <Save className="w-4 h-4 mr-2" />
             {isSaving ? "Saving..." : "Save Now"}
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-end gap-3 px-1">
-        <div className="flex items-center gap-1.5 p-1 bg-white/90 dark:bg-slate-900/90 rounded-full border border-slate-200/60 dark:border-slate-800 backdrop-blur-sm shadow-sm">
-          <Button
-            onClick={sendEmailNotifications}
-            disabled={isSendingNotifications}
-            variant="ghost"
-            size="sm"
-            className="typography-label h-7 px-3 text-[10px] uppercase text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-full"
-          >
-            <Mail className="w-3.5 h-3.5 mr-1.5" />
-            Email
-          </Button>
-          <div className="w-px h-3 bg-slate-200 dark:bg-slate-800" />
-          <Button
-            onClick={sendSMSNotifications}
-            disabled={isSendingNotifications}
-            variant="ghost"
-            size="sm"
-            className="typography-label h-7 px-3 text-[10px] uppercase text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-full"
-          >
-            <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
-            SMS
           </Button>
         </div>
       </div>
@@ -751,8 +751,8 @@ export function AttendanceTracking() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row gap-6 max-w-3xl">
+        <Card className="flex-1 border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
           <CardHeader className="pb-0 border-none">
             <CardTitle className="typography-label text-[10px] uppercase text-muted-foreground flex items-center gap-2">
               <Calendar className="w-3.5 h-3.5 text-blue-500" />
@@ -772,7 +772,7 @@ export function AttendanceTracking() {
         </Card>
 
         {settings?.attendanceMode === "session_based" && (
-          <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
+          <Card className="flex-1 border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
             <CardHeader className="pb-0 border-none">
               <CardTitle className="typography-label text-[10px] uppercase text-muted-foreground">Attendance Session</CardTitle>
             </CardHeader>
@@ -800,7 +800,7 @@ export function AttendanceTracking() {
 
       <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
         <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-3 items-center">
+          <div className="flex flex-col sm:flex-row gap-3 items-center">
             <div className="relative flex-1 w-full group">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 transition-colors group-focus-within:text-primary" />
               <Input
@@ -811,9 +811,9 @@ export function AttendanceTracking() {
               />
             </div>
 
-            <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start sm:justify-end">
               <Select value={gradeFilter} onValueChange={setGradeFilter}>
-                <SelectTrigger className="w-[120px] h-10 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl">
+                <SelectTrigger className="flex-1 sm:flex-none w-full sm:w-[120px] h-10 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl">
                   <SelectValue placeholder="Grade" />
                 </SelectTrigger>
                 <SelectContent>
@@ -827,7 +827,7 @@ export function AttendanceTracking() {
               </Select>
 
               <Select value={streamFilter} onValueChange={setStreamFilter}>
-                <SelectTrigger className="w-[120px] h-10 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl">
+                <SelectTrigger className="flex-1 sm:flex-none w-full sm:w-[120px] h-10 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl">
                   <SelectValue placeholder="Stream" />
                 </SelectTrigger>
                 <SelectContent>
@@ -841,7 +841,7 @@ export function AttendanceTracking() {
               </Select>
 
               <Select value={sectionFilter} onValueChange={setSectionFilter}>
-                <SelectTrigger className="w-[120px] h-10 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl">
+                <SelectTrigger className="flex-1 sm:flex-none w-full sm:w-[120px] h-10 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl">
                   <SelectValue placeholder="Section" />
                 </SelectTrigger>
                 <SelectContent>
@@ -924,7 +924,7 @@ export function AttendanceTracking() {
           <p className="text-gray-600">No students found</p>
         </div>
       ) : uiType === "card_based" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-24 md:pb-0 px-1 md:px-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pb-24 md:pb-0 px-1 md:px-0">
           {filteredStudents.map((student) => {
             const attendance = attendanceState[student.id] || { status: null, note: "" }
             return (
@@ -1008,10 +1008,10 @@ export function AttendanceTracking() {
                     />
                   </TableHead>
                   <TableHead className="w-16">Photo</TableHead>
-                  <TableHead className="min-w-[200px]">Student Name</TableHead>
+                  <TableHead className="min-w-[150px]">Student Name</TableHead>
                   <TableHead className="w-32">Student ID</TableHead>
-                  <TableHead className="min-w-[350px] text-center">Attendance Status</TableHead>
-                  <TableHead className="min-w-[200px]">Remarks</TableHead>
+                  <TableHead className="w-40 xl:w-[350px] text-center">Attendance Status</TableHead>
+                  <TableHead className="min-w-[150px]">Remarks</TableHead>
                   <TableHead className="w-24 text-center">Notify</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1040,20 +1040,24 @@ export function AttendanceTracking() {
                       <TableCell className="typography-helper font-mono text-foreground dark:text-slate-300">{student.student_id}</TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center gap-1">
-                          {(["present", "late", "absent", "excused"] as const).map((status) => (
-                            <Button
-                              key={status}
-                              variant={attendance.status === status ? "default" : "outline"}
-                              size="sm"
-                              className={`typography-helper capitalize h-8 px-3 ${ attendance.status === status ? getStatusColor(status) : "" } hover:scale-105 transition-transform`}
-                              onClick={() => updateAttendance(student.id, status)}
-                            >
-                              <div className="flex items-center gap-1">
-                                {attendance.status === status && <Check className="w-3 h-3" />}
-                                {status}
-                              </div>
-                            </Button>
-                          ))}
+                          {(["present", "late", "absent", "excused"] as const).map((status) => {
+                            const Icon = status === 'present' ? UserCheck : status === 'late' ? Clock : status === 'absent' ? UserX : AlertTriangle;
+                            return (
+                              <Button
+                                key={status}
+                                variant={attendance.status === status ? "default" : "outline"}
+                                size="sm"
+                                className={cn(
+                                  "typography-helper capitalize h-8 px-2 xl:px-3 hover:scale-105 transition-transform flex items-center gap-1.5",
+                                  attendance.status === status ? getStatusColor(status) : "text-slate-600 dark:text-slate-400"
+                                )}
+                                onClick={() => updateAttendance(student.id, status)}
+                              >
+                                <Icon className="w-3.5 h-3.5 shrink-0" />
+                                <span className="hidden xl:inline">{status}</span>
+                              </Button>
+                            );
+                          })}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1309,8 +1313,8 @@ export function AttendanceTracking() {
           </div>
         </DialogContent>
       </Dialog>
-      {/* Mobile Sticky Action Bar */}
-      <div className="md:hidden fixed bottom-24 left-0 right-0 z-40 px-4 pb-safe pointer-events-none">
+      {/* Mobile & Tablet Sticky Action Bar */}
+      <div className="lg:hidden fixed bottom-24 md:bottom-6 left-0 right-0 z-40 px-4 pb-safe pointer-events-none">
         <div className="bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur-xl rounded-[32px] p-2.5 border border-white/10 shadow-2xl flex items-center gap-2 pointer-events-auto max-w-lg mx-auto transform translate-y-[-10px]">
           <div className="flex-1 flex items-center gap-1 px-4">
             <div className="text-left">

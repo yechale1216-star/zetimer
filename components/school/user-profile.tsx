@@ -63,9 +63,9 @@ export function UserProfile() {
       const fileExt = file.name.split('.').pop()
       const fileName = `user-${Date.now()}.${fileExt}`
       const filePath = `avatars/${fileName}`
-      const { error: uploadError } = await supabase.storage.from('AVATARS').upload(filePath, file)
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file)
       if (!uploadError) {
-        const { data } = supabase.storage.from('AVATARS').getPublicUrl(filePath)
+        const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
         setFormData((prev: any) => ({ ...prev, profile_photo: data.publicUrl }))
         notifications.success("Success", "Profile photo uploaded to Supabase Storage")
         return

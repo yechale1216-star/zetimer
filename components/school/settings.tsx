@@ -65,9 +65,9 @@ export function Settings() {
       const fileExt = file.name.split('.').pop()
       const fileName = `logo-${Date.now()}.${fileExt}`
       const filePath = `logos/${fileName}`
-      const { error: uploadError } = await supabase.storage.from('SCHOOL-LOGOS').upload(filePath, file)
+      const { error: uploadError } = await supabase.storage.from('school-logos').upload(filePath, file)
       if (!uploadError) {
-        const { data } = supabase.storage.from('SCHOOL-LOGOS').getPublicUrl(filePath)
+        const { data } = supabase.storage.from('school-logos').getPublicUrl(filePath)
         setSchoolInfo((prev) => ({ ...prev, schoolLogo: data.publicUrl }))
         notifications.success("Success", "School logo uploaded to Supabase Storage")
         return
@@ -271,12 +271,12 @@ export function Settings() {
   return (
     <div className="space-y-8 pb-32">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1 pt-safe">
         <div>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+          <h1 className="text-lg md:text-xl font-black text-slate-900 dark:text-white uppercase tracking-normal">
             Settings
           </h1>
-          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+          <p className="text-[10px] font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
             System Configuration & Preferences
           </p>
         </div>

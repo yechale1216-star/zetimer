@@ -35,6 +35,8 @@ export function StudentManagement() {
   const [gradeFilter, setGradeFilter] = useState("All Grades")
   const [streamFilter, setStreamFilter] = useState("All Streams")
   const [sectionFilter, setSectionFilter] = useState("All Sections")
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 15
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
@@ -801,34 +803,34 @@ export function StudentManagement() {
         }
         skeletonVariant="table"
       >
-        <div className="space-y-8 pb-32">
+        <div className="space-y-6 pt-4 md:pt-6 pb-32">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1">
         <div>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
-            Students
+          <h1 className="typography-page-title">
+            Student Management
           </h1>
-          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
-            Directory & Enrollment
+          <p className="typography-helper text-xs md:text-sm font-medium mt-0.5">
+            Student directory, enrollment records, and academic profiles
           </p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <Button 
             onClick={() => setShowUploadDialog(true)} 
             variant="outline"
-            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
+            className="flex-1 md:flex-none h-10 rounded-xl border-slate-200 dark:border-slate-800 font-semibold text-xs"
           >
             <Upload className="w-4 h-4 mr-2" />
-            Import
+            Import CSV
           </Button>
           <Button 
             onClick={exportStudentListToCSV} 
             disabled={filteredStudents.length === 0}
             variant="outline"
-            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
+            className="flex-1 md:flex-none h-10 rounded-xl border-slate-200 dark:border-slate-800 font-semibold text-xs"
           >
             <Download className="w-4 h-4 mr-2" />
-            Export
+            Export CSV
           </Button>
         </div>
       </div>
@@ -1422,25 +1424,25 @@ export function StudentManagement() {
             <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-b border-slate-100 dark:border-slate-800/80">
-                    <TableHead className="w-[45%] font-black uppercase text-[10px] tracking-widest text-muted-foreground/70">Student Details</TableHead>
-                    <TableHead className="w-[20%] font-black uppercase text-[10px] tracking-widest text-muted-foreground/70">ID Number</TableHead>
-                    <TableHead className="w-[25%] font-black uppercase text-[10px] tracking-widest text-muted-foreground/70">Class / Section</TableHead>
-                    <TableHead className="w-[10%] text-right font-black uppercase text-[10px] tracking-widest text-muted-foreground/70">Actions</TableHead>
+                  <TableRow className="border-b border-slate-200/80 dark:border-slate-800/80">
+                    <TableHead className="w-[40%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">Student Details</TableHead>
+                    <TableHead className="w-[20%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">ID Number</TableHead>
+                    <TableHead className="w-[25%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">Class / Section</TableHead>
+                    <TableHead className="w-[15%] text-right font-semibold uppercase text-xs tracking-wider text-muted-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredStudents.map((student) => (
-                    <TableRow key={student.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors border-b border-slate-100/50 dark:border-slate-800/50">
+                    <TableRow key={student.id} className="group hover:bg-slate-50/70 dark:hover:bg-slate-800/30 transition-colors border-b border-slate-100 dark:border-slate-800/60">
                       <TableCell>
-                        <div className="flex items-center gap-4">
-                          <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black border border-primary/20 group-hover:scale-105 transition-transform">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm border border-primary/20 group-hover:scale-105 transition-transform shrink-0">
                             {student.name?.charAt(0).toUpperCase()}
                           </div>
-                          <div>
-                            <p className="text-sm font-black text-foreground uppercase tracking-tight">{student.name}</p>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground tracking-tight truncate">{student.name}</p>
                             <div className="flex items-center gap-2 mt-0.5">
-                              <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-tight bg-background/50 border-border/50 h-4 py-0 opacity-70">
+                              <Badge variant="outline" className="text-[10px] font-medium bg-background/50 border-border/50 h-4 py-0 text-muted-foreground">
                                 {student.gender || 'N/A'}
                               </Badge>
                             </div>
@@ -1448,14 +1450,14 @@ export function StudentManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <code className="text-[11px] font-bold text-muted-foreground bg-muted/30 px-2 py-1 rounded-lg border border-border/30 font-mono">
+                        <code className="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700">
                           {student.student_id}
                         </code>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
-                          <p className="text-sm font-bold text-foreground uppercase">{student.grade}</p>
-                          <p className="text-[10px] font-bold text-primary/70 uppercase tracking-tight">
+                          <p className="text-sm font-semibold text-foreground">{student.grade}</p>
+                          <p className="text-xs font-medium text-primary/80">
                             {student.section} {student.stream ? `• ${student.stream}` : ""}
                           </p>
                         </div>

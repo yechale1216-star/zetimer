@@ -117,6 +117,7 @@ export default function StudentPromotionPage() {
   const [isSubmitLoading, setIsSubmitLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [academicYear, setAcademicYear] = useState("2024/2025")
+  const [isFutureConfirmOpen, setIsFutureConfirmOpen] = useState(false)
   
   // Wizard Steps: 1 = Setup, 2 = Selection, 3 = Targets, 4 = Review
   const [currentStep, setCurrentStep] = useState(1)
@@ -435,6 +436,27 @@ export default function StudentPromotionPage() {
   )
   const selectedCountForExpanded = expandedCohortId ? (selectedStudentIds[expandedCohortId]?.size || 0) : 0
 
+  const isValidAcademicYear = (year: string): boolean => {
+    if (!year) return false
+    const match = year.trim().match(/^(\d{4})[\/\-](\d{4})$/)
+    if (!match) return false
+    const y1 = parseInt(match[1], 10)
+    const y2 = parseInt(match[2], 10)
+    return y2 === y1 + 1
+  }
+
+  const isAcademicYearValid = useMemo(() => {
+    return isValidAcademicYear(academicYear)
+  }, [academicYear])
+
+  const isFutureAcademicYear = useMemo(() => {
+    if (!isAcademicYearValid) return false
+    const match = academicYear.trim().match(/^(\d{4})/)
+    if (!match) return false
+    const startYear = parseInt(match[1], 10)
+    return startYear >= 2027
+  }, [academicYear, isAcademicYearValid])
+
   // Stepper steps configuration
   const steps = [
     { number: 1, label: "Setup" },
@@ -446,6 +468,14 @@ export default function StudentPromotionPage() {
   // Wizard Navigation Handlers
   const handleNext = () => {
     if (currentStep === 1) {
+      if (!isAcademicYearValid) {
+        notifications.warning("Invalid Academic Year", "Academic year must be consecutive years (e.g. 2026/2027).")
+        return
+      }
+      if (isFutureAcademicYear) {
+        setIsFutureConfirmOpen(true)
+        return
+      }
       setCurrentStep(2)
     } else if (currentStep === 2) {
       const selectionsCount = promotionMode === 'bulk' ? selectedCohortIds.size : totalSelectedInSelective
@@ -473,6 +503,9 @@ export default function StudentPromotionPage() {
 
   // Calculate if the "Next" button should be disabled
   const isNextDisabled = useMemo(() => {
+    if (currentStep === 1) {
+      return !isAcademicYearValid
+    }
     if (currentStep === 2) {
       return promotionMode === 'bulk' ? selectedCohortIds.size === 0 : totalSelectedInSelective === 0
     }
@@ -480,27 +513,27 @@ export default function StudentPromotionPage() {
       return !isConfigurationComplete
     }
     return false
-  }, [currentStep, promotionMode, selectedCohortIds, totalSelectedInSelective, isConfigurationComplete])
+  }, [currentStep, isAcademicYearValid, promotionMode, selectedCohortIds, totalSelectedInSelective, isConfigurationComplete])
 
   return (
-    <div className="space-y-6 pb-40 md:pb-16 max-w-5xl mx-auto px-4 md:px-0">
+    <div className="space-y-6 pt-4 md:pt-6 pb-24 md:pb-12 max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1">
         <div>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
-            <TrendingUp className="w-8 h-8 text-primary" /> Promotion
+          <h1 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+            <TrendingUp className="w-6 h-6 text-primary" /> Student Promotion
           </h1>
-          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
-            Student Advancement Wizard
+          <p className="text-xs md:text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
+            Batch promote cohorts or selectively advance individual students for the new academic year
           </p>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-          <TabsList className="grid grid-cols-2 w-full md:w-[240px] bg-slate-100 dark:bg-slate-800 rounded-2xl h-11 p-1">
-            <TabsTrigger value="promote" className="rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
+          <TabsList className="grid grid-cols-2 w-full md:w-[220px] bg-slate-100 dark:bg-slate-800 rounded-xl h-10 p-1">
+            <TabsTrigger value="promote" className="rounded-lg font-bold text-xs data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
               Promote
             </TabsTrigger>
-            <TabsTrigger value="history" className="rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
+            <TabsTrigger value="history" className="rounded-lg font-bold text-xs data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
               History
             </TabsTrigger>
           </TabsList>
@@ -517,12 +550,12 @@ export default function StudentPromotionPage() {
             className="space-y-6"
           >
             {/* STEP PROGRESS INDICATOR */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 shadow-sm">
-              {/* Desktop Stepper */}
-              <div className="hidden md:flex justify-between items-center relative">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+              {/* Desktop & Tablet Stepper */}
+              <div className="hidden sm:flex justify-between items-center relative max-w-3xl mx-auto">
                 <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-100 dark:bg-slate-800 -translate-y-1/2 z-0" />
                 <div 
-                  className="absolute top-1/2 left-0 h-1 bg-primary -translate-y-1/2 z-0 transition-all duration-355"
+                  className="absolute top-1/2 left-0 h-1 bg-primary -translate-y-1/2 z-0 transition-all duration-300"
                   style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
                 />
                 
@@ -533,19 +566,19 @@ export default function StudentPromotionPage() {
                     <div key={s.number} className="flex flex-col items-center z-10 relative">
                       <div 
                         className={cn(
-                          "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 border-2",
+                          "w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 border-2",
                           isCurrent 
-                            ? "bg-primary border-primary text-white shadow-lg shadow-primary/20 scale-110" 
+                            ? "bg-primary border-primary text-white shadow-md shadow-primary/20 scale-105" 
                             : isActive 
                               ? "bg-primary/10 border-primary text-primary" 
                               : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-400"
                         )}
                       >
-                        {isActive && !isCurrent ? <Check className="w-5 h-5" /> : s.number}
+                        {isActive && !isCurrent ? <Check className="w-4 h-4" /> : s.number}
                       </div>
                       <span 
                         className={cn(
-                          "text-[10px] font-black uppercase tracking-widest mt-2 transition-all duration-300",
+                          "text-xs font-semibold mt-2 transition-all duration-300",
                           isCurrent ? "text-primary font-bold" : "text-slate-400"
                         )}
                       >
@@ -557,12 +590,12 @@ export default function StudentPromotionPage() {
               </div>
 
               {/* Mobile Stepper */}
-              <div className="md:hidden space-y-3">
+              <div className="sm:hidden space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-primary">
+                  <span className="text-xs font-bold text-primary">
                     Step {currentStep} of {steps.length}: {steps[currentStep - 1].label}
                   </span>
-                  <span className="text-xs font-bold text-slate-400">
+                  <span className="text-xs font-medium text-slate-400">
                     {Math.round(((currentStep) / steps.length) * 100)}% Complete
                   </span>
                 </div>
@@ -587,36 +620,51 @@ export default function StudentPromotionPage() {
                     exit={{ opacity: 0, x: -20 }}
                     className="space-y-6"
                   >
-                    <Card className="border-none shadow-premium bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl rounded-3xl">
+                    <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl">
                       <CardHeader>
-                        <CardTitle className="text-xl flex items-center gap-2">
+                        <CardTitle className="text-lg md:text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
                           <Play className="w-5 h-5 text-primary" /> Setup Promotion Parameters
                         </CardTitle>
-                        <CardDescription>
-                          Choose the target academic year and the advancement scope mode.
+                        <CardDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                          Choose the target academic year and the advancement scope mode for your school.
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-8">
                         {/* Target Academic Year */}
-                        <div className="space-y-2 p-5 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800/80">
-                          <Label className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5 mb-1">
+                        <div className={cn(
+                          "space-y-2 p-5 rounded-xl border transition-all",
+                          isAcademicYearValid 
+                            ? "bg-slate-50 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-800" 
+                            : "bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50"
+                        )}>
+                          <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-1">
                             <Calendar className="w-4 h-4 text-primary" /> Target Academic Year
                           </Label>
                           <Input 
                             value={academicYear}
                             onChange={(e) => setAcademicYear(e.target.value)}
-                            placeholder="e.g. 2025/2026"
-                            className="bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 h-12 font-black text-xl text-primary text-center tracking-wider max-w-sm"
+                            placeholder="e.g. 2026/2027"
+                            className={cn(
+                              "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 h-11 font-bold text-lg text-primary text-center tracking-wider max-w-xs transition-all",
+                              !isAcademicYearValid && academicYear && "border-rose-400 dark:border-rose-800 text-rose-600 dark:text-rose-400 focus-visible:ring-rose-500"
+                            )}
                           />
-                          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-                            The target academic year students will transition into.
-                          </p>
+                          {!isAcademicYearValid && academicYear ? (
+                            <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1.5 mt-1">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              Invalid format! Must be consecutive years like 2026/2027 or 2025-2026.
+                            </p>
+                          ) : (
+                            <p className="text-xs text-slate-400 font-medium">
+                              The target academic year students will transition into upon promotion (e.g. 2026/2027).
+                            </p>
+                          )}
                         </div>
 
                         {/* Mode Select options */}
                         <div className="space-y-3">
-                          <Label className="text-xs font-black uppercase tracking-widest text-slate-500">
-                            Promotion Scope
+                          <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                            Promotion Scope Mode
                           </Label>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -624,23 +672,23 @@ export default function StudentPromotionPage() {
                             <div 
                               onClick={() => setPromotionMode('bulk')}
                               className={cn(
-                                "p-6 rounded-3xl border-2 cursor-pointer transition-all flex gap-4 items-start active:scale-[0.98]",
+                                "p-6 rounded-2xl border-2 cursor-pointer transition-all flex gap-4 items-start active:scale-[0.99]",
                                 promotionMode === 'bulk' 
                                   ? "border-primary bg-primary/5 dark:bg-primary/5 shadow-md shadow-primary/5" 
-                                  : "border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 bg-white dark:bg-slate-900"
+                                  : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900"
                               )}
                             >
                               <div className={cn(
-                                "p-3 rounded-2xl shrink-0 mt-0.5",
+                                "p-3 rounded-xl shrink-0 mt-0.5",
                                 promotionMode === 'bulk' ? "bg-primary text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
                               )}>
                                 <Layers className="w-6 h-6" />
                               </div>
                               <div>
-                                <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight text-base mb-1">
+                                <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1">
                                   Bulk Promotion
                                 </h3>
-                                <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
                                   Promote entire cohorts (Grade, Stream, and Section combinations) altogether. Fast and efficient for normal end-of-year rollings.
                                 </p>
                               </div>
@@ -650,23 +698,23 @@ export default function StudentPromotionPage() {
                             <div 
                               onClick={() => setPromotionMode('selective')}
                               className={cn(
-                                "p-6 rounded-3xl border-2 cursor-pointer transition-all flex gap-4 items-start active:scale-[0.98]",
+                                "p-6 rounded-2xl border-2 cursor-pointer transition-all flex gap-4 items-start active:scale-[0.99]",
                                 promotionMode === 'selective' 
                                   ? "border-primary bg-primary/5 dark:bg-primary/5 shadow-md shadow-primary/5" 
-                                  : "border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 bg-white dark:bg-slate-900"
+                                  : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900"
                               )}
                             >
                               <div className={cn(
-                                "p-3 rounded-2xl shrink-0 mt-0.5",
+                                "p-3 rounded-xl shrink-0 mt-0.5",
                                 promotionMode === 'selective' ? "bg-primary text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
                               )}>
                                 <UserCheck className="w-6 h-6" />
                               </div>
                               <div>
-                                <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight text-base mb-1">
+                                <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1">
                                   Selective Promotion
                                 </h3>
-                                <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
                                   Select specific students from sections to promote while retaining others. Ideal when handling retentions, individual transfers, or custom filters.
                                 </p>
                               </div>
@@ -692,28 +740,28 @@ export default function StudentPromotionPage() {
                       {promotionMode === 'selective' && expandedCohortId !== null ? (
                         <motion.div
                           key="student-checklist"
-                          initial={{ opacity: 0, scale: 0.98 }}
+                          initial={{ opacity: 0, scale: 0.99 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.98 }}
+                          exit={{ opacity: 0, scale: 0.99 }}
                         >
-                          <Card className="border-none shadow-premium bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl rounded-3xl overflow-hidden">
+                          <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl overflow-hidden">
                             <CardHeader className="pb-4">
                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                 <div className="flex items-center gap-3">
                                   <Button 
                                     variant="outline" 
                                     size="icon" 
-                                    className="rounded-full h-10 w-10 shrink-0 border-slate-200 dark:border-slate-800" 
+                                    className="rounded-xl h-10 w-10 shrink-0 border-slate-200 dark:border-slate-800" 
                                     onClick={() => setExpandedCohortId(null)}
                                   >
                                     <ChevronLeft className="w-5 h-5" />
                                   </Button>
                                   <div>
-                                    <CardTitle className="text-lg font-black uppercase tracking-tight flex items-center gap-2">
+                                    <CardTitle className="text-base md:text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-white">
                                       {expandedCohort?.gradeName} {expandedCohort?.streamName ? '- ' + expandedCohort.streamName : ''} (Sec {expandedCohort?.sectionName})
                                     </CardTitle>
-                                    <CardDescription>
-                                      Select students to promote ({selectedCountForExpanded} / {expandedStudents.length} selected)
+                                    <CardDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                      Select students to promote ({selectedCountForExpanded} of {expandedStudents.length} selected)
                                     </CardDescription>
                                   </div>
                                 </div>
@@ -722,7 +770,7 @@ export default function StudentPromotionPage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-10 rounded-2xl font-bold text-xs gap-1.5 border-slate-200 dark:border-slate-800 px-4"
+                                    className="h-10 rounded-xl font-bold text-xs gap-1.5 border-slate-200 dark:border-slate-800 px-4"
                                     onClick={() => toggleSelectAll(expandedCohortId!)}
                                   >
                                     {selectedCountForExpanded === expandedStudents.length ? (
@@ -738,60 +786,61 @@ export default function StudentPromotionPage() {
                                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                 <Input 
                                   placeholder="Search students by name or ID..." 
-                                  className="pl-10 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 h-11 rounded-2xl text-sm"
+                                  className="pl-10 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 h-11 rounded-xl text-sm"
                                   value={studentSearchTerm}
                                   onChange={(e) => setStudentSearchTerm(e.target.value)}
                                 />
                               </div>
                             </CardHeader>
                             
-                            <CardContent className="p-0">
+                            <CardContent className="p-4">
                               {loadingStudents ? (
                                 <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
                                   <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                  <span className="font-bold text-xs uppercase tracking-widest text-slate-500/80">Loading student roster...</span>
+                                  <span className="font-bold text-xs tracking-wider text-slate-500/80">Loading student roster...</span>
+                                </div>
+                              ) : filteredStudents.length === 0 ? (
+                                <div className="py-20 text-center text-slate-400 font-medium">
+                                  No students found matching your search.
                                 </div>
                               ) : (
-                                <ScrollArea className="h-[450px]">
-                                  <div className="divide-y divide-slate-100 dark:divide-slate-800 px-4 pb-4">
-                                    {filteredStudents.length === 0 ? (
-                                      <div className="py-20 text-center text-slate-400 font-medium">
-                                        No students found matching your criteria.
-                                      </div>
-                                    ) : filteredStudents.map((student) => {
+                                <ScrollArea className="h-[480px]">
+                                  {/* Grid representation on Tablet/Desktop (2-3 cols), vertical stack on mobile */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pr-3 pb-2">
+                                    {filteredStudents.map((student) => {
                                       const isSelected = selectedStudentIds[expandedCohortId!]?.has(student.id) || false
                                       return (
                                         <div 
                                           key={student.id} 
                                           className={cn(
-                                            "flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-all rounded-2xl my-1",
-                                            isSelected ? "bg-primary/5 dark:bg-primary/5" : ""
+                                            "flex items-center justify-between p-3.5 cursor-pointer border rounded-xl transition-all hover:border-primary/50",
+                                            isSelected 
+                                              ? "bg-primary/5 border-primary/40 dark:bg-primary/10 shadow-sm" 
+                                              : "bg-white dark:bg-slate-950 border-slate-100 dark:border-slate-800/80"
                                           )}
                                           onClick={() => toggleStudentSelection(expandedCohortId!, student.id)}
                                         >
-                                          <div className="flex items-center gap-3">
-                                            <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                                          <div className="flex items-center gap-3 min-w-0">
+                                            <div className="flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
                                               <Checkbox
                                                 checked={isSelected}
                                                 onCheckedChange={() => toggleStudentSelection(expandedCohortId!, student.id)}
-                                                className="w-5 h-5 rounded-md border-slate-300 dark:border-slate-700"
+                                                className="w-4 h-4 rounded border-slate-300 dark:border-slate-700"
                                               />
                                             </div>
-                                            <div className="flex flex-col">
-                                              <span className={cn("font-bold text-sm text-slate-955 dark:text-white leading-tight", isSelected && "text-primary")}>
+                                            <div className="flex flex-col min-w-0">
+                                              <span className={cn("font-bold text-xs md:text-sm text-slate-900 dark:text-white truncate leading-tight", isSelected && "text-primary")}>
                                                 {student.fullName}
                                               </span>
-                                              <span className="text-[10px] text-slate-400 uppercase font-black tracking-tight mt-0.5">
-                                                {student.student_id} {student.gender ? `â€¢ ${student.gender}` : ''}
+                                              <span className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                                ID: {student.student_id} {student.gender ? `• ${student.gender}` : ''}
                                               </span>
                                             </div>
                                           </div>
 
-                                          <div className="flex items-center gap-1.5">
-                                            <Badge variant="outline" className="text-[9px] uppercase tracking-wider font-bold">
-                                              {student.section?.name || 'No Sec'}
-                                            </Badge>
-                                          </div>
+                                          <Badge variant="outline" className="text-[9px] font-bold shrink-0">
+                                            {student.section?.name || 'Sec'}
+                                          </Badge>
                                         </div>
                                       )
                                     })}
@@ -799,13 +848,13 @@ export default function StudentPromotionPage() {
                                 </ScrollArea>
                               )}
                               
-                              <div className="p-4 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center rounded-b-3xl">
+                              <div className="pt-4 mt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
                                 <span className="text-xs font-bold text-slate-500 uppercase">
-                                  Cohort Total: {expandedStudents.length}
+                                  Cohort Total: {expandedStudents.length} Students
                                 </span>
                                 <Button 
                                   variant="default" 
-                                  className="h-10 rounded-2xl font-black text-xs uppercase px-6"
+                                  className="h-10 rounded-xl font-bold text-xs px-6"
                                   onClick={() => setExpandedCohortId(null)}
                                 >
                                   Done Selection
@@ -823,37 +872,37 @@ export default function StudentPromotionPage() {
                           exit={{ opacity: 0 }}
                           className="space-y-4"
                         >
-                          <div className="flex flex-col gap-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div>
-                              <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                              <h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                                 {promotionMode === 'bulk' ? "Select Cohorts for Promotion" : "Select Cohorts to Drilldown"}
                               </h2>
-                              <p className="text-xs font-medium text-slate-400">
+                              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                                 {promotionMode === 'bulk' 
-                                  ? "Toggle cards to select the entire class sections you want to advance."
+                                  ? "Toggle class cards to select entire sections you want to advance."
                                   : "Choose a class card to select individual students inside."}
                               </p>
                             </div>
                             
-                            <div className="relative w-full">
+                            <div className="relative w-full sm:w-72">
                               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                               <Input 
-                                placeholder="Filter classes by grade or section..." 
-                                className="pl-10 bg-white dark:bg-slate-905/50 border-slate-200 dark:border-slate-800 h-11 rounded-2xl text-sm"
+                                placeholder="Filter by grade or section..." 
+                                className="pl-10 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 h-10 rounded-xl text-xs"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                               />
                             </div>
                           </div>
 
-                          {/* Grid lists */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {/* Grid lists: 1 col on mobile, 2 on sm, 3 on md, 4 on lg/desktop */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             {isLoading ? (
-                              Array(6).fill(0).map((_, i) => (
-                                <div key={i} className="h-32 bg-slate-50 dark:bg-slate-900 animate-pulse rounded-[28px] border border-slate-100 dark:border-slate-800/80" />
+                              Array(8).fill(0).map((_, i) => (
+                                <div key={i} className="h-32 bg-slate-100 dark:bg-slate-900 animate-pulse rounded-2xl border border-slate-200/60 dark:border-slate-800" />
                               ))
                             ) : filteredCohorts.length === 0 ? (
-                              <div className="col-span-full py-20 text-center text-slate-450 bg-white/50 dark:bg-slate-900/50 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 font-medium">
+                              <div className="col-span-full py-16 text-center text-slate-400 bg-white/50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 font-medium text-xs">
                                 No active cohorts found.
                               </div>
                             ) : filteredCohorts.map((cohort) => {
@@ -867,24 +916,24 @@ export default function StudentPromotionPage() {
                                 <div 
                                   key={cohort.id} 
                                   className={cn(
-                                    "relative p-5 bg-white dark:bg-slate-900 rounded-[28px] border transition-all active:scale-[0.98] cursor-pointer group flex flex-col justify-between h-36 select-none",
+                                    "relative p-5 bg-white dark:bg-slate-900 rounded-2xl border transition-all active:scale-[0.99] cursor-pointer group flex flex-col justify-between h-36 select-none shadow-sm hover:shadow-md",
                                     isSelected 
-                                      ? "border-primary ring-1 ring-primary shadow-lg shadow-primary/5 bg-primary/[0.01]" 
-                                      : "border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700"
+                                      ? "border-primary ring-1 ring-primary shadow-md shadow-primary/5 bg-primary/[0.02]" 
+                                      : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                                   )}
                                   onClick={() => handleCohortClick(cohort)}
                                 >
                                   <div>
                                     <div className="flex items-start justify-between">
                                       <div className="flex flex-col">
-                                        <span className="text-[10px] font-black text-primary uppercase tracking-widest mb-0.5">
+                                        <span className="text-xs font-bold text-primary tracking-wide mb-0.5">
                                           {cohort.gradeName}
                                         </span>
-                                        <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight">
+                                        <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
                                           Section {cohort.sectionName}
                                         </h3>
                                         {cohort.streamName && (
-                                          <span className="text-[9px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider mt-0.5">
+                                          <span className="text-[10px] font-semibold text-violet-600 dark:text-violet-400 mt-0.5">
                                             {cohort.streamName}
                                           </span>
                                         )}
@@ -895,7 +944,7 @@ export default function StudentPromotionPage() {
                                         "w-8 h-8 flex items-center justify-center rounded-xl transition-all",
                                         isSelected 
                                           ? "bg-primary text-white" 
-                                          : "bg-slate-50 dark:bg-slate-800/80 text-slate-400 group-hover:text-slate-600"
+                                          : "bg-slate-50 dark:bg-slate-800 text-slate-400 group-hover:text-slate-600"
                                       )}>
                                         {promotionMode === 'bulk' ? (
                                           isSelected ? <CheckCircle2 className="w-5 h-5" /> : <Box className="w-4 h-4" />
@@ -906,13 +955,13 @@ export default function StudentPromotionPage() {
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-50 dark:border-slate-850">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                      <Users className="w-3.5 h-3.5 text-slate-400/85" /> {cohort.count} Students
+                                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                                      <Users className="w-3.5 h-3.5 text-slate-400" /> {cohort.count} Students
                                     </span>
                                     
                                     {promotionMode === 'selective' && isSelected && (
-                                      <Badge variant="default" className="text-[9px] font-black uppercase tracking-wider h-6 px-2.5">
+                                      <Badge variant="default" className="text-[10px] font-bold h-5 px-2">
                                         {countSelected} Selected
                                       </Badge>
                                     )}
@@ -923,10 +972,10 @@ export default function StudentPromotionPage() {
                           </div>
                           
                           {/* Selection summary statistics banner */}
-                          <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex justify-between items-center text-xs font-bold text-primary">
+                          <div className="p-4 bg-primary/5 rounded-xl border border-primary/15 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-xs font-bold text-primary">
                             <span>
                               {promotionMode === 'bulk' 
-                                ? `${selectedCohortIds.size} Cohorts Marked` 
+                                ? `${selectedCohortIds.size} Cohorts Marked for Promotion` 
                                 : `${Object.keys(selectedStudentIds).filter(k => selectedStudentIds[k].size > 0).length} Cohorts Configured`
                               }
                             </span>
@@ -949,18 +998,16 @@ export default function StudentPromotionPage() {
                     exit={{ opacity: 0, x: -20 }}
                     className="space-y-6"
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-1.5">
-                          <Filter className="w-5 h-5 text-primary" /> Destination Rules Mapping
-                        </h2>
-                        <p className="text-xs font-medium text-slate-400">
-                          Configure destination grades, mandatory streams, and target section names for advanced students.
-                        </p>
-                      </div>
+                    <div>
+                      <h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5">
+                        <Filter className="w-5 h-5 text-primary" /> Destination Rules Mapping
+                      </h2>
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Configure target grades, mandatory streams, and target section names for advanced students.
+                      </p>
                     </div>
 
-                    <Card className="border-none shadow-premium bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl rounded-3xl">
+                    <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl">
                       <CardContent className="p-6 divide-y divide-slate-100 dark:divide-slate-800">
                         {cohorts
                           .filter(c => activeCohortIds.includes(c.id))
@@ -975,29 +1022,29 @@ export default function StudentPromotionPage() {
                             return (
                               <div key={cohort.id} className="py-6 first:pt-0 last:pb-0 flex flex-col gap-4">
                                 {/* Cohort Origin Detail */}
-                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800">
                                   <div>
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Source Class</span>
-                                    <h4 className="font-black text-slate-900 dark:text-white uppercase text-base flex items-center gap-2 leading-tight">
+                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Source Cohort</span>
+                                    <h4 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2 leading-tight mt-0.5">
                                       {cohort.gradeName} - Sec {cohort.sectionName}
                                       {cohort.streamName && (
-                                        <Badge variant="outline" className="text-[9px] font-bold text-violet-600 dark:text-violet-400 border-violet-500/25">
+                                        <Badge variant="outline" className="text-[10px] font-bold text-violet-600 dark:text-violet-400 border-violet-500/25">
                                           {cohort.streamName}
                                         </Badge>
                                       )}
                                     </h4>
                                   </div>
                                   
-                                  <Badge variant="secondary" className="self-start sm:self-center text-xs font-black uppercase px-3 py-1">
+                                  <Badge variant="secondary" className="self-start sm:self-center text-xs font-bold px-3 py-1">
                                     {promotionMode === 'bulk' ? cohort.count : selectedStudentIds[cohort.id]?.size} Students
                                   </Badge>
                                 </div>
 
                                 {/* Inputs */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                   {/* Destination Grade */}
                                   <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Destination Grade</Label>
+                                    <Label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-0.5">Destination Grade</Label>
                                     <Select 
                                       value={currentRule.gradeId} 
                                       onValueChange={(val) => setPromotionRules(prev => ({ 
@@ -1005,14 +1052,14 @@ export default function StudentPromotionPage() {
                                         [cohort.id]: { ...prev[cohort.id]!, gradeId: val } 
                                       }))}
                                     >
-                                      <SelectTrigger className="w-full bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 h-11 rounded-2xl font-bold text-sm focus:ring-1 focus:ring-primary">
+                                      <SelectTrigger className="w-full bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 h-11 rounded-xl font-bold text-sm focus:ring-1 focus:ring-primary">
                                         <SelectValue placeholder="Select Grade" />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {grades.map(g => (
                                           <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                                         ))}
-                                        <SelectItem value="GRADUATE">ðŸŽ“ Graduation / Complete</SelectItem>
+                                        <SelectItem value="GRADUATE">🎓 Graduation / Complete</SelectItem>
                                       </SelectContent>
                                     </Select>
                                   </div>
@@ -1020,7 +1067,7 @@ export default function StudentPromotionPage() {
                                   {/* Destination Stream (if target is Gr 11 or 12) */}
                                   {currentRule.gradeId !== 'GRADUATE' && isStreamRequired ? (
                                     <div className="space-y-1.5">
-                                      <Label className="text-[10px] font-black text-violet-600 dark:text-violet-400 uppercase tracking-widest ml-1">Mandatory Stream</Label>
+                                      <Label className="text-xs font-semibold text-violet-600 dark:text-violet-400 ml-0.5">Mandatory Stream</Label>
                                       <Select 
                                         value={currentRule.streamId} 
                                         onValueChange={(val) => setPromotionRules(prev => ({ 
@@ -1028,7 +1075,7 @@ export default function StudentPromotionPage() {
                                           [cohort.id]: { ...prev[cohort.id]!, streamId: val } 
                                         }))}
                                       >
-                                        <SelectTrigger className="w-full bg-violet-50/50 dark:bg-violet-900/10 border border-violet-200 dark:border-violet-800/80 h-11 rounded-2xl text-violet-750 dark:text-violet-400 font-black shadow-sm text-sm">
+                                        <SelectTrigger className="w-full bg-violet-50/50 dark:bg-violet-900/10 border border-violet-200 dark:border-violet-800/80 h-11 rounded-xl text-violet-750 dark:text-violet-400 font-bold shadow-sm text-sm">
                                           <SelectValue placeholder="Choose Stream" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -1039,17 +1086,16 @@ export default function StudentPromotionPage() {
                                       </Select>
                                     </div>
                                   ) : (
-                                    /* Placeholder or empty cell if stream is not needed */
-                                    <div className="hidden md:block" />
+                                    <div className="hidden lg:block" />
                                   )}
 
                                   {/* Destination Section */}
                                   {currentRule.gradeId !== 'GRADUATE' && (
                                     <div className="space-y-1.5">
-                                      <Label className="text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">Target Section Name</Label>
+                                      <Label className="text-xs font-semibold text-slate-600 dark:text-slate-400 ml-0.5">Target Section Name</Label>
                                       <Input 
                                         placeholder="e.g. A"
-                                        className="h-11 rounded-2xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-sm font-bold"
+                                        className="h-11 rounded-xl bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-sm font-bold"
                                         value={currentRule.sectionName}
                                         onChange={(e) => setPromotionRules(prev => ({
                                           ...prev,
@@ -1076,16 +1122,16 @@ export default function StudentPromotionPage() {
                     exit={{ opacity: 0, x: -20 }}
                     className="space-y-6"
                   >
-                    <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 rounded-3xl border border-primary/10 flex items-start gap-4">
-                      <div className="p-3.5 bg-primary text-white rounded-2xl shadow-lg shadow-primary/10 shrink-0">
-                        <ShieldCheck className="w-8 h-8" />
+                    <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 rounded-2xl border border-primary/15 flex items-start gap-4">
+                      <div className="p-3 bg-primary text-white rounded-xl shadow-md shadow-primary/10 shrink-0">
+                        <ShieldCheck className="w-7 h-7" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight">
+                        <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight">
                           Review Promotion Parameters
                         </h2>
-                        <p className="text-sm text-slate-500 font-bold mt-1">
-                          Academic Year: <span className="text-primary">{academicYear}</span> â€¢ Mode: <span className="text-primary uppercase">{promotionMode}</span>
+                        <p className="text-xs md:text-sm text-slate-500 font-medium mt-1">
+                          Academic Year: <span className="text-primary font-bold">{academicYear}</span> • Mode: <span className="text-primary font-bold uppercase">{promotionMode}</span>
                         </p>
                       </div>
                     </div>
@@ -1093,8 +1139,8 @@ export default function StudentPromotionPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* Left: Summary cards list */}
                       <div className="md:col-span-2 space-y-4">
-                        <h3 className="font-black text-xs uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                           <Box className="w-4.5 h-4.5" /> Target Cohort Breakdown
+                        <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                           <Box className="w-4 h-4" /> Target Cohort Breakdown
                         </h3>
                         
                         <div className="space-y-3">
@@ -1107,24 +1153,24 @@ export default function StudentPromotionPage() {
                               const count = promotionMode === 'bulk' ? cohort.count : selectedStudentIds[cohort.id]?.size
                               
                               return (
-                                <div key={cohort.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 gap-3">
+                                <div key={cohort.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 gap-3">
                                   <div className="flex flex-col">
-                                    <span className="font-black text-sm uppercase tracking-tight text-slate-900 dark:text-white">
+                                    <span className="font-bold text-sm text-slate-900 dark:text-white">
                                       {cohort.gradeName} - Sec {cohort.sectionName}
                                     </span>
                                     <div className="flex flex-wrap items-center gap-2 mt-1">
-                                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide">Destination:</span>
-                                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">
-                                        {rule?.gradeId === 'GRADUATE' ? 'ðŸŽ“ Graduation' : `${targetGrade?.name} (Sec ${rule?.sectionName || cohort.sectionName})`}
+                                      <span className="text-xs text-slate-400 font-medium">Destination:</span>
+                                      <span className="text-xs font-bold text-primary">
+                                        {rule?.gradeId === 'GRADUATE' ? '🎓 Graduation' : `${targetGrade?.name} (Sec ${rule?.sectionName || cohort.sectionName})`}
                                       </span>
                                       {rule?.gradeId !== 'GRADUATE' && targetStream && (
-                                        <Badge variant="outline" className="text-[8px] font-bold h-5 text-violet-600 dark:text-violet-400 border-violet-500/20 px-1.5 uppercase">
+                                        <Badge variant="outline" className="text-[10px] font-semibold text-violet-600 dark:text-violet-400 border-violet-500/20 px-2">
                                           {targetStream.name}
                                         </Badge>
                                       )}
                                     </div>
                                   </div>
-                                  <Badge variant="default" className="text-xs font-black shadow-sm h-8 px-4 self-start sm:self-center">
+                                  <Badge variant="default" className="text-xs font-bold h-7 px-3.5 self-start sm:self-center">
                                     {count} students
                                   </Badge>
                                 </div>
@@ -1135,26 +1181,26 @@ export default function StudentPromotionPage() {
 
                       {/* Right: Warnings and Stats summary */}
                       <div className="space-y-6">
-                        <h3 className="font-black text-xs uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                        <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 flex items-center gap-2">
                            Summary Figures
                         </h3>
 
                         {/* Student Count Panel */}
-                        <div className="p-6 bg-slate-900 dark:bg-slate-950 border border-slate-850 rounded-3xl text-center shadow-inner relative overflow-hidden flex flex-col justify-center items-center">
-                          <span className="text-[9px] font-black text-slate-405 uppercase tracking-[0.2em] mb-1">Total Selected Students</span>
-                          <span className="text-5xl font-black text-white tracking-tight leading-none mb-1">
+                        <div className="p-6 bg-slate-900 dark:bg-slate-950 border border-slate-800 rounded-2xl text-center shadow-sm flex flex-col justify-center items-center">
+                          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Total Selected Students</span>
+                          <span className="text-4xl font-bold text-white tracking-tight leading-none mb-1">
                             {promotionMode === 'bulk' ? totalSelectedInBulk : totalSelectedInSelective}
                           </span>
-                          <span className="text-[9px] font-black text-primary uppercase tracking-widest">Ready for advancement</span>
+                          <span className="text-xs font-semibold text-primary">Ready for advancement</span>
                         </div>
 
                         {/* Attention warning banner */}
-                        <div className="p-5 bg-amber-50 dark:bg-amber-900/10 border-2 border-amber-200 dark:border-amber-800/30 rounded-3xl flex gap-3 items-start">
+                        <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-2xl flex gap-3 items-start">
                           <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                           <div className="space-y-1">
-                            <p className="font-black text-sm text-amber-900 dark:text-amber-400 leading-tight">Attention</p>
-                            <p className="text-xs text-amber-800/80 dark:text-amber-300/60 leading-relaxed font-bold">
-                              This action will update the grade and section records of students instantly. The process can be rolled back individually in the audit trail if necessary.
+                            <p className="font-bold text-sm text-amber-900 dark:text-amber-400 leading-tight">Attention</p>
+                            <p className="text-xs text-amber-800/80 dark:text-amber-300/70 leading-relaxed font-medium">
+                              This action will update student grade and section records immediately. Individual promotions can be rolled back in the Audit Trail if needed.
                             </p>
                           </div>
                         </div>
@@ -1165,122 +1211,116 @@ export default function StudentPromotionPage() {
               </AnimatePresence>
             </div>
 
-            {/* WIZARD FLOATING STICKY ACTION BAR */}
-            <div className="fixed bottom-16 md:bottom-0 left-0 right-0 p-4 bg-white/95 dark:bg-slate-900/95 border-t border-slate-100 dark:border-slate-850 flex justify-between items-center gap-4 backdrop-blur-md z-30 md:static md:bg-transparent md:border-none md:p-0 md:shadow-none md:mt-8">
-              <div className="max-w-5xl w-full mx-auto flex justify-between gap-4">
-                {/* Back button */}
-                {currentStep > 1 ? (
-                  <Button 
-                    variant="outline" 
-                    onClick={handleBack} 
-                    className="h-14 md:h-14 rounded-2xl font-bold px-6 text-slate-650 shrink-0 border-slate-200 dark:border-slate-800 hover:bg-slate-50 text-base"
-                  >
-                    Back
-                  </Button>
-                ) : (
-                  /* Spacer so layout aligns */
-                  <div className="w-0 shrink-0" />
-                )}
+            {/* WIZARD ACTION BAR */}
+            <div className="pt-6 mt-6 border-t border-slate-200/80 dark:border-slate-800 flex justify-between items-center gap-4">
+              {currentStep > 1 ? (
+                <Button 
+                  variant="outline" 
+                  onClick={handleBack} 
+                  className="h-11 md:h-12 rounded-xl font-bold px-6 border-slate-200 dark:border-slate-800 hover:bg-slate-50 text-sm"
+                >
+                  Back
+                </Button>
+              ) : (
+                <div />
+              )}
 
-                {/* Forward / Action buttons */}
-                {currentStep < 4 ? (
-                  <Button 
-                    onClick={handleNext} 
-                    disabled={isNextDisabled}
-                    className="flex-1 md:flex-none md:w-60 h-14 md:h-14 rounded-2xl text-base font-black shadow-lg shadow-primary/20 transform transition-all active:scale-[0.98]"
-                  >
-                    Next Step <ChevronRight className="w-5 h-5 ml-1.5" />
-                  </Button>
-                ) : (
-                  <Button 
-                    onClick={executePromotion} 
-                    disabled={isSubmitLoading || !isConfigurationComplete}
-                    className="flex-1 md:flex-none md:w-60 h-14 md:h-14 rounded-2xl text-base font-black shadow-lg shadow-primary/20 transform transition-all active:scale-[0.98]"
-                  >
-                    {isSubmitLoading ? "Advancing Students..." : "Confirm & Execute"}
-                  </Button>
-                )}
-              </div>
+              {currentStep < 4 ? (
+                <Button 
+                  onClick={handleNext} 
+                  disabled={isNextDisabled}
+                  className="h-11 md:h-12 rounded-xl text-sm font-bold px-8 shadow-sm transition-all"
+                >
+                  Next Step <ChevronRight className="w-4 h-4 ml-1.5" />
+                </Button>
+              ) : (
+                <Button 
+                  onClick={executePromotion} 
+                  disabled={isSubmitLoading || !isConfigurationComplete}
+                  className="h-11 md:h-12 rounded-xl text-sm font-bold px-8 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all"
+                >
+                  {isSubmitLoading ? "Advancing Students..." : "Confirm & Execute"}
+                </Button>
+              )}
             </div>
           </motion.div>
         ) : (
           /* AUDIT TRAIL LOGS VIEW */
-          /* AUDIT TRAIL LOGS VIEW */
           <motion.div
             key="history"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+            exit={{ opacity: 0, y: -15 }}
           >
-            <Card className="border-none shadow-premium bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
+            <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-2xl font-bold">Audit Trail</CardTitle>
-                  <CardDescription>Historical promotion records for the current academic year.</CardDescription>
+                  <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">Audit Trail</CardTitle>
+                  <CardDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">Historical promotion records for the academic year.</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                   <Button variant="outline" size="sm" className="gap-2 bg-white dark:bg-slate-900 border-none shadow-sm font-bold">
+                   <Button variant="outline" size="sm" className="gap-2 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl font-bold text-xs">
                       <Download className="w-4 h-4" /> Export logs
                    </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="rounded-2xl border border-border/50 overflow-hidden bg-white dark:bg-slate-950 shadow-sm">
+                <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-950 shadow-sm">
                   <Table>
-                    <TableHeader className="bg-slate-50 dark:bg-slate-900/50 font-black uppercase text-[10px]">
-                      <TableRow className="border-border/50">
-                        <TableHead className="font-black">Student Record</TableHead>
-                        <TableHead className="font-black">Academic Year</TableHead>
-                        <TableHead className="font-black">Transition</TableHead>
-                        <TableHead className="font-black">Timestamp</TableHead>
-                        <TableHead className="text-right font-black px-8">Actions</TableHead>
+                    <TableHeader className="bg-slate-50/80 dark:bg-slate-900/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                      <TableRow className="border-slate-200/80 dark:border-slate-800">
+                        <TableHead className="font-semibold">Student Record</TableHead>
+                        <TableHead className="font-semibold">Academic Year</TableHead>
+                        <TableHead className="font-semibold">Transition</TableHead>
+                        <TableHead className="font-semibold">Timestamp</TableHead>
+                        <TableHead className="text-right font-semibold px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {history.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={5} className="h-64 text-center">
-                            <div className="flex flex-col items-center justify-center text-muted-foreground gap-4">
-                              <History className="w-12 h-12 opacity-10" />
-                              <p className="font-black text-xs uppercase tracking-widest opacity-30">No records found</p>
+                            <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
+                              <History className="w-10 h-10 opacity-30" />
+                              <p className="font-bold text-xs uppercase tracking-wider text-slate-400">No promotion records found</p>
                             </div>
                           </TableCell>
                         </TableRow>
                       ) : history.map((h) => (
-                        <TableRow key={h.id} className="border-border/50 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors group">
+                        <TableRow key={h.id} className="border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors group">
                           <TableCell className="py-4">
                             <div className="flex flex-col">
-                              <span className="font-black text-slate-900 dark:text-white leading-tight group-hover:text-primary transition-colors">{h.student?.fullName || 'Unknown Student'}</span>
-                              <span className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">{h.student?.student_id || '-'}</span>
+                              <span className="font-bold text-sm text-slate-900 dark:text-white leading-tight group-hover:text-primary transition-colors">{h.student?.fullName || 'Unknown Student'}</span>
+                              <span className="text-xs text-slate-400 font-mono">ID: {h.student?.student_id || '-'}</span>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="bg-blue-50/50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-500/20 font-black text-[10px]">
+                            <Badge variant="outline" className="bg-blue-50/50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 border-blue-500/20 font-bold text-[10px]">
                               {h.academicYear}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2 text-sm">
-                              <span className="font-bold text-slate-500">{cohorts.find(c => c.gradeId === h.fromGradeId)?.gradeName || 'Prev'}</span>
-                              <ArrowRight className="w-3 h-3 text-primary animate-pulse" />
+                              <span className="font-medium text-slate-500">{cohorts.find(c => c.gradeId === h.fromGradeId)?.gradeName || 'Prev'}</span>
+                              <ArrowRight className="w-3.5 h-3.5 text-primary" />
                               {h.toGradeId ? (
-                                <span className="font-black text-primary uppercase">{cohorts.find(c => c.gradeId === h.toGradeId)?.gradeName || 'Next'}</span>
+                                <span className="font-bold text-primary">{cohorts.find(c => c.gradeId === h.toGradeId)?.gradeName || 'Next'}</span>
                               ) : (
-                                <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 font-black text-[9px] uppercase tracking-widest">Graduated</Badge>
+                                <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 font-bold text-[10px]">Graduated</Badge>
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-xs font-bold text-slate-400">
+                          <TableCell className="text-xs font-medium text-slate-400 whitespace-nowrap">
                             {format(new Date(h.promotedAt), 'MMM dd, yyyy HH:mm')}
                           </TableCell>
-                          <TableCell className="text-right px-8">
+                          <TableCell className="text-right px-6 whitespace-nowrap">
                              <Button 
                                 variant="ghost" 
-                                size="icon" 
-                                className="group-hover:bg-red-50 group-hover:text-red-500 rounded-full transition-all"
+                                size="sm" 
+                                className="rounded-xl font-bold text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                                 onClick={() => handleRollback(h.id)}
                              >
-                                <Undo2 className="w-4 h-4" />
+                                <Undo2 className="w-4 h-4 mr-1" /> Rollback
                              </Button>
                           </TableCell>
                         </TableRow>
@@ -1293,6 +1333,39 @@ export default function StudentPromotionPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Confirmation Dialog for Future Academic Year */}
+      <Dialog open={isFutureConfirmOpen} onOpenChange={setIsFutureConfirmOpen}>
+        <DialogContent className="max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base md:text-lg font-bold text-slate-900 dark:text-white">
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+              Confirm Academic Year: {academicYear}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed font-medium">
+              You are setting <span className="font-bold text-primary">{academicYear}</span> as the target academic year. Please confirm to proceed with student promotion for this academic year.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-row justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setIsFutureConfirmOpen(false)}
+              className="rounded-xl text-xs font-bold h-10 px-4 border-slate-200 dark:border-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setIsFutureConfirmOpen(false)
+                setCurrentStep(2)
+              }}
+              className="rounded-xl text-xs font-bold h-10 px-5 bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              Confirm & Proceed
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

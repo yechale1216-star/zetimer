@@ -527,17 +527,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           className="mb-4"
         />
       )}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-2">
-        <div className="space-y-1.5 w-full md:w-auto">
-          <h2 className="text-xl md:text-5xl font-black text-foreground leading-[1.1] tracking-tight uppercase whitespace-nowrap overflow-hidden text-ellipsis">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+        <div className="space-y-1 w-full md:w-auto">
+          <h2 className="typography-page-title">
             {getGreeting()}, <span className="text-primary">{firstName}</span>
           </h2>
-          <p className="text-xs md:text-sm font-bold text-muted-foreground/60 uppercase tracking-widest">
-            School Health Overview • {new Date().toLocaleDateString("en-ET", { timeZone: "Africa/Addis_Ababa", month: 'short', day: 'numeric' })}
+          <p className="typography-helper text-xs md:text-sm font-medium">
+            School Health Overview • {new Date().toLocaleDateString("en-ET", { timeZone: "Africa/Addis_Ababa", month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
-        <div className="flex flex-col items-start md:items-end gap-3 w-full md:w-auto">
-          <div className="typography-label text-[10px] uppercase bg-primary/10 text-primary px-4 py-1.5 rounded-full border border-primary/20 shadow-sm flex items-center gap-3">
+        <div className="flex flex-col items-start md:items-end gap-2.5 w-full md:w-auto">
+          <div className="text-xs font-medium bg-primary/10 text-primary px-3.5 py-1.5 rounded-full border border-primary/20 shadow-2xs flex items-center gap-2.5">
             {new Date().toLocaleDateString("en-ET", {
               timeZone: "Africa/Addis_Ababa",
               weekday: "long",
@@ -547,19 +547,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             })}
             <button 
               onClick={() => loadDashboardData()}
-              className="ml-2 hover:text-primary-focus transition-colors"
+              className="hover:text-primary-focus transition-colors"
               title="Refresh Data"
             >
-              <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
           {isSessionBased && (
-            <div className="flex gap-1.5 p-1 bg-white/50 dark:bg-slate-800/50 rounded-full border border-slate-200 dark:border-slate-700">
+            <div className="flex gap-1.5 p-1 bg-white/60 dark:bg-slate-800/60 rounded-full border border-slate-200 dark:border-slate-700/60">
               <Button 
                 variant={sessionFilter === "total" ? "default" : "ghost"} 
                 onClick={() => setSessionFilter("total")}
                 size="sm"
-                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
+                className="h-7 px-3 text-xs font-semibold rounded-full"
               >
                 Full Day
               </Button>
@@ -567,7 +567,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 variant={sessionFilter === "morning" ? "default" : "ghost"} 
                 onClick={() => setSessionFilter("morning")}
                 size="sm"
-                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full"
+                className="h-7 px-3 text-xs font-semibold rounded-full"
               >
                 Morning
               </Button>
@@ -575,7 +575,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 variant={sessionFilter === "afternoon" ? "default" : "outline"} 
                 onClick={() => setSessionFilter("afternoon")}
                 size="sm"
-                className="typography-label h-7 px-3 text-[10px] uppercase rounded-full border-none"
+                className="h-7 px-3 text-xs font-semibold rounded-full border-none"
               >
                 Afternoon
               </Button>
@@ -584,51 +584,36 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </div>
 
-      {/* School Overview Stats - Reimagined as a single row card */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4">
+      {/* School Overview Stats — matches announcement card style */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: "Total Students", value: stats.totalStudents, icon: Users, color: "slate", trend: null },
-          { label: "Present", value: stats.presentToday, icon: UserCheck, color: "emerald", trend: null },
-          { label: "Late", value: stats.lateToday, icon: Clock, color: "amber", trend: null },
-          { label: "Absent", value: stats.absentToday, icon: UserX, color: "rose", trend: null },
-          { label: "Excused", value: stats.excusedToday, icon: AlertTriangle, color: "sky", trend: null },
-          { label: "Attendance", value: `${stats.attendanceRate}%`, icon: TrendingUp, color: "indigo", isRate: true },
+          { label: "Total Students", value: stats.totalStudents, icon: Users,          iconBg: "bg-slate-100 dark:bg-slate-800",   iconColor: "text-slate-500 dark:text-slate-400",   valColor: "text-slate-700 dark:text-slate-200"   },
+          { label: "Present",        value: stats.presentToday,  icon: UserCheck,      iconBg: "bg-emerald-50 dark:bg-emerald-900/20", iconColor: "text-emerald-600 dark:text-emerald-400", valColor: "text-emerald-600 dark:text-emerald-400" },
+          { label: "Late",           value: stats.lateToday,     icon: Clock,          iconBg: "bg-amber-50 dark:bg-amber-900/20",   iconColor: "text-amber-500 dark:text-amber-400",   valColor: "text-amber-500 dark:text-amber-400"   },
+          { label: "Absent",         value: stats.absentToday,   icon: UserX,          iconBg: "bg-rose-50 dark:bg-rose-900/20",     iconColor: "text-rose-500 dark:text-rose-400",     valColor: "text-rose-500 dark:text-rose-400"     },
+          { label: "Excused",        value: stats.excusedToday,  icon: AlertTriangle,  iconBg: "bg-sky-50 dark:bg-sky-900/20",       iconColor: "text-sky-500 dark:text-sky-400",       valColor: "text-sky-500 dark:text-sky-400"       },
+          { label: "Attendance",     value: `${stats.attendanceRate}%`, icon: TrendingUp, iconBg: "bg-indigo-50 dark:bg-indigo-900/20", iconColor: "text-indigo-500 dark:text-indigo-400", valColor: "text-indigo-600 dark:text-indigo-400" },
         ].map((item, idx) => (
-          <div 
-            key={idx} 
-            className={cn(
-              "relative overflow-hidden transition-all duration-300 active:scale-[0.98] group rounded-[24px] p-4 flex flex-col items-center justify-center text-center border shadow-sm",
-              item.isRate 
-                ? "bg-slate-900 dark:bg-primary text-white border-transparent" 
-                : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800"
-            )}
+          <div
+            key={idx}
+            className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 md:p-5 flex flex-col items-center justify-center text-center gap-2 shadow-sm transition-all duration-200 group hover:shadow-md"
           >
-            <div className={cn(
-              "w-9 h-9 rounded-2xl flex items-center justify-center mb-2.5 transition-transform group-hover:scale-110",
-              item.isRate 
-                ? "bg-white/10" 
-                : `bg-${item.color}-500/10 text-${item.color}-600 dark:text-${item.color}-400`
-            )}>
-              <item.icon className="h-4 w-4" />
+            {/* Icon */}
+            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110", item.iconBg, item.iconColor)}>
+              <item.icon className="h-5 w-5" />
             </div>
-            <div className="space-y-0.5">
-              <p className={cn(
-                "text-lg font-black tracking-tight leading-none mb-1",
-                item.isRate ? "text-white" : `text-foreground`
-              )}>
-                {isLoading ? (
-                  <span className="inline-block w-8 h-4 bg-current opacity-10 animate-pulse rounded" />
-                ) : (
-                  item.value
-                )}
-              </p>
-              <p className={cn(
-                "text-[9px] uppercase font-black tracking-widest leading-none",
-                item.isRate ? "text-white/60" : "text-muted-foreground/60"
-              )}>
-                {item.label}
-              </p>
-            </div>
+            {/* Label */}
+            <p className="text-xs font-medium text-slate-400 dark:text-slate-500 leading-tight">
+              {item.label}
+            </p>
+            {/* Value */}
+            <p className={cn("text-2xl md:text-3xl font-bold tracking-tight leading-none", item.valColor)}>
+              {isLoading ? (
+                <span className="inline-block w-10 h-7 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
+              ) : (
+                item.value
+              )}
+            </p>
           </div>
         ))}
       </div>

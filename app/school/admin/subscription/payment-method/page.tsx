@@ -82,11 +82,13 @@ function PaymentMethodContent() {
     }
   }
 
-  const tierConfig = TIER_CONFIG[tier]
+  const validTiers: TierPlan[] = ['free', 'starter', 'standard', 'premium', 'enterprise']
+  const safeTier: TierPlan = validTiers.includes(tier) ? tier : 'starter'
+  const tierConfig = TIER_CONFIG[safeTier]
   
   const breakdown = calculateDynamicPrice({
-    studentCount: Math.max(studentCount, 1), // use at least 1 to avoid zero base if new
-    tier,
+    studentCount: Math.max(studentCount, 1),
+    tier: safeTier,
     billingPeriod: period,
     addons: []
   })

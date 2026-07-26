@@ -138,13 +138,13 @@ export default function CallPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto w-full space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Communications</h1>
           <p className="text-muted-foreground">Call your contacts or view recent call history.</p>
         </div>
-        <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-xl">
+        <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-xl self-start sm:self-auto">
           <Button
             variant={view === 'HISTORY' ? 'default' : 'ghost'}
             onClick={() => setView('HISTORY')}
@@ -164,20 +164,20 @@ export default function CallPage() {
         </div>
       </div>
 
-      <Card className="border-none shadow-xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl">
+      <Card className="border-none shadow-xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl overflow-hidden">
         <CardHeader className="pb-3 border-b border-border/50">
-          <div className="flex flex-col md:flex-row gap-4 justify-between">
-            <div className="relative group flex-1">
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+            <div className="relative group flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <Input
                 placeholder="Search by name or role..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-11 bg-background/50 border-none ring-1 ring-border/50 focus-visible:ring-primary/50 rounded-xl"
+                className="pl-10 h-11 bg-background/50 border-none ring-1 ring-border/50 focus-visible:ring-primary/50 rounded-xl w-full"
               />
             </div>
             {view === 'HISTORY' && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <Button variant={filter === 'ALL' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('ALL')} className="rounded-full px-4 text-xs font-semibold">All</Button>
                 <Button variant={filter === 'MISSED' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('MISSED')} className="rounded-full px-4 text-xs font-semibold">Missed</Button>
               </div>
@@ -185,7 +185,7 @@ export default function CallPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div>
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -196,6 +196,7 @@ export default function CallPage() {
                 formatDuration={formatDuration} 
                 getCallIcon={getCallIcon} 
                 getOtherParticipant={getOtherParticipant}
+                initiateCall={initiateCall}
               />
             ) : (
               <ContactsView 
@@ -206,7 +207,7 @@ export default function CallPage() {
           </div>
         </CardContent>
       </Card>
-
+      
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent className="rounded-2xl border-none shadow-2xl">
           <AlertDialogHeader>
@@ -229,120 +230,229 @@ export default function CallPage() {
   );
 }
 
-function HistoryView({ calls, formatDuration, getCallIcon, getOtherParticipant }: any) {
+function HistoryView({ calls, formatDuration, getCallIcon, getOtherParticipant, initiateCall }: any) {
   if (calls.length === 0) return <EmptyState icon={<History />} title="No call history" subtitle="Your recent calls will appear here. To start a call, go to the Contacts tab." />;
   return (
-    <table className="w-full text-left border-collapse">
-      <thead>
-        <tr className="border-b border-border/50 text-[11px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/30">
-          <th className="px-6 py-4">User</th>
-          <th className="px-6 py-4">Status</th>
-          <th className="px-6 py-4 text-center">Duration</th>
-          <th className="px-6 py-4 text-right">Time</th>
-          <th className="px-6 py-4"></th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-border/30">
+    <>
+      {/* Mobile & Tablet List Layout */}
+      <div className="space-y-3 p-4 lg:hidden">
         {calls.map((call: any) => {
           const otherUser = getOtherParticipant(call);
           return (
-            <tr key={call.id} className="group hover:bg-primary/[0.02] transition-colors">
-              <td className="px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10 border border-border shadow-sm">
-                    <AvatarImage src={otherUser?.profile_photo} />
-                    <AvatarFallback className="bg-primary/5 text-primary font-bold">
-                      {otherUser?.full_name?.slice(0, 2).toUpperCase() || '??'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <span className="font-bold text-sm tracking-tight">{otherUser?.full_name}</span>
-                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{otherUser?.role}</span>
+            <div key={call.id} className="p-4 rounded-2xl border border-border/50 bg-background/50 dark:bg-slate-800/40 hover:bg-background/80 transition-all flex items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar className="h-10 w-10 border border-border shadow-sm shrink-0">
+                  <AvatarImage src={otherUser?.profile_photo} />
+                  <AvatarFallback className="bg-primary/5 text-primary font-bold">
+                    {otherUser?.full_name?.slice(0, 2).toUpperCase() || '??'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-bold text-sm tracking-tight text-foreground truncate">{otherUser?.full_name}</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {getCallIcon(call.status)}
+                    <span className={cn("text-[11px] font-semibold", call.status === 'MISSED' ? "text-red-500" : "text-muted-foreground")}>
+                      {call.status === 'MISSED' ? 'Missed' : 'Outgoing'}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/60">•</span>
+                    <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-0.5">
+                      <Clock className="h-2.5 w-2.5" />
+                      {formatDuration(call.duration)}
+                    </span>
                   </div>
                 </div>
-              </td>
-              <td className="px-6 py-4">
-                <div className="flex items-center gap-2">
-                  {getCallIcon(call.status)}
-                  <span className={cn("text-xs font-bold", call.status === 'MISSED' ? "text-red-500" : "text-foreground")}>
-                    {call.status === 'MISSED' ? 'Missed' : 'Outgoing'}
-                  </span>
+              </div>
+              
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-col items-end text-right">
+                  <span className="text-xs font-bold text-foreground">{format(new Date(call.createdAt), 'HH:mm')}</span>
+                  <span className="text-[10px] text-muted-foreground font-medium">{format(new Date(call.createdAt), 'MMM d')}</span>
                 </div>
-              </td>
-              <td className="px-6 py-4 text-center">
-                <div className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  {formatDuration(call.duration)}
-                </div>
-              </td>
-              <td className="px-6 py-4 text-right">
-                <div className="flex flex-col items-end">
-                  <span className="text-xs font-bold">{format(new Date(call.createdAt), 'HH:mm')}</span>
-                  <span className="text-[10px] text-muted-foreground font-medium">{format(new Date(call.createdAt), 'MMM d, yyyy')}</span>
-                </div>
-              </td>
-              <td className="px-6 py-4 text-right opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </td>
-            </tr>
+                {otherUser?.phone && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => initiateCall(otherUser)}
+                    className="h-8 w-8 rounded-full text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                  >
+                    <Phone className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
           );
         })}
-      </tbody>
-    </table>
+      </div>
+
+      {/* Desktop Table Layout */}
+      <table className="w-full text-left border-collapse hidden lg:table">
+        <thead>
+          <tr className="border-b border-border/50 text-[11px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/30">
+            <th className="px-4 py-3 md:px-6 md:py-4">User</th>
+            <th className="px-4 py-3 md:px-6 md:py-4">Status</th>
+            <th className="px-4 py-3 md:px-6 md:py-4 text-center">Duration</th>
+            <th className="px-4 py-3 md:px-6 md:py-4 text-right">Time</th>
+            <th className="px-4 py-3 md:px-6 md:py-4"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/30">
+          {calls.map((call: any) => {
+            const otherUser = getOtherParticipant(call);
+            return (
+              <tr key={call.id} className="group hover:bg-primary/[0.02] transition-colors">
+                <td className="px-4 py-3 md:px-6 md:py-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 border border-border shadow-sm">
+                      <AvatarImage src={otherUser?.profile_photo} />
+                      <AvatarFallback className="bg-primary/5 text-primary font-bold">
+                        {otherUser?.full_name?.slice(0, 2).toUpperCase() || '??'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-sm tracking-tight">{otherUser?.full_name}</span>
+                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{otherUser?.role}</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-3 md:px-6 md:py-4">
+                  <div className="flex items-center gap-2">
+                    {getCallIcon(call.status)}
+                    <span className={cn("text-xs font-bold", call.status === 'MISSED' ? "text-red-500" : "text-foreground")}>
+                      {call.status === 'MISSED' ? 'Missed' : 'Outgoing'}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 md:px-6 md:py-4 text-center">
+                  <div className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {formatDuration(call.duration)}
+                  </div>
+                </td>
+                <td className="px-4 py-3 md:px-6 md:py-4 text-right">
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs font-bold">{format(new Date(call.createdAt), 'HH:mm')}</span>
+                    <span className="text-[10px] text-muted-foreground font-medium">{format(new Date(call.createdAt), 'MMM d, yyyy')}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 md:px-6 md:py-4 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    {otherUser?.phone && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => initiateCall(otherUser)}
+                        className="h-8 w-8 rounded-full text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Call back"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </>
   );
 }
 
 function ContactsView({ contacts, initiateCall }: any) {
   if (contacts.length === 0) return <EmptyState icon={<Users />} title="No contacts found" subtitle="Try searching for a different name or role." />;
   return (
-    <table className="w-full text-left border-collapse">
-      <thead>
-        <tr className="border-b border-border/50 text-[11px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/30">
-          <th className="px-6 py-4">Name</th>
-          <th className="px-6 py-4">Role</th>
-          <th className="px-6 py-4">Phone Number</th>
-          <th className="px-6 py-4 text-right">Action</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-border/30">
+    <>
+      {/* Mobile & Tablet Card Layout */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 lg:hidden">
         {contacts.map((contact: any) => (
-          <tr key={contact.id} className="group hover:bg-primary/[0.02] transition-colors">
-            <td className="px-6 py-4">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10 border border-border shadow-sm">
-                  <AvatarImage src={contact.profile_photo} />
-                  <AvatarFallback className="bg-primary/5 text-primary font-bold">
-                    {contact.full_name?.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="font-bold text-sm tracking-tight">{contact.full_name}</span>
+          <div key={contact.id} className="p-4 rounded-2xl border border-border/50 bg-background/50 dark:bg-slate-800/40 hover:bg-background/80 transition-all flex flex-col justify-between gap-4 shadow-sm hover:shadow-md">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12 border border-border shadow-sm shrink-0">
+                <AvatarImage src={contact.profile_photo} />
+                <AvatarFallback className="bg-primary/5 text-primary font-bold text-lg">
+                  {contact.full_name?.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-sm tracking-tight text-foreground truncate">{contact.full_name}</span>
+                <div className="mt-1">
+                  <Badge variant="outline" className="capitalize text-[10px] font-bold tracking-wider px-2 py-0.5 border-primary/20 bg-primary/5 text-primary">
+                    {contact.role}
+                  </Badge>
+                </div>
               </div>
-            </td>
-            <td className="px-6 py-4">
-              <Badge variant="outline" className="capitalize text-[10px] font-bold tracking-wider px-2 py-0.5 border-primary/20 bg-primary/5 text-primary">
-                {contact.role}
-              </Badge>
-            </td>
-            <td className="px-6 py-4">
-              <span className="text-sm font-medium text-muted-foreground">{contact.phone || 'No phone listed'}</span>
-            </td>
-            <td className="px-6 py-4 text-right">
-                <Button
-                  size="sm"
-                  onClick={() => initiateCall(contact)}
-                  disabled={!contact.phone}
-                  className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
-                >
-                  <Phone className="w-4 h-4" />
-                  Call
-                </Button>
-            </td>
-          </tr>
+            </div>
+            
+            <div className="flex flex-col gap-2.5 pt-2.5 border-t border-border/30">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground/60" />
+                <span className="truncate">{contact.phone || 'No phone listed'}</span>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => initiateCall(contact)}
+                disabled={!contact.phone}
+                className="w-full h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                <Phone className="w-4 h-4" />
+                Call
+              </Button>
+            </div>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </div>
+
+      {/* Desktop Table Layout */}
+      <table className="w-full text-left border-collapse hidden lg:table">
+        <thead>
+          <tr className="border-b border-border/50 text-[11px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/30">
+            <th className="px-4 py-3 md:px-6 md:py-4">Name</th>
+            <th className="px-4 py-3 md:px-6 md:py-4">Role</th>
+            <th className="px-4 py-3 md:px-6 md:py-4">Phone Number</th>
+            <th className="px-4 py-3 md:px-6 md:py-4 text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/30">
+          {contacts.map((contact: any) => (
+            <tr key={contact.id} className="group hover:bg-primary/[0.02] transition-colors">
+              <td className="px-4 py-3 md:px-6 md:py-4">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10 border border-border shadow-sm">
+                    <AvatarImage src={contact.profile_photo} />
+                    <AvatarFallback className="bg-primary/5 text-primary font-bold">
+                      {contact.full_name?.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="font-bold text-sm tracking-tight">{contact.full_name}</span>
+                </div>
+              </td>
+              <td className="px-4 py-3 md:px-6 md:py-4">
+                <Badge variant="outline" className="capitalize text-[10px] font-bold tracking-wider px-2 py-0.5 border-primary/20 bg-primary/5 text-primary">
+                  {contact.role}
+                </Badge>
+              </td>
+              <td className="px-4 py-3 md:px-6 md:py-4">
+                <span className="text-sm font-medium text-muted-foreground">{contact.phone || 'No phone listed'}</span>
+              </td>
+              <td className="px-4 py-3 md:px-6 md:py-4 text-right">
+                  <Button
+                    size="sm"
+                    onClick={() => initiateCall(contact)}
+                    disabled={!contact.phone}
+                    className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2"
+                  >
+                    <Phone className="w-4 h-4" />
+                    Call
+                  </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }
 

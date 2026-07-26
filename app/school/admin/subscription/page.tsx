@@ -132,28 +132,7 @@ export default function SubscriptionOverviewPage() {
   const usagePercentage = isEnterprise ? 0 : Math.min(100, (activeStudents / maxStudents) * 100)
 
   return (
-    <div className="space-y-8 pb-32">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe mx-4 md:mx-0">
-        <div>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
-            Subscription
-          </h1>
-          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
-            Plan & Billing Management
-          </p>
-        </div>
-        <div className="flex gap-2 w-full md:w-auto">
-          <Button 
-            onClick={fetchSubscription} 
-            variant="outline"
-            className="flex-1 md:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Sync
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6 pb-8 max-w-7xl mx-auto w-full">
       
       {/* Alerts */}
       {subscription.status === 'pending_payment' && (
@@ -202,7 +181,7 @@ export default function SubscriptionOverviewPage() {
             <CreditCard className="w-5 h-5 text-primary" />
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
-          <p className="text-xl font-black uppercase text-primary tracking-tight truncate">{subscription.status}</p>
+          <p className="text-lg font-black uppercase text-primary tracking-normal truncate">{subscription.status}</p>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -210,7 +189,7 @@ export default function SubscriptionOverviewPage() {
             <span className="text-emerald-600 font-black text-xs">ETB</span>
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Monthly</p>
-          <p className="text-xl font-black uppercase text-emerald-600 tracking-tight">{effectiveMrr.toLocaleString()}</p>
+          <p className="text-lg font-black uppercase text-emerald-600 tracking-normal">{effectiveMrr.toLocaleString()}</p>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -218,7 +197,7 @@ export default function SubscriptionOverviewPage() {
             <Calendar className="w-5 h-5 text-blue-500" />
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Renewal</p>
-          <p className="text-xl font-black uppercase text-blue-600 tracking-tight">{Math.max(0, daysUntilRenewal)} Days</p>
+          <p className="text-lg font-black uppercase text-blue-600 tracking-normal">{Math.max(0, daysUntilRenewal)} Days</p>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -226,7 +205,7 @@ export default function SubscriptionOverviewPage() {
             <Users className="w-5 h-5 text-orange-500" />
           </div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Usage</p>
-          <p className="text-xl font-black uppercase text-orange-600 tracking-tight">
+          <p className="text-lg font-black uppercase text-orange-600 tracking-normal">
             {Math.round(usagePercentage)}%
           </p>
         </div>

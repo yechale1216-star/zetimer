@@ -63,6 +63,7 @@ export default function SchoolAdminLayout({
   const { clearSchoolContext } = useSchool()
   const [isMounted, setIsMounted] = React.useState(false)
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
+  const [isCollapsed, setIsCollapsed] = React.useState(false)
   const [showBottomNav, setShowBottomNav] = React.useState(true)
   const [lastScrollY, setLastScrollY] = React.useState(0)
 
@@ -199,20 +200,53 @@ export default function SchoolAdminLayout({
               </aside>
 
               {/* ── Desktop Sidebar ── */}
-              <aside className="hidden md:flex w-64 border-r border-border bg-card/70 dark:bg-slate-900/70 backdrop-blur-xl flex-col relative z-20">
-                <div className="p-6 border-b border-border">
-                  <Logo size="md" href="/school/admin" />
+              <aside className={cn(
+                "hidden md:flex border-r border-border bg-card/80 dark:bg-slate-900/80 backdrop-blur-xl flex-col relative z-20 transition-all duration-300 ease-in-out",
+                isCollapsed ? "w-20" : "w-64"
+              )}>
+                <div className="h-16 px-4 border-b border-border flex items-center justify-between">
+                  {!isCollapsed && <Logo size="sm" href="/school/admin" />}
+                  {isCollapsed && (
+                    <div className="mx-auto">
+                      <Logo size="sm" href="/school/admin" iconOnly />
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    className={cn(
+                      "p-2 rounded-xl text-muted-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
+                      isCollapsed && "mx-auto mt-2"
+                    )}
+                    title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  >
+                    {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <X className="w-5 h-5 opacity-0 hover:opacity-100 hidden" />}
+                  </button>
                 </div>
-                <nav className="flex-1 p-4 space-y-2 overflow-y-auto no-scrollbar">
-                  {allNavItems.map(item => (
-                    <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} active={isActive(item.href)} />
-                  ))}
 
+                <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto no-scrollbar">
+                  {allNavItems.map(item => (
+                    <NavLink
+                      key={item.href}
+                      href={item.href}
+                      icon={item.icon}
+                      label={item.label}
+                      active={isActive(item.href)}
+                      isCollapsed={isCollapsed}
+                    />
+                  ))}
                 </nav>
-                <div className="p-4 border-t border-border">
-                  <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2 rounded-lg hover:bg-secondary text-muted-foreground transition text-sm font-medium">
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
+
+                <div className="p-3 border-t border-border">
+                  <button
+                    onClick={handleLogout}
+                    title={isCollapsed ? "Sign Out" : undefined}
+                    className={cn(
+                      "flex items-center gap-3 w-full rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 transition text-sm font-semibold",
+                      isCollapsed ? "justify-center p-3" : "px-4 py-2.5"
+                    )}
+                  >
+                    <LogOut className="w-4 h-4 flex-shrink-0" />
+                    {!isCollapsed && <span>Sign Out</span>}
                   </button>
                 </div>
               </aside>
@@ -257,15 +291,19 @@ export default function SchoolAdminLayout({
   )
 }
 
-function NavLink({ href, icon, label, active }: { href: string, icon: React.ReactNode, label: string, active: boolean }) {
+function NavLink({ href, icon, label, active, isCollapsed }: { href: string, icon: React.ReactNode, label: string, active: boolean, isCollapsed?: boolean }) {
   return (
-    <Link href={href}>
+    <Link href={href} title={isCollapsed ? label : undefined}>
       <div className={cn(
-        "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm font-semibold",
-        active ? 'bg-primary/15 text-primary shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+        "flex items-center gap-3 rounded-xl transition-all duration-200 text-sm font-semibold group",
+        isCollapsed ? "justify-center p-3" : "px-4 py-2.5",
+        active ? 'bg-primary/15 text-primary shadow-2xs font-bold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
       )}>
-        <span className={active ? 'text-primary' : 'text-slate-500'}>{icon}</span>
-        <span>{label}</span>
+        <span className={cn(
+          "transition-colors flex-shrink-0",
+          active ? 'text-primary' : 'text-slate-500 group-hover:text-foreground'
+        )}>{icon}</span>
+        {!isCollapsed && <span className="truncate">{label}</span>}
       </div>
     </Link>
   )

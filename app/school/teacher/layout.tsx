@@ -110,8 +110,8 @@ export default function TeacherLayout({
               
               {/* Desktop Sidebar */}
               <aside className="hidden md:flex w-64 border-r border-border bg-card/70 dark:bg-slate-900/70 backdrop-blur-xl flex-col relative z-20">
-                <div className="p-6 border-b border-border">
-                  <Logo size="md" href="/school/teacher" />
+                <div className="h-16 px-4 border-b border-border flex items-center justify-between">
+                  <Logo size="sm" href="/school/teacher" />
                 </div>
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto no-scrollbar">
                   {navItems.map(item => (

@@ -280,14 +280,14 @@ export function TeacherManagement() {
   }
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12 max-w-7xl mx-auto w-full">
       {/* Dynamic Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1 pt-safe">
         <div>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+          <h1 className="text-lg md:text-xl font-black text-slate-900 dark:text-white uppercase tracking-normal">
             Faculty
           </h1>
-          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+          <p className="text-[10px] font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
             Teacher Directory & Management
           </p>
         </div>
@@ -539,8 +539,8 @@ export function TeacherManagement() {
 
       {/* Card Grid of Teachers */}
       <div className="space-y-4">
-        <h2 className="typography-section-title text-slate-800 dark:text-slate-100 flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-blue-600" />
+        <h2 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-blue-600" />
           Active Faculty Members ({teachers.length})
         </h2>
 
@@ -552,7 +552,7 @@ export function TeacherManagement() {
             <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No faculty registered</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-1 md:px-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-1 md:px-0">
             {teachers.map((teacher) => {
               const bgGradient = getAvatarGradient(teacher.id)
               return (
@@ -575,7 +575,7 @@ export function TeacherManagement() {
                         </div>
                       )}
                       <div className="min-w-0">
-                        <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 leading-none truncate uppercase tracking-tight">
+                        <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 leading-none truncate uppercase tracking-normal">
                           {teacher.full_name}
                         </h3>
                         <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1.5 flex items-center gap-1.5">

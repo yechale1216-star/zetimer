@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
-import { LogOut, User, Menu, GraduationCap, Sun, Moon } from "lucide-react"
+import { LogOut, User, Menu, GraduationCap, Sun, Moon, Search } from "lucide-react"
 import { useSchoolSettings } from "@/hooks/use-school-settings"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils/utils"
@@ -20,6 +20,7 @@ import { useAuth } from "@/lib/context/auth-context"
 import { useSchool } from "@/lib/context/school-context"
 import { NotificationPopover } from "@/components/ui/notification-popover"
 import { useTheme } from "@/components/theme-provider"
+import { CommandPalette } from "@/components/ui/command-palette"
 
 interface TopNavProps {
   onMenuClick?: () => void
@@ -33,6 +34,7 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
   const { user, logout } = useAuth()
   const [logoError, setLogoError] = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false)
   const { theme, setTheme } = useTheme()
 
   React.useEffect(() => {
@@ -55,96 +57,117 @@ export function TopNav({ onMenuClick, showMenuButton = false }: TopNavProps) {
     .slice(0, 2) || "U"
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-sm pt-safe">
-      <div className="w-full flex h-16 md:h-20 items-center px-4 md:px-8">
-        {showMenuButton && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="mr-3 md:hidden h-10 w-10 rounded-xl hover:bg-primary/10 transition-all active:scale-90"
-            onClick={onMenuClick}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        )}
+    <>
+      <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-xs pt-safe">
+        <div className="w-full flex h-16 items-center px-4 md:px-8 gap-4">
+          {showMenuButton && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="mr-1 md:hidden h-10 w-10 rounded-xl hover:bg-primary/10 transition-all active:scale-90"
+              onClick={onMenuClick}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
 
-        <div className="flex items-center gap-2.5 md:gap-4 flex-1 min-w-0">
-          <div className="h-9 w-9 md:h-12 md:w-12 rounded-lg md:rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0 border border-primary/20 shadow-inner">
-            {logoUrl && !logoError ? (
-              <img 
-                src={logoUrl} 
-                alt="Logo" 
-                className="w-full h-full object-cover" 
-                onError={() => setLogoError(true)}
-              />
-            ) : (
-              <div className="bg-primary/5 w-full h-full flex items-center justify-center">
-                <GraduationCap className="h-4 w-4 md:h-6 md:w-6 text-primary" />
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <h1 className="text-sm md:text-xl font-black tracking-tight text-foreground truncate uppercase">
-              {schoolName}
-            </h1>
-            <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest truncate">
-              {user?.role?.replace('_', ' ')} Portal
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1 md:gap-3">
-          <div className="hidden sm:block">
-            <ModeToggle />
-          </div>
-          
-          <NotificationPopover />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-9 w-9 md:h-10 md:w-10 rounded-full p-0 border border-border/50 hover:border-primary/30 transition-all shadow-sm">
-                <Avatar className="h-8 w-8 md:h-9 md:w-9">
-                  <AvatarImage src={user?.profile_photo || undefined} />
-                  <AvatarFallback className="text-[10px] md:text-xs font-bold bg-primary/10 text-primary">{initials}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 rounded-2xl p-2" align="end" forceMount>
-              <DropdownMenuLabel className="p-2 font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-bold truncate">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+          <div className="flex items-center gap-2.5 md:gap-4 flex-1 min-w-0">
+            <div className="h-9 w-9 md:h-11 md:w-11 rounded-lg md:rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0 border border-primary/20 shadow-inner">
+              {logoUrl && !logoError ? (
+                <img 
+                  src={logoUrl} 
+                  alt="Logo" 
+                  className="w-full h-full object-cover" 
+                  onError={() => setLogoError(true)}
+                />
+              ) : (
+                <div className="bg-primary/5 w-full h-full flex items-center justify-center">
+                  <GraduationCap className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                 </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator className="opacity-50" />
-              <DropdownMenuItem className="rounded-xl h-10 gap-2 font-semibold" onClick={() => {
-                const target = user?.role === "parent" ? "/parent/profile" : "/school/admin/profile"
-                router.push(target)
-              }}>
-                <User className="h-4 w-4" />
-                <span>Profile</span>
-              </DropdownMenuItem>
-              {mounted && (
-                <>
-                  <DropdownMenuSeparator className="opacity-50 sm:hidden" />
-                  <DropdownMenuItem 
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
-                    className="rounded-xl h-10 gap-2 font-semibold sm:hidden"
-                  >
-                    {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                    <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-                  </DropdownMenuItem>
-                </>
               )}
-              <DropdownMenuSeparator className="opacity-50" />
-              <DropdownMenuItem onClick={handleLogout} className="rounded-xl h-10 gap-2 font-semibold text-rose-500 focus:bg-rose-50 focus:text-rose-600">
-                <LogOut className="h-4 w-4" />
-                <span>Sign out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <h1 className="text-sm md:text-lg font-black tracking-tight text-foreground truncate uppercase">
+                {schoolName}
+              </h1>
+              <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest truncate">
+                {user?.role?.replace('_', ' ')} Portal
+              </p>
+            </div>
+          </div>
+
+          {/* Desktop Command Palette Search Trigger */}
+          <div className="hidden md:flex items-center flex-1 max-w-sm">
+            <button
+              onClick={() => setCommandPaletteOpen(true)}
+              className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-muted-foreground bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl transition-all shadow-2xs group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Search className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors" />
+                <span>Search pages, commands...</span>
+              </div>
+              <kbd className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-bold text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-2xs">
+                ⌘ K
+              </kbd>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 md:gap-3">
+            <div className="hidden sm:block">
+              <ModeToggle />
+            </div>
+            
+            <NotificationPopover />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-9 w-9 md:h-10 md:w-10 rounded-full p-0 border border-border/50 hover:border-primary/30 transition-all shadow-2xs">
+                  <Avatar className="h-8 w-8 md:h-9 md:w-9">
+                    <AvatarImage src={user?.profile_photo || undefined} />
+                    <AvatarFallback className="text-[10px] md:text-xs font-bold bg-primary/10 text-primary">{initials}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 rounded-2xl p-2" align="end" forceMount>
+                <DropdownMenuLabel className="p-2 font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-bold truncate">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="opacity-50" />
+                <DropdownMenuItem className="rounded-xl h-10 gap-2 font-semibold" onClick={() => {
+                  const target = user?.role === "parent" ? "/parent/profile" : "/school/admin/profile"
+                  router.push(target)
+                }}>
+                  <User className="h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                {mounted && (
+                  <>
+                    <DropdownMenuSeparator className="opacity-50 sm:hidden" />
+                    <DropdownMenuItem 
+                      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
+                      className="rounded-xl h-10 gap-2 font-semibold sm:hidden"
+                    >
+                      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                      <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator className="opacity-50" />
+                <DropdownMenuItem onClick={handleLogout} className="rounded-xl h-10 gap-2 font-semibold text-rose-500 focus:bg-rose-50 focus:text-rose-600">
+                  <LogOut className="h-4 w-4" />
+                  <span>Sign out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
+    </>
   )
 }
+

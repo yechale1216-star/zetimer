@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Search, Loader2, Users, BookOpen, ShieldCheck, ShieldOff, Eye } from 'lucide-react'
+import { Search, Loader2, Users, BookOpen, ShieldCheck, ShieldOff, Eye, PlusCircle } from 'lucide-react'
 import Link from 'next/link'
 import { getApiUrl } from '@/lib/api-config'
 import { AddSchoolDialog } from '@/components/super-admin/add-school-dialog'
@@ -19,6 +19,7 @@ export default function SchoolsPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [assigningId, setAssigningId] = useState<string | null>(null)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
 
   const fetchSchools = async () => {
@@ -56,6 +57,27 @@ export default function SchoolsPage() {
       fetchSchools()
     } finally {
       setTogglingId(null)
+    }
+  }
+
+  const handleAssignFreePlan = async (school: any) => {
+    setAssigningId(school.id)
+    try {
+      const res = await fetch(`${getApiUrl()}/api/super-admin/schools/${school.id}/assign-free-plan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('attendance_token')}`
+        }
+      })
+      const json = await res.json()
+      if (json.success) {
+        fetchSchools()
+      } else {
+        alert(json.error || 'Failed to assign free plan')
+      }
+    } finally {
+      setAssigningId(null)
     }
   }
 
@@ -157,6 +179,21 @@ export default function SchoolsPage() {
                       <td className="py-4 pr-4 text-xs text-muted-foreground">{s.createdAt}</td>
                       <td className="py-4">
                         <div className="flex items-center gap-1">
+                          {/* Assign Free Plan button for schools without a plan */}
+                          {s.plan === 'No Plan' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 gap-1 text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/30"
+                              disabled={assigningId === s.id}
+                              onClick={() => handleAssignFreePlan(s)}
+                              title="Assign Free Plan"
+                            >
+                              {assigningId === s.id
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : <PlusCircle className="w-3.5 h-3.5" />}
+                            </Button>
+                          )}
                           <Button variant="ghost" size="sm" asChild className="h-8 gap-1">
                             <Link href={`/super-admin/schools/detail?id=${s.id}`}><Eye className="w-3.5 h-3.5" /></Link>
                           </Button>

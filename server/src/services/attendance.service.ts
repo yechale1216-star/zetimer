@@ -1,7 +1,11 @@
 import prisma from '../config/db';
 
 export const markAttendance = async (data: any, schoolId: string) => {
-  const { studentId, date, session, status, remarks, teacherId } = data;
+  const { studentId, date, status, remarks, teacherId } = data;
+  // Normalize session to lowercase for consistent DB storage.
+  // The bulk route bypasses validateAttendance middleware, so normalization
+  // must happen here to avoid mixed-case records ("Morning" vs "morning").
+  const session = data.session ? data.session.toLowerCase() : null;
 
   if (!studentId || !date) {
     throw new Error("Student ID and Date are required");
@@ -20,7 +24,8 @@ export const markAttendance = async (data: any, schoolId: string) => {
   const startDate = new Date(`${dateStr}T00:00:00.000Z`);
   const endDate = new Date(`${dateStr}T23:59:59.999Z`);
 
-  // Find if a record already exists for this student on this day and session
+  // Find if a record already exists for this student on this day and session.
+  // Use case-insensitive match to handle any legacy mixed-case records.
   const existing = await prisma.attendance.findFirst({
     where: {
       schoolId,
@@ -29,7 +34,10 @@ export const markAttendance = async (data: any, schoolId: string) => {
         gte: startDate,
         lte: endDate,
       },
-      session: session || null,
+      ...(session
+        ? { session: { equals: session, mode: 'insensitive' } }
+        : { session: null }
+      ),
     }
   });
 

@@ -7,7 +7,14 @@ async function main() {
 
   // Sequential deletes to avoid transaction timeouts
   try {
-    // Delete logs and tickets
+    // Delete discipline data
+    await prisma.disciplineFollowUp.deleteMany();
+    await prisma.studentDiscipline.deleteMany();
+    await prisma.disciplineCategory.deleteMany();
+
+    // Delete notifications and logs
+    await prisma.userNotification.deleteMany();
+    await prisma.parentPreferences.deleteMany();
     await prisma.attendanceReport.deleteMany();
     await prisma.auditLog.deleteMany();
     await prisma.broadcastLog.deleteMany();

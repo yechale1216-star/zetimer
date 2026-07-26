@@ -8,6 +8,7 @@ interface LogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   withText?: boolean;
+  iconOnly?: boolean;
   href?: string;
 }
 
@@ -49,22 +50,24 @@ export const Logo: React.FC<LogoProps> = ({
   className, 
   size = 'md', 
   withText = true,
+  iconOnly = false,
   href = '/'
 }) => {
+  const showText = withText && !iconOnly;
   const [imgError, setImgError] = useState(false);
 
   const dimensions = {
-    sm: { px: 32, cls: 'h-8 w-8' },
-    md: { px: 48, cls: 'h-12 w-12' },
-    lg: { px: 64, cls: 'h-16 w-16' },
-    xl: { px: 96, cls: 'h-24 w-24' }
+    sm: { px: 28, cls: 'h-7 w-7' },
+    md: { px: 36, cls: 'h-9 w-9' },
+    lg: { px: 48, cls: 'h-12 w-12' },
+    xl: { px: 64, cls: 'h-16 w-16' }
   };
 
   const textSizes = {
-    sm: 'text-lg',
-    md: 'text-2xl',
-    lg: 'text-4xl',
-    xl: 'text-5xl'
+    sm: 'text-base',
+    md: 'text-xl',
+    lg: 'text-3xl',
+    xl: 'text-4xl'
   };
 
   const content = (
@@ -87,7 +90,7 @@ export const Logo: React.FC<LogoProps> = ({
           />
         )}
       </div>
-      {withText && (
+      {showText && (
         <span className={cn(
           "font-black tracking-tighter transition-all duration-300 group-hover:tracking-normal drop-shadow-sm text-slate-900 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r dark:from-blue-400 dark:to-indigo-300 dark:text-white",
           textSizes[size]

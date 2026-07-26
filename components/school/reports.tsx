@@ -509,11 +509,11 @@ export function Reports() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[24px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
+    <div className="space-y-6 max-w-7xl mx-auto w-full pb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1 pt-safe">
         <div>
-          <h2 className="text-2xl md:text-3xl font-black text-foreground uppercase tracking-tight">Reports</h2>
-          <p className="text-[10px] md:text-sm font-bold text-muted-foreground/60 uppercase tracking-widest mt-1">Analytics & Export</p>
+          <h2 className="text-lg md:text-xl font-black text-foreground uppercase tracking-normal">Reports</h2>
+          <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mt-1">Analytics & Export</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <Button onClick={printReport} variant="outline" className="flex-1 md:flex-none font-black text-[10px] uppercase bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-2xl h-11 px-4 tracking-widest">
@@ -570,8 +570,8 @@ export function Reports() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="total">Total (Combined)</SelectItem>
-                    <SelectItem value="morning">Morning Only</SelectItem>
-                    <SelectItem value="afternoon">Afternoon Only</SelectItem>
+                    <SelectItem value="morning">Morning</SelectItem>
+                    <SelectItem value="afternoon">Afternoon</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -641,7 +641,7 @@ export function Reports() {
 
       {/* Summary Stats */}
       {filteredReports.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4 px-1 md:px-0">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 px-1 md:px-0">
           {[
             { label: "Students", value: totalStats.totalStudents, icon: Users, color: "blue" },
             { label: "Present", value: totalStats.totalPresent, icon: UserCheck, color: "emerald" },

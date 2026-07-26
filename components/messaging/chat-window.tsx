@@ -484,7 +484,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
     const token = session?.access_token || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     const apiKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co';
-    const uploadUrl = `${supabaseUrl}/storage/v1/object/COMMUNICATION-ATTACHMENTS/${filePath}`;
+    const uploadUrl = `${supabaseUrl}/storage/v1/object/communication-attachments/${filePath}`;
 
     await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -521,13 +521,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = React.memo(({
 
     // Use signed URL for privacy (10 years expiration)
     const { data, error: signError } = await supabase.storage
-      .from('COMMUNICATION-ATTACHMENTS')
+      .from('communication-attachments')
       .createSignedUrl(filePath, 315360000); // 10 years
 
     if (signError || !data?.signedUrl) {
       // Fallback to public URL if signing fails
       const { data: { publicUrl } } = supabase.storage
-        .from('COMMUNICATION-ATTACHMENTS')
+        .from('communication-attachments')
         .getPublicUrl(filePath);
       return publicUrl;
     }

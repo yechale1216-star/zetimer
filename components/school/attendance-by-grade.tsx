@@ -332,14 +332,14 @@ export function AttendanceByGrade() {
   ].filter(d => d.value > 0)
 
   return (
-    <div className="space-y-8 pb-32">
+    <div className="space-y-6 pb-32 max-w-7xl mx-auto w-full">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1 pt-safe">
         <div>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+          <h1 className="text-lg md:text-xl font-black text-slate-900 dark:text-white uppercase tracking-normal">
             Analytics
           </h1>
-          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+          <p className="text-[10px] font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
             Grade-Wise Participation
           </p>
         </div>
@@ -410,7 +410,7 @@ export function AttendanceByGrade() {
               <item.icon className={cn("w-5 h-5", item.text)} />
             </div>
             <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{item.label}</p>
-            <p className={cn("text-xl md:text-2xl font-black uppercase tracking-tight", item.text)}>
+            <p className={cn("text-lg font-black uppercase tracking-normal", item.text)}>
               {isLoading ? "..." : item.value}
             </p>
           </div>

@@ -88,7 +88,7 @@ export function calculateDynamicPrice(
   const volPct = volumeDiscountPercent(studentCount) / 100
   const couponPct = Math.min(100, Math.max(0, discountPercent)) / 100
 
-  const tierCfg = TIER_CONFIG[tier]
+  const tierCfg = TIER_CONFIG[tier] ?? TIER_CONFIG['starter']
   const baseRate = options?.tierBaseOverrides?.[tier] ?? tierCfg.basePerStudentMonth
   const listStudentMonth = baseRate * studentCount
   const afterVolume = listStudentMonth * (1 - volPct)

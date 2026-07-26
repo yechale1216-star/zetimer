@@ -526,7 +526,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
             <ShieldAlert className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
               Student Discipline & Conduct
             </h1>
             <p className="text-xs md:text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
@@ -581,11 +581,11 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
         <TabsContent value="incidents" className="space-y-6 mt-6 focus-visible:outline-none">
           {/* Quick Metrics Header Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl">
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/70 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Total Incidents</p>
-                  <p className="text-3xl font-black text-slate-900 dark:text-white mt-1">{analytics?.total || 0}</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Incidents</p>
+                  <p className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mt-1">{analytics?.total || 0}</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-600">
                   <ShieldAlert className="w-6 h-6" />
@@ -593,11 +593,11 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
               </CardContent>
             </Card>
 
-            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl">
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/70 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Open Cases</p>
-                  <p className="text-3xl font-black text-amber-600 dark:text-amber-400 mt-1">
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Open Cases</p>
+                  <p className="text-2xl md:text-3xl font-bold text-amber-600 dark:text-amber-400 mt-1">
                     {analytics?.openCases || 0}
                   </p>
                 </div>
@@ -607,11 +607,11 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
               </CardContent>
             </Card>
 
-            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl">
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/70 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Resolved Cases</p>
-                  <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Resolved Cases</p>
+                  <p className="text-2xl md:text-3xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
                     {analytics?.resolvedCases || 0}
                   </p>
                 </div>
@@ -621,11 +621,11 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
               </CardContent>
             </Card>
 
-            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl">
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/70 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Critical Cases</p>
-                  <p className="text-3xl font-black text-rose-600 dark:text-rose-400 mt-1">
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Critical Cases</p>
+                  <p className="text-2xl md:text-3xl font-bold text-rose-600 dark:text-rose-400 mt-1">
                     {analytics?.criticalCases || 0}
                   </p>
                 </div>
@@ -635,11 +635,11 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
               </CardContent>
             </Card>
 
-            <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl col-span-2 md:col-span-1">
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/70 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all col-span-2 md:col-span-1">
               <CardContent className="p-5 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">This Month</p>
-                  <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">This Month</p>
+                  <p className="text-2xl md:text-3xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
                     {analytics?.thisMonth || 0}
                   </p>
                 </div>
@@ -857,17 +857,17 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
         <TabsContent value="analytics" className="space-y-6 mt-6 focus-visible:outline-none">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Top Categories Card */}
-            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-100 dark:border-slate-800 rounded-3xl shadow-sm">
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/70 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
               <CardHeader className="p-6">
-                <CardTitle className="text-base font-black uppercase tracking-tight flex items-center gap-2 text-slate-900 dark:text-white">
+                <CardTitle className="text-sm md:text-base font-bold tracking-tight flex items-center gap-2 text-slate-900 dark:text-white">
                   <Sparkles className="w-4 h-4 text-indigo-500" />
                   Incidents by Category
                 </CardTitle>
                 <CardDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">Breakdown of discipline types</CardDescription>
               </CardHeader>
-              <CardContent className="px-6 pb-6 space-y-3">
+              <CardContent className="px-6 pb-6 space-y-3 min-h-[160px] flex flex-col justify-center">
                 {!analytics?.byCategory || analytics.byCategory.length === 0 ? (
-                  <div className="py-8 text-center space-y-2">
+                  <div className="py-8 text-center space-y-2 border border-dashed border-slate-200 dark:border-slate-800/80 rounded-xl bg-slate-50/50 dark:bg-slate-950/50">
                     <Sparkles className="w-6 h-6 text-slate-400 mx-auto opacity-40" />
                     <p className="text-xs text-slate-400 font-medium">No category breakdown data yet</p>
                   </div>
@@ -893,17 +893,17 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
             </Card>
 
             {/* Repeat Offenders Card */}
-            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-100 dark:border-slate-800 rounded-3xl shadow-sm">
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/70 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
               <CardHeader className="p-6">
-                <CardTitle className="text-base font-black uppercase tracking-tight flex items-center gap-2 text-slate-900 dark:text-white">
+                <CardTitle className="text-sm md:text-base font-bold tracking-tight flex items-center gap-2 text-slate-900 dark:text-white">
                   <AlertTriangle className="w-4 h-4 text-amber-500" />
                   Repeated Incidents
                 </CardTitle>
                 <CardDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">Students requiring intervention</CardDescription>
               </CardHeader>
-              <CardContent className="px-6 pb-6 space-y-3">
+              <CardContent className="px-6 pb-6 space-y-3 min-h-[160px] flex flex-col justify-center">
                 {!analytics?.repeatOffenders || analytics.repeatOffenders.length === 0 ? (
-                  <div className="py-8 text-center space-y-2">
+                  <div className="py-8 text-center space-y-2 border border-dashed border-slate-200 dark:border-slate-800/80 rounded-xl bg-slate-50/50 dark:bg-slate-950/50">
                     <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto opacity-50" />
                     <p className="text-xs text-slate-400 font-medium">No repeat offenders recorded</p>
                   </div>
@@ -924,17 +924,17 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
             </Card>
 
             {/* Top Reporting Teachers Card */}
-            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-100 dark:border-slate-800 rounded-3xl shadow-sm">
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/70 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
               <CardHeader className="p-6">
-                <CardTitle className="text-base font-black uppercase tracking-tight flex items-center gap-2 text-slate-900 dark:text-white">
+                <CardTitle className="text-sm md:text-base font-bold tracking-tight flex items-center gap-2 text-slate-900 dark:text-white">
                   <User className="w-4 h-4 text-blue-500" />
                   Top Reporting Staff
                 </CardTitle>
                 <CardDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">Staff members reporting incidents</CardDescription>
               </CardHeader>
-              <CardContent className="px-6 pb-6 space-y-3">
+              <CardContent className="px-6 pb-6 space-y-3 min-h-[160px] flex flex-col justify-center">
                 {!analytics?.topReporters || analytics.topReporters.length === 0 ? (
-                  <div className="py-8 text-center space-y-2">
+                  <div className="py-8 text-center space-y-2 border border-dashed border-slate-200 dark:border-slate-800/80 rounded-xl bg-slate-50/50 dark:bg-slate-950/50">
                     <User className="w-6 h-6 text-slate-400 mx-auto opacity-40" />
                     <p className="text-xs text-slate-400 font-medium">No staff reports logged yet</p>
                   </div>
@@ -951,17 +951,20 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
           </div>
 
           {/* Monthly Trend Bar Chart Card */}
-          <Card className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-slate-100 dark:border-slate-800 rounded-3xl p-6">
+          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200/70 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
             <CardHeader className="p-0 pb-4">
-              <CardTitle className="text-lg font-black uppercase tracking-tight flex items-center gap-2">
+              <CardTitle className="text-base font-bold tracking-tight flex items-center gap-2 text-slate-900 dark:text-white">
                 <BarChart3 className="w-5 h-5 text-indigo-600" />
                 Monthly Discipline Incident Trend
               </CardTitle>
-              <CardDescription className="text-xs font-medium">Incident distribution over time across months</CardDescription>
+              <CardDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">Incident distribution over time across months</CardDescription>
             </CardHeader>
             <CardContent className="p-0 pt-4">
               {!analytics?.monthlyMap || Object.keys(analytics.monthlyMap).length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-8">No monthly trend data logged yet.</p>
+                <div className="py-10 text-center space-y-2 border border-dashed border-slate-200 dark:border-slate-800/80 rounded-xl bg-slate-50/50 dark:bg-slate-950/50">
+                  <BarChart3 className="w-6 h-6 text-slate-400 mx-auto opacity-40" />
+                  <p className="text-xs text-slate-400 font-medium">No monthly trend data logged yet</p>
+                </div>
               ) : (
                 <div className="flex items-end gap-3 h-48 pt-6 border-b border-slate-100 dark:border-slate-800 px-2 overflow-x-auto">
                   {Object.entries(analytics.monthlyMap).map(([month, count]) => {
@@ -976,7 +979,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
                             style={{ height: `${heightPct}%` }}
                           />
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">{month}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{month}</span>
                       </div>
                     );
                   })}

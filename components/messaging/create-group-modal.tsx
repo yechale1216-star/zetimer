@@ -112,13 +112,13 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       const filePath = `group-avatars/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('AVATARS')
+        .from('avatars')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage
-        .from('AVATARS')
+        .from('avatars')
         .getPublicUrl(filePath);
 
       setAvatar(data.publicUrl);

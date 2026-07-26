@@ -238,15 +238,15 @@ export function TeacherAssignmentManagement() {
   }
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12 max-w-7xl mx-auto w-full">
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white/90 dark:bg-slate-900/90 p-4 md:p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 backdrop-blur-sm shadow-sm pt-safe">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-1 pt-safe">
         <div>
-          <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+          <h1 className="text-lg md:text-xl font-black text-slate-900 dark:text-white uppercase tracking-normal">
             Assignments
           </h1>
-          <p className="text-[10px] md:text-sm font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
+          <p className="text-[10px] font-bold text-slate-500/60 dark:text-slate-400/60 uppercase tracking-widest mt-1">
             Teacher Class Allocation
           </p>
         </div>
@@ -417,8 +417,8 @@ export function TeacherAssignmentManagement() {
       {/* Assignments Grid */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="typography-section-title text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-600" />
+          <h2 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <Users className="w-4 h-4 text-blue-600" />
             Active Assignments ({assignments.length})
           </h2>
         </div>
@@ -431,7 +431,7 @@ export function TeacherAssignmentManagement() {
             <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No assignments found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-1 md:px-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-1 md:px-0">
             {assignments.map((assignment) => {
               const teacherName = assignment.teacher?.full_name || "Unknown Teacher"
               const bgGradient = getAvatarGradient(assignment.teacher?.id || assignment.teacher_id)
@@ -454,7 +454,7 @@ export function TeacherAssignmentManagement() {
                         </div>
                       )}
                       <div className="min-w-0">
-                        <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 leading-none truncate uppercase tracking-tight">
+                        <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 leading-none truncate uppercase tracking-normal">
                           {teacherName}
                         </h3>
                         <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1.5 flex items-center gap-1.5 truncate">

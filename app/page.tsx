@@ -88,10 +88,9 @@ export default function HomePage() {
               </div>
 
               {/* Main Headline */}
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-slate-900 dark:text-white">
-                Modern School <br className="hidden sm:inline" />
-                <span className="text-blue-600 dark:text-blue-400 italic">Attendance & Communication</span> <br className="hidden sm:inline" />
-                Platform.
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-3xl xl:text-4xl font-black tracking-tight leading-snug text-slate-900 dark:text-white">
+                Modern School <span className="text-blue-600 dark:text-blue-400 italic">Attendance &</span> <br />
+                <span className="text-blue-600 dark:text-blue-400 italic">Communication</span> Platform.
               </h1>
 
               {/* Subtitle */}

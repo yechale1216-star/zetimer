@@ -404,12 +404,12 @@ export const resolveSchoolFeatures = async (schoolId: string): Promise<string[]>
     return Array.from(featureKeys);
   } catch (error) {
     console.error(`[resolveSchoolFeatures] Error for school ${schoolId}:`, error);
-    // On error, grant core + messaging to avoid total blackout
+    // On error, grant core + messaging + discipline to avoid total blackout
     try {
       const core = await prisma.feature.findMany({ where: { isCore: true }, select: { key: true } });
-      return [...core.map(f => f.key), 'messaging'];
+      return [...core.map(f => f.key), 'messaging', 'discipline_management'];
     } catch {
-      return ['messaging', 'attendance_tracking', 'student_management'];
+      return ['messaging', 'attendance_tracking', 'student_management', 'discipline_management'];
     }
   }
 };

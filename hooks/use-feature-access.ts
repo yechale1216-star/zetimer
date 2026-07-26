@@ -77,3 +77,4 @@ export type FeatureKey =
   | "custom_branding"
   | "api_access"
   | "priority_support"
+  | "discipline_management"

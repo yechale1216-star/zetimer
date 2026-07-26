@@ -14,6 +14,7 @@ const DEFAULT_FEATURES = [
   { key: "export_csv", name: "Export CSV", category: "reporting", isCore: true, description: "Export data to CSV/Excel" },
   { key: "parent_portal", name: "Parent Portal", category: "communication", isCore: true, description: "Parents can view attendance and receive notifications" },
   { key: "student_promotion", name: "Student Promotion", category: "admin", isCore: true, description: "Bulk cohort-based student promotion" },
+  { key: "discipline_management", name: "Discipline Management", category: "admin", isCore: true, description: "Student conduct tracking and incident management" },
   
   // Add-ons (Modular advanced features)
   { key: "sms_notifications", name: "SMS Notifications", category: "communication", isCore: false, description: "Automated SMS alerts to parents" },

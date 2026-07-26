@@ -3,11 +3,11 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, History, FileText, ArrowUpCircle, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, History, FileText, ArrowUpCircle, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils/utils'
 
 const navItems = [
-  { name: 'Overview', href: '/school/admin/subscription', icon: LayoutGrid },
+  { name: 'Overview', href: '/school/admin/subscription', icon: LayoutDashboard },
   { name: 'Billing History', href: '/school/admin/subscription/billing', icon: History },
   { name: 'Invoices', href: '/school/admin/subscription/invoices', icon: FileText },
   { name: 'Upgrade Plan', href: '/school/admin/subscription/upgrade', icon: ArrowUpCircle },

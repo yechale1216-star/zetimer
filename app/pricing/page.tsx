@@ -8,7 +8,8 @@ import { PublicNavbar } from "@/components/layout/public-navbar"
 import { PublicFooter } from "@/components/layout/public-footer"
 import {
   Check, Zap, Users, School, ArrowRight, Loader2,
-  ChevronDown, ChevronUp, Star, Shield, Clock
+  ChevronDown, ChevronUp, Star, Shield, Clock, ShieldAlert,
+  MessageSquare, Smartphone, FileText, Headphones
 } from "lucide-react"
 import { getApiUrl } from "@/lib/api-config"
 
@@ -49,6 +50,7 @@ const BILLING_PERIODS: { value: BillingPeriod; label: string; badge?: string; mo
 ]
 
 const PLAN_ICON_MAP: Record<string, React.ReactNode> = {
+  free:         <School className="w-5 h-5" />,
   starter:      <School className="w-5 h-5" />,
   standard:     <Users className="w-5 h-5" />,
   professional: <Zap className="w-5 h-5" />,
@@ -61,25 +63,27 @@ const PLAN_HIGHLIGHT_MAP: Record<string, boolean> = {
 }
 
 const STATIC_FEATURES: Record<string, string[]> = {
-  starter:      ["Student attendance tracking", "Parent portal access", "Basic reports", "Up to 2 admin users"],
-  standard:     ["Everything in Starter", "Session-based attendance", "Grade & stream analytics", "Real-time notifications", "CSV exports", "Teacher portal"],
-  professional: ["Everything in Standard", "Multi-campus support", "API access", "Advanced analytics", "Priority support", "Custom integrations"],
-  enterprise:   ["Everything in Professional", "Dedicated account manager", "Custom contracts", "SLA guarantee", "White-label option", "Unlimited users"],
+  free:         ["Full Feature Access for 30 Days", "Daily & Session Attendance", "Discipline & Conduct Module", "Parent Portal & Messaging", "Up to 100 Students"],
+  starter:      ["Student attendance tracking", "Parent portal access", "Discipline incident reporting", "Basic reports & exports", "Up to 250 Students"],
+  standard:     ["Everything in Starter", "Session-based attendance (Morning/Afternoon)", "Discipline follow-up tracking & audit logs", "Real-time parent push notifications", "CSV & PDF exports", "Teacher portal access"],
+  professional: ["Everything in Standard", "Advanced discipline analytics & repeat offender tracking", "Multi-campus support", "Direct parent messaging & announcements", "API & webhook access", "Priority 24/7 support"],
+  enterprise:   ["Everything in Professional", "Dedicated account manager", "Custom contracts & invoicing", "99.9% SLA guarantee", "White-label custom domain", "Unlimited students & staff"],
 }
 
 const FAQS = [
-  { q: "Is there a free trial?", a: "Yes! Every plan starts with a 14-day free trial. No credit card required." },
-  { q: "Can I change my plan later?", a: "Absolutely. You can upgrade or downgrade at any time. Billing is prorated automatically." },
-  { q: "What currency are prices in?", a: "All prices are in Ethiopian Birr (ETB). Enterprise clients can arrange custom billing." },
-  { q: "How is 'student count' calculated?", a: "Only active students count against your quota. Archived or graduated students don't count." },
-  { q: "What happens if I exceed my student limit?", a: "You'll be notified in advance and can upgrade your plan at any time. We never abruptly shut off access." },
+  { q: "Is there a free trial?", a: "Yes! Every new school account starts with a 30-day free trial containing access to all 16 SaaS features, including messaging, discipline tracking, and session attendance." },
+  { q: "Can I change my plan or upgrade later?", a: "Prorated upgrades can be made anytime from your School Admin Billing Dashboard. Your student quota updates instantly." },
+  { q: "What currency are prices displayed in?", a: "All standard institutional pricing is calculated in Ethiopian Birr (ETB). Custom international arrangements are available for Enterprise tiers." },
+  { q: "How is student quota calculated?", a: "Only active enrolled students count toward your tier quota. Archived, graduated, or transferred students do not consume plan capacity." },
+  { q: "Does the Discipline module cost extra?", a: "No! Discipline & Conduct management, incident follow-ups, and parent notifications are fully integrated into our core subscription tiers." },
+  { q: "How do parents receive notifications?", a: "Parents receive high-priority push notifications directly on the Zetime Mobile App, alongside optional SMS and automated email alerts." },
 ]
 
 export default function PricingPage() {
   const [plans, setPlans] = useState<DBPlan[]>([])
   const [addons, setAddons] = useState<DBAddon[]>([])
   const [billing, setBilling] = useState<BillingPeriod>("monthly")
-  const [studentCount, setStudentCount] = useState(150)
+  const [studentCount, setStudentCount] = useState(250)
   const [loading, setLoading] = useState(true)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
@@ -116,7 +120,7 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-blue-500/20">
-      {/* Animated Orbs */}
+      {/* Background Orbs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-400/20 dark:bg-blue-600/10 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-400/20 dark:bg-emerald-600/10 rounded-full blur-[120px] animate-pulse delay-700"></div>
@@ -128,24 +132,24 @@ export default function PricingPage() {
 
         {/* ── Hero ── */}
         <section className="text-center space-y-8 py-12">
-           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] mb-4">
-              <Shield className="w-3 h-3" /> 14-day free trial · No credit card
-            </div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.2]">
-            Simple, Transparent <br />
-            <span className="text-blue-600 dark:text-blue-400 italic">Institutional Pricing.</span>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em]">
+            <Shield className="w-3.5 h-3.5" /> 30-Day Full Feature Free Trial &bull; No Credit Card Required
+          </div>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.15]">
+            Transparent Institutional Pricing <br />
+            <span className="text-blue-600 dark:text-blue-400 italic">Built for Modern Schools.</span>
           </h1>
-          <p className="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed font-medium">
-            Pay for what you need. Built for modern schools and universities across Ethiopia.
+          <p className="text-base sm:text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed font-medium">
+            Scalable attendance, discipline tracking, and parent communication tools tailored for schools, academies, and universities across Ethiopia.
           </p>
 
           {/* Billing toggle */}
-          <div className="inline-flex p-1.5 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md rounded-2xl border border-white/60 dark:border-white/10 mt-10">
+          <div className="inline-flex p-1.5 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-white/10 shadow-lg mt-6">
             {BILLING_PERIODS.map(({ value, label, badge }) => (
               <button
                 key={value}
                 onClick={() => setBilling(value)}
-                className={`relative px-6 py-3 rounded-xl text-xs font-black uppercase tracking-tighter transition-all duration-300 ${
+                className={`relative px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all duration-300 ${
                   billing === value
                     ? "bg-blue-600 text-white shadow-xl shadow-blue-500/20"
                     : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
@@ -162,6 +166,22 @@ export default function PricingPage() {
           </div>
         </section>
 
+        {/* ── Feature Highlights Banner ── */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { icon: <Clock className="w-5 h-5 text-blue-600" />, title: "Session Attendance", desc: "Split Morning & Afternoon monitoring" },
+            { icon: <ShieldAlert className="w-5 h-5 text-indigo-600" />, title: "Discipline Module", desc: "Incident & audit log management" },
+            { icon: <Smartphone className="w-5 h-5 text-violet-600" />, title: "Parent Mobile App", desc: "Instant push & SMS notifications" },
+            { icon: <FileText className="w-5 h-5 text-emerald-600" />, title: "CSV Reports", desc: "Automated grade & section analytics" },
+          ].map((item, idx) => (
+            <div key={idx} className="p-5 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 backdrop-blur-xl space-y-2">
+              <div className="p-2.5 w-max rounded-xl bg-slate-100 dark:bg-slate-800">{item.icon}</div>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">{item.title}</h3>
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{item.desc}</p>
+            </div>
+          ))}
+        </section>
+
         {/* ── Plans Grid ── */}
         <section>
           {loading ? (
@@ -170,14 +190,14 @@ export default function PricingPage() {
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Synchronizing Plans...</p>
             </div>
           ) : plans.length === 0 ? (
-            <div className="text-center py-32 glass-card rounded-[40px] border-dashed border-2 border-slate-200 dark:border-white/5 mx-8">
-              <p className="text-slate-500 font-bold uppercase tracking-widest">Configuration in progress. Please return shortly.</p>
+            <div className="text-center py-32 rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 p-8">
+              <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Configuration in progress. Please return shortly.</p>
             </div>
           ) : (
             <div className={`grid gap-8 ${plans.length <= 3 ? "md:grid-cols-3" : "md:grid-cols-2 lg:grid-cols-4"}`}>
               {plans.map((plan) => {
                 const highlighted = !!PLAN_HIGHLIGHT_MAP[plan.slug]
-                const features = STATIC_FEATURES[plan.slug] ?? []
+                const features = STATIC_FEATURES[plan.slug] ?? (plan.features?.map(f => f.feature.name) || [])
                 const price = getPlanPrice(plan)
                 const monthly = getMonthlyRate(plan)
                 const billingMonths = BILLING_PERIODS.find(b => b.value === billing)?.months ?? 1
@@ -186,26 +206,26 @@ export default function PricingPage() {
                 return (
                   <div
                     key={plan.id}
-                    className={`relative rounded-[32px] border p-8 flex flex-col gap-8 transition-all duration-500 hover:scale-[1.03] group ${
+                    className={`relative rounded-3xl border p-8 flex flex-col gap-8 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] group ${
                       highlighted
-                        ? "border-blue-600/50 bg-white/60 dark:bg-blue-500/5 shadow-2xl shadow-blue-500/10"
-                        : "border-white/60 dark:border-white/10 bg-white/40 dark:bg-white/5 backdrop-blur-xl"
+                        ? "border-blue-500 bg-gradient-to-b from-blue-50/50 to-white dark:from-blue-950/20 dark:to-slate-900 shadow-xl shadow-blue-500/10"
+                        : "border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl"
                     }`}
                   >
                     {highlighted && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-blue-600 text-[10px] font-black text-white uppercase tracking-widest shadow-xl">
-                        Recommended
+                      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-blue-600 text-[10px] font-black text-white uppercase tracking-widest shadow-md">
+                        Most Popular
                       </div>
                     )}
 
                     <div className="space-y-4">
-                      <div className={`w-12 h-12 rounded-[18px] flex items-center justify-center transition-transform group-hover:rotate-12 ${
-                        highlighted ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400"
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${
+                        highlighted ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
                       }`}>
                         {icon}
                       </div>
                       <div>
-                        <h2 className="text-2xl font-black tracking-tight">{plan.name}</h2>
+                        <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">{plan.name}</h2>
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-tighter mt-1">
                           {plan.description || `Max ${plan.maxStudents === -1 ? "Unlimited" : plan.maxStudents.toLocaleString()} Students`}
                         </p>
@@ -213,11 +233,11 @@ export default function PricingPage() {
                     </div>
 
                     <div className="space-y-2">
-                       <div className="flex items-baseline gap-2">
-                        <span className="text-5xl font-black tracking-tighter">
-                          {price > 0 ? `${monthly.toLocaleString()}` : "Custom"}
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">
+                          {price > 0 ? `${monthly.toLocaleString()}` : "Free Trial"}
                         </span>
-                        {price > 0 && <span className="text-slate-500 font-bold text-sm uppercase">ETB / mo</span>}
+                        {price > 0 && <span className="text-slate-500 font-bold text-xs uppercase">ETB / mo</span>}
                       </div>
                       {billingMonths > 1 && price > 0 && (
                         <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest leading-none">
@@ -228,23 +248,23 @@ export default function PricingPage() {
 
                     <ul className="space-y-3 flex-1">
                       {features.map((f, i) => (
-                        <li key={i} className="flex items-start gap-3 text-sm">
-                          <Check className={`w-4 h-4 mt-0.5 shrink-0 ${highlighted ? "text-blue-600" : "text-slate-400"}`} />
-                          <span className={`${highlighted ? "font-bold text-slate-900 dark:text-white" : "font-medium text-slate-600 dark:text-slate-400"}`}>{f}</span>
+                        <li key={i} className="flex items-start gap-3 text-xs md:text-sm">
+                          <Check className={`w-4 h-4 mt-0.5 shrink-0 ${highlighted ? "text-blue-600 dark:text-blue-400" : "text-emerald-500"}`} />
+                          <span className={`${highlighted ? "font-bold text-slate-900 dark:text-white" : "font-medium text-slate-600 dark:text-slate-300"}`}>{f}</span>
                         </li>
                       ))}
                     </ul>
 
                     <Button
                       asChild
-                      className={`w-full h-14 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${
+                      className={`w-full h-12 rounded-2xl font-black text-xs uppercase tracking-wider transition-all ${
                         highlighted 
-                        ? "bg-blue-600 hover:bg-blue-500 text-white shadow-xl shadow-blue-500/20" 
-                        : "bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white hover:bg-slate-50"
+                        ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25" 
+                        : "bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100"
                       }`}
                     >
                       <Link href="/school/admin/signup">
-                        Start Trial <ArrowRight className="ml-2 w-4 h-4" />
+                        Start 30-Day Free Trial <ArrowRight className="ml-2 w-4 h-4" />
                       </Link>
                     </Button>
                   </div>
@@ -256,36 +276,35 @@ export default function PricingPage() {
 
         {/* ── Interactive Calculator ── */}
         {!loading && plans.length > 0 && (
-          <section className="py-24 space-y-12">
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl font-black tracking-tight uppercase">Analyze Your Cost</h2>
-              <p className="text-slate-500 font-medium max-w-xl mx-auto">Adjust the scale to visualize live pricing across our core infrastructure tiers.</p>
+          <section className="py-12 space-y-8">
+            <div className="text-center space-y-3">
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight uppercase text-slate-900 dark:text-white">Estimate Your School Cost</h2>
+              <p className="text-slate-500 text-xs sm:text-sm font-medium max-w-xl mx-auto">Adjust the student capacity slider to preview monthly and annual pricing for your institution.</p>
             </div>
-            <div className="rounded-[40px] border border-white/60 dark:border-white/10 bg-white/40 dark:bg-white/5 backdrop-blur-2xl p-8 md:p-16 space-y-12 shadow-2xl">
-              <div className="space-y-6">
+            <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl p-6 md:p-12 space-y-10 shadow-xl">
+              <div className="space-y-4">
                 <div className="flex justify-between items-end">
-                  <label className="text-sm font-black uppercase tracking-widest text-slate-500">Student Capacity</label>
-                  <span className="text-4xl font-black text-blue-600">{studentCount.toLocaleString()}</span>
+                  <label className="text-xs font-black uppercase tracking-widest text-slate-500">Enrolled Student Capacity</label>
+                  <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{studentCount.toLocaleString()} Students</span>
                 </div>
                 <input
                   type="range"
                   min={20} max={2000} step={10}
                   value={studentCount}
                   onChange={e => setStudentCount(Number(e.target.value))}
-                  className="w-full h-3 bg-slate-200 dark:bg-white/10 rounded-full appearance-none cursor-pointer accent-blue-600"
+                  className="w-full h-3 bg-slate-200 dark:bg-slate-800 rounded-full appearance-none cursor-pointer accent-blue-600"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {plans.slice(0, 3).map((plan) => {
                   const fits = plan.maxStudents === -1 || studentCount <= plan.maxStudents
-                  const total = getPlanPrice(plan)
                   const monthly = getMonthlyRate(plan)
                   return (
-                    <div key={plan.id} className={`rounded-3xl p-6 border transition-all duration-500 ${
+                    <div key={plan.id} className={`rounded-2xl p-6 border transition-all duration-300 ${
                       fits
-                        ? "border-blue-600/20 bg-blue-600/5 shadow-lg"
-                        : "border-slate-200 dark:border-white/5 grayscale opacity-40"
+                        ? "border-blue-500/30 bg-blue-500/5 shadow-md"
+                        : "border-slate-200 dark:border-slate-800 opacity-40 grayscale"
                     }`}>
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{plan.name}</p>
                       <div className="flex items-baseline gap-1">
@@ -293,8 +312,8 @@ export default function PricingPage() {
                         <span className="text-[11px] font-bold text-slate-500 uppercase">ETB / mo</span>
                       </div>
                       {!fits && (
-                        <p className="text-[10px] font-bold text-rose-600 uppercase mt-4 flex items-center gap-1">
-                          <Check className="rotate-45 w-3 h-3" /> Exceeds {plan.maxStudents.toLocaleString()} max
+                        <p className="text-[10px] font-bold text-rose-500 uppercase mt-3 flex items-center gap-1">
+                          Exceeds {plan.maxStudents.toLocaleString()} max capacity
                         </p>
                       )}
                     </div>
@@ -306,20 +325,23 @@ export default function PricingPage() {
         )}
 
         {/* ── FAQ ── */}
-        <section className="max-w-3xl mx-auto space-y-8 py-24">
-          <h2 className="text-4xl font-black text-center uppercase tracking-tight">Core Questions</h2>
+        <section className="max-w-3xl mx-auto space-y-8 py-12">
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-slate-900 dark:text-white">Frequently Asked Questions</h2>
+            <p className="text-xs text-slate-500 font-medium">Everything you need to know about Zetime subscriptions and school onboarding.</p>
+          </div>
           <div className="space-y-4">
             {FAQS.map((faq, idx) => (
-              <div key={idx} className="rounded-[24px] border border-white/60 dark:border-white/10 bg-white/40 dark:bg-white/5 backdrop-blur-xl transition-all hover:bg-white/60">
+              <div key={idx} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl transition-all">
                 <button
-                  className="w-full flex items-center justify-between px-8 py-6 text-left"
+                  className="w-full flex items-center justify-between px-6 py-5 text-left"
                   onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
                 >
-                  <span className="text-sm font-black uppercase tracking-tight leading-none">{faq.q}</span>
-                  {openFaq === idx ? <ChevronUp className="w-5 h-5 text-blue-600" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                  <span className="text-xs md:text-sm font-black uppercase tracking-tight text-slate-900 dark:text-white">{faq.q}</span>
+                  {openFaq === idx ? <ChevronUp className="w-4 h-4 text-blue-600 shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
                 </button>
                 {openFaq === idx && (
-                  <div className="px-8 pb-6 text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed border-t border-white/40 dark:border-white/5 pt-4">
+                  <div className="px-6 pb-5 text-xs md:text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-slate-800/80 pt-4">
                     {faq.a}
                   </div>
                 )}

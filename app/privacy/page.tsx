@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Shield, Lock, ArrowLeft, Globe, Eye } from "lucide-react"
+import { Shield, Lock, ArrowLeft, Globe, Eye, ShieldCheck, Database, Bell, FileText, UserCheck } from "lucide-react"
 import { PublicNavbar } from "@/components/layout/public-navbar"
 import { PublicFooter } from "@/components/layout/public-footer"
 
@@ -11,84 +11,119 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-blue-500/20">
       <PublicNavbar />
 
-      <main className="max-w-4xl mx-auto px-8 py-20 relative z-10">
-        <Link href="/" className="inline-flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-12 hover:translate-x-[-4px] transition-transform">
-          <ArrowLeft className="mr-2 w-4 h-4" /> Back to Home
-        </Link>
-        
-        <div className="space-y-6 mb-16">
-          <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-blue-500/20">
-            <Shield className="w-8 h-8" />
+      <main className="max-w-4xl mx-auto px-4 sm:px-8 py-16 relative z-10 space-y-16">
+        <div>
+          <Link href="/" className="inline-flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 mb-8 hover:translate-x-[-4px] transition-transform">
+            <ArrowLeft className="mr-2 w-4 h-4" /> Back to Home
+          </Link>
+          
+          <div className="space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-blue-500/20">
+              <Shield className="w-7 h-7" />
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-tight">
+              Privacy <span className="text-blue-600 dark:text-blue-400">&</span> Data Protection Policy
+            </h1>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+              Zetime Institutional Platform &bull; Last updated: July 2026
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-[1.2]">Privacy <br /><span className="text-blue-600">Protocol.</span></h1>
-          <p className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Last updated: June 13, 2026</p>
         </div>
 
         <div className="space-y-12 text-slate-600 dark:text-slate-400">
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 uppercase tracking-tight">1. Information Architecture</h2>
-            <p className="mb-6 leading-relaxed">
-              We collect information to provide better services to our institutions. This data is segregated into three core layers:
+          
+          {/* Section 1 */}
+          <section className="space-y-4">
+            <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+              <Database className="w-5 h-5 text-blue-600" />
+              1. Information Architecture & Scope
+            </h2>
+            <p className="text-sm font-medium leading-relaxed">
+              Zetime processes educational and operational data to power attendance tracking, discipline incident management, and parent-teacher communication across educational institutions. Data is partitioned into strict tenant layers:
             </p>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-3 gap-4 pt-2">
               <DataLayerCard 
                 icon={<Lock className="w-4 h-4" />}
-                title="Account Integrity"
-                desc="Name, encrypted contacts, and institutional credentials."
+                title="Account Credentials"
+                desc="Encrypted user names, emails, phone contacts, role assignments, and school credentials."
               />
               <DataLayerCard 
                 icon={<Eye className="w-4 h-4" />}
-                title="Academic Logging"
-                desc="Real-time attendance, enrollment status, and records."
+                title="Attendance & Discipline"
+                desc="Daily/session attendance records, discipline incident reports, follow-up logs, and parent acknowledgments."
               />
               <DataLayerCard 
-                icon={<Globe className="w-4 h-4" />}
-                title="Cloud Sync"
-                desc="Offline cached records and local storage metrics."
+                icon={<Bell className="w-4 h-4" />}
+                title="Communications & Mobile"
+                desc="Direct messages, announcement broadcasts, FCM push notification tokens, and Capacitor mobile app device metrics."
               />
             </div>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 uppercase tracking-tight">2. Usage Strategy</h2>
-            <p className="leading-relaxed mb-6">
-              The data we collect is used solely for maintaining the Zetime educational ecosystem. We never sell or distribute institutional data to third parties.
+          {/* Section 2 */}
+          <section className="space-y-4">
+            <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-blue-600" />
+              2. Data Usage & Processing Principles
+            </h2>
+            <p className="text-sm font-medium leading-relaxed">
+              We process data strictly to facilitate institutional operations and parent transparency. Zetime <span className="font-bold text-slate-900 dark:text-white">never sells or monetizes student or institutional data</span> to third parties or advertising networks.
             </p>
-            <ul className="space-y-3">
-              <ListItem text="Facilitating secure parent-teacher communication portals." />
-              <ListItem text="Generating automated high-precision reports." />
-              <ListItem text="Managing SMS and real-time notification stacks." />
-            </ul>
+            <div className="space-y-3 pt-2">
+              <ListItem text="Authenticating school administrators, teachers, parents, and students with strict Role-Based Access Control (RBAC)." />
+              <ListItem text="Delivering real-time attendance alerts (Absent/Late notifications) and discipline report updates to linked parent profiles." />
+              <ListItem text="Generating high-precision attendance analytics, section breakdown charts, and CSV/PDF compliance reports." />
+              <ListItem text="Enabling direct parent-teacher messaging and school-wide announcement channels." />
+            </div>
           </section>
 
-          <div className="p-8 rounded-[32px] bg-blue-600 text-white shadow-2xl shadow-blue-600/20 relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-8 transform translate-x-4 -translate-y-4 opacity-10">
-                <Shield className="w-32 h-32" />
-             </div>
-             <h3 className="text-xl font-black mb-4 uppercase tracking-widest">Global Encryption Standards</h3>
-             <p className="text-blue-100 leading-relaxed font-medium">
-               We employ AES-256 encryption at rest and TLS 1.3 for all data in transit. 
-               Our multi-tenant architecture ensures complete isolation between different schools, 
-               guaranteeing that your data is only ever accessible to authorized personnel.
-             </p>
+          {/* Security Box */}
+          <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white shadow-2xl relative overflow-hidden space-y-3">
+            <div className="absolute top-0 right-0 p-8 transform translate-x-6 -translate-y-6 opacity-10">
+              <Shield className="w-40 h-40" />
+            </div>
+            <h3 className="text-lg font-black uppercase tracking-wider flex items-center gap-2">
+              <Lock className="w-5 h-5 text-blue-200" /> Multi-Tenant Isolation & Encryption Standards
+            </h3>
+            <p className="text-xs md:text-sm text-blue-100 leading-relaxed font-medium">
+              Zetime enforces strict multi-tenant isolation at the database and application levels (<code className="bg-white/20 px-1.5 py-0.5 rounded font-mono text-[11px]">schoolId</code> scoping). All data in transit is encrypted using <strong>TLS 1.3</strong>, and data at rest is secured with <strong>AES-256 encryption</strong>. Discipline audit logs and attendance records are immutably timestamped to ensure audit compliance.
+            </p>
           </div>
 
-          <section>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-6 uppercase tracking-tight">3. Data Sovereignty</h2>
-            <p className="leading-relaxed">
-              Schools retain full ownership of their data. Bulk exports and permanent deletion requests 
-              are processed within 24 hours of account closure. We maintain a 30-day grace period 
-              for data recovery before permanent cryptographic purging.
+          {/* Section 3 */}
+          <section className="space-y-4">
+            <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600" />
+              3. Data Retention & Institutional Rights
+            </h2>
+            <p className="text-sm font-medium leading-relaxed">
+              Educational institutions retain full ownership and sovereignty over their data. Upon account closure or subscription termination:
+            </p>
+            <div className="space-y-3 pt-2">
+              <ListItem text="School Admins can export all attendance logs, student records, and discipline reports in standard CSV format." />
+              <ListItem text="Data is maintained for a 30-day grace period for recovery, after which permanent cryptographic purging occurs upon request." />
+              <ListItem text="Parents may request access or correction of their student link details through their designated School Administrator." />
+            </div>
+          </section>
+
+          {/* Section 4 */}
+          <section className="space-y-4">
+            <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-blue-600" />
+              4. Mobile & Push Notification Policies
+            </h2>
+            <p className="text-sm font-medium leading-relaxed">
+              The Zetime Mobile Application (Capacitor for Android & iOS) registers Firebase Cloud Messaging (FCM) push tokens exclusively for operational alerts (e.g., child attendance warnings, new discipline notes, and incoming call notifications). Push tokens are revoked automatically upon user logout.
             </p>
           </section>
         </div>
 
-        <div className="mt-24 pt-12 border-t border-white/40 dark:border-white/10 text-center">
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">
-            Detailed security inquiries?
+        <div className="pt-12 border-t border-slate-200 dark:border-slate-800 text-center space-y-4">
+          <p className="text-xs font-black text-slate-500 uppercase tracking-widest">
+            Have questions regarding security or data compliance?
           </p>
-          <Button asChild className="rounded-xl h-12 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold hover:bg-slate-50">
-            <Link href="mailto:privacy@zetime.io">Contact Security Team</Link>
+          <Button asChild className="rounded-2xl h-11 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs hover:bg-slate-800">
+            <Link href="mailto:privacy@zetime.app">Contact Security & Compliance</Link>
           </Button>
         </div>
       </main>
@@ -100,19 +135,19 @@ export default function PrivacyPage() {
 
 function DataLayerCard({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
   return (
-    <div className="p-6 rounded-2xl bg-white/40 dark:bg-white/5 border border-white/60 dark:border-white/10 backdrop-blur-xl">
-      <div className="text-blue-600 dark:text-blue-400 mb-3">{icon}</div>
-      <h4 className="font-bold text-slate-900 dark:text-white mb-1 uppercase text-xs tracking-widest">{title}</h4>
-      <p className="text-xs text-slate-500/80 dark:text-slate-400 leading-relaxed font-medium">{desc}</p>
+    <div className="p-5 rounded-2xl bg-white/70 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 backdrop-blur-xl space-y-2">
+      <div className="text-blue-600 dark:text-blue-400">{icon}</div>
+      <h4 className="font-black text-slate-900 dark:text-white uppercase text-xs tracking-wider">{title}</h4>
+      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{desc}</p>
     </div>
   )
 }
 
 function ListItem({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div>
-      <span className="font-medium text-sm">{text}</span>
+    <div className="flex items-start gap-3 text-xs md:text-sm font-medium">
+      <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1.5" />
+      <span className="leading-relaxed">{text}</span>
     </div>
   )
 }

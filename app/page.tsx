@@ -24,7 +24,8 @@ import {
   ChevronRight,
   Smartphone,
   Star,
-  Check
+  Check,
+  Megaphone
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -175,16 +176,16 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
               {/* Feature 1: Discipline */}
               <Card className="border shadow-lg hover:shadow-xl transition-all duration-300 group">
                 <CardContent className="p-6 space-y-4">
                   <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <ShieldAlert className="w-6 h-6" />
                   </div>
-                  <h3 className="text-xl font-bold">Student Discipline Module</h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                    Incident reporting, multi-step evidence uploads, color-coded severities, follow-up notes, and parent report acknowledgment.
+                  <h3 className="text-lg font-bold">Discipline & Conduct</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                    Incident reporting, multi-step evidence uploads, severities, follow-up logs, and parent acknowledgments.
                   </p>
                 </CardContent>
               </Card>
@@ -195,35 +196,48 @@ export default function HomePage() {
                   <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <h3 className="text-xl font-bold">Precision Attendance</h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                    Session-based arrival tracking, grade & section metrics, automated threshold alerts, and instant parent notifications.
+                  <h3 className="text-lg font-bold">Dual Attendance Modes</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                    Supports both Daily and Session-Based (Morning & Afternoon split) tracking with threshold warnings and parent push notifications.
                   </p>
                 </CardContent>
               </Card>
 
-              {/* Feature 3: Parent Communication */}
+              {/* Feature 3: Announcements */}
+              <Card className="border shadow-lg hover:shadow-xl transition-all duration-300 group border-indigo-500/30 bg-gradient-to-b from-indigo-500/10 to-indigo-500/5 dark:from-indigo-500/15 dark:to-indigo-500/5">
+                <CardContent className="p-6 space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center group-hover:scale-110 transition-transform shadow-md shadow-indigo-500/30">
+                    <Megaphone className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">Broadcasts & Announcements</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                    Broadcast critical campus bulletins, grade-level announcements, and emergency notices instantly with high-priority parent push notifications.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Feature 4: Parent Communication */}
               <Card className="border shadow-lg hover:shadow-xl transition-all duration-300 group">
                 <CardContent className="p-6 space-y-4">
                   <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <MessageSquare className="w-6 h-6" />
                   </div>
-                  <h3 className="text-xl font-bold">Parent & Staff Messaging</h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                    Direct messaging between homeroom teachers and parents, group announcements, saved messages, and voice/video calling integration.
+                  <h3 className="text-lg font-bold">Parent & Staff Messaging</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                    Direct messaging between homeroom teachers and parents, group channels, saved messages, and voice/video calling.
                   </p>
                 </CardContent>
               </Card>
 
-              {/* Feature 4: Multi-tenant SaaS */}
+              {/* Feature 5: Multi-tenant SaaS & Analytics */}
               <Card className="border shadow-lg hover:shadow-xl transition-all duration-300 group">
                 <CardContent className="p-6 space-y-4">
                   <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <BarChart3 className="w-6 h-6" />
                   </div>
-                  <h3 className="text-xl font-bold">Analytics & Reports</h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                    Multi-session attendance reports, repeat offender charts, student promotion workflows, and instant CSV exports.
+                  <h3 className="text-lg font-bold">Analytics & Reports</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                    Multi-session attendance reports, repeat offender charts, student promotion workflows, and CSV exports.
                   </p>
                 </CardContent>
               </Card>

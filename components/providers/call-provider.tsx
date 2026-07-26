@@ -562,7 +562,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       {/* Global Modals */}
       <IncomingCallModal
-        isOpen={!!incomingCallData && !isWaitingForOffer && !NativeBridge.isNative()}
+        isOpen={!!incomingCallData && !NativeBridge.isNative()}
         caller={activeCaller || { name: 'Unknown' }}
         type={callType}
         isConnecting={isWaitingForOffer}
@@ -570,7 +570,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         onReject={handleReject}
       />
 
-      {(webrtc.callStatus !== 'IDLE' || isWaitingForOffer) && (!incomingCallData || isWaitingForOffer) && (
+      {/* CallOverlay: only show once the incoming modal is fully dismissed (incomingCallData=null) */}
+      {(webrtc.callStatus !== 'IDLE' || isWaitingForOffer) && !incomingCallData && (
         <CallOverlay
           status={isWaitingForOffer || webrtc.callStatus === 'IDLE' ? 'CONNECTING' : webrtc.callStatus}
           type={callType}

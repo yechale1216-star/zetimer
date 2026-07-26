@@ -75,11 +75,11 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.25 } }}
-          className="fixed inset-0 z-[200] flex flex-col overflow-hidden select-none"
+          className="fixed inset-0 z-[200] flex flex-col overflow-hidden"
           style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           {/* ── Gradient Background matching native activity_incoming_call ── */}
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-0 pointer-events-none">
             <div className="absolute inset-0 bg-gradient-to-b from-[#1a2a3a] via-[#0f1f2e] to-[#061018]" />
             {/* Soft ambient green glow in video call helper */}
             <motion.div

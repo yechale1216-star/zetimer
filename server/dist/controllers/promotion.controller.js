@@ -30,11 +30,27 @@ const getStudentsByGrade = async (req, res) => {
     }
 };
 exports.getStudentsByGrade = getStudentsByGrade;
+const isValidAcademicYear = (year) => {
+    if (!year || typeof year !== 'string')
+        return false;
+    const match = year.trim().match(/^(\d{4})[\/\-](\d{4})$/);
+    if (!match)
+        return false;
+    const y1 = parseInt(match[1], 10);
+    const y2 = parseInt(match[2], 10);
+    return y2 === y1 + 1;
+};
 const promoteStudents = async (req, res) => {
     const schoolId = req.user?.schoolId;
     const userId = req.user?.id;
     if (!schoolId || !userId)
         return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (!req.body.academicYear || !isValidAcademicYear(req.body.academicYear)) {
+        return res.status(400).json({
+            success: false,
+            error: 'Invalid academic year format. Academic year must be consecutive years (e.g. 2026/2027).'
+        });
+    }
     try {
         const result = await promotion_service_1.promotionService.promoteStudents(req.body, schoolId, userId);
         res.status(201).json({ success: true, data: result });

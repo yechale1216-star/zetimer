@@ -90,9 +90,11 @@ const AudioStream = React.memo(({ stream }: { stream: MediaStream | null }) => {
     const el = audioRef.current;
     if (!el) return;
     if (stream) {
-      el.srcObject = stream;
-      el.play().catch((e) => console.log('[AudioStream] auto-play blocked or failed:', e));
-    } else {
+      if (el.srcObject !== stream) {
+        el.srcObject = stream;
+        el.play().catch((e) => console.log('[AudioStream] auto-play blocked or failed:', e));
+      }
+    } else if (el.srcObject) {
       el.srcObject = null;
     }
   }, [stream]);
@@ -104,7 +106,7 @@ const AudioStream = React.memo(({ stream }: { stream: MediaStream | null }) => {
       ref={audioRef}
       autoPlay
       playsInline
-      className="hidden" // No UI needed for audio, just the element
+      className="sr-only" // Hide visually without display:none so media engine keeps track active
     />
   );
 });

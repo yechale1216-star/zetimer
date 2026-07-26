@@ -259,7 +259,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── handleAccept: called by the in-app modal (foreground only) ────────────
   const handleAccept = useCallback(() => {
-    const current = incomingCallRef.current;
+    const current = incomingCallRef.current || incomingCallData;
     if (!current) {
       console.warn('[CallProvider] handleAccept: no incomingCallData');
       return;
@@ -275,10 +275,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     webrtc.answerCall(current.from, current.offer, current.type, current.callId, current.conversationId);
     setIncomingCallData(null);
     setIsWaitingForOffer(false);
-  }, [webrtc]);
+  }, [incomingCallData, webrtc]);
 
   const handleReject = useCallback((isMissed: boolean = false) => {
-    const current = incomingCallRef.current;
+    const current = incomingCallRef.current || incomingCallData;
     NativeBridge.dismissCallBanner();
     NativeBridge.endNativeCall();
     NativeBridge.setAudioModeNormal(); // Ensure audio is restored on decline
@@ -290,7 +290,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setIncomingCallData(null);
     setParticipants(prev => prev.filter(p => p.isLocal));
-  }, [webrtc]);
+  }, [incomingCallData, webrtc]);
 
   // ── Auto-answer when offer finally arrives while waiting ──────────────────
   useEffect(() => {

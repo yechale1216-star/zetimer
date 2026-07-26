@@ -223,4 +223,26 @@ router.post("/check-expirations", async (_req, res) => {
         fail(res, e.message, 500);
     }
 });
+// Assign free plan to a school that has no subscription
+router.post("/schools/:id/assign-free-plan", async (req, res) => {
+    try {
+        const schoolId = req.params.id;
+        // Find the free plan in DB
+        const freePlan = await (await Promise.resolve().then(() => __importStar(require("../config/db")))).default.subscriptionPlan.findFirst({
+            where: { slug: 'free', isActive: true }
+        });
+        if (!freePlan)
+            return fail(res, "Free plan not found in database. Please create it first.", 404);
+        // Upsert subscription — will auto-set status=trial and trialEndsAt
+        const sub = await SubscriptionService.upsertSchoolSubscription(schoolId, {
+            planId: freePlan.id,
+            billingPeriod: 'monthly',
+            studentCount: 0,
+        });
+        ok(res, sub);
+    }
+    catch (e) {
+        fail(res, e.message, 500);
+    }
+});
 exports.default = router;

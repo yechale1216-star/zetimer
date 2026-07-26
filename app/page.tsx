@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { PublicNavbar } from '@/components/layout/public-navbar';
 import { PublicFooter } from '@/components/layout/public-footer';
 import { authService } from '@/lib/auth/auth';
+import { getApiUrl } from '@/lib/api-config';
 import {
   ShieldAlert,
   CheckCircle2,
@@ -25,12 +26,36 @@ import {
   Smartphone,
   Star,
   Check,
-  Megaphone
+  Megaphone,
+  Loader2
 } from 'lucide-react';
+
+const planFeaturesMap: Record<string, string[]> = {
+  free: ["Full Access for 30 Days", "Daily & Session Attendance", "Student Discipline Module", "Parent Portal & Messaging"],
+  starter: ["Student Attendance Tracking", "Parent Portal Access", "Discipline Incident Reporting", "Basic CSV Reports"],
+  standard: ["Everything in Starter", "Session-Based Attendance (Morning/Afternoon)", "Discipline Audit Logs", "Parent Push Notifications"],
+  professional: ["Everything in Standard", "Advanced Analytics", "School Announcements Broadcast", "Direct Parent Chat"],
+  enterprise: ["Everything in Professional", "Dedicated Account Manager", "Custom SLAs & Contracts", "White-Label Domain"]
+};
 
 export default function HomePage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'admin' | 'teacher' | 'parent' | 'discipline'>('discipline');
+
+  const [plans, setPlans] = useState<any[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${getApiUrl()}/api/subscriptions/plans`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data)) {
+          setPlans(data.data.filter((p: any) => p.isActive));
+        }
+      })
+      .catch((err) => console.error("Error loading plans on homepage:", err))
+      .finally(() => setPlansLoading(false));
+  }, []);
 
   useEffect(() => {
     // If logged in, automatically redirect to role-specific dashboard
@@ -377,50 +402,128 @@ export default function HomePage() {
             <div className="space-y-4 max-w-2xl mx-auto">
               <h2 className="text-3xl sm:text-5xl font-black">Flexible SaaS Pricing Plans</h2>
               <p className="text-slate-400 text-base font-medium">
-                Transparent per-student pricing with a 14-day free trial. No hidden fees.
+                Transparent institutional pricing with a 30-day full feature free trial. No hidden fees.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-              <Card className="bg-slate-800/80 border-slate-700 text-white p-6 space-y-4">
-                <h3 className="text-xl font-bold">Starter Plan</h3>
-                <p className="text-xs text-slate-400">For small institutions</p>
-                <div className="text-3xl font-black">ETB 15 <span className="text-xs font-semibold text-slate-400">/ student / mo</span></div>
-                <ul className="space-y-2 text-xs text-slate-300">
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Attendance tracking</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Parent portal access</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Basic reports</li>
-                </ul>
-              </Card>
+            {plansLoading ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading Live Plans...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 text-left">
+                {plans.length > 0 ? (
+                  plans.slice(0, 4).map((plan) => {
+                    const isPopular = plan.slug === 'standard' || plan.slug === 'professional';
+                    const priceDisplay = plan.monthlyTotal > 0
+                      ? `${plan.monthlyTotal.toLocaleString()} ETB`
+                      : plan.pricePerStudentMonthly > 0
+                      ? `${plan.pricePerStudentMonthly} ETB`
+                      : 'Free Trial';
 
-              <Card className="bg-blue-600 border-blue-500 text-white p-6 space-y-4 shadow-2xl relative">
-                <Badge className="absolute top-4 right-4 bg-white text-blue-600 font-bold">Popular</Badge>
-                <h3 className="text-xl font-bold">Standard Plan</h3>
-                <p className="text-xs text-blue-100">For growing schools</p>
-                <div className="text-3xl font-black">ETB 25 <span className="text-xs font-semibold text-blue-200">/ student / mo</span></div>
-                <ul className="space-y-2 text-xs text-blue-100">
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-white" /> Everything in Starter</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-white" /> Student Discipline Module</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-white" /> Real-time messaging</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-white" /> CSV exports</li>
-                </ul>
-              </Card>
+                    const planFeatures: string[] = (planFeaturesMap as Record<string, string[]>)[plan.slug] || ["Full Feature Access", "Attendance & Discipline", "Parent Portal", "Analytics & CSV Export"];
 
-              <Card className="bg-slate-800/80 border-slate-700 text-white p-6 space-y-4">
-                <h3 className="text-xl font-bold">Enterprise</h3>
-                <p className="text-xs text-slate-400">Custom capacity & SLAs</p>
-                <div className="text-3xl font-black">Custom</div>
-                <ul className="space-y-2 text-xs text-slate-300">
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Dedicated account manager</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Custom contracts</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> White-label option</li>
-                </ul>
-              </Card>
-            </div>
+                    return (
+                      <Card
+                        key={plan.id}
+                        className={`p-6 space-y-4 rounded-3xl border transition-all duration-300 ${
+                          isPopular
+                            ? "bg-blue-600 border-blue-500 text-white shadow-2xl relative scale-[1.02]"
+                            : "bg-slate-800/80 border-slate-700 text-white"
+                        }`}
+                      >
+                        {isPopular && (
+                          <Badge className="absolute top-4 right-4 bg-white text-blue-600 font-bold uppercase text-[10px] tracking-widest">
+                            Most Popular
+                          </Badge>
+                        )}
+                        <div>
+                          <h3 className="text-xl font-black">{plan.name}</h3>
+                          <p className={`text-xs ${isPopular ? "text-blue-100" : "text-slate-400"} mt-1 font-medium`}>
+                            {plan.description || `Up to ${plan.maxStudents === -1 ? 'Unlimited' : plan.maxStudents} Students`}
+                          </p>
+                        </div>
+                        <div className="text-3xl font-black">
+                          {priceDisplay}
+                          {plan.pricePerStudentMonthly > 0 && <span className={`text-xs font-semibold ${isPopular ? "text-blue-200" : "text-slate-400"}`}> / student / mo</span>}
+                          {plan.monthlyTotal > 0 && <span className={`text-xs font-semibold ${isPopular ? "text-blue-200" : "text-slate-400"}`}> / mo</span>}
+                        </div>
+                        <ul className={`space-y-2 text-xs ${isPopular ? "text-blue-100" : "text-slate-300"}`}>
+                          {planFeatures.map((feat, idx) => (
+                            <li key={idx} className="flex items-center gap-2">
+                              <Check className={`w-4 h-4 shrink-0 ${isPopular ? "text-white" : "text-emerald-400"}`} />
+                              <span>{feat}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <Button
+                          asChild
+                          className={`w-full rounded-xl font-bold text-xs uppercase tracking-wider ${
+                            isPopular
+                              ? "bg-white text-blue-600 hover:bg-slate-100"
+                              : "bg-blue-600 text-white hover:bg-blue-500"
+                          }`}
+                        >
+                          <Link href="/school/admin/signup">Start 30-Day Free Trial</Link>
+                        </Button>
+                      </Card>
+                    );
+                  })
+                ) : (
+                  <>
+                    <Card className="bg-slate-800/80 border-slate-700 text-white p-6 space-y-4 rounded-3xl">
+                      <h3 className="text-xl font-bold">30-Day Free Trial</h3>
+                      <p className="text-xs text-slate-400">Full access for new schools</p>
+                      <div className="text-3xl font-black">Free</div>
+                      <ul className="space-y-2 text-xs text-slate-300">
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Full Access for 30 Days</li>
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Dual Attendance Modes</li>
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Student Discipline Module</li>
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Parent Messaging & Push Alerts</li>
+                      </ul>
+                      <Button asChild className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs">
+                        <Link href="/school/admin/signup">Start 30-Day Trial</Link>
+                      </Button>
+                    </Card>
+
+                    <Card className="bg-blue-600 border-blue-500 text-white p-6 space-y-4 shadow-2xl relative rounded-3xl">
+                      <Badge className="absolute top-4 right-4 bg-white text-blue-600 font-bold">Popular</Badge>
+                      <h3 className="text-xl font-bold">Standard Plan</h3>
+                      <p className="text-xs text-blue-100">For growing institutions</p>
+                      <div className="text-3xl font-black">Institutional ETB</div>
+                      <ul className="space-y-2 text-xs text-blue-100">
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-white" /> Session & Daily Attendance</li>
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-white" /> Discipline Module & Follow-ups</li>
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-white" /> School Announcements Broadcast</li>
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-white" /> CSV & PDF Analytics Export</li>
+                      </ul>
+                      <Button asChild className="w-full bg-white text-blue-600 hover:bg-slate-100 rounded-xl font-bold text-xs">
+                        <Link href="/school/admin/signup">Start Free Trial</Link>
+                      </Button>
+                    </Card>
+
+                    <Card className="bg-slate-800/80 border-slate-700 text-white p-6 space-y-4 rounded-3xl">
+                      <h3 className="text-xl font-bold">Enterprise</h3>
+                      <p className="text-xs text-slate-400">Custom capacity & SLAs</p>
+                      <div className="text-3xl font-black">Custom</div>
+                      <ul className="space-y-2 text-xs text-slate-300">
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Dedicated account manager</li>
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Custom contracts & invoicing</li>
+                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> White-label domain option</li>
+                      </ul>
+                      <Button asChild className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs">
+                        <Link href="/school/admin/signup">Contact Enterprise</Link>
+                      </Button>
+                    </Card>
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="pt-4">
-              <Button asChild size="lg" className="rounded-2xl bg-white text-slate-900 font-bold hover:bg-slate-100">
-                <Link href="/pricing">View Complete Pricing & Addons</Link>
+              <Button asChild size="lg" className="rounded-2xl bg-white text-slate-900 font-bold hover:bg-slate-100 text-xs uppercase tracking-wider">
+                <Link href="/pricing">View Complete Plans, Addons & Cost Estimator</Link>
               </Button>
             </div>
           </div>

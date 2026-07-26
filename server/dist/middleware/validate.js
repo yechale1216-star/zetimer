@@ -36,13 +36,15 @@ const validateAttendance = (req, res, next) => {
             message: 'Missing required fields. Required: studentId, status',
         });
     }
-    // Normalize case
+    // Normalize status to Title Case (Present, Absent, etc.)
     req.body.status = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    // Normalize session to lowercase for consistent DB storage.
+    // All code (frontend filters, service layer) compares using lowercase.
     if (!session) {
-        req.body.session = 'Full Day';
+        req.body.session = null;
     }
     else {
-        req.body.session = session.charAt(0).toUpperCase() + session.slice(1).toLowerCase();
+        req.body.session = session.toLowerCase();
     }
     // Validate status
     const validStatuses = ['Present', 'Absent', 'Late', 'Excused'];
@@ -52,12 +54,11 @@ const validateAttendance = (req, res, next) => {
             message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
         });
     }
-    // Validate session
-    const validSessions = ['Morning', 'Afternoon', 'Full Day'];
-    if (!validSessions.includes(req.body.session)) {
+    // Validate session (lowercase)
+    if (req.body.session !== null && !['morning', 'afternoon'].includes(req.body.session)) {
         return res.status(400).json({
             success: false,
-            message: `Invalid session. Must be one of: ${validSessions.join(', ')}`,
+            message: `Invalid session. Must be one of: morning, afternoon`,
         });
     }
     next();

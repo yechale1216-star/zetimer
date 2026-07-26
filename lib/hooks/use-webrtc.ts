@@ -99,15 +99,18 @@ export interface CallStats {
   frameRate?: number;        // e.g. 30
 }
 
-/** HD Audio constraints tailored for Opus crystal-clear voice (48kHz, low-latency, AEC/NS/AGC) */
+/** HD Audio constraints tailored for Opus voice with advanced browser Acoustic Echo Cancellation (AEC/NS/AGC) */
 const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
-  echoCancellation: { ideal: true },
-  noiseSuppression: { ideal: true },
-  autoGainControl: { ideal: true },
-  sampleRate: { ideal: 48000 },
-  sampleSize: { ideal: 16 },
-  channelCount: { ideal: 1 },
-};
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+  // Advanced Chromium / WebKit AEC constraints to eliminate speaker feedback loop
+  googEchoCancellation: true,
+  googAutoGainControl: true,
+  googNoiseSuppression: true,
+  googHighpassFilter: true,
+  googAudioMirroring: false,
+} as any;
 
 /** Adaptive HD Video constraints (720p 30fps default) */
 const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
@@ -118,7 +121,7 @@ const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
 };
 
 /**
- * Optimizes WebRTC SDP offer/answer for Opus voice FEC + high bitrate
+ * Optimizes WebRTC SDP offer/answer for Opus voice FEC + 64kbps HD voice
  * and VP8/H.264 video codec priority (Telegram-style SDP munging).
  */
 function optimizeSDP(sdp: string, isVideo: boolean): string {
@@ -126,16 +129,16 @@ function optimizeSDP(sdp: string, isVideo: boolean): string {
 
   // 1. Opus Audio Optimization
   // minptime=10 (10ms low latency frames), useinbandfec=1 (In-Band Forward Error Correction for packet loss recovery),
-  // usedtx=1 (discontinuous transmission during silence), maxaveragebitrate=128000 (128kbps HD audio).
+  // usedtx=1 (discontinuous transmission during silence), maxaveragebitrate=64000 (64kbps HD voice prevents speaker clipping feedback).
   if (modified.includes('opus/48000')) {
     modified = modified.replace(
       /(a=fmtp:\d+ .*opus\/48000.*)/g,
-      '$1;useinbandfec=1;usedtx=1;minptime=10;maxaveragebitrate=128000;stereo=0;sprop-maxcapturerate=48000'
+      '$1;useinbandfec=1;usedtx=1;minptime=10;maxaveragebitrate=64000;stereo=0;sprop-stereo=0;sprop-maxcapturerate=48000'
     );
     if (!modified.includes('maxaveragebitrate=')) {
       modified = modified.replace(
         /(a=rtpmap:(\d+) opus\/48000\/2)/g,
-        '$1\r\na=fmtp:$2 minptime=10;useinbandfec=1;usedtx=1;maxaveragebitrate=128000;stereo=0;sprop-maxcapturerate=48000'
+        '$1\r\na=fmtp:$2 minptime=10;useinbandfec=1;usedtx=1;maxaveragebitrate=64000;stereo=0;sprop-stereo=0;sprop-maxcapturerate=48000'
       );
     }
   }
@@ -304,17 +307,18 @@ export const useWebRTC = (options: WebRTCOptions) => {
     };
 
     pc.ontrack = (event) => {
-      console.log('Received remote track:', event.track.kind);
+      console.log('[WebRTC] Received remote track:', event.track.kind);
       const stream = event.streams[0] || new MediaStream([event.track]);
       
       setRemoteStreams(prev => {
         const existing = prev[userId];
         if (existing) {
-          // Add track to the existing stream if not present
-          if (!existing.getTracks().find(t => t.id === event.track.id)) {
-            existing.addTrack(event.track);
+          const hasTrack = existing.getTracks().some(t => t.id === event.track.id);
+          if (hasTrack) {
+            // Track is already attached — preserve existing object reference to prevent audio buffer restarts
+            return prev;
           }
-          // Always return a new MediaStream instance so React updates bindings immediately
+          existing.addTrack(event.track);
           return {
             ...prev,
             [userId]: new MediaStream(existing.getTracks())
@@ -675,51 +679,69 @@ export const useWebRTC = (options: WebRTCOptions) => {
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   const flipCamera = useCallback(async () => {
-    if (!localStreamRef.current || callType.current !== 'VIDEO') return;
+    // Both caller AND callee can flip — check if there's an active local stream with a video track
     const currentStream = localStreamRef.current;
-    
+    if (!currentStream) {
+      console.warn('[WebRTC] flipCamera: no local stream');
+      return;
+    }
+    const hasVideoTrack = currentStream.getVideoTracks().length > 0;
+    if (!hasVideoTrack) {
+      console.warn('[WebRTC] flipCamera: no video track in local stream (voice call?)');
+      return;
+    }
+
     const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
     setFacingMode(newFacingMode);
-    
+    console.log('[WebRTC] flipCamera: switching to facingMode =', newFacingMode);
+
     try {
-      const newStream = await acquireStream(currentStream, {
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+      // Stop ONLY the current video track — keep existing audio track alive to
+      // avoid interrupting the active WebRTC audio sender during camera switch.
+      currentStream.getVideoTracks().forEach(t => t.stop());
+
+      // Request only a fresh video track using ideal (non-strict) facingMode
+      // to prevent OverconstrainedError on single/multi-camera web and Android WebView.
+      const newVideoStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: newFacingMode },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
         },
-        video: { facingMode: newFacingMode }
+        audio: false, // audio track stays alive — do NOT re-acquire
       });
-      
-      setLocalStream(newStream);
 
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      const newAudioTrack = newStream.getAudioTracks()[0];
-      
-      if (isCameraOffRef.current && newVideoTrack) {
-         newVideoTrack.enabled = false;
-      }
-      if (isMutedRef.current && newAudioTrack) {
-         newAudioTrack.enabled = false;
+      const newVideoTrack = newVideoStream.getVideoTracks()[0];
+      if (!newVideoTrack) {
+        console.error('[WebRTC] flipCamera: no video track from getUserMedia');
+        return;
       }
 
+      // Apply current camera-off state
+      if (isCameraOffRef.current) {
+        newVideoTrack.enabled = false;
+      }
+
+      // Build updated local stream: existing audio track + new video track
+      const audioTracks = currentStream.getAudioTracks();
+      const updatedStream = new MediaStream([...audioTracks, newVideoTrack]);
+      setLocalStream(updatedStream);
+
+      // Replace ONLY the video sender on all active peer connections
       peerConnections.current.forEach((pc) => {
-        const senders = pc.getSenders();
-        
-        const videoSender = senders.find(s => s.track?.kind === 'video');
-        if (videoSender && newVideoTrack) {
-          videoSender.replaceTrack(newVideoTrack).catch(e => console.error(e));
-        }
-        
-        const audioSender = senders.find(s => s.track?.kind === 'audio');
-        if (audioSender && newAudioTrack) {
-           audioSender.replaceTrack(newAudioTrack).catch(e => console.error(e));
+        const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (videoSender) {
+          videoSender.replaceTrack(newVideoTrack).catch(e =>
+            console.error('[WebRTC] flipCamera replaceTrack error:', e)
+          );
         }
       });
+
+      console.log('[WebRTC] ✅ Camera flipped to', newFacingMode);
     } catch (err) {
-      console.error('Error flipping camera:', err);
+      console.error('[WebRTC] flipCamera error:', err);
       if (err instanceof Error) {
-         setMediaError(describeMediaError(err));
+        setMediaError(describeMediaError(err));
       }
     }
   }, [facingMode]);
@@ -750,6 +772,9 @@ export const useWebRTC = (options: WebRTCOptions) => {
 
       // Store callId in ref so we can match it against pending ANSWER intents
       if (data.callId) callIdRef.current = data.callId;
+      // ── CRITICAL for callee camera flip: sync callType ref so flipCamera()
+      // does not bail out early with callType.current !== 'VIDEO' on the receiver side.
+      if (data.type) callType.current = data.type;
       if (options.onIncomingCall) options.onIncomingCall(data);
       setCallStatus('RINGING');
       socket.emit('call_ringing', { to: data.from, from: options.userId });

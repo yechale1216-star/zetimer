@@ -6,7 +6,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAttendanceByStudent = exports.getAttendance = exports.markAttendance = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const markAttendance = async (data, schoolId) => {
-    const { studentId, date, session, status, remarks, teacherId } = data;
+    const { studentId, date, status, remarks, teacherId } = data;
+    // Normalize session to lowercase for consistent DB storage.
+    // The bulk route bypasses validateAttendance middleware, so normalization
+    // must happen here to avoid mixed-case records ("Morning" vs "morning").
+    const session = data.session ? data.session.toLowerCase() : null;
     if (!studentId || !date) {
         throw new Error("Student ID and Date are required");
     }
@@ -21,7 +25,8 @@ const markAttendance = async (data, schoolId) => {
     const dateStr = typeof date === 'string' ? date.split("T")[0] : new Date(date).toISOString().split("T")[0];
     const startDate = new Date(`${dateStr}T00:00:00.000Z`);
     const endDate = new Date(`${dateStr}T23:59:59.999Z`);
-    // Find if a record already exists for this student on this day and session
+    // Find if a record already exists for this student on this day and session.
+    // Use case-insensitive match to handle any legacy mixed-case records.
     const existing = await db_1.default.attendance.findFirst({
         where: {
             schoolId,
@@ -30,7 +35,9 @@ const markAttendance = async (data, schoolId) => {
                 gte: startDate,
                 lte: endDate,
             },
-            session: session || null,
+            ...(session
+                ? { session: { equals: session, mode: 'insensitive' } }
+                : { session: null }),
         }
     });
     const result = existing

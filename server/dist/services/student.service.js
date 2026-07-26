@@ -51,16 +51,26 @@ const mapStudentToFlat = (student) => {
         stream: student.stream?.name || null,
     };
 };
-const getAllStudents = async (schoolId) => {
+const getAllStudents = async (schoolId, search) => {
     if (!schoolId)
         throw new Error('School ID is required');
+    const where = { schoolId };
+    if (search && search.trim()) {
+        const term = search.trim();
+        where.OR = [
+            { fullName: { contains: term, mode: 'insensitive' } },
+            { student_id: { contains: term, mode: 'insensitive' } },
+        ];
+    }
     const students = await db_1.default.student.findMany({
-        where: { schoolId: schoolId },
+        where,
         include: {
             grade: true,
             section: true,
             stream: true
-        }
+        },
+        take: 20,
+        orderBy: { fullName: 'asc' }
     });
     return students.map(mapStudentToFlat);
 };

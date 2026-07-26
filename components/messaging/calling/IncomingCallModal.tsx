@@ -21,7 +21,7 @@ interface IncomingCallModalProps {
 // ── Native-like Pulse Rings ───────────────────────────────────────────────
 const PulseRing = ({ delay }: { delay: number }) => (
   <motion.div
-    className="absolute inset-0 rounded-full border border-white/20"
+    className="absolute inset-0 rounded-full border border-white/20 pointer-events-none"
     initial={{ scale: 1, opacity: 0.6 }}
     animate={{ scale: 2.2, opacity: 0 }}
     transition={{
@@ -117,7 +117,7 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
               className="relative flex items-center justify-center h-[144dp] w-[144dp]"
             >
               {/* Pulse rings */}
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 {[0, 0.9, 1.8].map((delay, i) => (
                   <PulseRing key={i} delay={delay} />
                 ))}
@@ -170,14 +170,18 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
               <div className="flex flex-col items-center gap-3">
                 <div className="relative h-20 w-20 flex items-center justify-center">
                   <motion.div
-                    className="absolute inset-0 rounded-full bg-red-500/15"
+                    className="absolute inset-0 rounded-full bg-red-500/15 pointer-events-none"
                     animate={{ scale: [1, 1.3], opacity: [0.6, 0] }}
                     transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
                   />
                   <motion.button
+                    type="button"
                     whileTap={{ scale: 0.88 }}
-                    onClick={onReject}
-                    className="h-[72px] w-[72px] rounded-full bg-red-500 hover:bg-red-600 shadow-xl flex items-center justify-center text-white focus:outline-none transition-colors border border-red-400/20"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onReject();
+                    }}
+                    className="relative z-10 h-[72px] w-[72px] rounded-full bg-red-500 hover:bg-red-600 shadow-xl flex items-center justify-center text-white focus:outline-none transition-colors border border-red-400/20 cursor-pointer"
                   >
                     <PhoneOff className="h-7 w-7 text-white" />
                   </motion.button>
@@ -190,8 +194,9 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
               {/* ── Message (Msg) ── */}
               <div className="flex flex-col items-center gap-2 pb-3">
                 <motion.button
+                  type="button"
                   whileTap={{ scale: 0.88 }}
-                  className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center focus:outline-none transition-colors"
+                  className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center focus:outline-none transition-colors cursor-pointer"
                 >
                   <Mail className="h-5 w-5 text-white/80" />
                 </motion.button>
@@ -204,16 +209,20 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
               <div className="flex flex-col items-center gap-3">
                 <div className="relative h-20 w-20 flex items-center justify-center">
                   <motion.div
-                    className="absolute inset-0 rounded-full bg-green-500/15"
+                    className="absolute inset-0 rounded-full bg-green-500/15 pointer-events-none"
                     animate={{ scale: [1, 1.3], opacity: [0.6, 0] }}
                     transition={{ duration: 2, repeat: Infinity, ease: 'easeOut', delay: 0.4 }}
                   />
                   <motion.button
+                    type="button"
                     whileTap={{ scale: 0.88 }}
-                    onClick={onAccept}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAccept();
+                    }}
                     disabled={isConnecting}
                     className={cn(
-                      "h-[72px] w-[72px] rounded-full bg-green-500 hover:bg-green-600 shadow-xl flex items-center justify-center text-white focus:outline-none transition-all border border-green-400/20",
+                      "relative z-10 h-[72px] w-[72px] rounded-full bg-green-500 hover:bg-green-600 shadow-xl flex items-center justify-center text-white focus:outline-none transition-all border border-green-400/20 cursor-pointer",
                       isConnecting && "opacity-75 cursor-not-allowed"
                     )}
                   >

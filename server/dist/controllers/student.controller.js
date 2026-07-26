@@ -41,7 +41,8 @@ const getStudents = async (req, res, next) => {
         if (!schoolId) {
             return res.status(401).json({ success: false, message: 'School ID context missing' });
         }
-        const students = await studentService.getAllStudents(schoolId);
+        const search = req.query.search;
+        const students = await studentService.getAllStudents(schoolId, search);
         res.status(200).json({ success: true, data: students });
     }
     catch (error) {

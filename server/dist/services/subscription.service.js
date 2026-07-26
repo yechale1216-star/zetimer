@@ -172,6 +172,21 @@ const upsertSchoolSubscription = async (schoolId, data) => {
     const billingStart = data.billingStart ?? new Date();
     const billingEnd = data.billingEnd ?? (() => { const d = new Date(billingStart); d.setMonth(d.getMonth() + months); return d; })();
     const renewalDate = data.renewalDate ?? (() => { const d = new Date(billingEnd); d.setDate(d.getDate() + 1); return d; })();
+    // Look up the plan to check if it's a free/trial plan
+    const plan = await db_1.default.subscriptionPlan.findUnique({ where: { id: data.planId } });
+    const isFreePlan = (plan?.slug ?? '').toLowerCase() === 'free';
+    // Free plan: always set status=trial and compute trialEndsAt from plan.trialDays
+    // This ensures resolveSchoolFeatures grants ALL features during the free trial period.
+    let effectiveStatus = data.status ?? (isFreePlan ? 'trial' : 'active');
+    let effectiveTrialEndsAt = data.trialEndsAt;
+    if (isFreePlan) {
+        effectiveStatus = 'trial';
+        if (!effectiveTrialEndsAt && plan?.trialDays && plan.trialDays > 0) {
+            const trialEnd = new Date(billingStart);
+            trialEnd.setDate(trialEnd.getDate() + plan.trialDays);
+            effectiveTrialEndsAt = trialEnd;
+        }
+    }
     return db_1.default.schoolSubscription.upsert({
         where: { schoolId },
         create: {
@@ -179,24 +194,24 @@ const upsertSchoolSubscription = async (schoolId, data) => {
             planId: data.planId,
             billingPeriod: data.billingPeriod,
             studentCount: data.studentCount,
-            status: data.status ?? "trial",
+            status: effectiveStatus,
             discountPercent: data.discountPercent ?? 0,
             billingStart,
             billingEnd,
             renewalDate,
-            trialEndsAt: data.trialEndsAt,
+            trialEndsAt: effectiveTrialEndsAt,
             notes: data.notes,
         },
         update: {
             planId: data.planId,
             billingPeriod: data.billingPeriod,
             studentCount: data.studentCount,
-            status: data.status ?? "trial",
+            status: effectiveStatus,
             discountPercent: data.discountPercent ?? 0,
             billingStart,
             billingEnd,
             renewalDate,
-            trialEndsAt: data.trialEndsAt,
+            trialEndsAt: effectiveTrialEndsAt,
             notes: data.notes,
         },
         include: { plan: { include: { features: { include: { feature: true } } } } },
@@ -263,16 +278,19 @@ const resolveSchoolFeatures = async (schoolId) => {
             return [];
         const sub = school.subscription;
         const rawStatus = (sub?.status || '').toLowerCase();
-        // 1. Detect if school is in an active TRIAL period
-        // A school is in trial if:
+        const planSlug = (sub?.plan?.slug || '').toLowerCase();
+        // 1. Detect if school is in an active TRIAL period OR is on the Free plan.
+        // Free plan schools always get full access — restricted only by student/user limits and trialEndsAt date.
+        // A school is in trial/free if:
+        //   - plan slug is 'free', OR
         //   - status is explicitly 'trial', OR
-        //   - trialEndsAt exists and is still in the future (even if status shows 'active')
+        //   - trialEndsAt exists and is still in the future
         const now = new Date();
         const trialEndsAt = sub?.trialEndsAt ? new Date(sub.trialEndsAt) : null;
-        const isInActiveTrial = rawStatus === 'trial' ||
-            (trialEndsAt !== null && trialEndsAt > now);
+        const trialStillActive = trialEndsAt !== null && trialEndsAt > now;
+        const isInActiveTrial = planSlug === 'free' || rawStatus === 'trial' || trialStillActive;
         if (isInActiveTrial) {
-            // Full access to ALL features during trial
+            // Full access to ALL features during trial / free plan
             const allFeatures = await db_1.default.feature.findMany({
                 where: { isActive: true },
                 select: { key: true }
@@ -303,7 +321,6 @@ const resolveSchoolFeatures = async (schoolId) => {
             }
         }
         // C. Emergency Fallback: Grant messaging to any non-free active school if plan mapping is missing
-        const planSlug = (sub?.plan?.slug || '').toLowerCase();
         if (planSlug && planSlug !== 'free') {
             featureKeys.add('messaging');
         }

@@ -47,10 +47,15 @@ async function getUserCachedInfo(userId) {
     try {
         const info = await prisma.user.findUnique({
             where: { id: userId },
-            select: { schoolId: true, role: true }
+            select: { schoolId: true, role: true, full_name: true, profile_photo: true }
         });
         if (info) {
-            const data = { schoolId: info.schoolId || '', role: info.role || '' };
+            const data = {
+                schoolId: info.schoolId || '',
+                role: info.role || '',
+                full_name: info.full_name || 'User',
+                profile_photo: info.profile_photo || undefined,
+            };
             userCache.set(userId, { ...data, expires: Date.now() + USER_CACHE_TTL });
             return data;
         }
@@ -307,8 +312,31 @@ const initSocket = (server) => {
           - DB Write: ${dbEnd - dbStart}ms
           - Server Processing (Total): ${totalDuration}ms
           - Total Pipeline Latency (Client to Broadcast): ${transitLatency + totalDuration}ms`);
-                io.to(data.conversationId).emit('new_message', { ...message, tempId: data.tempId, performance });
+                const broadcastPayload = { ...message, tempId: data.tempId, performance };
+                io.to(data.conversationId).emit('new_message', broadcastPayload);
                 socket.emit('message_sent', { tempId: data.tempId, messageId: message.id });
+                // ── Bug 1 Fix: Guaranteed delivery to online-but-not-in-room members ──
+                // Socket.IO room broadcast (io.to(roomId)) ONLY reaches sockets that
+                // have explicitly called socket.join(roomId) via join_conversation.
+                // If the receiver is online but has never opened this conversation in the
+                // current session, they are NOT in the room and will miss the message.
+                // We fix this by directly emitting to ALL of their socket connections.
+                getConversationMemberIds(data.conversationId).then((memberIds) => {
+                    const roomSockets = io.sockets.adapter.rooms.get(data.conversationId) || new Set();
+                    for (const memberId of memberIds) {
+                        if (memberId === data.senderId)
+                            continue; // sender already got message_sent
+                        const memberSocketIds = exports.userSockets.get(memberId);
+                        if (!memberSocketIds)
+                            continue; // offline — push notification handles this
+                        for (const sid of memberSocketIds) {
+                            if (!roomSockets.has(sid)) {
+                                // This socket is online but NOT in the room — deliver directly
+                                io.to(sid).emit('new_message', broadcastPayload);
+                            }
+                        }
+                    }
+                }).catch(() => { });
                 getConversationMemberIds(data.conversationId).then(async (memberIds) => {
                     const offlineTargets = memberIds.filter(id => id !== data.senderId && !onlineUsers.has(id));
                     if (offlineTargets.length === 0)

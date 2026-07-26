@@ -79,6 +79,7 @@ export function MessagingCenter() {
   const activeConversationIdRef = useRef<string | null>(null);
   const userRef = useRef<any>(null);
   const isConnectedRef = useRef(false);
+  const joinedRoomsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
@@ -265,6 +266,19 @@ export function MessagingCenter() {
 
       // ── Telegram-style: persist conversations to IndexedDB for offline ──
       cacheConversations(finalConversations).catch(() => {});
+
+      // ── Telegram-style: Pre-load recent messages for top 10 chats into memory (0ms tap delay) ──
+      const topChats = activeChats.slice(0, 10);
+      topChats.forEach(conv => {
+        getCachedMessages(conv.id).then(cached => {
+          if (cached && cached.length > 0) {
+            setMessagesByConversation(prev => {
+              if (prev[conv.id]?.length > 0) return prev;
+              return { ...prev, [conv.id]: cached };
+            });
+          }
+        }).catch(() => {});
+      });
     } catch (error) {
       console.error('[Messaging] Failed to load data:', error);
       toast({ 
@@ -511,12 +525,18 @@ export function MessagingCenter() {
     return () => window.removeEventListener('online', handleOnline);
   }, [loadMessages]);
 
-  // ── Offline outbox drain ─────────────────────────────────────────────────────
-  // When the socket reconnects, replay any messages that were queued while offline.
-  // This is the core of "offline-first" messaging: users can type and send messages
-  // even with no connection, and they'll be delivered as soon as connectivity returns.
+  // ── Offline outbox drain & room re-join on reconnect ────────────────────────
+  // Re-join active room and replay any messages queued while offline.
   useEffect(() => {
     if (!isConnected || !socket || !user) return;
+
+    // ── Bug 3 Fix: Re-join joined rooms on socket reconnect ──
+    if (joinedRoomsRef.current.size > 0) {
+      console.log(`[Messaging] Socket reconnected — re-joining ${joinedRoomsRef.current.size} conversation room(s)...`);
+      joinedRoomsRef.current.forEach(convId => {
+        socket.emit('join_conversation', convId);
+      });
+    }
 
     const drainOutbox = async () => {
       const pending = await getOutboxMessages();
@@ -549,7 +569,7 @@ export function MessagingCenter() {
               if (res.ok) {
                 const newConv = await res.json();
                 const realId = newConv.id;
-                conversationIdMap[msg.conversationId] = realId;
+                conversationIdMap[conversationId] = realId;
                 conversationId = realId;
 
                 // Sync the active conversation state if the user has it open
@@ -716,6 +736,7 @@ export function MessagingCenter() {
       // 2. Switch active conversation & join socket room FIRST — this
       //    ensures we don't miss any incoming messages while fetching metadata.
       setActiveConversationId(id);
+      joinedRoomsRef.current.add(id);
       if (socket && isConnected) {
         socket.emit('join_conversation', id);
       }
@@ -1009,12 +1030,9 @@ export function MessagingCenter() {
     }
   }, [activeConversationId, messagesByConversation, markMessagesAsRead]);
 
-  // ── Socket: authenticate + listen for new messages ────────────────────────
+  // ── Socket: listen for new messages ───────────────────────────
   useEffect(() => {
-    if (!socket || !isConnected || !user) return;
-
-    const token = localStorage.getItem('attendance_token');
-    socket.emit('authenticate', { token });
+    if (!socket || !user) return;
 
     const handleNewMessage = (message: any) => {
       const clientReceivedAt = Date.now();
@@ -1364,7 +1382,7 @@ export function MessagingCenter() {
       socket.off('user_typing', handleUserTyping);
       socket.off('user_stop_typing', handleUserStopTyping);
     };
-  }, [socket, isConnected, user]);
+  }, [socket, user]);
 
   // ── Send message ─────────────────────────────────────────────────────────────
   const handleSendMessage = useCallback(

@@ -12,6 +12,7 @@ import { authService } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
 import { useToast } from "@/hooks/use-toast"
 import { Lock } from "lucide-react"
+import { PhoneInput } from "@/components/ui/phone-input"
 
 interface SchoolSetupProps {
   onSetupComplete: () => void
@@ -148,13 +149,10 @@ export function SchoolSetup({ onSetupComplete }: SchoolSetupProps) {
               <Label htmlFor="schoolPhone" className="text-foreground">
                 School Phone Number (Optional)
               </Label>
-              <Input
+              <PhoneInput
                 id="schoolPhone"
-                type="tel"
-                placeholder="Enter school phone number"
                 value={schoolInfo.schoolPhone}
-                onChange={(e) => setSchoolInfo({ ...schoolInfo, schoolPhone: e.target.value })}
-                className="h-12"
+                onChange={(val) => setSchoolInfo({ ...schoolInfo, schoolPhone: val })}
               />
             </div>
 

@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { getApiUrl } from '@/lib/api-config'
+import { PhoneInput } from '@/components/ui/phone-input'
 
 interface AddSchoolDialogProps {
   open: boolean
@@ -212,11 +213,10 @@ export function AddSchoolDialog({ open, onOpenChange, onSuccess }: AddSchoolDial
 
             <div className="space-y-2">
               <Label htmlFor="adminPhone">Phone Number</Label>
-              <Input
+              <PhoneInput
                 id="adminPhone"
-                placeholder="+251..."
                 value={formData.adminPhone}
-                onChange={(e) => setFormData({ ...formData, adminPhone: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, adminPhone: val })}
                 disabled={loading}
               />
             </div>

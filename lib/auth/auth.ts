@@ -276,7 +276,7 @@ class AuthService {
     }
   }
 
-  async updateParentProfile(phone: string, data: { name: string, email: string, address?: string }): Promise<{ success: boolean; message: string; error?: string; user?: User }> {
+  async updateParentProfile(phone: string, data: { name: string, email: string, address?: string, profile_photo?: string | null }): Promise<{ success: boolean; message: string; error?: string; user?: User }> {
     try {
       const res = await fetch(`${API_URL}/api/parent/profile/${phone}`, {
         method: "PUT",
@@ -295,7 +295,8 @@ class AuthService {
           ...currentUser, 
           name: result.data.name, 
           email: result.data.email,
-          phone: result.data.phone
+          phone: result.data.phone,
+          ...(result.data.profile_photo !== undefined && { profile_photo: result.data.profile_photo }),
         };
         localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(updatedUser));
         window.dispatchEvent(new Event("userSessionChanged"));

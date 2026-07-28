@@ -68,10 +68,8 @@ export const tenantMiddleware = async (req: AuthenticatedRequest, res: Response,
       if (url.startsWith('/api/parent')) {
         requestedRole = 'parent';
       } else if (url.startsWith('/api/teachers') || url.includes('/attendance-sessions')) {
-        // Broadly speaking, routes under /api/teachers or attendance tracking require teacher role
         requestedRole = 'teacher';
       } else if (url.startsWith('/api/school/') || url.startsWith('/api/schools/') || url.startsWith('/api/settings')) {
-        // Admin portal routes
         requestedRole = 'school_admin';
       }
     }

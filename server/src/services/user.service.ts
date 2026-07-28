@@ -14,7 +14,26 @@ export const getUserById = async (id: string, schoolId?: string) => {
   if (schoolId) where.schoolId = schoolId;
   return await prisma.user.findFirst({ 
     where,
-    include: { school: { include: { settings: true } } }
+    select: {
+      id: true,
+      email: true,
+      full_name: true,
+      role: true,
+      phone: true,
+      is_active: true,
+      teacher_id: true,
+      schoolId: true,
+      createdAt: true,
+      updatedAt: true,
+      experience_years: true,
+      qualification: true,
+      subject: true,
+      profile_photo: true,
+      address: true,
+      lastActive: true,
+      pushToken: true,
+      school: { include: { settings: true } }
+    }
   });
 };
 
@@ -22,6 +41,24 @@ export const getUsers = async (schoolId: string) => {
   if (!schoolId) throw new Error('School ID is required');
   return await prisma.user.findMany({ 
     where: { schoolId },
+    select: {
+      id: true,
+      email: true,
+      full_name: true,
+      role: true,
+      phone: true,
+      is_active: true,
+      teacher_id: true,
+      schoolId: true,
+      createdAt: true,
+      updatedAt: true,
+      experience_years: true,
+      qualification: true,
+      subject: true,
+      profile_photo: true,
+      address: true,
+      lastActive: true
+    },
     orderBy: { full_name: 'asc' }
   });
 };

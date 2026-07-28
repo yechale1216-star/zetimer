@@ -21,6 +21,8 @@ import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/context/auth-context"
 import { clearMessageCache } from "@/lib/utils/message-cache"
 
+import { PhoneInput } from "@/components/ui/phone-input"
+
 interface LoginFormProps {
   onLoginSuccess: (user?: any) => void
   onShowForgotPassword: () => void
@@ -323,30 +325,13 @@ export function LoginForm({ onLoginSuccess, onShowForgotPassword, onShowAdminSig
           <form onSubmit={handleParentLogin} className="space-y-5 animate-in fade-in duration-300">
             <div className="space-y-2">
               <Label htmlFor="parentPhone" className="typography-label text-slate-800 dark:text-slate-300">{t("registered_phone")}</Label>
-              <div className="relative group">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-emerald-600 dark:group-focus-within:text-emerald-400 transition-colors">
-                  <Phone className="w-4 h-4" />
-                </div>
-                <Input
-                  id="parentPhone"
-                  type="tel"
-                  placeholder={t("parent_phone_placeholder")}
-                  maxLength={13}
-                  value={parentPhone}
-                  onChange={(e) => {
-                    let val = e.target.value.replace(/[^\d+]/g, "")
-                    if (val.startsWith("0")) {
-                      val = "+251" + val.substring(1);
-                    } else if (val.length > 0 && !val.startsWith("+")) {
-                      val = "+251" + val
-                    }
-                    if (val.lastIndexOf("+") > 0) val = "+" + val.replace(/\+/g, "")
-                    setParentPhone(val)
-                  }}
-                  required
-                  className="typography-body pl-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-12 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all rounded-xl"
-                />
-              </div>
+              <PhoneInput
+                id="parentPhone"
+                value={parentPhone}
+                onChange={(val) => setParentPhone(val)}
+                placeholder={t("parent_phone_placeholder")}
+                required
+              />
             </div>
 
             <div className="space-y-2">

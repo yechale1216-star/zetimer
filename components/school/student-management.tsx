@@ -29,6 +29,8 @@ import { DisciplineApi, StudentDiscipline } from "@/lib/discipline-service"
 
 
 
+import { PhoneInput } from "@/components/ui/phone-input"
+
 export function StudentManagement() {
   const [students, setStudents] = useState<Student[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -1042,49 +1044,13 @@ export function StudentManagement() {
                         
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <Label htmlFor="parent_phone" className="typography-label text-slate-700 dark:text-slate-300">Parent Phone Number (Ethiopian) *</Label>
-                            <div className="relative group">
-                              <Input
-                                id="parent_phone"
-                                type="tel"
-                                placeholder="+251 9XX XXX XXX"
-                                maxLength={13}
-                                value={formData.parent_phone || ""}
-                                onChange={(e) => {
-                                  let val = e.target.value.replace(/[^\d+]/g, "")
-                                  if (val.startsWith("0")) {
-                                    val = "+251" + val.substring(1)
-                                  } else if (val.startsWith("251") && !val.startsWith("+")) {
-                                    val = "+" + val
-                                  } else if (!val.startsWith("+") && val.length > 0) {
-                                    val = "+251" + val
-                                  }
-                                  if (val.lastIndexOf("+") > 0) val = "+" + val.replace(/\+/g, "")
-                                  setFormData((prev) => ({ ...prev, parent_phone: val }))
-                                }}
-                                required
-                                className={`typography-body h-12 rounded-xl bg-background/50 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all ${parentLookupState === 'found' ? 'border-emerald-500 bg-emerald-50/30' : parentLookupState === 'error' ? 'border-rose-400 bg-rose-50/20' : ''}`}
-                              />
-                              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                                {parentLookupState === 'searching' ? (
-                                  <RefreshCw className="w-4 h-4 text-emerald-500 animate-spin mr-2" />
-                                ) : parentLookupState === 'found' ? (
-                                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mr-2" />
-                                ) : parentLookupState === 'error' ? (
-                                  <AlertCircle className="w-5 h-5 text-rose-500 mr-2" />
-                                ) : (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-slate-400 hover:text-emerald-500"
-                                    onClick={() => handleSearchParent(formData.parent_phone)}
-                                  >
-                                    <Search className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
+                            <Label htmlFor="parent_phone" className="typography-label text-slate-700 dark:text-slate-300">Parent Phone Number *</Label>
+                            <PhoneInput
+                              id="parent_phone"
+                              value={formData.parent_phone || ""}
+                              onChange={(val) => setFormData((prev) => ({ ...prev, parent_phone: val }))}
+                              required
+                            />
                             <p className="text-[10px] text-muted-foreground italic">Phone number is used for automatic global parent account detection.</p>
                           </div>
 

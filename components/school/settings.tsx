@@ -21,6 +21,7 @@ import { notifications } from "@/lib/utils/notifications"
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
 import { supabase } from "@/lib/utils/supabase"
 import { Lock, Edit2, Check, Calendar } from "lucide-react"
+import { PhoneInput } from "@/components/ui/phone-input"
 
 export function Settings() {
   const [settings, setSettings] = useState<any>({})
@@ -373,11 +374,10 @@ export function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="schoolPhone">School Phone Number</Label>
-                  <Input
+                  <PhoneInput
                     id="schoolPhone"
                     value={settings.schoolPhone || ""}
-                    onChange={(e) => setSettings({ ...settings, schoolPhone: e.target.value })}
-                    placeholder="Enter school phone number"
+                    onChange={(val) => setSettings({ ...settings, schoolPhone: val })}
                   />
                 </div>
               </div>

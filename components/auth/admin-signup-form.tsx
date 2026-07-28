@@ -15,6 +15,8 @@ import Link from "next/link"
 import { useAuth } from "@/lib/context/auth-context"
 import { clearMessageCache } from "@/lib/utils/message-cache"
 
+import { PhoneInput } from "@/components/ui/phone-input"
+
 interface AdminSignupFormProps {
   onSignupSuccess: (user?: any) => void
   onBack: () => void
@@ -332,30 +334,16 @@ export function AdminSignupForm({ onSignupSuccess, onBack }: AdminSignupFormProp
             {/* Phone */}
             <div className="space-y-1.5">
               <Label htmlFor="phone" className="text-slate-800 dark:text-slate-300">Phone</Label>
-              <div className="relative group">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-500 group-focus-within:text-blue-700 dark:group-focus-within:text-blue-400 transition-colors">
-                  <Phone className="w-4 h-4" />
-                </div>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+2519..."
-                  maxLength={13}
-                  value={credentials.phone}
-                  onChange={(e) => handlePhoneChange(e.target.value)}
-                  onBlur={(e) => handlePhoneBlur(e.target.value)}
-                  required
-                  className={`pl-10 bg-slate-100/50 dark:bg-white/5 border-slate-300 dark:border-white/10 h-11 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all rounded-xl ${
-                    fieldErrors.phone ? "border-red-500/50 ring-red-500/20" : ""
-                  }`}
-                />
-                {checkingPhone && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                  </div>
-                )}
-              </div>
-              {fieldErrors.phone && <p className="text-[10px] text-red-600 dark:text-red-400 ml-1 font-medium">{fieldErrors.phone}</p>}
+              <PhoneInput
+                id="phone"
+                value={credentials.phone}
+                onChange={(val) => {
+                  setCredentials((prev) => ({ ...prev, phone: val }))
+                  handlePhoneBlur(val)
+                }}
+                error={fieldErrors.phone}
+                required
+              />
             </div>
 
             {/* Email */}

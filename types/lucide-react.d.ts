@@ -101,6 +101,7 @@ declare module 'lucide-react' {
   export const FileVideo: LucideIcon;
   export const FileCode: LucideIcon;
   export const FileAudio: LucideIcon;
+  export const FilePlus: LucideIcon;
   export const File: LucideIcon;
   export const CalendarDays: LucideIcon;
   export const Building2: LucideIcon;
@@ -142,6 +143,7 @@ declare module 'lucide-react' {
   export const Sun: LucideIcon;
   export const Moon: LucideIcon;
   export const PhoneOff: LucideIcon;
+  export const Power: LucideIcon;
   export const Pin: LucideIcon;
   export const Bookmark: LucideIcon;
   export const Camera: LucideIcon;

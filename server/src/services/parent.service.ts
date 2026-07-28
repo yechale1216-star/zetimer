@@ -717,7 +717,7 @@ export const searchParentByPhone = async (phone: string, schoolId: string) => {
   return { success: false, message: "No parent found with this phone number." };
 };
 
-export const updateProfile = async (phone: string, schoolId: string, data: { name: string, email: string, address?: string }) => {
+export const updateProfile = async (phone: string, schoolId: string, data: { name: string, email: string, address?: string, profile_photo?: string | null }) => {
   const cleanPhone = normalizePhoneNumber(phone);
   const user = await prisma.user.findUnique({
     where: { phone: cleanPhone }
@@ -727,13 +727,20 @@ export const updateProfile = async (phone: string, schoolId: string, data: { nam
     throw new Error("Parent not found.");
   }
 
+  const updateData: any = {
+    full_name: data.name,
+    email: data.email,
+    address: data.address
+  };
+
+  // Only update profile_photo if explicitly provided (allows null to remove)
+  if (data.profile_photo !== undefined) {
+    updateData.profile_photo = data.profile_photo;
+  }
+
   const updatedUser = await prisma.user.update({
     where: { id: user.id },
-    data: {
-      full_name: data.name,
-      email: data.email,
-      address: data.address
-    }
+    data: updateData
   });
 
   return { 
@@ -744,7 +751,8 @@ export const updateProfile = async (phone: string, schoolId: string, data: { nam
       name: updatedUser.full_name,
       email: updatedUser.email,
       phone: updatedUser.phone,
-      address: updatedUser.address
+      address: updatedUser.address,
+      profile_photo: updatedUser.profile_photo
     }
   };
 };

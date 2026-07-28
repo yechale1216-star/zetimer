@@ -231,6 +231,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (currentPath.startsWith('/parent')) profileHeaders["x-requested-role"] = 'parent'
     else if (currentPath.startsWith('/school/teacher')) profileHeaders["x-requested-role"] = 'teacher'
     else if (currentPath.startsWith('/school/admin')) profileHeaders["x-requested-role"] = 'school_admin'
+    else if (currentPath.startsWith('/school/registrar')) profileHeaders["x-requested-role"] = 'registrar'
+    else if (currentPath.startsWith('/school/discipline-officer')) profileHeaders["x-requested-role"] = 'discipline_officer'
+    else if (currentPath.startsWith('/school/call-center')) profileHeaders["x-requested-role"] = 'call_center'
     else if (currentPath.startsWith('/super-admin')) profileHeaders["x-requested-role"] = 'super_admin'
 
     // PARALLEL REVALIDATION:

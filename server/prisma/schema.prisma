@@ -173,6 +173,7 @@ model School {
   userNotifications    UserNotification[]
   disciplines          StudentDiscipline[]
   disciplineCategories DisciplineCategory[]
+  systemRoles          SystemRole[]
 }
 
 model User {
@@ -739,6 +740,26 @@ model BroadcastLog {
   sentAt    DateTime @default(now())
 
   @@map("broadcast_logs")
+}
+
+model SystemRole {
+  id          String   @id @default(uuid())
+  schoolId    String?
+  key         String
+  name        String
+  description String?
+  color       String   @default("#6366f1")
+  isSystem    Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  permissions Json     @default("{}")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  school      School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([key])
+  @@map("system_roles")
 }
 
 enum OnboardingStatus {

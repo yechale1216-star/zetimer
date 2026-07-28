@@ -26,6 +26,9 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     if (role === "teacher") return "/school/teacher"
     if (role === "parent") return "/parent/dashboard"
     if (role === "admin" || role === "school_admin") return "/school/admin"
+    if (role === "registrar") return "/school/registrar"
+    if (role === "discipline_officer") return "/school/discipline-officer"
+    if (role === "call_center") return "/school/call-center"
     return "/login"
   }
 

@@ -1,0 +1,24 @@
+import type { MetadataRoute } from "next"
+import { SITE_URL } from "@/lib/seo/metadata-constants"
+
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: [
+      {
+        userAgent: "*",
+        allow: "/",
+        disallow: [
+          "/school/",
+          "/parent/",
+          "/super-admin/",
+          "/auth/",
+          "/onboarding/",
+          "/dev-tools/",
+          "/checkout-simulation/",
+          "/api/",
+        ],
+      },
+    ],
+    sitemap: `${SITE_URL}/sitemap.xml`,
+  }
+}

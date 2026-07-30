@@ -16,6 +16,15 @@ import { GlobalOfflineOverlay } from "@/components/system/global-offline-overlay
 import { InAppNotificationProvider } from "@/components/providers/in-app-notification-provider"
 import { SocketProvider } from "@/components/providers/socket-provider"
 import { CallProvider } from "@/components/providers/call-provider"
+import { OrganizationJsonLd } from "@/components/seo/json-ld"
+import {
+  SITE_NAME,
+  SITE_URL,
+  DEFAULT_OG_IMAGE,
+  DEFAULT_DESCRIPTION,
+  DEFAULT_KEYWORDS,
+  TWITTER_HANDLE,
+} from "@/lib/seo/metadata-constants"
 
 const inter = localFont({
   src: "../public/fonts/inter.woff2",
@@ -30,29 +39,48 @@ const jetbrainsMono = localFont({
 })
 
 export const metadata: Metadata = {
-  title: "Zetime - School Attendance Management",
-  description: "Smart school attendance tracking and management system",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} — Smart School Attendance Management`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: DEFAULT_DESCRIPTION,
+  keywords: DEFAULT_KEYWORDS,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Zetime",
+    title: SITE_NAME,
   },
   formatDetection: {
     telephone: false,
   },
+  alternates: {
+    canonical: SITE_URL,
+  },
   openGraph: {
     type: "website",
-    siteName: "Zetime",
-    title: "Zetime - School Attendance Management",
-    description: "Smart school attendance tracking and management system",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — Smart School Attendance Management`,
+    description: DEFAULT_DESCRIPTION,
+    url: SITE_URL,
+    locale: "en_US",
+    images: [
+      {
+        url: DEFAULT_OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: `${SITE_NAME} — Smart School Attendance Management`,
+      },
+    ],
   },
   twitter: {
-    card: "summary",
-    title: "Zetime - School Attendance Management",
-    description: "Smart school attendance tracking and management system",
+    card: "summary_large_image",
+    site: TWITTER_HANDLE,
+    title: `${SITE_NAME} — Smart School Attendance Management`,
+    description: DEFAULT_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE],
   },
-  generator: "v0.app",
 }
 
 export const viewport: Viewport = {
@@ -73,7 +101,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* head tags */}
+        <OrganizationJsonLd />
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}>
         <ThemeProvider

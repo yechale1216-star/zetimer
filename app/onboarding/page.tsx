@@ -1,12 +1,13 @@
-"use client"
+import OnboardingPage from "./onboarding-content"
+import { createPageMetadata } from "@/lib/seo/metadata-constants"
 
-import OnboardingWizard from "@/components/onboarding/onboarding-wizard"
-import { AuthGuard } from "@/components/auth/auth-guard"
+export const metadata = createPageMetadata({
+  title: "School Onboarding Wizard",
+  description: "Set up your institution, grade levels, and academic schedule on Zetime.",
+  path: "/onboarding",
+  noIndex: true,
+})
 
-export default function OnboardingPage() {
-  return (
-    <AuthGuard allowedRoles={["admin", "school_admin"]}>
-      <OnboardingWizard />
-    </AuthGuard>
-  )
+export default function Page() {
+  return <OnboardingPage />
 }

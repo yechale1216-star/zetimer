@@ -1,10 +1,13 @@
 import { Suspense } from "react"
 import ResetPasswordPageContent from "./reset-password-content"
+import { createPageMetadata } from "@/lib/seo/metadata-constants"
 
-export const metadata = {
+export const metadata = createPageMetadata({
   title: "Reset Password",
-  description: "Reset your account password",
-}
+  description: "Reset your Zetime account password securely.",
+  path: "/reset-password",
+  noIndex: true,
+})
 
 export default function ResetPasswordPage() {
   return (

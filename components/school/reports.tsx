@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Download, Printer, Calendar, Users, UserCheck, Clock, UserX, AlertTriangle, TrendingUp, TrendingDown, PieChart as PieChartIcon } from "lucide-react"
+import { Download, Printer, Calendar, Users, UserCheck, Clock, UserX, AlertTriangle, TrendingUp, TrendingDown, PieChart as PieChartIcon, Search } from "lucide-react"
 import { db, type Student } from "@/lib/db/database"
 import { notifications } from "@/lib/utils/notifications"
 import { ValidationService } from "@/lib/utils/validation"
@@ -52,6 +52,7 @@ export function Reports() {
   const [gradeFilter, setGradeFilter] = useState("All Grades")
   const [streamFilter, setStreamFilter] = useState("All Streams")
   const [sectionFilter, setSectionFilter] = useState("All Sections")
+  const [searchQuery, setSearchQuery] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -107,7 +108,7 @@ export function Reports() {
 
   useEffect(() => {
     filterReports()
-  }, [reportData, gradeFilter, streamFilter, sectionFilter])
+  }, [reportData, gradeFilter, streamFilter, sectionFilter, searchQuery])
 
   const loadStudents = async () => {
     try {
@@ -160,6 +161,7 @@ export function Reports() {
       // session mode  → only records that have a real session value
       //   + optionally narrowed by sessionFilter (morning / afternoon / total)
       let processedAttendance: typeof allAttendance
+      let sessionRecords: typeof allAttendance = []
 
       if (!isSessionBased) {
         // Daily mode: reject every record that carries a session tag
@@ -168,20 +170,22 @@ export function Reports() {
         )
       } else {
         // Session-based mode: reject records with no session
-        const sessionRecords = allAttendance.filter(
+        sessionRecords = allAttendance.filter(
           record => !!record.session
         )
-        // Then narrow by selected session filter if not "total"
+        // Narrow processedAttendance by selected session filter if not "total" (used for charts & raw data)
         processedAttendance = sessionFilter !== "total"
           ? sessionRecords.filter(
-              record => record.session?.toLowerCase() === sessionFilter.toLowerCase()
+              record => record.session?.trim().toLowerCase() === sessionFilter.toLowerCase()
             )
           : sessionRecords
       }
 
       // Pre-group attendance by student ID for O(N) lookup
+      // In session-based mode, use ALL session records so we can access both Morning & Afternoon for each date
+      const targetRecords = isSessionBased ? sessionRecords : processedAttendance
       const attendanceByStudent: Record<string, any[]> = {}
-      processedAttendance.forEach(record => {
+      targetRecords.forEach(record => {
         if (!attendanceByStudent[record.student_id]) {
           attendanceByStudent[record.student_id] = []
         }
@@ -206,43 +210,30 @@ export function Reports() {
           let morningTotal = 0
           let afternoonPresentCount = 0
           let afternoonTotal = 0
-          const totalDays = Object.keys(dateGroups).length
+
+          // Local helpers (trim + lowerCase to guarantee case insensitivity)
+          const isP = (s: string | undefined) => s?.trim().toLowerCase() === "present"
+          const isL = (s: string | undefined) => s?.trim().toLowerCase() === "late"
+          const isE = (s: string | undefined) => s?.trim().toLowerCase() === "excused"
+          const isA = (s: string | undefined) => s?.trim().toLowerCase() === "absent"
+          const isAtt = (s: string | undefined) => isP(s) || isL(s)
+
+          const resolveFullDay = (ms?: string, as?: string): 'present' | 'late' | 'excused' | 'absent' | null => {
+            if (!ms || !as) return null
+            const mn = ms.trim().toLowerCase()
+            const an = as.trim().toLowerCase()
+            if (mn !== an) return null
+            if (mn === 'present') return 'present'
+            if (mn === 'late')    return 'late'
+            if (mn === 'excused') return 'excused'
+            if (mn === 'absent')  return 'absent'
+            return null
+          }
 
           Object.values(dateGroups).forEach(records => {
-            const m = records.find(r => r.session?.toLowerCase() === "morning")
-            const a = records.find(r => r.session?.toLowerCase() === "afternoon")
+            const m = records.find(r => r.session?.trim().toLowerCase() === "morning")
+            const a = records.find(r => r.session?.trim().toLowerCase() === "afternoon")
 
-            // Local helpers
-            const isP = (s: string | undefined) => s?.toLowerCase() === "present"
-            const isL = (s: string | undefined) => s?.toLowerCase() === "late"
-            const isE = (s: string | undefined) => s?.toLowerCase() === "excused"
-            const isA = (s: string | undefined) => s?.toLowerCase() === "absent"
-            const isAtt = (s: string | undefined) => isP(s) || isL(s)
-
-            /**
-             * resolveFullDay — strict match rule.
-             * Both sessions must be recorded AND have the exact same status.
-             * Any mismatch or missing session → null (day is not counted).
-             */
-            const resolveFullDay = (ms?: string, as?: string): 'present' | 'late' | 'excused' | 'absent' | null => {
-              if (!ms || !as) return null
-              const mn = ms.toLowerCase()
-              const an = as.toLowerCase()
-              if (mn !== an) return null
-              if (mn === 'present') return 'present'
-              if (mn === 'late')    return 'late'
-              if (mn === 'excused') return 'excused'
-              if (mn === 'absent')  return 'absent'
-              return null
-            }
-
-            const fullDayStatus = resolveFullDay(m?.status, a?.status)
-            if (fullDayStatus === 'present')      presentDays++
-            else if (fullDayStatus === 'late')    lateDays++
-            else if (fullDayStatus === 'excused') excusedDays++
-            else if (fullDayStatus === 'absent')  absentDays++
-
-            
             if (m) {
               morningTotal++
               if (isAtt(m.status)) morningPresentCount++
@@ -251,11 +242,41 @@ export function Reports() {
               afternoonTotal++
               if (isAtt(a.status)) afternoonPresentCount++
             }
+
+            if (sessionFilter === "morning") {
+              if (m) {
+                if (isP(m.status)) presentDays++
+                else if (isL(m.status)) lateDays++
+                else if (isE(m.status)) excusedDays++
+                else if (isA(m.status)) absentDays++
+              }
+            } else if (sessionFilter === "afternoon") {
+              if (a) {
+                if (isP(a.status)) presentDays++
+                else if (isL(a.status)) lateDays++
+                else if (isE(a.status)) excusedDays++
+                else if (isA(a.status)) absentDays++
+              }
+            } else {
+              // sessionFilter === "total"
+              const fullDayStatus = resolveFullDay(m?.status, a?.status)
+              if (fullDayStatus === 'present')      presentDays++
+              else if (fullDayStatus === 'late')    lateDays++
+              else if (fullDayStatus === 'excused') excusedDays++
+              else if (fullDayStatus === 'absent')  absentDays++
+            }
           })
+
+          let totalDays = Object.keys(dateGroups).length
+          if (sessionFilter === "morning") {
+            totalDays = morningTotal
+          } else if (sessionFilter === "afternoon") {
+            totalDays = afternoonTotal
+          }
 
           const morningRate = morningTotal > 0 ? (morningPresentCount / morningTotal) * 100 : 0
           const afternoonRate = afternoonTotal > 0 ? (afternoonPresentCount / afternoonTotal) * 100 : 0
-          const totalAttending = presentDays + lateDays + excusedDays
+          const totalAttending = presentDays + lateDays
           const attendanceRate = totalDays > 0 ? (totalAttending / totalDays) * 100 : 0
 
           return {
@@ -272,10 +293,10 @@ export function Reports() {
             afternoonRate: Math.round(afternoonRate * 100) / 100,
           }
         } else {
-          const presentDays = studentAttendance.filter((record) => record.status?.toLowerCase() === "present").length
-          const lateDays = studentAttendance.filter((record) => record.status?.toLowerCase() === "late").length
-          const absentDays = studentAttendance.filter((record) => record.status?.toLowerCase() === "absent").length
-          const excusedDays = studentAttendance.filter((record) => record.status?.toLowerCase() === "excused").length
+          const presentDays = studentAttendance.filter((record) => record.status?.trim().toLowerCase() === "present").length
+          const lateDays = studentAttendance.filter((record) => record.status?.trim().toLowerCase() === "late").length
+          const absentDays = studentAttendance.filter((record) => record.status?.trim().toLowerCase() === "absent").length
+          const excusedDays = studentAttendance.filter((record) => record.status?.trim().toLowerCase() === "excused").length
           const totalDays = studentAttendance.length
 
           const attendanceRate = totalDays > 0 ? ((presentDays + lateDays) / totalDays) * 100 : 0
@@ -310,6 +331,17 @@ export function Reports() {
     }
 
     let filtered = reportData
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      filtered = filtered.filter(
+        (report) =>
+          report.student.name?.toLowerCase().includes(q) ||
+          report.student.student_id?.toLowerCase().includes(q) ||
+          (report.student.grade && report.student.grade.toLowerCase().includes(q)) ||
+          (report.student.stream && report.student.stream.toLowerCase().includes(q))
+      )
+    }
 
     if (gradeFilter !== "All Grades") {
       filtered = filtered.filter((report) => report.student.grade === gradeFilter)
@@ -589,55 +621,67 @@ export function Reports() {
       </Card>
 
       {/* Filters */}
-      {isAdmin && (
-        <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
-          <CardContent className="pt-6">
-            <div className="flex gap-4 flex-wrap">
-              <Select value={gradeFilter} onValueChange={setGradeFilter}>
-                <SelectTrigger className="w-40 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl">
-                  <SelectValue placeholder="All Grades" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All Grades">All Grades</SelectItem>
-                  {grades.map((grade) => (
-                    <SelectItem key={grade || "unknown"} value={grade || "unknown"}>
-                      {grade}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={streamFilter} onValueChange={setStreamFilter}>
-                <SelectTrigger className="w-40 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl">
-                  <SelectValue placeholder="All Streams" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All Streams">All Streams</SelectItem>
-                  {streams.map((stream) => (
-                    <SelectItem key={stream || "unknown"} value={stream || "unknown"}>
-                      {stream}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={sectionFilter} onValueChange={setSectionFilter}>
-                <SelectTrigger className="w-40 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl">
-                  <SelectValue placeholder="All Sections" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All Sections">All Sections</SelectItem>
-                  {sections.map((section) => (
-                    <SelectItem key={section || "unknown"} value={section || "unknown"}>
-                      {section}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
+        <CardContent className="pt-6">
+          <div className="flex gap-4 flex-wrap items-center">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search student by name, ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl h-11 focus:ring-primary/20"
+              />
             </div>
-          </CardContent>
-        </Card>
-      )}
+
+            {isAdmin && (
+              <>
+                <Select value={gradeFilter} onValueChange={setGradeFilter}>
+                  <SelectTrigger className="w-36 md:w-40 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl h-11">
+                    <SelectValue placeholder="All Grades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All Grades">All Grades</SelectItem>
+                    {grades.map((grade) => (
+                      <SelectItem key={grade || "unknown"} value={grade || "unknown"}>
+                        {grade}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={streamFilter} onValueChange={setStreamFilter}>
+                  <SelectTrigger className="w-36 md:w-40 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl h-11">
+                    <SelectValue placeholder="All Streams" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All Streams">All Streams</SelectItem>
+                    {streams.map((stream) => (
+                      <SelectItem key={stream || "unknown"} value={stream || "unknown"}>
+                        {stream}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                  <SelectTrigger className="w-36 md:w-40 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl h-11">
+                    <SelectValue placeholder="All Sections" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All Sections">All Sections</SelectItem>
+                    {sections.map((section) => (
+                      <SelectItem key={section || "unknown"} value={section || "unknown"}>
+                        {section}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Stats */}
       {filteredReports.length > 0 && (
@@ -790,11 +834,20 @@ export function Reports() {
       {/* Report Table */}
       {filteredReports.length > 0 ? (
         <Card className="overflow-hidden border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
-          <CardHeader className="pb-0 border-none">
+          <CardHeader className="pb-0 border-none flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <CardTitle className="typography-card-title flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               Detailed Report
             </CardTitle>
+            <div className="relative w-full md:w-72">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search student by name or ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-white/95 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 rounded-xl h-10 text-xs focus:ring-primary/20"
+              />
+            </div>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="md:hidden space-y-4">
@@ -810,7 +863,7 @@ export function Reports() {
                           {report.student.name || 'Unknown Student'}
                         </p>
                         <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-tight">
-                          ID: {report.student.student_id} • {report.student.grade} - {report.student.section}
+                          ID: {report.student.student_id} • {report.student.grade} - {report.student.section}{report.student.stream ? ` (${report.student.stream})` : ''}
                         </p>
                       </div>
                     </div>
@@ -847,6 +900,7 @@ export function Reports() {
                   <tr className="bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                     <th className="px-4 py-4 text-left text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">Student</th>
                     <th className="px-4 py-4 text-left text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">Grade</th>
+                    <th className="px-4 py-4 text-center text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">Stream</th>
                     <th className="px-4 py-4 text-center text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">Sect</th>
                     <th className="px-4 py-4 text-center text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest text-emerald-600">P</th>
                     <th className="px-4 py-4 text-center text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest text-amber-600">L</th>
@@ -863,6 +917,7 @@ export function Reports() {
                         <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-tight">ID: {report.student.student_id}</p>
                       </td>
                       <td className="px-4 py-4 text-xs font-bold text-muted-foreground">{report.student.grade}</td>
+                      <td className="px-4 py-4 text-center text-xs font-bold text-muted-foreground">{report.student.stream || "-"}</td>
                       <td className="px-4 py-4 text-center text-xs font-bold text-muted-foreground">{report.student.section}</td>
                       <td className="px-4 py-4 text-center text-sm font-black text-emerald-600">{report.presentDays}</td>
                       <td className="px-4 py-4 text-center text-sm font-black text-amber-600">{report.lateDays}</td>

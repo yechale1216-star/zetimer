@@ -145,7 +145,7 @@ export default function RoleManagementList() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'system' | 'custom'>('all')
+  const [filterType, setFilterType] = useState<'all' | 'active' | 'disabled'>('all')
 
   // Modals state
   const [editingPermissionsRole, setEditingPermissionsRole] = useState<any | null>(null)
@@ -153,16 +153,6 @@ export default function RoleManagementList() {
 
   const [editingMetadataRole, setEditingMetadataRole] = useState<any | null>(null)
   const [metadataForm, setMetadataForm] = useState({ name: '', description: '', color: '#6366f1', isActive: true })
-
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [newRole, setNewRole] = useState({
-    name: '',
-    key: '',
-    description: '',
-    color: '#6366f1',
-    permissions: JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS_TEMPLATE)),
-  })
 
   const getHeaders = () => {
     const token = localStorage.getItem('attendance_token')
@@ -203,11 +193,11 @@ export default function RoleManagementList() {
       name: role.name || '',
       description: role.description || '',
       color: role.color || '#6366f1',
-      isActive: role.isActive ?? true,
+      isActive: role.isActive !== false,
     })
   }
 
-  // Save Permissions Policy
+  // Save Permissions Matrix
   const handleSavePermissions = async () => {
     if (!editingPermissionsRole) return
     setSaving(true)
@@ -220,17 +210,18 @@ export default function RoleManagementList() {
         })
       }
       setRoles(prev => prev.map(r => r.key === editingPermissionsRole.key ? { ...r, permissions: editablePermissions } : r))
-      notifications.success('Policy Updated', `Permissions saved for '${editingPermissionsRole.name}'`)
+      notifications.success('Policy Saved', `Updated permissions matrix for '${editingPermissionsRole.name}'`)
       setEditingPermissionsRole(null)
     } catch (err: any) {
-      notifications.error('Save Failed', err.message || 'Could not save policy.')
+      notifications.error('Save Failed', err.message || 'Could not update role policy.')
     } finally {
       setSaving(false)
     }
   }
 
-  // Save Metadata Changes
-  const handleSaveMetadata = async () => {
+  // Save Role Metadata Details
+  const handleSaveMetadata = async (e: React.FormEvent) => {
+    e.preventDefault()
     if (!editingMetadataRole) return
     setSaving(true)
     try {
@@ -238,22 +229,11 @@ export default function RoleManagementList() {
         await apiFetch(`${API_URL}/api/roles/${editingMetadataRole.id}`, {
           method: 'PUT',
           headers: getHeaders(),
-          body: JSON.stringify({
-            name: metadataForm.name,
-            description: metadataForm.description,
-            color: metadataForm.color,
-            isActive: metadataForm.isActive,
-          }),
+          body: JSON.stringify(metadataForm),
         })
       }
-      setRoles(prev => prev.map(r => r.key === editingMetadataRole.key ? {
-        ...r,
-        name: metadataForm.name,
-        description: metadataForm.description,
-        color: metadataForm.color,
-        isActive: metadataForm.isActive,
-      } : r))
-      notifications.success('Role Updated', `Metadata saved for '${metadataForm.name}'`)
+      setRoles(prev => prev.map(r => r.key === editingMetadataRole.key ? { ...r, ...metadataForm } : r))
+      notifications.success('Role Details Saved', `Updated parameters for '${metadataForm.name}'`)
       setEditingMetadataRole(null)
     } catch (err: any) {
       notifications.error('Save Failed', err.message || 'Could not update role details.')
@@ -262,7 +242,7 @@ export default function RoleManagementList() {
     }
   }
 
-  // Toggle Active Status
+  // Toggle active status
   const handleToggleStatus = async (role: any) => {
     const newStatus = !role.isActive
     try {
@@ -280,90 +260,6 @@ export default function RoleManagementList() {
     }
   }
 
-  // Create Custom Role
-  const handleCreateRole = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newRole.name.trim()) return
-
-    let keyToUse = newRole.key.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
-    if (!keyToUse) keyToUse = newRole.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
-
-    setCreating(true)
-    try {
-      const res = await apiFetch<{ success: boolean; data: any }>(`${API_URL}/api/roles`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          key: keyToUse,
-          name: newRole.name.trim(),
-          description: newRole.description.trim(),
-          color: newRole.color,
-          permissions: newRole.permissions,
-        }),
-      })
-
-      const created = res.data || {
-        id: `custom-${Date.now()}`,
-        key: keyToUse,
-        name: newRole.name.trim(),
-        description: newRole.description.trim(),
-        color: newRole.color,
-        isSystem: false,
-        isActive: true,
-        permissions: newRole.permissions,
-      }
-
-      setRoles(prev => [...prev, created])
-      setShowCreateModal(false)
-      notifications.success('Custom Role Created', `Created custom role '${newRole.name}'`)
-      setNewRole({
-        name: '',
-        key: '',
-        description: '',
-        color: '#6366f1',
-        permissions: JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS_TEMPLATE)),
-      })
-    } catch (err: any) {
-      const localRole = {
-        id: `custom-${Date.now()}`,
-        key: keyToUse,
-        name: newRole.name.trim(),
-        description: newRole.description.trim(),
-        color: newRole.color,
-        isSystem: false,
-        isActive: true,
-        permissions: newRole.permissions,
-      }
-      setRoles(prev => [...prev, localRole])
-      setShowCreateModal(false)
-      notifications.success('Custom Role Created', `Created custom role '${newRole.name}'`)
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  // Delete Custom Role
-  const handleDeleteRole = async (role: any) => {
-    if (role.isSystem) return
-    if (!confirm(`Are you sure you want to delete custom role '${role.name}'?`)) return
-
-    setDeleting(true)
-    try {
-      if (role.id && !role.id.startsWith('custom-')) {
-        await apiFetch(`${API_URL}/api/roles/${role.id}`, {
-          method: 'DELETE',
-          headers: getHeaders(),
-        })
-      }
-      setRoles(prev => prev.filter(r => r.key !== role.key))
-      notifications.success('Role Deleted', `Removed custom role '${role.name}'`)
-    } catch (err: any) {
-      notifications.error('Delete Failed', err.message || 'Could not delete role.')
-    } finally {
-      setDeleting(false)
-    }
-  }
-
   const togglePermission = (module: string, action: string) => {
     setEditablePermissions(prev => {
       const next = { ...prev }
@@ -373,20 +269,11 @@ export default function RoleManagementList() {
     })
   }
 
-  const toggleNewRolePermission = (module: string, action: string) => {
-    setNewRole(prev => {
-      const nextPerms = { ...prev.permissions }
-      if (!nextPerms[module]) nextPerms[module] = {}
-      nextPerms[module] = { ...nextPerms[module], [action]: !nextPerms[module][action] }
-      return { ...prev, permissions: nextPerms }
-    })
-  }
-
   // Filtered Roles
   const filteredRoles = roles.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(searchQuery.toLowerCase()) || r.key.toLowerCase().includes(searchQuery.toLowerCase())
-    if (filterType === 'system') return matchesSearch && r.isSystem
-    if (filterType === 'custom') return matchesSearch && !r.isSystem
+    if (filterType === 'active') return matchesSearch && r.isActive
+    if (filterType === 'disabled') return matchesSearch && !r.isActive
     return matchesSearch
   })
 
@@ -411,40 +298,19 @@ export default function RoleManagementList() {
           </Link>
           <div>
             <h1 className="text-2xl font-black text-foreground">Role Directory & Policies</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Manage system default and school custom roles with actions and permission matrices</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Manage system default roles with actions and permission matrices</p>
           </div>
         </div>
-
-        <Button onClick={() => setShowCreateModal(true)} className="gap-2 bg-primary">
-          <Plus className="w-4 h-4" />
-          Create Custom Role
-        </Button>
       </div>
 
       {/* KPI Stats Bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl border border-border/60 bg-card">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase text-muted-foreground">Total Roles</p>
+            <p className="text-xs font-bold uppercase text-muted-foreground">Total System Roles</p>
             <Shield className="w-4 h-4 text-indigo-500" />
           </div>
           <p className="text-2xl font-black text-foreground mt-2">{roles.length}</p>
-        </div>
-
-        <div className="p-4 rounded-2xl border border-border/60 bg-card">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase text-muted-foreground">System Defaults</p>
-            <ShieldCheck className="w-4 h-4 text-violet-500" />
-          </div>
-          <p className="text-2xl font-black text-foreground mt-2">{roles.filter(r => r.isSystem).length}</p>
-        </div>
-
-        <div className="p-4 rounded-2xl border border-border/60 bg-card">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase text-muted-foreground">Custom Roles</p>
-            <Layers className="w-4 h-4 text-teal-500" />
-          </div>
-          <p className="text-2xl font-black text-foreground mt-2">{roles.filter(r => !r.isSystem).length}</p>
         </div>
 
         <div className="p-4 rounded-2xl border border-border/60 bg-card">
@@ -453,6 +319,22 @@ export default function RoleManagementList() {
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </div>
           <p className="text-2xl font-black text-foreground mt-2">{roles.filter(r => r.isActive).length}</p>
+        </div>
+
+        <div className="p-4 rounded-2xl border border-border/60 bg-card">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase text-muted-foreground">Controlled Modules</p>
+            <Layers className="w-4 h-4 text-teal-500" />
+          </div>
+          <p className="text-2xl font-black text-foreground mt-2">{Object.keys(MODULE_DEFINITIONS).length}</p>
+        </div>
+
+        <div className="p-4 rounded-2xl border border-border/60 bg-card">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase text-muted-foreground">Configured Policies</p>
+            <ShieldCheck className="w-4 h-4 text-violet-500" />
+          </div>
+          <p className="text-2xl font-black text-foreground mt-2">{roles.filter(r => countEnabledModules(r.permissions) > 0).length}</p>
         </div>
       </div>
 
@@ -469,7 +351,7 @@ export default function RoleManagementList() {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {(['all', 'system', 'custom'] as const).map(type => (
+          {(['all', 'active', 'disabled'] as const).map(type => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
@@ -480,7 +362,7 @@ export default function RoleManagementList() {
                   : 'bg-secondary/40 text-muted-foreground hover:bg-secondary'
               )}
             >
-              {type === 'all' ? 'All Roles' : type === 'system' ? 'System Defaults' : 'Custom Only'}
+              {type === 'all' ? 'All Roles' : type === 'active' ? 'Active Roles' : 'Disabled'}
             </button>
           ))}
         </div>
@@ -588,17 +470,6 @@ export default function RoleManagementList() {
                       >
                         <Power className="w-4 h-4" />
                       </button>
-
-                      {/* Delete Custom Role */}
-                      {!role.isSystem && (
-                        <button
-                          onClick={() => handleDeleteRole(role)}
-                          title="Delete Custom Role"
-                          className="p-2 rounded-xl hover:bg-rose-50 text-rose-600 dark:hover:bg-rose-950/20 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -743,106 +614,6 @@ export default function RoleManagementList() {
         </div>
       )}
 
-      {/* ── Modal 3: Create Custom Role Modal ── */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-4">
-              <div>
-                <h2 className="text-lg font-bold text-foreground">Create Custom Role</h2>
-                <p className="text-xs text-muted-foreground">Define a custom staff role and grant module permissions</p>
-              </div>
-              <button onClick={() => setShowCreateModal(false)} className="p-1 rounded-lg text-muted-foreground hover:bg-secondary">
-                <ArrowLeft className="w-5 h-5 rotate-90" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateRole} className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Role Name *</label>
-                  <Input
-                    required
-                    placeholder="e.g. Academic Counselor"
-                    value={newRole.name}
-                    onChange={e => setNewRole({ ...newRole, name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Role Key (Optional)</label>
-                  <Input
-                    placeholder="e.g. academic_counselor"
-                    value={newRole.key}
-                    onChange={e => setNewRole({ ...newRole, key: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Description</label>
-                <Input
-                  placeholder="Responsibilities & scope of this custom role..."
-                  value={newRole.description}
-                  onChange={e => setNewRole({ ...newRole, description: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Role Badge Color</label>
-                <div className="flex items-center gap-3 mt-1.5">
-                  {['#6366f1', '#f59e0b', '#14b8a6', '#ec4899', '#8b5cf6', '#10b981', '#ef4444'].map(color => (
-                    <button
-                      type="button"
-                      key={color}
-                      onClick={() => setNewRole({ ...newRole, color })}
-                      className={cn(
-                        'w-7 h-7 rounded-full transition-transform',
-                        newRole.color === color && 'ring-2 ring-offset-2 ring-primary scale-110'
-                      )}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4 pt-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Initial Permission Policy</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-1">
-                  {Object.entries(MODULE_DEFINITIONS).map(([moduleKey, def]) => {
-                    const modulePerms = newRole.permissions[moduleKey] || {}
-                    return (
-                      <div key={moduleKey} className="p-3 rounded-xl border border-border/60 bg-secondary/10 space-y-2">
-                        <p className="text-xs font-bold text-foreground">{def.label}</p>
-                        <div className="space-y-1">
-                          {def.actions.map(action => (
-                            <div key={action} className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground capitalize">{action}</span>
-                              <Switch
-                                checked={!!modulePerms[action]}
-                                onCheckedChange={() => toggleNewRolePermission(moduleKey, action)}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
-                <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={creating} className="bg-primary gap-2">
-                  {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  {creating ? 'Creating...' : 'Create Role'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

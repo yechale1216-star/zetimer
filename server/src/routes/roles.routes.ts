@@ -27,22 +27,9 @@ router.get('/:key', async (req: AuthenticatedRequest, res: Response, next: NextF
   }
 });
 
-// POST /api/roles — create a custom role isolated to the caller's school (admin/super_admin only)
-router.post('/', authorize(['admin', 'school_admin', 'super_admin']), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  try {
-    const schoolId = req.user?.schoolId;
-    if (!schoolId) {
-      return res.status(401).json({ success: false, message: 'School ID required to create custom role' });
-    }
-    const { key, name, description, color, permissions } = req.body;
-    if (!key || !name) {
-      return res.status(400).json({ success: false, message: 'key and name are required' });
-    }
-    const role = await rolesService.createRole(schoolId, { key, name, description, color, permissions });
-    res.status(201).json({ success: true, data: role });
-  } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message || 'Could not create custom role' });
-  }
+// POST /api/roles — custom role creation disabled
+router.post('/', authorize(['admin', 'school_admin', 'super_admin']), async (req: AuthenticatedRequest, res: Response) => {
+  return res.status(400).json({ success: false, message: 'Custom role creation is disabled.' });
 });
 
 // PUT /api/roles/:id — update custom or system role policy (admin/super_admin only)

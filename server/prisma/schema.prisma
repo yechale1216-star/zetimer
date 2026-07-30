@@ -356,6 +356,9 @@ model Student {
   @@index([gradeId])
   @@index([sectionId])
   @@index([streamId])
+  @@index([schoolId, status])
+  @@index([schoolId, gradeId, sectionId])
+  @@index([schoolId, fullName])
 }
 
 model StudentPromotion {
@@ -407,6 +410,10 @@ model Attendance {
   @@index([date])
   @@index([session])
   @@index([status])
+  @@index([schoolId, date])
+  @@index([schoolId, date, session])
+  @@index([studentId, date])
+  @@index([schoolId, status, date])
 }
 
 model AuditLog {

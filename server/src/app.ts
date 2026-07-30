@@ -19,6 +19,7 @@ if (missingEnv.length > 0) {
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import studentRoutes from './routes/student.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import schoolRoutes from './routes/school.routes';
@@ -73,15 +74,18 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-school-id', 'x-requested-role']
 }));
+app.use(compression());
 app.use(cookieParser());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-  console.log(`[DEBUG] ${req.method} ${req.url}`);
-  next();
-});
+// Debug middleware to log requests in dev mode only
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    console.log(`[DEBUG] ${req.method} ${req.url}`);
+    next();
+  });
+}
 
 // Global Maintenance Guard
 app.use(maintenanceMiddleware);

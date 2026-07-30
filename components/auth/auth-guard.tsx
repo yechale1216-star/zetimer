@@ -23,12 +23,9 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   // Helper: get the correct home dashboard for a role
   const getDashboardForRole = (role: string): string => {
     if (role === "super_admin") return "/super-admin"
-    if (role === "teacher") return "/school/teacher"
     if (role === "parent") return "/parent/dashboard"
-    if (role === "admin" || role === "school_admin") return "/school/admin"
-    if (role === "registrar") return "/school/registrar"
-    if (role === "discipline_officer") return "/school/discipline-officer"
-    if (role === "call_center") return "/school/call-center"
+    if (["admin", "school_admin", "registrar", "discipline_officer", "call_center", "staff"].includes(role)) return "/school/admin"
+    if (role === "teacher") return "/school/teacher"
     return "/login"
   }
 

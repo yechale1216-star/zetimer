@@ -20,6 +20,7 @@ import { SubscriptionProvider } from '@/lib/context/subscription-context'
 import { Logo } from '@/components/logo'
 import { TopNav } from '@/components/layout/top-nav'
 import { SuspensionProvider, useSuspension } from '@/lib/context/suspension-context'
+import { usePermissions } from '@/lib/hooks/use-permissions'
 
 import { apiUrl } from '@/lib/api-config'
 const API_URL = apiUrl;
@@ -121,30 +122,43 @@ export default function SchoolAdminClientLayout({
     notifications.info("Logged Out", "You have been successfully logged out")
   }
 
-  if (!isMounted) return null
+  const { hasModulePermission } = usePermissions()
 
-  const allNavItems = [
-    { href: '/school/admin', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Dashboard', show: true },
-    { href: '/school/admin/announcements', icon: <Megaphone className="w-5 h-5" />, label: 'Announcements', show: true },
-    { href: '/school/admin/communication', icon: <MessageSquare className="w-5 h-5" />, label: 'Communication', show: true },
-    { href: '/school/admin/calls', icon: <Phone className="w-5 h-5" />, label: 'Calls', show: true },
-    { href: '/school/admin/students', icon: <Users className="w-5 h-5" />, label: 'Students', show: true },
-    { href: '/school/admin/teachers', icon: <User className="w-5 h-5" />, label: 'Teachers', show: true },
-    { href: '/school/admin/users-and-roles', icon: <ShieldCheck className="w-5 h-5" />, label: 'Users & Roles', show: true },
-    { href: '/school/admin/teacher-assignments', icon: <BookOpen className="w-5 h-5" />, label: 'Assignments', show: true },
-    { href: '/school/admin/attendance', icon: <CheckSquare className="w-5 h-5" />, label: 'Attendance', show: true },
-    { href: '/school/admin/attendance-by-grade', icon: <BarChart2 className="w-5 h-5" />, label: 'Analytics', show: true },
-    { href: '/school/admin/reports', icon: <BookOpen className="w-5 h-5" />, label: 'Reports', show: true },
-    { href: '/school/admin/discipline', icon: <ShieldAlert className="w-5 h-5" />, label: 'Discipline', show: true },
-    { href: '/school/admin/promotion', icon: <TrendingUp className="w-5 h-5" />, label: 'Promotion', show: true },
-    { href: '/school/admin/subscription', icon: <CreditCard className="w-5 h-5" />, label: 'Subscription', show: true },
-    { href: '/school/admin/support', icon: <HeadphonesIcon className="w-5 h-5" />, label: 'Help Desk', show: true },
-    { href: '/school/admin/settings', icon: <Settings className="w-5 h-5" />, label: 'Settings', show: true },
-    { href: '/school/admin/profile', icon: <User className="w-5 h-5" />, label: 'Profile', show: true },
+  const rawNavItems = [
+    { href: '/school/admin', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Dashboard', module: 'dashboard' },
+    { href: '/school/admin/announcements', icon: <Megaphone className="w-5 h-5" />, label: 'Announcements', module: 'announcements' },
+    { href: '/school/admin/communication', icon: <MessageSquare className="w-5 h-5" />, label: 'Communication', module: 'communication' },
+    { href: '/school/admin/calls', icon: <Phone className="w-5 h-5" />, label: 'Calls', module: 'calls' },
+    { href: '/school/admin/students', icon: <Users className="w-5 h-5" />, label: 'Students', module: 'students' },
+    { href: '/school/admin/teachers', icon: <User className="w-5 h-5" />, label: 'Teachers', module: 'teachers' },
+    { href: '/school/admin/users-and-roles', icon: <ShieldCheck className="w-5 h-5" />, label: 'Users & Roles', module: 'users' },
+    { href: '/school/admin/teacher-assignments', icon: <BookOpen className="w-5 h-5" />, label: 'Assignments', module: 'assignments' },
+    { href: '/school/admin/attendance', icon: <CheckSquare className="w-5 h-5" />, label: 'Attendance', module: 'attendance' },
+    { href: '/school/admin/attendance-by-grade', icon: <BarChart2 className="w-5 h-5" />, label: 'Analytics', module: 'attendance_analytics' },
+    { href: '/school/admin/reports', icon: <BookOpen className="w-5 h-5" />, label: 'Reports', module: 'reports' },
+    { href: '/school/admin/discipline', icon: <ShieldAlert className="w-5 h-5" />, label: 'Discipline', module: 'discipline' },
+    { href: '/school/admin/promotion', icon: <TrendingUp className="w-5 h-5" />, label: 'Promotion', module: 'promotion' },
+    { href: '/school/admin/subscription', icon: <CreditCard className="w-5 h-5" />, label: 'Subscription', module: 'subscription' },
+    { href: '/school/admin/support', icon: <HeadphonesIcon className="w-5 h-5" />, label: 'Help Desk', module: 'support' },
+    { href: '/school/admin/settings', icon: <Settings className="w-5 h-5" />, label: 'Settings', module: 'settings' },
+    { href: '/school/admin/profile', icon: <User className="w-5 h-5" />, label: 'Profile', module: 'profile' },
   ]
 
+  const allNavItems = rawNavItems.filter(item => hasModulePermission(item.module, 'view'))
+
+  // Direct URL access check for staff roles
+  React.useEffect(() => {
+    if (!pathname || pathname === '/school/admin') return
+
+    const currentItem = rawNavItems.find(item => item.href !== '/school/admin' && pathname.startsWith(item.href))
+    if (currentItem && !hasModulePermission(currentItem.module, 'view')) {
+      notifications.error('Access Restricted', `Your role does not have permission to view ${currentItem.label}.`)
+      router.replace('/school/admin')
+    }
+  }, [pathname, hasModulePermission, router])
+
   return (
-    <AuthGuard allowedRoles={['admin', 'school_admin']}>
+    <AuthGuard allowedRoles={['admin', 'school_admin', 'registrar', 'discipline_officer', 'call_center', 'teacher', 'staff']}>
       <SuspensionProvider>
         <SubscriptionProvider>
             <div className="flex h-screen bg-background dark:bg-slate-950 flex-col md:flex-row relative overflow-hidden">

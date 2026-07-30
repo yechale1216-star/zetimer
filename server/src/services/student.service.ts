@@ -14,8 +14,17 @@ const mapStudentToFlat = (student: any) => {
   };
 };
 
-export const getAllStudents = async (schoolId: string, search?: string) => {
+export const getAllStudents = async (
+  schoolId: string,
+  search?: string,
+  page: number = 1,
+  limit: number = 50
+) => {
   if (!schoolId) throw new Error('School ID is required');
+
+  // Hard cap to prevent OOM — max 200 per page
+  const safeLimit = Math.min(Math.max(1, limit), 200);
+  const safeSkip = (Math.max(1, page) - 1) * safeLimit;
 
   const where: any = { schoolId };
 
@@ -27,40 +36,51 @@ export const getAllStudents = async (schoolId: string, search?: string) => {
     ];
   }
 
-  const students = await prisma.student.findMany({
-    where,
-    include: {
-      grade: true,
-      section: true,
-      stream: true
-    },
-    take: 20,
-    orderBy: { fullName: 'asc' }
-  });
-  return students.map(mapStudentToFlat);
+  const [students, total] = await Promise.all([
+    prisma.student.findMany({
+      where,
+      include: { grade: true, section: true, stream: true },
+      skip: safeSkip,
+      take: safeLimit,
+      orderBy: { fullName: 'asc' }
+    }),
+    prisma.student.count({ where })
+  ]);
+
+  return {
+    data: students.map(mapStudentToFlat),
+    total,
+    page: Math.max(1, page),
+    limit: safeLimit,
+    totalPages: Math.ceil(total / safeLimit),
+  };
 };
 
 
 export const getNextStudentId = async (schoolId: string) => {
   const idPrefix = 'STU';
+  // Use count-based sequence so IDs stay correct even beyond STU9999
+  const totalCount = await prisma.student.count({
+    where: { schoolId, student_id: { startsWith: idPrefix } }
+  });
+
+  // Also check the highest numeric suffix so we don't collide with manually set IDs
   const latestStudent = await prisma.student.findFirst({
-    where: { 
-      schoolId,
-      student_id: { startsWith: idPrefix }
-    },
-    orderBy: { student_id: 'desc' },
+    where: { schoolId, student_id: { startsWith: idPrefix } },
+    orderBy: { createdAt: 'desc' },
     select: { student_id: true }
   });
 
-  let nextSequence = 1;
+  let nextSequence = totalCount + 1;
   if (latestStudent && latestStudent.student_id) {
-    const currentSequence = parseInt(latestStudent.student_id.substring(idPrefix.length), 10);
-    if (!isNaN(currentSequence)) {
-      nextSequence = currentSequence + 1;
+    const suffix = latestStudent.student_id.substring(idPrefix.length);
+    const parsed = parseInt(suffix, 10);
+    if (!isNaN(parsed) && parsed >= nextSequence) {
+      nextSequence = parsed + 1;
     }
   }
 
-  return `${idPrefix}${nextSequence.toString().padStart(4, '0')}`;
+  return `${idPrefix}${nextSequence.toString().padStart(6, '0')}`;
 };
 
 export const createStudent = async (data: any, schoolId: string) => {
@@ -169,21 +189,22 @@ export const bulkUpsertStudents = async (students: any[], schoolId: string) => {
   let autoGenSequenceOffset = 0;
   const idPrefix = 'STU';
 
-  // Pre-calculate starting sequence if needed
+  // Use count + latest suffix max to get correct next sequence even above STU9999
+  const totalExisting = await prisma.student.count({
+    where: { schoolId, student_id: { startsWith: idPrefix } }
+  });
   const latestStudent = await prisma.student.findFirst({
-    where: {
-      schoolId: schoolId,
-      student_id: { startsWith: idPrefix }
-    },
-    orderBy: { student_id: 'desc' },
+    where: { schoolId, student_id: { startsWith: idPrefix } },
+    orderBy: { createdAt: 'desc' },
     select: { student_id: true }
   });
 
-  let nextBaseSequence = 1;
+  let nextBaseSequence = totalExisting + 1;
   if (latestStudent && latestStudent.student_id) {
-    const currentSequence = parseInt(latestStudent.student_id.substring(idPrefix.length), 10);
-    if (!isNaN(currentSequence)) {
-      nextBaseSequence = currentSequence + 1;
+    const suffix = latestStudent.student_id.substring(idPrefix.length);
+    const parsed = parseInt(suffix, 10);
+    if (!isNaN(parsed) && parsed >= nextBaseSequence) {
+      nextBaseSequence = parsed + 1;
     }
   }
 
@@ -201,7 +222,7 @@ export const bulkUpsertStudents = async (students: any[], schoolId: string) => {
 
       // Auto-generate ID if missing
       if (!studentId) {
-        studentId = `${idPrefix}${(nextBaseSequence + autoGenSequenceOffset).toString().padStart(4, '0')}`;
+        studentId = `${idPrefix}${(nextBaseSequence + autoGenSequenceOffset).toString().padStart(6, '0')}`;
         autoGenSequenceOffset++;
       }
 
@@ -418,7 +439,8 @@ export const getStudentsByParentPhone = async (parentPhone: string, schoolId: st
       section: true,
       stream: true,
       attendance: {
-        orderBy: { date: 'desc' }
+        orderBy: { date: 'desc' },
+        take: 30    // limit to 30 most recent records to prevent OOM
       }
     }
   });
@@ -427,3 +449,4 @@ export const getStudentsByParentPhone = async (parentPhone: string, schoolId: st
     attendance: student.attendance
   }));
 };
+

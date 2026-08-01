@@ -105,6 +105,8 @@ export function AttendanceTracking() {
   const [adminNote, setAdminNote] = useState("")
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false)
 
+  const pendingRequestsCount = editRequests.filter((r: any) => r.status === 'PENDING').length
+
   useEffect(() => {
     if (settings?.attendanceUiType) {
       setUiType(settings.attendanceUiType)

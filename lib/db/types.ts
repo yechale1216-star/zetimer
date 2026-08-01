@@ -38,6 +38,10 @@ export interface AttendanceRecord {
   date?: string
   class_id?: string
   session?: "morning" | "afternoon" | null
+  latitude?: number | null
+  longitude?: number | null
+  locationVerified?: boolean | null
+  locationDistance?: number | null
 }
 
 export interface TeacherAssignment {

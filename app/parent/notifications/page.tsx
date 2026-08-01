@@ -8,12 +8,12 @@ import { formatLocalizedDate } from "@/lib/utils/date-utils"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { Switch } from "@/components/ui/switch"
 import {
-  Bell, Settings, CheckCheck, Trash2, BellOff,
+  Bell, Settings, Settings2, CheckCheck, Trash2, BellOff,
   Smartphone, Mail, Radio, Clock, XCircle, Megaphone,
   AlertTriangle, Info, UserX, X, ChevronRight,
   Filter, RefreshCw, GraduationCap, ShieldAlert,
   LogOut, Loader2, Sparkles,
-  CheckCircle2, Inbox, SlidersHorizontal, Zap,
+  CheckCircle2, Zap,
 } from "lucide-react"
 
 function isLoggedIn(): boolean {
@@ -425,7 +425,7 @@ export default function ParentNotifications() {
               </div>
               <p className="text-xs pl-10">
                 {unreadCount > 0
-                  ? <span className="text-indigo-400 font-bold">{unreadCount} unread · {totalCount} total</span>
+                  ? <span className="text-indigo-400 font-bold">{unreadCount} unread ï¿½ {totalCount} total</span>
                   : <span className="text-slate-600">All caught up ?</span>
                 }
               </p>
@@ -453,8 +453,8 @@ export default function ParentNotifications() {
           {/* Tab Bar */}
           <div className="flex gap-0">
             {[
-              { key: "inbox", icon: <Inbox className="w-3.5 h-3.5" />, label: "Inbox" },
-              { key: "preferences", icon: <SlidersHorizontal className="w-3.5 h-3.5" />, label: "Preferences" },
+              { key: "inbox", icon: <Bell className="w-3.5 h-3.5" />, label: "Inbox" },
+              { key: "preferences", icon: <Settings2 className="w-3.5 h-3.5" />, label: "Preferences" },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -547,7 +547,7 @@ export default function ParentNotifications() {
                     <span className="flex items-center gap-1.5 text-[10px] font-black text-slate-600 uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/3 border border-white/5">
                       {label === "Today" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />}
                       {label}
-                      <span className="text-slate-700">· {items.length}</span>
+                      <span className="text-slate-700">ï¿½ {items.length}</span>
                     </span>
                     <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/5" />
                   </div>

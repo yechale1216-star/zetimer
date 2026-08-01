@@ -15,6 +15,60 @@ export function calculateDistanceMeters(lat1: number, lon1: number, lat2: number
   return Math.round(R * c);
 }
 
+export const resolveTeacherId = async (schoolId: string, rawTeacherId?: string | null): Promise<string | null> => {
+  if (!rawTeacherId) return null;
+
+  // 1. Try finding Teacher directly by id or user_id
+  const teacher = await prisma.teacher.findFirst({
+    where: {
+      schoolId,
+      OR: [
+        { id: rawTeacherId },
+        { user_id: rawTeacherId }
+      ]
+    }
+  });
+  if (teacher) return teacher.id;
+
+  // 2. Try finding User by id or teacher_id
+  const user = await prisma.user.findFirst({
+    where: {
+      schoolId,
+      OR: [
+        { id: rawTeacherId },
+        { teacher_id: rawTeacherId }
+      ]
+    }
+  });
+
+  if (user?.teacher_id) {
+    const teacherFromUser = await prisma.teacher.findFirst({
+      where: { id: user.teacher_id }
+    });
+    if (teacherFromUser) return teacherFromUser.id;
+  }
+
+  // 3. If user is a teacher role but has no Teacher profile row yet, auto-create one
+  if (user && user.role === 'teacher') {
+    const newTeacher = await prisma.teacher.create({
+      data: {
+        name: user.full_name,
+        email: user.email,
+        schoolId,
+        phone: user.phone || null,
+        user_id: user.id
+      }
+    });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { teacher_id: newTeacher.id }
+    }).catch(() => {});
+    return newTeacher.id;
+  }
+
+  return null;
+};
+
 export const markAttendance = async (data: any, schoolId: string) => {
   const { studentId, date, status, remarks, teacherId, userRole, userId } = data;
   const session = data.session ? data.session.toLowerCase() : null;
@@ -22,6 +76,9 @@ export const markAttendance = async (data: any, schoolId: string) => {
   if (!studentId || !date) {
     throw new Error("Student ID and Date are required");
   }
+
+  // Resolve valid teacherId foreign key (or null if marked by admin/non-teacher)
+  const resolvedTeacherId = await resolveTeacherId(schoolId, teacherId || userId);
 
   // Ensure student belongs to this school
   const student = await prisma.student.findFirst({
@@ -93,9 +150,11 @@ export const markAttendance = async (data: any, schoolId: string) => {
       // Find active approved request
       const approvedRequest = await prisma.attendanceEditRequest.findFirst({
         where: {
-          schoolId,
-          teacherId: teacherId || userId,
-          status: 'APPROVED',
+          OR: [
+            ...(resolvedTeacherId ? [{ teacherId: resolvedTeacherId }] : []),
+            ...(teacherId ? [{ teacherId }] : []),
+            ...(userId ? [{ teacherId: userId }] : [])
+          ],
           isUsed: false,
           date: {
             gte: startDate,
@@ -134,7 +193,7 @@ export const markAttendance = async (data: any, schoolId: string) => {
         data: {
           status,
           remarks,
-          teacherId,
+          teacherId: resolvedTeacherId,
           session: session || null,
           latitude: data.latitude != null ? Number(data.latitude) : existing.latitude,
           longitude: data.longitude != null ? Number(data.longitude) : existing.longitude,
@@ -146,7 +205,7 @@ export const markAttendance = async (data: any, schoolId: string) => {
         data: {
           studentId,
           schoolId,
-          teacherId,
+          teacherId: resolvedTeacherId,
           date: startDate,
           status,
           session: session || null,

@@ -47,6 +47,6 @@ export async function getTeacherAssignments(headers: any, schoolId?: string, tea
         } : undefined,
       }))
     },
-    { staleTime: 60_000 }
+    { staleTime: 60_000, persist: true }
   )
 }

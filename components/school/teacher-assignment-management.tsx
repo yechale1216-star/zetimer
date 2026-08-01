@@ -106,7 +106,7 @@ export function TeacherAssignmentManagement() {
 
   const loadAllData = async (school: string, isBackground = false) => {
     try {
-      if (!isBackground) setIsLoading(true)
+      if (!isBackground && assignments.length === 0) setIsLoading(true)
       const [teachersData, assignmentsData, gradesData, sectionsData, streamsData] = await Promise.all([
         db.getTeachers(),
         db.getTeacherAssignments(),

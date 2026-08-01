@@ -363,7 +363,7 @@ class Database extends BaseDatabase {
         )
         return result.data
       },
-      { staleTime: 300_000 }
+      { staleTime: 300_000, persist: true }
     )
   }
 
@@ -378,7 +378,7 @@ class Database extends BaseDatabase {
         )
         return result.data
       },
-      { staleTime: 300_000 }
+      { staleTime: 300_000, persist: true }
     )
   }
 
@@ -393,7 +393,7 @@ class Database extends BaseDatabase {
         )
         return result.data
       },
-      { staleTime: 300_000 }
+      { staleTime: 300_000, persist: true }
     )
   }
 

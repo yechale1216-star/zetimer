@@ -71,11 +71,10 @@ export function TeacherManagement() {
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false)
 
   const loadData = async (isBackground = false) => {
-    if (!isBackground && teachers.length === 0) setIsLoading(true)
+    if (!isBackground) setIsLoading(teachers.length === 0)
     try {
       const teachersData = await db.getTeachers()
       setTeachers(teachersData)
-      console.log("[v0] Teachers loaded:", teachersData.length)
     } catch (error) {
       console.error("[v0] Error loading teachers:", error)
       notifications.error("Teachers", "Failed to load teachers")
@@ -142,12 +141,19 @@ export function TeacherManagement() {
       }
 
       if (editingTeacher) {
+        // Optimistic update: update teacher in local state immediately
+        const updatedPayload = { ...editingTeacher, ...payload }
+        setTeachers(prev => prev.map(t => t.id === editingTeacher.id ? { ...t, ...updatedPayload } : t))
         await db.updateTeacher(editingTeacher.id, payload)
         notifications.success("Teacher Updated Successfully", "The teacher information has been updated.")
         setIsFormVisible(false)
         setEditingTeacher(null)
       } else {
-        await db.createTeacher(payload)
+        const newTeacher = await db.createTeacher(payload)
+        // Optimistic update: add to local state immediately with real data
+        if (newTeacher) {
+          setTeachers(prev => [newTeacher, ...prev])
+        }
         setShowSuccess(true)
         setTimeout(() => {
           setShowSuccess(false)
@@ -156,8 +162,8 @@ export function TeacherManagement() {
         }, 2500)
       }
 
-      // Refresh teachers list
-      await loadData()
+      // Background refresh to sync with server (no skeleton shown)
+      loadData(true)
 
       // Reset form
       setFormData({
@@ -199,13 +205,16 @@ export function TeacherManagement() {
       return
     }
 
+    // Optimistic update: remove from local state immediately
+    setTeachers(prev => prev.filter(t => t.id !== teacherId))
     try {
       await db.deleteTeacher(teacherId)
-      setTeachers(teachers.filter((t) => t.id !== teacherId))
       notifications.success("Teacher Deleted Successfully", "The teacher has been removed from the system.")
     } catch (error: any) {
       console.error("[v0] Error deleting teacher:", error)
       notifications.error("Error", error.message || "Failed to delete teacher")
+      // Revert optimistic update on failure
+      loadData(true)
     }
   }
 

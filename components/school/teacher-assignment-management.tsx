@@ -104,9 +104,9 @@ export function TeacherAssignmentManagement() {
     initializeAndLoad()
   }, [])
 
-  const loadAllData = async (school: string) => {
+  const loadAllData = async (school: string, isBackground = false) => {
     try {
-      setIsLoading(true)
+      if (!isBackground) setIsLoading(true)
       const [teachersData, assignmentsData, gradesData, sectionsData, streamsData] = await Promise.all([
         db.getTeachers(),
         db.getTeacherAssignments(),
@@ -174,14 +174,22 @@ export function TeacherAssignmentManagement() {
       }
 
       if (isEditing && editingAssignmentId) {
+        // Optimistic update for edit
+        setAssignments(prev => prev.map(a => a.id === editingAssignmentId
+          ? { ...a, teacher_id: selectedTeacher, gradeId: selectedGrade, sectionId: selectedSection, streamId: selectedStream || undefined }
+          : a
+        ))
         await db.updateTeacherAssignment(editingAssignmentId, data)
       } else {
         const classId = `class-${selectedGrade}-${selectedSection}-${selectedStream || "none"}`
-        await db.assignTeacherToClass(selectedTeacher, classId, undefined, selectedGrade, selectedSection, selectedStream || undefined)
+        const created = await db.assignTeacherToClass(selectedTeacher, classId, undefined, selectedGrade, selectedSection, selectedStream || undefined)
+        // Optimistic update: add new assignment to local state
+        if (created) setAssignments(prev => [created as any, ...prev])
       }
 
       setShowSuccess(true)
-      await loadAllData(schoolId)
+      // Background refresh to sync real data (no skeleton)
+      loadAllData(schoolId, true)
       setTimeout(() => {
         setShowSuccess(false)
         setIsDialogOpen(false)
@@ -189,6 +197,8 @@ export function TeacherAssignmentManagement() {
       }, 2500)
     } catch (error: any) {
       notifications.error("Error", error.message)
+      // Revert on failure
+      loadAllData(schoolId, true)
     } finally {
       setIsAssigning(false)
     }
@@ -214,20 +224,22 @@ export function TeacherAssignmentManagement() {
     
     const isConfirmed = window.confirm("Are you sure you want to remove this teacher assignment?")
     if (!isConfirmed) {
-      console.log("[v0] Delete cancelled by user")
       return
     }
     
     try {
-      console.log("[v0] Proceeding with deletion...")
       setDeletingId(assignmentId)
+      // Optimistic update: remove from local state immediately
+      setAssignments(prev => prev.filter(a => a.id !== assignmentId))
       await db.removeTeacherAssignment(assignmentId)
-      console.log("[v0] Deletion successful")
       notifications.success("Assignment Removed", "Teacher assignment has been removed.")
-      await loadAllData(schoolId)
+      // Background sync (no skeleton)
+      loadAllData(schoolId, true)
     } catch (error: any) {
       console.error("[v0] Deletion failed:", error)
       notifications.error("Delete Failed", error.message || "Failed to remove assignment")
+      // Revert optimistic update on failure
+      loadAllData(schoolId, true)
     } finally {
       setDeletingId(null)
     }

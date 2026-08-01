@@ -243,10 +243,12 @@ class Database extends BaseDatabase {
         }),
       }
     )
+    queryCache.invalidate(`teachers_${schoolId}`)
     return result.data
   }
 
   async updateTeacher(teacherId: string, teacherData: any): Promise<void> {
+    const schoolId = this.getSchoolId()
     await apiFetch(
       `${API_URL}/api/users/${teacherId}`,
       {
@@ -255,9 +257,11 @@ class Database extends BaseDatabase {
         body: JSON.stringify(teacherData),
       }
     )
+    if (schoolId) queryCache.invalidate(`teachers_${schoolId}`)
   }
 
   async deleteTeacher(teacherId: string): Promise<void> {
+    const schoolId = this.getSchoolId()
     await apiFetch(
       `${API_URL}/api/users/${teacherId}`,
       {
@@ -265,6 +269,7 @@ class Database extends BaseDatabase {
         headers: this.getApiHeaders(),
       }
     )
+    if (schoolId) queryCache.invalidate(`teachers_${schoolId}`)
   }
 
   // ─── TEACHER ASSIGNMENTS ──────────────────────────────────────────────────
@@ -292,10 +297,12 @@ class Database extends BaseDatabase {
         }),
       }
     )
+    queryCache.invalidate(`assignments_${schoolId}`)
     return result.data
   }
 
   async removeTeacherAssignment(assignmentId: string): Promise<void> {
+    const schoolId = this.getSchoolId()
     await apiFetch(
       `${API_URL}/api/assignments/${assignmentId}`,
       {
@@ -303,9 +310,11 @@ class Database extends BaseDatabase {
         headers: this.getApiHeaders(),
       }
     )
+    if (schoolId) queryCache.invalidate(`assignments_${schoolId}`)
   }
 
   async updateTeacherAssignment(assignmentId: string, data: any): Promise<void> {
+    const schoolId = this.getSchoolId()
     await apiFetch(
       `${API_URL}/api/assignments/${assignmentId}`,
       {
@@ -320,6 +329,7 @@ class Database extends BaseDatabase {
         }),
       }
     )
+    if (schoolId) queryCache.invalidate(`assignments_${schoolId}`)
   }
 
   // ─── ACADEMIC ENTITIES ────────────────────────────────────────────────────

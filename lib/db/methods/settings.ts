@@ -16,6 +16,12 @@ export function defaultSettings() {
     emailNotifications: true,
     smsNotifications: false,
     notificationTime: "16:00",
+    allowAttendanceEditing: true,
+    restrictLocation: false,
+    schoolLatitude: null,
+    schoolLongitude: null,
+    allowedRadiusMeters: 200,
+    allowOutsideAttendance: true,
   }
 }
 
@@ -43,6 +49,12 @@ export async function getSettings(headers: any, schoolId: string): Promise<any> 
       smsNotifications: s.sms_notifications ?? false,
       notificationTime: s.notification_time || "16:00",
       schoolLogo: s.school_logo || "",
+      allowAttendanceEditing: s.allow_attendance_editing ?? true,
+      restrictLocation: s.restrict_location ?? false,
+      schoolLatitude: s.school_latitude ?? null,
+      schoolLongitude: s.school_longitude ?? null,
+      allowedRadiusMeters: s.allowed_radius_meters ?? 200,
+      allowOutsideAttendance: s.allow_outside_attendance ?? true,
     }
   } catch (error) {
     // If settings are not found (404), return default settings. Otherwise, propagate the error.

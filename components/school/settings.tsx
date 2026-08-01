@@ -20,7 +20,7 @@ import { notifications } from "@/lib/utils/notifications"
 
 import { parseJsonResponse } from "@/lib/utils/parse-json-response"
 import { supabase } from "@/lib/utils/supabase"
-import { Lock, Edit2, Check, Calendar } from "lucide-react"
+import { Lock, Edit2, Check, Calendar, MapPin, ShieldCheck, Navigation } from "lucide-react"
 import { PhoneInput } from "@/components/ui/phone-input"
 
 export function Settings() {
@@ -39,6 +39,30 @@ export function Settings() {
   const [mounted, setMounted] = useState(false)
 
 
+
+  const detectCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      notifications.error("Geolocation Unsupported", "Your browser does not support GPS location detection.")
+      return
+    }
+    notifications.info("Detecting Location", "Fetching device GPS coordinates...")
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = parseFloat(pos.coords.latitude.toFixed(6))
+        const lon = parseFloat(pos.coords.longitude.toFixed(6))
+        setSettings((prev: any) => ({
+          ...prev,
+          schoolLatitude: lat,
+          schoolLongitude: lon,
+        }))
+        notifications.success("Location Set", `Coordinates detected: ${lat}, ${lon}`)
+      },
+      (err) => {
+        notifications.error("Location Failed", err.message || "Failed to retrieve device location. Check GPS permissions.")
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
 
   useEffect(() => {
     loadSettings()
@@ -591,6 +615,101 @@ export function Settings() {
                   </SelectContent>
                 </Select>
                 <p className="typography-body text-gray-600 mt-1">Choose between the card-based layout or a professional table view</p>
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Allow Attendance Editing by Homeroom Teachers</Label>
+                  <p className="typography-body text-muted-foreground">
+                    If disabled, teachers cannot edit records after submission without requesting admin permission.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.allowAttendanceEditing ?? true}
+                  onCheckedChange={(checked) => setSettings({ ...settings, allowAttendanceEditing: checked })}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" /> Restrict Attendance to School Location (Geofencing)
+                    </Label>
+                    <p className="typography-body text-muted-foreground">
+                      Verify teacher GPS proximity against configured school coordinates before submission.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.restrictLocation ?? false}
+                    onCheckedChange={(checked) => setSettings({ ...settings, restrictLocation: checked })}
+                  />
+                </div>
+
+                {settings.restrictLocation && (
+                  <div className="bg-muted/40 border rounded-xl p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">School Geographic Location</span>
+                      <Button type="button" variant="outline" size="sm" onClick={detectCurrentLocation}>
+                        <Navigation className="h-4 w-4 mr-2" /> Detect My Location
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="schoolLatitude">School Latitude</Label>
+                        <Input
+                          id="schoolLatitude"
+                          type="number"
+                          step="any"
+                          placeholder="e.g. 9.030000"
+                          value={settings.schoolLatitude ?? ""}
+                          onChange={(e) => setSettings({ ...settings, schoolLatitude: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="schoolLongitude">School Longitude</Label>
+                        <Input
+                          id="schoolLongitude"
+                          type="number"
+                          step="any"
+                          placeholder="e.g. 38.740000"
+                          value={settings.schoolLongitude ?? ""}
+                          onChange={(e) => setSettings({ ...settings, schoolLongitude: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="allowedRadiusMeters">Allowed Radius (meters)</Label>
+                        <Input
+                          id="allowedRadiusMeters"
+                          type="number"
+                          min="10"
+                          max="5000"
+                          placeholder="200"
+                          value={settings.allowedRadiusMeters ?? 200}
+                          onChange={(e) => setSettings({ ...settings, allowedRadiusMeters: parseInt(e.target.value) || 200 })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div>
+                        <Label>Allow Attendance Outside School</Label>
+                        <p className="typography-body text-muted-foreground text-xs">
+                          Enable bypass to allow submission outside school radius when needed.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.allowOutsideAttendance ?? true}
+                        onCheckedChange={(checked) => setSettings({ ...settings, allowOutsideAttendance: checked })}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

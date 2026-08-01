@@ -26,6 +26,15 @@ import {
   Copy,
   Check,
   Download,
+  MapPin,
+  Lock,
+  ShieldCheck,
+  FileCheck,
+  CheckCircle2,
+  XCircle,
+  History,
+  AlertCircle,
+  Unlock,
 } from "lucide-react"
 import { db, type Student } from "@/lib/db/database"
 import { notifications, combinedNotificationService, emailService } from "@/lib/utils/notifications"
@@ -42,6 +51,21 @@ interface AttendanceState {
     status: "present" | "late" | "absent" | "excused" | null
     note: string
   }
+}
+
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3
+  const φ1 = (lat1 * Math.PI) / 180
+  const φ2 = (lat2 * Math.PI) / 180
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+  return Math.round(R * c)
 }
 
 export function AttendanceTracking() {
@@ -71,6 +95,16 @@ export function AttendanceTracking() {
   const [showUnmarkedOnly, setShowUnmarkedOnly] = useState(false)
   const [uiType, setUiType] = useState<"card_based" | "tabular">("card_based")
 
+  // Attendance Edit Permission & Audit Log state
+  const [editRequests, setEditRequests] = useState<any[]>([])
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [editRequestModalOpen, setEditRequestModalOpen] = useState(false)
+  const [showRequestsModal, setShowRequestsModal] = useState(false)
+  const [showAuditLogsModal, setShowAuditLogsModal] = useState(false)
+  const [editReason, setEditReason] = useState("")
+  const [adminNote, setAdminNote] = useState("")
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false)
+
   useEffect(() => {
     if (settings?.attendanceUiType) {
       setUiType(settings.attendanceUiType)
@@ -81,14 +115,97 @@ export function AttendanceTracking() {
     const user = authService.getCurrentUser()
     setIsTeacher(user?.role === "teacher")
     loadStudents()
+    fetchEditRequests()
 
     // Background polling for "instant" updates (every 30 seconds)
     const pollInterval = setInterval(() => {
       loadAttendanceForDate(true)
+      fetchEditRequests()
     }, 30000)
 
     return () => clearInterval(pollInterval)
   }, [])
+
+  const fetchEditRequests = async () => {
+    try {
+      const requests = await db.getAttendanceEditRequests()
+      setEditRequests(requests || [])
+    } catch (err) {
+      console.error("Error fetching edit requests:", err)
+    }
+  }
+
+  const fetchAuditLogs = async () => {
+    try {
+      const logs = await db.getAttendanceAuditLogs()
+      setAuditLogs(logs || [])
+    } catch (err) {
+      console.error("Error fetching audit logs:", err)
+    }
+  }
+
+  const handleRequestPermission = async () => {
+    setIsSubmittingRequest(true)
+    try {
+      await db.createAttendanceEditRequest({
+        date: selectedDate,
+        session: settings?.attendanceMode === "session_based" ? selectedSession : null,
+        reason: editReason,
+      })
+      notifications.success("Request Submitted", "Your edit request has been sent to the School Admin for approval.")
+      setEditRequestModalOpen(false)
+      setEditReason("")
+      await fetchEditRequests()
+    } catch (err: any) {
+      notifications.error("Error", err.message || "Failed to submit request")
+    } finally {
+      setIsSubmittingRequest(false)
+    }
+  }
+
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      await db.approveAttendanceEditRequest(requestId, adminNote)
+      notifications.success("Approved", "Edit request approved successfully.")
+      setAdminNote("")
+      await fetchEditRequests()
+    } catch (err: any) {
+      notifications.error("Error", err.message || "Failed to approve request")
+    }
+  }
+
+  const handleRejectRequest = async (requestId: string) => {
+    try {
+      await db.rejectAttendanceEditRequest(requestId, adminNote)
+      notifications.success("Rejected", "Edit request rejected.")
+      setAdminNote("")
+      await fetchEditRequests()
+    } catch (err: any) {
+      notifications.error("Error", err.message || "Failed to reject request")
+    }
+  }
+
+  const isEditingBlockedForTeacher = () => {
+    if (!isTeacher) return false
+    if (settings?.allowAttendanceEditing !== false) return false
+
+    // Allow initial attendance marking if no records are saved yet
+    const hasSavedRecords = Object.values(attendanceState).some(item => item.status !== null)
+    if (!hasSavedRecords) return false
+
+    // Check if teacher has active approved request
+    const dateStr = selectedDate
+    const isSessionBased = settings?.attendanceMode === "session_based"
+    const hasApproved = editRequests.some(
+      (req: any) =>
+        req.status === 'APPROVED' &&
+        !req.isUsed &&
+        req.date?.split("T")[0] === dateStr &&
+        (!isSessionBased || !req.session || req.session.toLowerCase() === selectedSession.toLowerCase())
+    )
+
+    return !hasApproved
+  }
 
   useEffect(() => {
     loadAttendanceForDate()
@@ -338,6 +455,16 @@ export function AttendanceTracking() {
   }
 
   const saveAttendance = async () => {
+    // 1. Check Edit Permission Restriction for Teachers
+    if (isEditingBlockedForTeacher()) {
+      notifications.warning(
+        "Edit Permission Required",
+        "Attendance editing is disabled by School Admin. Please submit an edit request for approval."
+      )
+      setEditRequestModalOpen(true)
+      return
+    }
+
     setIsSaving(true)
     try {
       const isSessionBased = settings?.attendanceMode === "session_based"
@@ -353,16 +480,109 @@ export function AttendanceTracking() {
 
       if (attendanceRecords.length === 0) {
         notifications.warning("No Data", "Please mark attendance for at least one student")
-
+        setIsSaving(false)
         return
       }
 
-      await db.markAttendance(attendanceRecords)
+      let locationData: any = null
+
+      // 2. Geofence Location Restriction Verification
+      if (settings?.restrictLocation && !settings?.allowOutsideAttendance) {
+        if (!navigator.geolocation) {
+          notifications.error(
+            "GPS Required",
+            "Geolocation is not supported by your device/browser. Cannot verify school location."
+          )
+          setIsSaving(false)
+          return
+        }
+
+        notifications.info("Verifying Location", "Fetching GPS location to verify school proximity...")
+
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0,
+            })
+          })
+
+          const userLat = position.coords.latitude
+          const userLon = position.coords.longitude
+
+          if (settings.schoolLatitude != null && settings.schoolLongitude != null) {
+            const distance = calculateDistanceMeters(
+              userLat,
+              userLon,
+              Number(settings.schoolLatitude),
+              Number(settings.schoolLongitude)
+            )
+
+            const allowedRadius = Number(settings.allowedRadiusMeters) || 200
+
+            if (distance > allowedRadius) {
+              notifications.error(
+                "Submission Blocked",
+                `Outside school boundary! You are ${distance}m away (Allowed: ${allowedRadius}m). Attendance submission blocked.`
+              )
+              setIsSaving(false)
+              return
+            }
+
+            locationData = {
+              latitude: userLat,
+              longitude: userLon,
+              locationVerified: true,
+              locationDistance: distance,
+            }
+            notifications.success("Location Verified", `GPS verified: ${distance}m from school.`)
+          }
+        } catch (geoError: any) {
+          let msg = "Failed to obtain GPS coordinates."
+          if (geoError.code === 1) {
+            msg = "Location permission denied. Please enable location access in browser/device settings to submit attendance."
+          } else if (geoError.code === 2) {
+            msg = "GPS location unavailable. Please check your device location services."
+          } else if (geoError.code === 3) {
+            msg = "Location request timed out. Please try again."
+          }
+          notifications.error("GPS Verification Failed", msg)
+          setIsSaving(false)
+          return
+        }
+      } else if (navigator.geolocation) {
+        // Optional location capture when geofence restriction is OFF or bypass is ON
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 })
+          }).catch(() => null)
+
+          if (position) {
+            const userLat = position.coords.latitude
+            const userLon = position.coords.longitude
+            let dist: number | null = null
+            if (settings?.schoolLatitude != null && settings?.schoolLongitude != null) {
+              dist = calculateDistanceMeters(userLat, userLon, Number(settings.schoolLatitude), Number(settings.schoolLongitude))
+            }
+            locationData = {
+              latitude: userLat,
+              longitude: userLon,
+              locationVerified: dist != null ? dist <= (Number(settings?.allowedRadiusMeters) || 200) : false,
+              locationDistance: dist,
+            }
+          }
+        } catch (err) {
+          // Ignore fallback errors
+        }
+      }
+
+      await db.markAttendance(attendanceRecords, locationData)
 
       notifications.success("Attendance Saved Successfully", "The student attendance records have been updated.")
 
-
       await loadAttendanceForDate()
+      await fetchEditRequests()
     } catch (error: any) {
       console.error("[v0] Error saving attendance:", error)
       notifications.error("Error", error.message || "Failed to save attendance. Please try again.")
@@ -688,15 +908,101 @@ export function AttendanceTracking() {
             <Download className="w-4 h-4 mr-2" />
             CSV
           </Button>
-          <Button
-            onClick={saveAttendance}
-            disabled={isSaving}
-            className="hidden lg:flex h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest px-6 shadow-lg shadow-blue-500/20 active:scale-95 transition-all animate-in fade-in zoom-in-95 duration-200"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {isSaving ? "Saving..." : "Save Now"}
-          </Button>
+
+          {!isTeacher && (
+            <>
+              <Button
+                onClick={() => {
+                  fetchEditRequests()
+                  setShowRequestsModal(true)
+                }}
+                variant="outline"
+                className="relative flex-1 sm:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
+              >
+                <FileCheck className="w-4 h-4 mr-2 text-primary" />
+                Requests
+                {pendingRequestsCount > 0 && (
+                  <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500 text-white rounded-full">
+                    {pendingRequestsCount}
+                  </span>
+                )}
+              </Button>
+
+              <Button
+                onClick={() => {
+                  fetchAuditLogs()
+                  setShowAuditLogsModal(true)
+                }}
+                variant="outline"
+                className="flex-1 sm:flex-none h-11 rounded-2xl border-slate-200 dark:border-slate-800 font-black text-[10px] uppercase tracking-widest"
+              >
+                <History className="w-4 h-4 mr-2 text-primary" />
+                Audit Log
+              </Button>
+            </>
+          )}
+
+          {isTeacher && isEditingBlockedForTeacher() ? (
+            <Button
+              onClick={() => setEditRequestModalOpen(true)}
+              className="flex-1 sm:flex-none h-11 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] uppercase tracking-widest px-5 shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+            >
+              <Lock className="w-4 h-4 mr-2" />
+              Request Permission
+            </Button>
+          ) : (
+            <Button
+              onClick={saveAttendance}
+              disabled={isSaving}
+              className="hidden lg:flex h-11 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest px-6 shadow-lg shadow-blue-500/20 active:scale-95 transition-all animate-in fade-in zoom-in-95 duration-200"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isSaving ? "Saving..." : "Save Now"}
+            </Button>
+          )}
         </div>
+      </div>
+
+      {/* Geofence & Permission Alert Banner */}
+      <div className="space-y-3">
+        {settings?.restrictLocation && (
+          <div className="flex items-center justify-between p-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-200 text-xs font-medium">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span>
+                Location Restriction Active: Attendance must be marked within <strong>{settings.allowedRadiusMeters || 200}m</strong> of school.
+              </span>
+            </div>
+            {settings.allowOutsideAttendance && (
+              <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-900/30">
+                Bypass Allowed
+              </Badge>
+            )}
+          </div>
+        )}
+
+        {isTeacher && settings?.allowAttendanceEditing === false && isEditingBlockedForTeacher() && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-700 dark:text-amber-300 shrink-0">
+                <Lock className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold">Attendance Editing Restricted</p>
+                <p className="text-xs opacity-80">
+                  School Admin has disabled attendance record modifications after submission without prior approval.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold uppercase text-[10px] tracking-wider px-4 shrink-0"
+              onClick={() => setEditRequestModalOpen(true)}
+            >
+              <FileCheck className="h-4 w-4 mr-2" /> Request Permission
+            </Button>
+          </div>
+        )}
       </div>
 
       <Card className="border-none shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-200/60 dark:border-slate-800">
@@ -1313,6 +1619,175 @@ export function AttendanceTracking() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Teacher Request Edit Permission Dialog */}
+      <Dialog open={editRequestModalOpen} onOpenChange={setEditRequestModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-amber-600" />
+              Request Attendance Edit Permission
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-xs text-muted-foreground">
+              Editing attendance for <strong>{selectedDate}</strong> ({selectedSession}) is currently restricted. Submit a request to the School Admin for approval.
+            </p>
+            <div>
+              <Label htmlFor="editReason" className="text-xs font-semibold">
+                Reason for Edit Request (Optional)
+              </Label>
+              <Textarea
+                id="editReason"
+                rows={3}
+                placeholder="e.g. Correcting inadvertent late status for Grade 8A students..."
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                className="mt-1 text-sm rounded-xl"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" onClick={() => setEditRequestModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRequestPermission} disabled={isSubmittingRequest} className="bg-amber-600 hover:bg-amber-700 text-white">
+              {isSubmittingRequest ? "Submitting..." : "Submit Request"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Edit Requests Modal */}
+      <Dialog open={showRequestsModal} onOpenChange={setShowRequestsModal}>
+        <DialogContent className="max-w-3xl rounded-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCheck className="w-5 h-5 text-blue-600" />
+              Attendance Edit Requests
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-4">
+            {editRequests.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <FileCheck className="w-10 h-10 mx-auto opacity-30 mb-2" />
+                <p>No attendance edit requests found.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {editRequests.map((req: any) => (
+                  <div
+                    key={req.id}
+                    className="p-4 rounded-xl border bg-card flex flex-col md:flex-row justify-between items-start md:items-center gap-3"
+                  >
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm">{req.teacher?.name || "Teacher"}</span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "uppercase text-[10px]",
+                            req.status === "PENDING" && "bg-amber-50 text-amber-700 border-amber-300",
+                            req.status === "APPROVED" && "bg-emerald-50 text-emerald-700 border-emerald-300",
+                            req.status === "REJECTED" && "bg-rose-50 text-rose-700 border-rose-300"
+                          )}
+                        >
+                          {req.status}
+                        </Badge>
+                        {req.isUsed && (
+                          <Badge variant="outline" className="bg-slate-100 text-slate-600 text-[10px]">
+                            Permission Used
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Requested Date: <strong>{req.date?.split("T")[0]}</strong> {req.session ? `(${req.session})` : ""}
+                      </p>
+                      {req.reason && <p className="text-xs text-slate-700 dark:text-slate-300 italic">"{req.reason}"</p>}
+                    </div>
+
+                    {!isTeacher && req.status === "PENDING" && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Input
+                          placeholder="Admin note..."
+                          value={adminNote}
+                          onChange={(e) => setAdminNote(e.target.value)}
+                          className="h-8 text-xs w-36"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveRequest(req.id)}
+                          className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRejectRequest(req.id)}
+                          className="h-8 border-rose-300 text-rose-700 hover:bg-rose-50 text-xs px-3"
+                        >
+                          <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Attendance Audit Logs Modal */}
+      <Dialog open={showAuditLogsModal} onOpenChange={setShowAuditLogsModal}>
+        <DialogContent className="max-w-4xl rounded-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5 text-blue-600" />
+              Attendance Audit Logs
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            {auditLogs.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <History className="w-10 h-10 mx-auto opacity-30 mb-2" />
+                <p>No audit logs available.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Timestamp</TableHead>
+                    <TableHead className="text-xs">Action</TableHead>
+                    <TableHead className="text-xs">Entity</TableHead>
+                    <TableHead className="text-xs">Details</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {auditLogs.map((log: any) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {new Date(log.created_at).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-xs font-semibold uppercase">
+                        <Badge variant="outline" className="text-[10px]">
+                          {log.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs">{log.entity_type}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                        {log.new_values ? JSON.stringify(log.new_values) : log.old_values ? JSON.stringify(log.old_values) : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Mobile & Tablet Sticky Action Bar */}
       <div className="lg:hidden fixed bottom-24 md:bottom-6 left-0 right-0 z-40 px-4 pb-safe pointer-events-none">
         <div className="bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur-xl rounded-[32px] p-2.5 border border-white/10 shadow-2xl flex items-center gap-2 pointer-events-auto max-w-lg mx-auto transform translate-y-[-10px]">

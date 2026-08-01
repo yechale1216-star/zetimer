@@ -26,7 +26,12 @@ export async function getAttendance(headers: any, schoolId: string): Promise<Att
   return result.data.map((r: any) => mapAttendance(r, schoolId))
 }
 
-export async function markAttendance(headers: any, schoolId: string, records: Partial<AttendanceRecord>[]): Promise<void> {
+export async function markAttendance(
+  headers: any,
+  schoolId: string,
+  records: Partial<AttendanceRecord>[],
+  locationData?: { latitude?: number | null; longitude?: number | null; locationVerified?: boolean; locationDistance?: number | null }
+): Promise<void> {
   if (!schoolId) throw new Error("School ID not found")
   
   const formattedRecords = records.map(record => {
@@ -37,6 +42,10 @@ export async function markAttendance(headers: any, schoolId: string, records: Pa
       session: record.session || null,
       remarks: record.remarks || record.note || "",
       date: recDate ? new Date(recDate).toISOString() : new Date().toISOString(),
+      latitude: record.latitude ?? locationData?.latitude ?? null,
+      longitude: record.longitude ?? locationData?.longitude ?? null,
+      locationVerified: record.locationVerified ?? locationData?.locationVerified ?? false,
+      locationDistance: record.locationDistance ?? locationData?.locationDistance ?? null,
     }
   })
 
@@ -45,7 +54,66 @@ export async function markAttendance(headers: any, schoolId: string, records: Pa
     {
       method: "POST",
       headers,
-      body: JSON.stringify({ records: formattedRecords }),
+      body: JSON.stringify({
+        records: formattedRecords,
+        latitude: locationData?.latitude,
+        longitude: locationData?.longitude,
+        locationVerified: locationData?.locationVerified,
+        locationDistance: locationData?.locationDistance,
+      }),
     }
   )
+}
+
+export async function createEditRequest(headers: any, payload: { studentId?: string; gradeId?: string; sectionId?: string; date: string; session?: string | null; reason?: string }): Promise<any> {
+  const result = await apiFetch<{ success: boolean; data: any }>(
+    `${API_URL}/api/attendance/edit-requests`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    }
+  )
+  return result.data
+}
+
+export async function getEditRequests(headers: any, filters: any = {}): Promise<any[]> {
+  const query = new URLSearchParams(filters).toString()
+  const result = await apiFetch<{ success: boolean; data: any[] }>(
+    `${API_URL}/api/attendance/edit-requests${query ? `?${query}` : ''}`,
+    { headers, cache: 'no-store' }
+  )
+  return result.data
+}
+
+export async function approveEditRequest(headers: any, requestId: string, adminNote?: string): Promise<any> {
+  const result = await apiFetch<{ success: boolean; data: any }>(
+    `${API_URL}/api/attendance/edit-requests/${requestId}/approve`,
+    {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ adminNote }),
+    }
+  )
+  return result.data
+}
+
+export async function rejectEditRequest(headers: any, requestId: string, adminNote?: string): Promise<any> {
+  const result = await apiFetch<{ success: boolean; data: any }>(
+    `${API_URL}/api/attendance/edit-requests/${requestId}/reject`,
+    {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ adminNote }),
+    }
+  )
+  return result.data
+}
+
+export async function getAttendanceAuditLogs(headers: any): Promise<any[]> {
+  const result = await apiFetch<{ success: boolean; data: any[] }>(
+    `${API_URL}/api/attendance/audit-logs`,
+    { headers, cache: 'no-store' }
+  )
+  return result.data
 }

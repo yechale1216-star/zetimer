@@ -13,6 +13,12 @@ const DEFAULT_SETTINGS = {
   sms_notifications: false,
   notification_time: '16:00',
   school_logo: '',
+  allow_attendance_editing: true,
+  restrict_location: false,
+  school_latitude: null,
+  school_longitude: null,
+  allowed_radius_meters: 200,
+  allow_outside_attendance: true,
 };
 
 export const getSettings = async (schoolId: string) => {

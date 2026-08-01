@@ -109,8 +109,28 @@ class Database extends BaseDatabase {
     return this.getAttendance()
   }
 
-  async markAttendance(records: Partial<AttendanceRecord>[]): Promise<void> {
-    return attendance.markAttendance(this.getApiHeaders(), this.getSchoolId(), records)
+  async markAttendance(records: Partial<AttendanceRecord>[], locationData?: any): Promise<void> {
+    return attendance.markAttendance(this.getApiHeaders(), this.getSchoolId(), records, locationData)
+  }
+
+  async createAttendanceEditRequest(payload: { studentId?: string; gradeId?: string; sectionId?: string; date: string; session?: string | null; reason?: string }): Promise<any> {
+    return attendance.createEditRequest(this.getApiHeaders(), payload)
+  }
+
+  async getAttendanceEditRequests(filters?: any): Promise<any[]> {
+    return attendance.getEditRequests(this.getApiHeaders(), filters)
+  }
+
+  async approveAttendanceEditRequest(requestId: string, adminNote?: string): Promise<any> {
+    return attendance.approveEditRequest(this.getApiHeaders(), requestId, adminNote)
+  }
+
+  async rejectAttendanceEditRequest(requestId: string, adminNote?: string): Promise<any> {
+    return attendance.rejectEditRequest(this.getApiHeaders(), requestId, adminNote)
+  }
+
+  async getAttendanceAuditLogs(): Promise<any[]> {
+    return attendance.getAttendanceAuditLogs(this.getApiHeaders())
   }
 
   async saveAttendance(record: Partial<AttendanceRecord>): Promise<AttendanceRecord> {
@@ -176,6 +196,12 @@ class Database extends BaseDatabase {
           sms_notifications: settingsData.smsNotifications,
           notification_time: settingsData.notificationTime,
           school_logo: settingsData.schoolLogo,
+          allow_attendance_editing: settingsData.allowAttendanceEditing,
+          restrict_location: settingsData.restrictLocation,
+          school_latitude: settingsData.schoolLatitude != null && settingsData.schoolLatitude !== "" ? Number(settingsData.schoolLatitude) : null,
+          school_longitude: settingsData.schoolLongitude != null && settingsData.schoolLongitude !== "" ? Number(settingsData.schoolLongitude) : null,
+          allowed_radius_meters: settingsData.allowedRadiusMeters != null && settingsData.allowedRadiusMeters !== "" ? Number(settingsData.allowedRadiusMeters) : 200,
+          allow_outside_attendance: settingsData.allowOutsideAttendance,
         }),
       }
     )

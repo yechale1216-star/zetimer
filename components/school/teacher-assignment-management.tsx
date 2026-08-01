@@ -153,14 +153,15 @@ export function TeacherAssignmentManagement() {
     // Check if the teacher already has this exact class assigned
     const isDuplicate = assignments.some(
       (assign) =>
-        assign.teacher_id === selectedTeacher &&
-        assign.gradeId === selectedGrade &&
-        assign.sectionId === selectedSection &&
-        (assign.streamId || "") === (selectedStream || "")
+        assign.id !== editingAssignmentId &&
+        (assign.teacher_id === selectedTeacher || assign.teacher?.id === selectedTeacher) &&
+        (assign.gradeId === selectedGrade || assign.grade?.id === selectedGrade) &&
+        (assign.sectionId === selectedSection || assign.section?.id === selectedSection) &&
+        ((assign.streamId || assign.stream?.id || "") === (selectedStream || ""))
     )
 
     if (isDuplicate) {
-      notifications.error("Error", "This class is already assigned to this teacher.")
+      notifications.error("Duplicate Assignment", "This teacher is already assigned to this Grade, Section, and Stream.")
       return
     }
 

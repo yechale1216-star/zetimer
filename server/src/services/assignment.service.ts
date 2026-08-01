@@ -95,12 +95,11 @@ export const createAssignment = async (data: any, schoolId: string) => {
       gradeId: data.gradeId,
       sectionId: data.sectionId,
       streamId: data.streamId || null,
-      subject: data.subject || null,
     }
   });
 
   if (existing) {
-    throw new Error("This class assignment already exists for this teacher.");
+    throw new Error("This teacher is already assigned to this Grade, Section, and Stream.");
   }
 
   return await prisma.teacherAssignment.create({
@@ -162,6 +161,22 @@ export const updateAssignment = async (id: string, data: any, schoolId: string) 
     if (!stream) {
       throw new Error("Stream does not exist in this school context.");
     }
+  }
+
+  // Check for duplicate class assignment for this teacher (excluding current assignment id)
+  const existingDuplicate = await prisma.teacherAssignment.findFirst({
+    where: {
+      id: { not: id },
+      schoolId,
+      teacher_id: teacherId,
+      gradeId: data.gradeId,
+      sectionId: data.sectionId,
+      streamId: data.streamId || null,
+    }
+  });
+
+  if (existingDuplicate) {
+    throw new Error("This teacher is already assigned to this Grade, Section, and Stream.");
   }
 
   return await prisma.teacherAssignment.update({

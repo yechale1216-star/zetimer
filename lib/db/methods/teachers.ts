@@ -3,18 +3,19 @@ import type { TeacherAssignment } from "../types"
 import { apiFetch } from "@/lib/utils/fetch-with-timeout"
 import { queryCache } from "@/lib/utils/query-cache"
 
-export async function getTeachers(headers: any): Promise<any[]> {
-  const schoolId = headers["x-school-id"] || "default"
+export async function getTeachers(headers: any, schoolId?: string): Promise<any[]> {
+  const activeSchoolId = schoolId || headers["x-school-id"] || ""
+  if (!activeSchoolId) return []
   return queryCache.fetch(
-    `teachers_${schoolId}`,
+    `teachers_${activeSchoolId}`,
     async () => {
       const result = await apiFetch<{ success: boolean; data: any[] }>(
-        `${API_URL}/api/users`,
+        `${API_URL}/api/users?role=teacher`,
         { headers }
       )
       return result.data.filter((u: any) => u.role === "teacher")
     },
-    { staleTime: 60_000 }
+    { staleTime: 60_000, persist: true }
   )
 }
 

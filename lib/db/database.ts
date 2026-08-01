@@ -242,7 +242,7 @@ class Database extends BaseDatabase {
 
   // ─── TEACHERS ─────────────────────────────────────────────────────────────
   async getTeachers(): Promise<any[]> {
-    return teachers.getTeachers(this.getApiHeaders())
+    return teachers.getTeachers(this.getApiHeaders(), this.getSchoolId())
   }
 
   async createTeacher(teacherData: any): Promise<any> {

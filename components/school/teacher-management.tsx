@@ -71,7 +71,7 @@ export function TeacherManagement() {
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(false)
 
   const loadData = async (isBackground = false) => {
-    if (!isBackground) setIsLoading(teachers.length === 0)
+    if (!isBackground && teachers.length === 0) setIsLoading(true)
     try {
       const teachersData = await db.getTeachers()
       setTeachers(teachersData)

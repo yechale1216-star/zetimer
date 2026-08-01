@@ -34,6 +34,7 @@ import { notifications } from "@/lib/utils/notifications"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { format } from "date-fns"
 import { useAuth } from "@/lib/context/auth-context"
+import { queryCache } from "@/lib/utils/query-cache"
 
 import { apiUrl } from "@/lib/api-config"
 const API_URL = apiUrl;
@@ -95,35 +96,35 @@ export default function AdminAnnouncementsPage() {
   }, [confirmedSchoolId])
 
   const fetchAnnouncements = async (isBackground = false) => {
-    if (!isBackground) setIsLoading(true)
-    // Safety net: never fetch if schoolId is not yet confirmed.
+    if (!isBackground && announcements.length === 0) setIsLoading(true)
     if (!confirmedSchoolId) {
       console.warn("[Announcements] fetchAnnouncements skipped — no confirmed schoolId")
       setIsLoading(false)
       return
     }
     try {
-      const res = await fetch(`${API_URL}/api/announcements`, {
-        headers: getAuthHeaders()
-      })
-      
-      if (!res.ok) {
-        if (res.status === 401) {
-          console.warn("[fetchAnnouncements] Unauthorized - Redirecting to login");
-          const { authService } = await import("@/lib/auth/auth");
-          authService.handleUnauthorized();
-          return;
-        }
-        const text = await res.text()
-        console.error(`[fetchAnnouncements] Server returned ${res.status}:`, text)
-        throw new Error(text || `HTTP ${res.status}`)
-      }
-
-      const data = await res.json()
-      if (data.success) {
-        setAnnouncements(data.data)
-        setLastUpdated(new Date())
-      }
+      const data = await queryCache.fetch(
+        `announcements_${confirmedSchoolId}`,
+        async () => {
+          const res = await fetch(`${API_URL}/api/announcements`, {
+            headers: getAuthHeaders()
+          })
+          if (!res.ok) {
+            if (res.status === 401) {
+              const { authService } = await import("@/lib/auth/auth");
+              authService.handleUnauthorized();
+              return [];
+            }
+            const text = await res.text()
+            throw new Error(text || `HTTP ${res.status}`)
+          }
+          const json = await res.json()
+          return json.success ? json.data : []
+        },
+        { staleTime: 30_000, persist: false }
+      )
+      setAnnouncements(data)
+      setLastUpdated(new Date())
     } catch (error) {
       console.error("Failed to fetch announcements:", error)
       if (!isBackground) {
@@ -167,6 +168,7 @@ export default function AdminAnnouncementsPage() {
           editingId ? "Updated" : "Published", 
           editingId ? "Announcement updated successfully." : "Your announcement is now live on the parent portal."
         )
+        queryCache.invalidate("announcements_")
         setIsCreateModalOpen(false)
         resetForm()
         fetchAnnouncements()

@@ -23,6 +23,7 @@ export async function logCall(
   headers: any,
   data: { recipientId: string; type: 'VOICE' | 'VIDEO'; status: string; duration?: number }
 ): Promise<any> {
+  const schoolId = headers?.["x-school-id"] || "default"
   const result = await apiFetch<{ success: boolean; data: any }>(
     `${API_URL}/api/calls/log`,
     {
@@ -31,16 +32,21 @@ export async function logCall(
       body: JSON.stringify(data),
     }
   )
+  queryCache.invalidate(`call_history_${schoolId}`)
   return result.data
 }
 
 export async function getCallHistoryApi(headers: any): Promise<any[]> {
-  const result = await apiFetch<{ success: boolean; data: any[] }>(
-    `${API_URL}/api/calls/history`,
-    { 
-      headers,
-      cache: 'no-store'
-    }
+  const schoolId = headers?.["x-school-id"] || "default"
+  return queryCache.fetch(
+    `call_history_${schoolId}`,
+    async () => {
+      const result = await apiFetch<{ success: boolean; data: any[] }>(
+        `${API_URL}/api/calls/history`,
+        { headers }
+      )
+      return result.data
+    },
+    { staleTime: 30_000, persist: false }
   )
-  return result.data
 }

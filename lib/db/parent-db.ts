@@ -1,5 +1,6 @@
 import { apiUrl } from "@/lib/api-config";
 import { apiFetch } from "@/lib/utils/fetch-with-timeout";
+import { queryCache } from "@/lib/utils/query-cache";
 
 const API_URL = apiUrl;
 
@@ -46,13 +47,21 @@ class ParentDatabase {
 
   // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
   async getNotifications(phone: string, schoolId?: string): Promise<ParentNotification[]> {
-    const result = await apiFetch<{ success: boolean; data: ParentNotification[] }>(
-      `${API_URL}/api/parent/notifications/${encodeURIComponent(phone)}`,
-      {
-        headers: this.getHeaders(schoolId),
-      }
+    if (!phone) return [];
+    const resolvedSchoolId = schoolId || (typeof window !== "undefined" ? localStorage.getItem("x-school-id") || "default" : "default")
+    return queryCache.fetch(
+      `parent_notifications_${phone}_${resolvedSchoolId}`,
+      async () => {
+        const result = await apiFetch<{ success: boolean; data: ParentNotification[] }>(
+          `${API_URL}/api/parent/notifications/${encodeURIComponent(phone)}`,
+          {
+            headers: this.getHeaders(schoolId),
+          }
+        );
+        return result.data || [];
+      },
+      { staleTime: 15_000, persist: false }
     );
-    return result.data || [];
   }
 
   async markNotificationAsRead(id: string, schoolId?: string): Promise<boolean> {
@@ -63,6 +72,7 @@ class ParentDatabase {
         headers: this.getHeaders(schoolId),
       }
     );
+    queryCache.invalidate("parent_notifications_");
     return true;
   }
 
@@ -74,6 +84,7 @@ class ParentDatabase {
         headers: this.getHeaders(schoolId),
       }
     );
+    queryCache.invalidate("parent_notifications_");
     return true;
   }
 
@@ -85,6 +96,7 @@ class ParentDatabase {
         headers: this.getHeaders(schoolId),
       }
     );
+    queryCache.invalidate("parent_notifications_");
     return true;
   }
 

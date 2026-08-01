@@ -700,13 +700,18 @@ const updateProfile = async (phone, schoolId, data) => {
     if (!user) {
         throw new Error("Parent not found.");
     }
+    const updateData = {
+        full_name: data.name,
+        email: data.email,
+        address: data.address
+    };
+    // Only update profile_photo if explicitly provided (allows null to remove)
+    if (data.profile_photo !== undefined) {
+        updateData.profile_photo = data.profile_photo;
+    }
     const updatedUser = await db_1.default.user.update({
         where: { id: user.id },
-        data: {
-            full_name: data.name,
-            email: data.email,
-            address: data.address
-        }
+        data: updateData
     });
     return {
         success: true,
@@ -716,7 +721,8 @@ const updateProfile = async (phone, schoolId, data) => {
             name: updatedUser.full_name,
             email: updatedUser.email,
             phone: updatedUser.phone,
-            address: updatedUser.address
+            address: updatedUser.address,
+            profile_photo: updatedUser.profile_photo
         }
     };
 };

@@ -72,6 +72,7 @@ const call_routes_1 = __importDefault(require("./routes/call.routes"));
 const notification_routes_1 = __importDefault(require("./routes/notification.routes"));
 const saved_messages_routes_1 = __importDefault(require("./routes/saved-messages.routes"));
 const discipline_routes_1 = __importDefault(require("./routes/discipline.routes"));
+const roles_routes_1 = __importDefault(require("./routes/roles.routes"));
 const tenant_middleware_1 = require("./middleware/tenant.middleware");
 const maintenance_middleware_1 = require("./middleware/maintenance.middleware");
 const parentController = __importStar(require("./controllers/parent.controller"));
@@ -246,6 +247,7 @@ app.use('/api/calls', call_routes_1.default);
 app.use('/api/notifications', notification_routes_1.default);
 app.use('/api/saved-messages', saved_messages_routes_1.default);
 app.use('/api/discipline', discipline_routes_1.default);
+app.use('/api/roles', roles_routes_1.default);
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);

@@ -222,7 +222,7 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
     { href: "/parent/communication", label: t("communication"), icon: <MessageSquare />, badge: unreadCount > 0 ? unreadCount : undefined },
     { href: "/parent/announcements", label: t("notifications"), icon: <Megaphone /> },
     { href: "/parent/attendance", label: t("attendance"), icon: <Calendar /> },
-    { href: "/parent/discipline", label: "Discipline", icon: <ShieldAlert /> },
+    { href: "/parent/discipline", label: t("discipline"), icon: <ShieldAlert /> },
     { href: "/parent/profile", label: t("profile"), icon: <User /> },
     { href: "/parent/feedback", label: "Feedback", icon: <Sparkles /> },
   ]
@@ -252,9 +252,9 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2.5 min-w-0">
               <Avatar className="h-8 w-8 rounded-xl ring-2 ring-primary/10">
                 {parentPhoto && <AvatarImage src={parentPhoto} alt="Profile" className="object-cover rounded-xl" />}
-                <AvatarFallback className="text-[10px] bg-primary/10 text-primary rounded-xl">{getInitials(currentUser?.name || selectedStudent.fullName)}</AvatarFallback>
+                <AvatarFallback className="text-[10px] bg-primary/10 text-primary rounded-xl">{getInitials(selectedStudent.fullName)}</AvatarFallback>
               </Avatar>
-              <div className="min-w-0"><p className="text-sm font-bold truncate">{currentUser?.name || selectedStudent.fullName}</p></div>
+              <div className="min-w-0"><p className="text-sm font-bold truncate">{selectedStudent.fullName}</p></div>
             </div>
             <ChevronDown className={cn("w-4 h-4 transition-transform", studentDropdownOpen && "rotate-180")} />
           </button>
@@ -395,9 +395,9 @@ function ParentLayoutInner({ children }: { children: React.ReactNode }) {
             <button onClick={() => setStudentDropdownOpen(!studentDropdownOpen)} className="flex items-center gap-2 p-1 px-3 bg-white/50 dark:bg-slate-800/50 rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">
               <Avatar className="h-5 w-5 border border-white/20">
                 {parentPhoto && <AvatarImage src={parentPhoto} alt="Profile" className="object-cover" />}
-                <AvatarFallback className="text-[9px] bg-primary/10 text-primary">{getInitials(currentUser?.name || selectedStudent.fullName)}</AvatarFallback>
+                <AvatarFallback className="text-[9px] bg-primary/10 text-primary">{getInitials(selectedStudent.fullName)}</AvatarFallback>
               </Avatar>
-              <span className="text-[11px] font-black uppercase tracking-tight">{(currentUser?.name || selectedStudent.fullName).split(" ")[0]}</span>
+              <span className="text-[11px] font-black uppercase tracking-tight">{selectedStudent.fullName.split(" ")[0]}</span>
               <ChevronDown className="w-3 h-3 opacity-50" />
             </button>
             {unreadCount > 0 && <Link href="/parent/communication" className="p-2 relative"><Bell className="w-4 h-4 text-primary" /><span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-slate-900" /></Link>}

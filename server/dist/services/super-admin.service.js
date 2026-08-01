@@ -138,7 +138,13 @@ const searchAllUsers = async (params) => {
             where,
             skip,
             take: limit,
-            include: {
+            select: {
+                id: true,
+                full_name: true,
+                email: true,
+                role: true,
+                is_active: true,
+                createdAt: true,
                 school: { select: { name: true } }
             },
             orderBy: { createdAt: "desc" }

@@ -24,7 +24,7 @@ const getAttendanceSummary = async (schoolId, filters) => {
             where.date.lte = new Date(endDate);
     }
     if (!isFullDay) {
-        where.session = session;
+        where.session = { equals: session.trim().toLowerCase(), mode: 'insensitive' };
     }
     // Filter attendance by student attributes if provided
     const studentWhere = { schoolId };
@@ -153,7 +153,7 @@ const getGradeStats = async (schoolId, filters) => {
             where.date.lte = new Date(endDate);
     }
     if (!isFullDay) {
-        where.session = session;
+        where.session = { equals: session.trim().toLowerCase(), mode: 'insensitive' };
     }
     // Filter by student attributes if provided
     const studentWhere = { schoolId };

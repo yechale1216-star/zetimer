@@ -4,184 +4,263 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/context/auth-context'
 import { db } from '@/lib/db/database'
 import {
-  ClipboardList, Users, CheckCircle2, Clock, TrendingUp,
-  ArrowUpRight, Plus, FileText, AlertCircle, Calendar, Star
+  Users, UserPlus, Table, CheckCircle2,
+  ArrowUpRight, GraduationCap, Sparkles,
+  ShieldCheck, ArrowRight, Layers
 } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils/utils'
 import Link from 'next/link'
 
-function StatCard({
-  title, value, subtitle, icon: Icon, color, trend, href
-}: {
-  title: string
-  value: string | number
-  subtitle: string
-  icon: React.ElementType
-  color: string
-  trend?: { value: number; label: string }
-  href?: string
-}) {
-  const content = (
-    <div className={cn(
-      'group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-5 transition-all duration-300',
-      href && 'hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'
-    )}>
-      <div className={cn('absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity', `bg-gradient-to-br ${color} opacity-[0.02]`)} />
-      <div className="flex items-start justify-between mb-4">
-        <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center', `bg-gradient-to-br ${color}`)}>
-          <Icon className="w-5 h-5 text-white" />
-        </div>
-        {href && <ArrowUpRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />}
-      </div>
-      <p className="text-2xl font-black text-foreground">{value}</p>
-      <p className="text-sm font-semibold text-muted-foreground mt-0.5">{title}</p>
-      <p className="text-xs text-muted-foreground/70 mt-1">{subtitle}</p>
-      {trend && (
-        <div className="mt-3 flex items-center gap-1">
-          <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-          <span className="text-xs font-semibold text-emerald-600">+{trend.value}% {trend.label}</span>
-        </div>
-      )}
-    </div>
-  )
-  return href ? <Link href={href}>{content}</Link> : content
-}
-
-export default function RegistrarDashboard() {
+export default function RegistrarDashboardPage() {
   const { user } = useAuth()
   const [students, setStudents] = useState<any[]>([])
-  const [time, setTime] = useState(new Date())
+  const [grades, setGrades] = useState<any[]>([])
+  const [sections, setSections] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 60000)
-    db.getStudents().then(res => setStudents(res ?? [])).catch(() => {})
-    return () => clearInterval(t)
+    Promise.all([
+      db.getStudents().catch(() => []),
+      db.getGrades().catch(() => []),
+      db.getSections().catch(() => [])
+    ]).then(([st, gr, sec]) => {
+      setStudents(st || [])
+      setGrades(gr || [])
+      setSections(sec || [])
+    }).finally(() => setLoading(false))
   }, [])
 
-  const totalStudents = students?.length ?? 0
-  const activeStudents = students?.filter((s: any) => s.status === 'ACTIVE').length ?? 0
-  const today = time.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const total = students.length
+  const activeCount = students.filter(s => s.status === 'ACTIVE' || !s.status).length
+  const maleCount = students.filter(s => s.gender?.toLowerCase() === 'male').length
+  const femaleCount = students.filter(s => s.gender?.toLowerCase() === 'female').length
 
-  const stats = [
-    {
-      title: 'Total Students',
-      value: totalStudents.toLocaleString(),
-      subtitle: 'All enrolled students',
-      icon: Users,
-      color: 'from-indigo-500 to-indigo-600',
-      href: '/school/registrar/students',
-    },
-    {
-      title: 'Active Students',
-      value: activeStudents.toLocaleString(),
-      subtitle: 'Currently enrolled & active',
-      icon: CheckCircle2,
-      color: 'from-emerald-500 to-emerald-600',
-    },
-    {
-      title: 'Pending Records',
-      value: Math.max(0, totalStudents - activeStudents),
-      subtitle: 'Awaiting completion',
-      icon: Clock,
-      color: 'from-amber-500 to-amber-600',
-    },
-    {
-      title: "Today's Date",
-      value: time.toLocaleDateString('en-US', { day: '2-digit', month: 'short' }),
-      subtitle: today,
-      icon: Calendar,
-      color: 'from-violet-500 to-violet-600',
-    },
-  ]
+  const todayStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  })
 
-  const quickActions = [
-    { label: 'Register New Student', href: '/school/registrar/register', icon: Plus, color: 'bg-indigo-500 hover:bg-indigo-600' },
-    { label: 'View Student Records', href: '/school/registrar/students', icon: Users, color: 'bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-700' },
-    { label: 'Generate Report', href: '/school/registrar/reports', icon: FileText, color: 'bg-violet-500 hover:bg-violet-600' },
-  ]
+  // Group students by grade
+  const gradeBreakdown = grades.map(g => {
+    const count = students.filter(s => s.gradeId === g.id || s.grade?.id === g.id).length
+    const pct = total > 0 ? Math.round((count / total) * 100) : 0
+    return { id: g.id, name: g.name, count, pct }
+  })
+
+  // Recent 5 registered students
+  const recentStudents = [...students].reverse().slice(0, 5)
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto w-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-            <span className="text-xs font-semibold text-indigo-600 uppercase tracking-widest">Registrar Portal</span>
+    <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
+      {/* Top Banner Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-r from-indigo-900 via-indigo-800 to-violet-900 text-white p-6 md:p-8 rounded-3xl shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full bg-white/10 text-indigo-200 text-xs font-semibold backdrop-blur-md flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Registrar Command Center
+            </span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-black text-foreground">
-            Welcome, {user?.name?.split(' ')[0] ?? 'Officer'} 👋
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight">
+            Welcome back, {user?.name?.split(' ')[0] || 'Registrar'}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">{today}</p>
-        </div>
-        <Link href="/school/registrar/register">
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 hover:-translate-y-0.5 active:translate-y-0">
-            <Plus className="w-4 h-4" />
-            Register Student
-          </button>
-        </Link>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map(s => <StatCard key={s.title} {...s} />)}
-      </div>
-
-      {/* Quick Actions + Responsibilities */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions */}
-        <div className="lg:col-span-1 space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground px-1">Quick Actions</h2>
-          {quickActions.map(a => (
-            <Link key={a.href} href={a.href}>
-              <div className={cn('flex items-center gap-3 px-4 py-3.5 rounded-xl text-white font-semibold text-sm transition-all hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 mt-2', a.color)}>
-                <a.icon className="w-5 h-5 flex-shrink-0" />
-                {a.label}
-                <ArrowUpRight className="w-4 h-4 ml-auto opacity-60" />
-              </div>
-            </Link>
-          ))}
+          <p className="text-sm text-indigo-100/80 max-w-xl">
+            {todayStr} — Manage student admissions, individual registrations, bulk imports, and official academic records.
+          </p>
         </div>
 
-        {/* Responsibilities */}
-        <div className="lg:col-span-2 rounded-2xl border border-border/60 bg-card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Star className="w-4 h-4 text-indigo-500" />
-            <h2 className="font-bold text-foreground">Your Responsibilities</h2>
+        <div className="relative z-10 flex flex-wrap items-center gap-3">
+          <Link href="/school/registrar/students">
+            <Button className="bg-white text-indigo-950 hover:bg-indigo-50 font-bold rounded-2xl h-11 px-5 gap-2 shadow-lg transition-transform hover:-translate-y-0.5">
+              <UserPlus className="w-4 h-4 text-indigo-600" />
+              New Student Registration
+            </Button>
+          </Link>
+
+          <Link href="/school/registrar/students">
+            <Button variant="outline" className="border-white/20 hover:bg-white/10 text-white font-bold rounded-2xl h-11 px-5 gap-2 backdrop-blur-md">
+              <Table className="w-4 h-4 text-indigo-200" />
+              Bulk Import
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* KPI Stats Bar — desktop first: 4 cols always on large screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        {/* Total Enrolled */}
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-5 py-4 hover:shadow-md transition-all">
+          <div className="w-11 h-11 rounded-xl bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
+            <Users className="w-5 h-5 text-indigo-600" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[
-              { label: 'Student Intake & Enrollment', desc: 'Process new student registrations and intake forms' },
-              { label: 'Record Maintenance', desc: 'Keep student profiles accurate and up to date' },
-              { label: 'Document Management', desc: 'Manage enrollment documents and official records' },
-              { label: 'Registration Reports', desc: 'Generate enrollment statistics and analytics' },
-              { label: 'Parent Communication', desc: 'Coordinate with parents during enrollment process' },
-              { label: 'Data Accuracy', desc: 'Ensure all student information is complete and verified' },
-            ].map(r => (
-              <div key={r.label} className="flex items-start gap-3 p-3 rounded-xl bg-secondary/40 hover:bg-secondary/60 transition-colors">
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{r.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{r.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Permissions Info */}
-      <div className="rounded-2xl border border-indigo-200/50 bg-indigo-50/50 dark:bg-indigo-950/20 dark:border-indigo-800/30 p-5">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-indigo-800 dark:text-indigo-200 text-sm">Role Permissions Summary</p>
-            <p className="text-xs text-indigo-700/70 dark:text-indigo-300/70 mt-1 leading-relaxed">
-              As a <strong>Student Registration Officer</strong>, you can: register new students, view and edit student records,
-              access attendance data (read-only), generate registration reports, and view communications.
-              You do not have access to discipline cases, call center functions, or system settings.
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Total Enrolled</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white leading-tight">{total}</p>
+            <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
+              <CheckCircle2 className="w-3 h-3 flex-shrink-0" /> {activeCount} Active
             </p>
           </div>
+        </div>
+
+        {/* Gender Demographics */}
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-5 py-4 hover:shadow-md transition-all">
+          <div className="w-11 h-11 rounded-xl bg-teal-500/10 flex items-center justify-center flex-shrink-0">
+            <GraduationCap className="w-5 h-5 text-teal-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Gender Split</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white leading-tight">
+              {maleCount}M / {femaleCount}F
+            </p>
+            <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
+              {total > 0 ? Math.round((maleCount / total) * 100) : 0}% Male · {total > 0 ? Math.round((femaleCount / total) * 100) : 0}% Female
+            </p>
+          </div>
+        </div>
+
+        {/* Academic Grades */}
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-5 py-4 hover:shadow-md transition-all">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+            <Layers className="w-5 h-5 text-amber-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Grade Levels</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white leading-tight">{grades.length}</p>
+            <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
+              {sections.length} Section{sections.length !== 1 ? 's' : ''} Configured
+            </p>
+          </div>
+        </div>
+
+        {/* Registration Status */}
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-5 py-4 hover:shadow-md transition-all">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+            <ShieldCheck className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">Status</p>
+            <p className="text-lg font-black text-emerald-600 leading-tight">Operational</p>
+            <p className="text-[11px] font-semibold text-emerald-600/70 dark:text-emerald-400/70 mt-0.5 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 flex-shrink-0" /> Intake Open
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Main Grid: Grade Breakdown + Recent Intake Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Grade Breakdown Progress Bars */}
+        <div className="lg:col-span-1 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <GraduationCap className="w-5 h-5 text-indigo-500" />
+              Enrollment by Grade
+            </h2>
+            <Link href="/school/registrar/reports" className="text-xs font-bold text-indigo-600 hover:underline">
+              Full Analytics →
+            </Link>
+          </div>
+
+          {gradeBreakdown.length === 0 ? (
+            <p className="text-xs text-slate-400 text-center py-6">No grade levels found</p>
+          ) : (
+            <div className="space-y-4 pt-2">
+              {gradeBreakdown.map(gb => (
+                <div key={gb.id || gb.name} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{gb.name}</span>
+                    <span className="font-semibold text-slate-500">{gb.count} students ({gb.pct}%)</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(gb.pct, 4)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+            <Link href="/school/registrar/students">
+              <Button variant="secondary" className="w-full rounded-2xl text-xs font-bold gap-2">
+                Open Full Student Directory
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Recent Registered Students */}
+        <div className="lg:col-span-2 rounded-3xl border border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-500" />
+                Recent Student Admissions
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">Latest students enrolled into the system</p>
+            </div>
+
+            <Link href="/school/registrar/students">
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold gap-1.5">
+                <UserPlus className="w-3.5 h-3.5" />
+                Register Student
+              </Button>
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map(i => <div key={i} className="h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />)}
+            </div>
+          ) : recentStudents.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+              <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No students enrolled yet</p>
+              <p className="text-xs text-slate-400 mt-1">Click below to start student intake</p>
+              <Link href="/school/registrar/students" className="inline-block mt-3">
+                <Button size="sm" className="rounded-xl text-xs font-bold">Start Intake</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {recentStudents.map((st: any) => (
+                <div
+                  key={st.id || st.student_id}
+                  className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-100/60 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/15 text-indigo-600 font-bold flex items-center justify-center flex-shrink-0 text-sm">
+                      {(st.fullName || st.name || 'S').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                        {st.fullName || st.name}
+                      </p>
+                      <p className="text-xs text-slate-400 font-mono truncate">
+                        ID: {st.student_id || 'N/A'} · Parent: {st.parent_name || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="border-indigo-500/30 text-indigo-600 bg-indigo-500/10 text-[10px] font-bold rounded-xl">
+                      {st.grade?.name || 'Enrolled'}
+                    </Badge>
+                    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold rounded-xl">
+                      {st.status || 'ACTIVE'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

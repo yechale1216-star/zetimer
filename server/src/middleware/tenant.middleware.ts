@@ -207,26 +207,17 @@ export const subscriptionGuard = async (req: AuthenticatedRequest, res: Response
 
     console.log(`[subscriptionGuard] Checking school ${schoolId}. Status: ${status}`);
 
-    if (status === 'SUSPENDED') {
-      console.log(`[subscriptionGuard] BLOCKING request to ${req.method} ${req.originalUrl} - School SUSPENDED`);
+    if (status === 'SUSPENDED' || status === 'EXPIRED') {
+      console.log(`[subscriptionGuard] BLOCKING request to ${req.method} ${req.originalUrl} - School ${status}`);
+
+      const message = status === 'SUSPENDED'
+        ? 'Your school account is suspended. Please contact support.'
+        : 'Your school subscription or trial has expired. Please upgrade your plan to continue making changes.';
+
       return res.status(403).json({
         success: false,
-        message: 'Your school account is suspended. Please contact support.',
-        code: 'SCHOOL_SUSPENDED',
-      });
-    }
-
-    if (status === 'EXPIRED') {
-      // Discipline module is 100% FREE — write access is allowed even if subscription expired!
-      if (url.startsWith('/api/discipline')) {
-        return next();
-      }
-
-      console.log(`[subscriptionGuard] BLOCKING request to ${req.method} ${req.originalUrl} - School EXPIRED`);
-      return res.status(403).json({
-        success: false,
-        message: 'Your school subscription or trial has expired. Please upgrade your plan to continue making changes.',
-        code: 'SCHOOL_EXPIRED',
+        message: message,
+        code: `SCHOOL_${status}`,
       });
     }
   } catch (err) {
@@ -244,11 +235,6 @@ export const featureGuard = (featureKey: string) => {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     // Super admins bypass all feature checks
     if (!req.user || req.user.role === 'super_admin') return next();
-
-    // Discipline feature is 100% FREE for all schools unless suspended
-    if (featureKey === 'discipline' || featureKey === 'discipline_management') {
-      return next();
-    }
 
     const schoolId = req.user.schoolId;
     if (!schoolId) return next();

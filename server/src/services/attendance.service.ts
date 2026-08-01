@@ -99,40 +99,50 @@ export const markAttendance = async (data: any, schoolId: string) => {
         }
       });
 
-      // Fetch school name and parent links in parallel
+      // Send fcm push notification to linked parents
       const { sendCategoryNotification } = require('./notification.service');
-      const [school, parentLinks] = await Promise.all([
-        prisma.school.findUnique({ where: { id: schoolId }, select: { name: true } }),
-        prisma.parentStudentLink.findMany({ where: { studentId: student.id }, include: { parent: true } })
-      ]);
+      const parentLinks = await prisma.parentStudentLink.findMany({
+        where: { studentId: student.id },
+        include: { parent: true }
+      });
+
+      // Fetch school name once for all parent pushes
+      const school = await prisma.school.findUnique({
+        where: { id: schoolId },
+        select: { name: true }
+      });
       const schoolName = school?.name || 'ZeTime School';
+
+      // Human-readable category label shown between school name and message body
       const categoryLabel = isAbsent ? 'Absent Alert' : 'Late Arrival';
 
-      // Batch preference check and push dispatch in parallel
-      await Promise.allSettled(
-        parentLinks
-          .filter(link => link.parent?.pushToken)
-          .map(async (link) => {
-            // Check opt-out preferences if phone is available
-            if (link.parent.phone) {
-              const prefs = await prisma.parentPreferences.findUnique({
-                where: { parentPhone_schoolId: { parentPhone: link.parent.phone, schoolId } }
-              });
-              if (prefs && !prefs.pushNotifications) return;
-            }
-            await sendCategoryNotification(link.parent.pushToken, {
-              type: typePush,
-              title: schoolName,
-              body: message,
-              route: `/parent/attendance`,
-              studentId: student.id,
-              schoolId,
-              schoolName,
-              categoryLabel,
-              tag: `attendance-${student.id}`
+      for (const link of parentLinks) {
+        if (link.parent && link.parent.pushToken) {
+          // Check preferences only if phone is set
+          if (link.parent.phone) {
+            const prefs = await prisma.parentPreferences.findUnique({
+              where: { parentPhone_schoolId: { parentPhone: link.parent.phone, schoolId } }
             });
-          })
-      );
+            if (prefs && !prefs.pushNotifications) {
+              continue; // Guard: parent disabled push alerts
+            }
+          }
+
+          await sendCategoryNotification(link.parent.pushToken, {
+            type: typePush,
+            title: schoolName,       // School name is the notification title
+            body: message,           // Full Amharic message as the body
+            route: `/parent/attendance`,
+            studentId: student.id,
+            schoolId,
+            schoolName,
+            categoryLabel,           // Shown as the category subtext in Android
+            tag: `attendance-${student.id}`
+          }).catch((err: any) => {
+            console.error(`Failed to dispatch push to parent ${link.parentId}:`, err);
+          });
+        }
+      }
     } catch (notificationError) {
       console.error("Failed to create parent notification or send push:", notificationError);
     }

@@ -27,8 +27,6 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/context/auth-context"
 import { useTheme } from "@/components/theme-provider"
 
-import { usePermissions } from "@/lib/hooks/use-permissions"
-
 interface CommandPaletteProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -38,7 +36,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const router = useRouter()
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
-  const { hasModulePermission } = usePermissions()
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -59,21 +56,21 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const role = user?.role || "admin"
 
   const navItems = [
-    { title: "Dashboard", href: role === "parent" ? "/parent/dashboard" : role === "teacher" ? "/school/teacher" : "/school/admin", icon: LayoutDashboard, module: "dashboard" },
-    { title: "Announcements", href: role === "parent" ? "/parent/announcements" : "/school/admin/announcements", icon: Megaphone, module: "announcements" },
-    { title: "Communication & Chat", href: role === "parent" ? "/parent/communication" : role === "teacher" ? "/school/teacher/communication" : "/school/admin/communication", icon: MessageSquare, module: "communication" },
-    { title: "Students", href: "/school/admin/students", icon: Users, module: "students" },
-    { title: "Teachers", href: "/school/admin/teachers", icon: User, module: "teachers" },
-    { title: "Attendance", href: role === "teacher" ? "/school/teacher/attendance" : role === "parent" ? "/parent/attendance" : "/school/admin/attendance", icon: CheckSquare, module: "attendance" },
-    { title: "Analytics & Grades", href: "/school/admin/attendance-by-grade", icon: BarChart2, module: "attendance_analytics" },
-    { title: "Reports", href: role === "teacher" ? "/school/teacher/reports" : "/school/admin/reports", icon: BookOpen, module: "reports" },
-    { title: "Discipline", href: role === "parent" ? "/parent/discipline" : role === "teacher" ? "/school/teacher/discipline" : "/school/admin/discipline", icon: ShieldAlert, module: "discipline" },
-    { title: "Settings", href: "/school/admin/settings", icon: Settings, module: "settings" },
-    { title: "Subscription", href: "/school/admin/subscription", icon: CreditCard, module: "subscription" },
-    { title: "Help Desk", href: "/school/admin/support", icon: HeadphonesIcon, module: "support" },
+    { title: "Dashboard", href: role === "parent" ? "/parent/dashboard" : role === "teacher" ? "/school/teacher" : "/school/admin", icon: LayoutDashboard },
+    { title: "Announcements", href: role === "parent" ? "/parent/announcements" : "/school/admin/announcements", icon: Megaphone },
+    { title: "Communication & Chat", href: role === "parent" ? "/parent/communication" : role === "teacher" ? "/school/teacher/communication" : "/school/admin/communication", icon: MessageSquare },
+    { title: "Students", href: "/school/admin/students", icon: Users, roles: ["admin", "school_admin"] },
+    { title: "Teachers", href: "/school/admin/teachers", icon: User, roles: ["admin", "school_admin"] },
+    { title: "Attendance", href: role === "teacher" ? "/school/teacher/attendance" : role === "parent" ? "/parent/attendance" : "/school/admin/attendance", icon: CheckSquare },
+    { title: "Analytics & Grades", href: "/school/admin/attendance-by-grade", icon: BarChart2, roles: ["admin", "school_admin"] },
+    { title: "Reports", href: role === "teacher" ? "/school/teacher/reports" : "/school/admin/reports", icon: BookOpen },
+    { title: "Discipline", href: role === "parent" ? "/parent/discipline" : role === "teacher" ? "/school/teacher/discipline" : "/school/admin/discipline", icon: ShieldAlert },
+    { title: "Settings", href: "/school/admin/settings", icon: Settings, roles: ["admin", "school_admin"] },
+    { title: "Subscription", href: "/school/admin/subscription", icon: CreditCard, roles: ["admin", "school_admin"] },
+    { title: "Help Desk", href: "/school/admin/support", icon: HeadphonesIcon, roles: ["admin", "school_admin"] },
   ]
 
-  const filteredItems = navItems.filter(item => hasModulePermission(item.module, 'view'))
+  const filteredItems = navItems.filter(item => !item.roles || item.roles.includes(role))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

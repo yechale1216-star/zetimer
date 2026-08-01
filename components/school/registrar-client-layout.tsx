@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, BarChart2, User,
-  LogOut, X, ChevronRight, BookOpen, ClipboardList
+  LogOut, X, ChevronRight, BookOpen, ClipboardList, MessageSquare
 } from 'lucide-react'
 import { cn } from '@/lib/utils/utils'
 import { useAuth } from '@/lib/context/auth-context'
@@ -16,9 +16,9 @@ import { notifications } from '@/lib/utils/notifications'
 
 const navItems = [
   { href: '/school/registrar', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { href: '/school/registrar/register', icon: ClipboardList, label: 'New Registration' },
-  { href: '/school/registrar/students', icon: Users, label: 'Student Records' },
-  { href: '/school/registrar/reports', icon: BarChart2, label: 'Reports' },
+  { href: '/school/registrar/students', icon: Users, label: 'Student Directory & Registration' },
+  { href: '/school/registrar/communication', icon: MessageSquare, label: 'Communication' },
+  { href: '/school/registrar/reports', icon: BarChart2, label: 'Enrollment Reports' },
   { href: '/school/registrar/profile', icon: User, label: 'My Profile' },
 ]
 

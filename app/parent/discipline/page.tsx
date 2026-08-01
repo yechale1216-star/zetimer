@@ -6,14 +6,10 @@ import {
   ShieldAlert,
   CheckCircle2,
   Clock,
-  AlertOctagon,
   FileText,
   MessageSquare,
   Eye,
-  Check,
-  Calendar,
-  User,
-  Sparkles
+  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -24,9 +20,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 
 import { DisciplineApi, StudentDiscipline } from '@/lib/discipline-service';
+import { useLanguage } from '@/lib/context/language-context';
 
 export default function ParentDisciplinePage() {
   const router = useRouter();
+  const { t } = useLanguage();
+
   const [incidents, setIncidents] = useState<StudentDiscipline[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIncident, setSelectedIncident] = useState<StudentDiscipline | null>(null);
@@ -46,7 +45,7 @@ export default function ParentDisciplinePage() {
       const res = await DisciplineApi.getIncidents({ limit: 50 });
       setIncidents(res.items);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to load discipline reports');
+      toast.error(err.message || t('failed_to_load_discipline'));
     } finally {
       setIsLoading(false);
     }
@@ -62,12 +61,12 @@ export default function ParentDisciplinePage() {
     try {
       const updated = await DisciplineApi.acknowledgeIncident(selectedIncident.id, ackNotes);
       setSelectedIncident(updated);
-      toast.success('Discipline report acknowledged successfully');
+      toast.success(t('report_acknowledged_success'));
       setIsAckModalOpen(false);
       setAckNotes('');
       fetchParentIncidents();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to acknowledge report');
+      toast.error(err.message || t('report_acknowledge_failed'));
     } finally {
       setIsSubmittingAck(false);
     }
@@ -80,13 +79,13 @@ export default function ParentDisciplinePage() {
   const getSeverityBadge = (severity: string) => {
     switch (severity.toUpperCase()) {
       case 'LOW':
-        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800">Low</Badge>;
+        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800">{t('severity_low')}</Badge>;
       case 'MEDIUM':
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800">Medium</Badge>;
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800">{t('severity_medium')}</Badge>;
       case 'HIGH':
-        return <Badge className="bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800">High</Badge>;
+        return <Badge className="bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800">{t('severity_high')}</Badge>;
       case 'CRITICAL':
-        return <Badge className="bg-red-900 text-red-100 border-red-950 dark:bg-red-950 dark:text-red-200 dark:border-red-900 animate-pulse">Critical</Badge>;
+        return <Badge className="bg-red-900 text-red-100 border-red-950 dark:bg-red-950 dark:text-red-200 dark:border-red-900 animate-pulse">{t('severity_critical')}</Badge>;
       default:
         return <Badge variant="outline">{severity}</Badge>;
     }
@@ -95,13 +94,13 @@ export default function ParentDisciplinePage() {
   const getStatusBadge = (status: string) => {
     switch (status.toUpperCase()) {
       case 'OPEN':
-        return <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400">Open</Badge>;
+        return <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400">{t('status_open')}</Badge>;
       case 'UNDER_REVIEW':
-        return <Badge variant="outline" className="border-blue-500 text-blue-600 dark:text-blue-400">Under Review</Badge>;
+        return <Badge variant="outline" className="border-blue-500 text-blue-600 dark:text-blue-400">{t('status_under_review')}</Badge>;
       case 'RESOLVED':
-        return <Badge variant="outline" className="border-emerald-500 text-emerald-600 dark:text-emerald-400">Resolved</Badge>;
+        return <Badge variant="outline" className="border-emerald-500 text-emerald-600 dark:text-emerald-400">{t('status_resolved')}</Badge>;
       case 'CLOSED':
-        return <Badge variant="secondary">Closed</Badge>;
+        return <Badge variant="secondary">{t('status_closed')}</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -120,16 +119,16 @@ export default function ParentDisciplinePage() {
             <ShieldAlert className="w-7 h-7 text-indigo-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Student Discipline & Conduct</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{t('student_discipline_title')}</h1>
             <p className="text-sm text-slate-300">
-              View official school conduct reports, action notes, evidence, and communicate with teachers
+              {t('discipline_subtitle')}
             </p>
           </div>
         </div>
 
         <Button onClick={handleMessageTeacher} className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium">
           <MessageSquare className="w-4 h-4 mr-2" />
-          Message Homeroom Teacher
+          {t('message_homeroom_teacher')}
         </Button>
       </div>
 
@@ -138,7 +137,7 @@ export default function ParentDisciplinePage() {
         <Card className="border shadow-sm">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-medium">Total Discipline Reports</p>
+              <p className="text-xs text-muted-foreground font-medium">{t('total_discipline_reports')}</p>
               <p className="text-2xl font-bold mt-1">{totalReports}</p>
             </div>
             <div className="p-2.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 rounded-lg">
@@ -150,7 +149,7 @@ export default function ParentDisciplinePage() {
         <Card className="border shadow-sm">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-medium">Open Cases</p>
+              <p className="text-xs text-muted-foreground font-medium">{t('open_cases')}</p>
               <p className="text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400">{openReports}</p>
             </div>
             <div className="p-2.5 bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 rounded-lg">
@@ -162,7 +161,7 @@ export default function ParentDisciplinePage() {
         <Card className="border shadow-sm">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-medium">Resolved Cases</p>
+              <p className="text-xs text-muted-foreground font-medium">{t('resolved_cases')}</p>
               <p className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">{resolvedReports}</p>
             </div>
             <div className="p-2.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 rounded-lg">
@@ -175,8 +174,8 @@ export default function ParentDisciplinePage() {
       {/* Reports Timeline / List */}
       <Card className="border shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg font-bold">Discipline History Timeline</CardTitle>
-          <CardDescription>All reports issued for your child</CardDescription>
+          <CardTitle className="text-lg font-bold">{t('discipline_history_timeline')}</CardTitle>
+          <CardDescription>{t('all_reports_for_child')}</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -188,9 +187,9 @@ export default function ParentDisciplinePage() {
           ) : incidents.length === 0 ? (
             <div className="text-center py-12">
               <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3 opacity-60" />
-              <h3 className="text-lg font-semibold">No Discipline Incidents Reported</h3>
+              <h3 className="text-lg font-semibold">{t('no_discipline_incidents')}</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Your child has no recorded discipline incidents.
+                {t('no_discipline_incidents_desc')}
               </p>
             </div>
           ) : (
@@ -212,7 +211,12 @@ export default function ParentDisciplinePage() {
                     <div>
                       <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">{inc.title}</h3>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Reported for <span className="font-semibold">{inc.student?.fullName}</span> on {new Date(inc.date).toLocaleDateString()} at {inc.time} by {inc.reportedByName || 'Staff'}
+                        {t('reported_for', {
+                          name: inc.student?.fullName || '',
+                          date: new Date(inc.date).toLocaleDateString(),
+                          time: inc.time || '',
+                          reporter: inc.reportedByName || t('staff')
+                        })}
                       </p>
                     </div>
 
@@ -232,11 +236,11 @@ export default function ParentDisciplinePage() {
                         }}
                       >
                         <Check className="w-4 h-4 mr-1" />
-                        Acknowledge Report
+                        {t('acknowledge_report')}
                       </Button>
                     ) : (
                       <Badge variant="outline" className="border-emerald-500 text-emerald-600 gap-1">
-                        <Check className="w-3.5 h-3.5" /> Acknowledged
+                        <Check className="w-3.5 h-3.5" /> {t('acknowledged')}
                       </Badge>
                     )}
 
@@ -249,7 +253,7 @@ export default function ParentDisciplinePage() {
                       }}
                     >
                       <Eye className="w-4 h-4 mr-1" />
-                      View Details
+                      {t('view_details')}
                     </Button>
                   </div>
                 </div>
@@ -271,18 +275,18 @@ export default function ParentDisciplinePage() {
                 </div>
                 <DialogTitle className="text-xl font-bold mt-2">{selectedIncident.title}</DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  Child: <span className="font-semibold text-slate-900 dark:text-slate-100">{selectedIncident.student?.fullName}</span> | Date: {new Date(selectedIncident.date).toLocaleDateString()}
+                  {t('child_label')}: <span className="font-semibold text-slate-900 dark:text-slate-100">{selectedIncident.student?.fullName}</span> | {t('date_label')}: {new Date(selectedIncident.date).toLocaleDateString()}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="p-4 border rounded-xl bg-slate-50 dark:bg-slate-900 space-y-2">
-                <h4 className="text-xs font-semibold uppercase text-muted-foreground">Description</h4>
+                <h4 className="text-xs font-semibold uppercase text-muted-foreground">{t('incident_description')}</h4>
                 <p className="text-sm leading-relaxed">{selectedIncident.description}</p>
               </div>
 
               {selectedIncident.immediateAction && (
                 <div className="p-3 border border-indigo-200 dark:border-indigo-900 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-xl space-y-1">
-                  <h4 className="text-xs font-semibold text-indigo-900 dark:text-indigo-300">Action Taken by School</h4>
+                  <h4 className="text-xs font-semibold text-indigo-900 dark:text-indigo-300">{t('action_taken_by_school')}</h4>
                   <p className="text-xs text-indigo-800 dark:text-indigo-200">{selectedIncident.immediateAction}</p>
                 </div>
               )}
@@ -290,7 +294,9 @@ export default function ParentDisciplinePage() {
               {/* Evidence attachments */}
               {selectedIncident.evidence && Array.isArray(selectedIncident.evidence) && selectedIncident.evidence.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase text-muted-foreground">Evidence Files ({selectedIncident.evidence.length})</h4>
+                  <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+                    {t('evidence_files', { count: selectedIncident.evidence.length })}
+                  </h4>
                   <div className="grid grid-cols-2 gap-2">
                     {selectedIncident.evidence.map((att: any, idx: number) => (
                       <div
@@ -309,12 +315,12 @@ export default function ParentDisciplinePage() {
               {/* Teacher Follow-up Notes */}
               {selectedIncident.followUps && selectedIncident.followUps.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase text-muted-foreground">Teacher Notes & Updates</h4>
+                  <h4 className="text-xs font-semibold uppercase text-muted-foreground">{t('teacher_notes_updates')}</h4>
                   <div className="space-y-2 border rounded-xl p-3 max-h-40 overflow-y-auto">
                     {selectedIncident.followUps.map((fu) => (
                       <div key={fu.id} className="text-xs border-b last:border-b-0 pb-2 mb-2 space-y-1">
                         <div className="flex justify-between font-medium">
-                          <span>{fu.authorName || 'Teacher'}</span>
+                          <span>{fu.authorName || t('staff')}</span>
                           <span className="text-muted-foreground">{new Date(fu.createdAt).toLocaleDateString()}</span>
                         </div>
                         <p className="text-slate-700 dark:text-slate-300">{fu.note}</p>
@@ -328,7 +334,7 @@ export default function ParentDisciplinePage() {
               <DialogFooter className="flex items-center justify-between gap-2 border-t pt-4">
                 <Button variant="outline" onClick={handleMessageTeacher}>
                   <MessageSquare className="w-4 h-4 mr-2 text-indigo-600" />
-                  Message Homeroom Teacher
+                  {t('message_homeroom_teacher')}
                 </Button>
 
                 {!selectedIncident.parentAcknowledged && (
@@ -339,7 +345,7 @@ export default function ParentDisciplinePage() {
                     }}
                     className="bg-emerald-600 hover:bg-emerald-500 text-white"
                   >
-                    Acknowledge Report
+                    {t('acknowledge_report')}
                   </Button>
                 )}
               </DialogFooter>
@@ -352,15 +358,15 @@ export default function ParentDisciplinePage() {
       <Dialog open={isAckModalOpen} onOpenChange={setIsAckModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Acknowledge Discipline Report</DialogTitle>
+            <DialogTitle>{t('acknowledge_discipline_report')}</DialogTitle>
             <DialogDescription>
-              Confirming receipt of this report notifies the school administration that you have reviewed the incident details.
+              {t('acknowledge_modal_desc')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-2">
             <Textarea
-              placeholder="Optional message or parent notes to the school..."
+              placeholder={t('optional_message_placeholder')}
               rows={3}
               value={ackNotes}
               onChange={(e) => setAckNotes(e.target.value)}
@@ -368,13 +374,13 @@ export default function ParentDisciplinePage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAckModalOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsAckModalOpen(false)}>{t('cancel')}</Button>
             <Button
               onClick={handleAcknowledgeSubmit}
               disabled={isSubmittingAck}
               className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
             >
-              Confirm Acknowledgment
+              {t('confirm_acknowledgment')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -346,17 +346,17 @@ export const resolveSchoolFeatures = async (schoolId: string): Promise<string[]>
       return allFeatures.map(f => f.key);
     }
 
-    // 2. IF EXPIRED or SUSPENDED: Core Features + Discipline (Discipline is free)
+    // 2. IF EXPIRED or SUSPENDED: Only Core Features
     if (rawStatus === 'expired' || rawStatus === 'suspended') {
       const coreFeatures = await prisma.feature.findMany({
         where: { isCore: true, isActive: true },
         select: { key: true }
       });
-      return [...coreFeatures.map(f => f.key), 'discipline', 'discipline_management'];
+      return coreFeatures.map(f => f.key);
     }
 
-    // 3. ACTIVE paid subscription: Core + Free Discipline + Plan Features + Add-ons + Overrides
-    const featureKeys = new Set<string>(['discipline', 'discipline_management']);
+    // 3. ACTIVE paid subscription: Core + Plan Features + Add-ons + Overrides
+    const featureKeys = new Set<string>();
 
     // A. Core Features (always available)
     const coreFeatures = await prisma.feature.findMany({

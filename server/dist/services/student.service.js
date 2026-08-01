@@ -92,7 +92,7 @@ const getNextStudentId = async (schoolId) => {
             nextSequence = currentSequence + 1;
         }
     }
-    return `${idPrefix}${nextSequence.toString().padStart(4, '0')}`;
+    return `${idPrefix}${nextSequence.toString().padStart(6, '0')}`;
 };
 exports.getNextStudentId = getNextStudentId;
 const createStudent = async (data, schoolId) => {
@@ -178,6 +178,31 @@ const createStudent = async (data, schoolId) => {
             relationshipType: data.relationshipType || 'Guardian'
         }
     });
+    // Notify all school_admin users for this school about the new enrollment
+    try {
+        const adminUsers = await db_1.default.user.findMany({
+            where: { schoolId, role: 'school_admin' },
+            select: { id: true }
+        });
+        if (adminUsers.length > 0) {
+            await db_1.default.userNotification.createMany({
+                data: adminUsers.map((admin) => ({
+                    userId: admin.id,
+                    schoolId,
+                    title: '🎓 New Student Registered',
+                    message: `${newStudent.fullName} (${newStudent.student_id}) has been enrolled in ${newStudent.grade?.name || 'a grade'} by the registrar.`,
+                    type: 'NEW_STUDENT',
+                    isRead: false,
+                })),
+                skipDuplicates: true,
+            });
+            console.log(`[StudentService] Notified ${adminUsers.length} school admin(s) about new student enrollment: ${newStudent.fullName}`);
+        }
+    }
+    catch (notifErr) {
+        // Non-blocking — student was created successfully, notification failure should not roll back
+        console.error('[StudentService] Failed to send admin notification for new student:', notifErr);
+    }
     return mapStudentToFlat(newStudent);
 };
 exports.createStudent = createStudent;
@@ -220,7 +245,7 @@ const bulkUpsertStudents = async (students, schoolId) => {
             let studentId = data.student_id ? String(data.student_id).trim() : null;
             // Auto-generate ID if missing
             if (!studentId) {
-                studentId = `${idPrefix}${(nextBaseSequence + autoGenSequenceOffset).toString().padStart(4, '0')}`;
+                studentId = `${idPrefix}${(nextBaseSequence + autoGenSequenceOffset).toString().padStart(6, '0')}`;
                 autoGenSequenceOffset++;
             }
             // Stream Validation (Ethiopian Standards)
@@ -328,6 +353,32 @@ const bulkUpsertStudents = async (students, schoolId) => {
             results.errors.push(`Row ${i + 1} (${data.name}): ${err.message}`);
         }
     }
+    // Notify school admins with a summary if any new students were created in this batch
+    if (results.created > 0) {
+        try {
+            const adminUsers = await db_1.default.user.findMany({
+                where: { schoolId, role: 'school_admin' },
+                select: { id: true }
+            });
+            if (adminUsers.length > 0) {
+                await db_1.default.userNotification.createMany({
+                    data: adminUsers.map((admin) => ({
+                        userId: admin.id,
+                        schoolId,
+                        title: '📋 Bulk Student Import Completed',
+                        message: `${results.created} new student${results.created !== 1 ? 's' : ''} enrolled via bulk import${results.updated > 0 ? `, ${results.updated} updated` : ''}${results.errors.length > 0 ? `, ${results.errors.length} error${results.errors.length !== 1 ? 's' : ''}` : ''}.`,
+                        type: 'NEW_STUDENT',
+                        isRead: false,
+                    })),
+                    skipDuplicates: true,
+                });
+                console.log(`[StudentService] Notified ${adminUsers.length} admin(s) about bulk import: ${results.created} created, ${results.updated} updated`);
+            }
+        }
+        catch (notifErr) {
+            console.error('[StudentService] Failed to send admin notification for bulk import:', notifErr);
+        }
+    }
     return results;
 };
 exports.bulkUpsertStudents = bulkUpsertStudents;
@@ -402,7 +453,7 @@ const deleteStudent = async (id, schoolId) => {
     let result = await db_1.default.student.deleteMany({
         where: { id, schoolId }
     });
-    // If no record was deleted, try deleting by the custom 'student_id' field (like STU0001)
+    // If no record was deleted, try deleting by the custom 'student_id' field (like STU000001)
     if (result.count === 0) {
         console.log(`[StudentService] UUID match failed, trying custom student_id field...`);
         result = await db_1.default.student.deleteMany({

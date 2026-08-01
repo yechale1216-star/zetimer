@@ -114,18 +114,20 @@ const resolveRoleInSchool = async (userId, schoolId, requestedRole) => {
             if (user)
                 return user.role;
         }
-        // In some cases, staff can be 'staff'
-        if (requestedRole === 'staff') {
+        // Staff / generic non-teacher school roles (includes 3 new system roles)
+        const staffRoles = ['staff', 'registrar', 'discipline_officer', 'call_center'];
+        if (staffRoles.includes(requestedRole)) {
             const user = await db_1.default.user.findFirst({
-                where: { id: userId, schoolId, role: 'staff' }
+                where: { id: userId, schoolId, role: requestedRole }
             });
             if (user)
-                return 'staff';
+                return requestedRole;
         }
     }
     // 2. Fallback: Determine highest available role in priority order
     // Priority: Admin/Staff > Teacher > Parent
-    // A. Check User table (Staff/Admin roles)
+    // A. Check User table (Staff/Admin roles) — covers all non-parent/non-student roles
+    //    including: admin, school_admin, teacher, staff, registrar, discipline_officer, call_center
     const user = await db_1.default.user.findFirst({
         where: { id: userId, schoolId }
     });

@@ -173,7 +173,7 @@ const getAttendance = async (filters, schoolId) => {
             where.session = null; // daily mode: fetch records with no session
         }
         else {
-            where.session = session; // session mode: fetch only that session
+            where.session = { equals: session.trim().toLowerCase(), mode: 'insensitive' }; // session mode: fetch only that session
         }
     }
     if (grade || section) {
@@ -205,7 +205,7 @@ const getAttendanceByStudent = async (studentId, schoolId, filters = {}) => {
             where.session = null;
         }
         else {
-            where.session = session;
+            where.session = { equals: session.trim().toLowerCase(), mode: 'insensitive' };
         }
     }
     return await db_1.default.attendance.findMany({

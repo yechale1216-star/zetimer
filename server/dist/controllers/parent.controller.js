@@ -315,11 +315,15 @@ const updateProfile = async (req, res, next) => {
         if (!isOwner) {
             return res.status(403).json({ success: false, message: "Forbidden: You cannot modify another parent's profile." });
         }
-        const { name, email, address } = req.body;
+        const { name, email, address, profile_photo } = req.body;
         if (!name) {
             return res.status(400).json({ success: false, message: "Name is required." });
         }
-        const result = await parentService.updateProfile(phone, schoolId, { name, email, address });
+        // Validate base64 image size (max ~2MB base64 ≈ 2.7M chars)
+        if (profile_photo && typeof profile_photo === 'string' && profile_photo.length > 3_000_000) {
+            return res.status(400).json({ success: false, message: "Photo is too large. Please use an image under 2MB." });
+        }
+        const result = await parentService.updateProfile(phone, schoolId, { name, email, address, profile_photo });
         res.status(200).json(result);
     }
     catch (error) {

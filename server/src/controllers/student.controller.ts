@@ -9,24 +9,12 @@ export const getStudents = async (req: AuthenticatedRequest, res: Response, next
       return res.status(401).json({ success: false, message: 'School ID context missing' });
     }
     const search = req.query.search as string | undefined;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 50;
-    const result = await studentService.getAllStudents(schoolId, search, page, limit);
-    res.status(200).json({
-      success: true,
-      data: result.data,
-      pagination: {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        totalPages: result.totalPages,
-      }
-    });
+    const students = await studentService.getAllStudents(schoolId, search);
+    res.status(200).json({ success: true, data: students });
   } catch (error) {
     next(error);
   }
 };
-
 
 export const getNextStudentId = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {

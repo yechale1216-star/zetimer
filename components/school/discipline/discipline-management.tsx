@@ -36,8 +36,10 @@ import {
   Users,
   GraduationCap,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Scale
 } from 'lucide-react';
+import { useAuth } from '@/lib/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -78,11 +80,26 @@ const DEFAULT_FALLBACK_CATEGORIES: DisciplineCategory[] = [
 ].map((name) => ({ id: name, schoolId: '', name, isDefault: true }));
 
 interface DisciplineManagementProps {
-  userRole?: 'school_admin' | 'teacher' | 'super_admin';
+  userRole?: 'school_admin' | 'teacher' | 'super_admin' | 'discipline_officer';
+  initialTab?: 'incidents' | 'analytics' | 'categories';
 }
 
-export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineManagementProps) {
-  const [activeTab, setActiveTab] = useState<'incidents' | 'analytics' | 'categories'>('incidents');
+export function DisciplineManagement({ userRole = 'school_admin', initialTab = 'incidents' }: DisciplineManagementProps) {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'incidents' | 'analytics' | 'categories'>(initialTab);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   
   // Data States
   const [incidents, setIncidents] = useState<StudentDiscipline[]>([]);
@@ -519,27 +536,36 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
 
   return (
     <div className="space-y-8 pb-20 max-w-7xl mx-auto">
-      {/* Top Header Card */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/80 dark:bg-slate-900/80 p-6 md:p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm backdrop-blur-xl">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3.5 bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-2xl border border-indigo-500/20">
-            <ShieldAlert className="w-8 h-8" />
+      {/* Top Header Card / Hero Banner */}
+      <div className="relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-r from-slate-950 via-amber-950/40 to-slate-900 p-6 md:p-8 rounded-3xl border border-amber-500/20 shadow-2xl shadow-amber-500/5 backdrop-blur-xl">
+        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -mb-12 -ml-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative flex items-center gap-4">
+          <div className="p-4 bg-amber-500/15 text-amber-500 dark:text-amber-400 rounded-2xl border border-amber-500/30 shadow-inner flex-shrink-0">
+            <Scale className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-              Student Discipline & Conduct
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-amber-400 animate-spin" />
+                Officer Conduct Dashboard
+              </span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+              {getGreeting()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-300 to-amber-200">{user?.name || 'Officer'}</span>
             </h1>
-            <p className="text-xs md:text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
-              Track, investigate, log, and communicate student conduct and behavioral reports across the school
+            <p className="text-xs md:text-sm font-medium text-slate-300 mt-1 max-w-2xl">
+              Track, investigate, log, and communicate student conduct and behavioral reports across the school.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex flex-wrap items-center gap-3">
           <Button
             onClick={exportToCSV}
             variant="outline"
-            className="rounded-2xl font-bold text-xs h-11 px-5 border-slate-200 dark:border-slate-800"
+            className="rounded-2xl font-bold text-xs h-11 px-5 bg-white/10 hover:bg-white/20 text-white border-white/20 backdrop-blur-md transition-all"
           >
             <Download className="w-4 h-4 mr-2" />
             Export CSV
@@ -550,7 +576,7 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
               setCreateStep(1);
               setIsCreateOpen(true);
             }}
-            className="rounded-2xl font-bold text-xs h-11 px-5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-md shadow-indigo-500/20 border-none"
+            className="rounded-2xl font-bold text-xs h-11 px-6 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25 border-none transition-all transform hover:scale-[1.02]"
           >
             <Plus className="w-4 h-4 mr-2" />
             Report Incident
@@ -560,22 +586,24 @@ export function DisciplineManagement({ userRole = 'school_admin' }: DisciplineMa
 
       {/* Main Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full space-y-6">
-        <TabsList className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 inline-flex">
-          <TabsTrigger value="incidents" className="rounded-xl font-bold text-xs h-9 px-4 gap-2">
-            <ClipboardList className="w-4 h-4" />
-            Incidents Directory
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="rounded-xl font-bold text-xs h-9 px-4 gap-2">
-            <BarChart3 className="w-4 h-4" />
-            Dashboard & Analytics
-          </TabsTrigger>
-          {userRole === 'school_admin' && (
-            <TabsTrigger value="categories" className="rounded-xl font-bold text-xs h-9 px-4 gap-2">
-              <Layers className="w-4 h-4" />
-              Custom Categories
+        {userRole !== 'discipline_officer' && (
+          <TabsList className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 inline-flex">
+            <TabsTrigger value="incidents" className="rounded-xl font-bold text-xs h-9 px-4 gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Incidents Directory
             </TabsTrigger>
-          )}
-        </TabsList>
+            <TabsTrigger value="analytics" className="rounded-xl font-bold text-xs h-9 px-4 gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Dashboard & Analytics
+            </TabsTrigger>
+            {(userRole === 'school_admin' || userRole === 'super_admin') && (
+              <TabsTrigger value="categories" className="rounded-xl font-bold text-xs h-9 px-4 gap-2">
+                <Layers className="w-4 h-4" />
+                Custom Categories
+              </TabsTrigger>
+            )}
+          </TabsList>
+        )}
 
         {/* TAB 1: INCIDENTS DIRECTORY */}
         <TabsContent value="incidents" className="space-y-6 mt-6 focus-visible:outline-none">

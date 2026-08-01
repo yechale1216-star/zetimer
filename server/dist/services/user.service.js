@@ -20,7 +20,26 @@ const getUserById = async (id, schoolId) => {
         where.schoolId = schoolId;
     return await db_1.default.user.findFirst({
         where,
-        include: { school: { include: { settings: true } } }
+        select: {
+            id: true,
+            email: true,
+            full_name: true,
+            role: true,
+            phone: true,
+            is_active: true,
+            teacher_id: true,
+            schoolId: true,
+            createdAt: true,
+            updatedAt: true,
+            experience_years: true,
+            qualification: true,
+            subject: true,
+            profile_photo: true,
+            address: true,
+            lastActive: true,
+            pushToken: true,
+            school: { include: { settings: true } }
+        }
     });
 };
 exports.getUserById = getUserById;
@@ -29,6 +48,24 @@ const getUsers = async (schoolId) => {
         throw new Error('School ID is required');
     return await db_1.default.user.findMany({
         where: { schoolId },
+        select: {
+            id: true,
+            email: true,
+            full_name: true,
+            role: true,
+            phone: true,
+            is_active: true,
+            teacher_id: true,
+            schoolId: true,
+            createdAt: true,
+            updatedAt: true,
+            experience_years: true,
+            qualification: true,
+            subject: true,
+            profile_photo: true,
+            address: true,
+            lastActive: true
+        },
         orderBy: { full_name: 'asc' }
     });
 };

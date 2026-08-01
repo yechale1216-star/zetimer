@@ -174,6 +174,13 @@ model School {
   disciplines          StudentDiscipline[]
   disciplineCategories DisciplineCategory[]
   systemRoles          SystemRole[]
+  academicYears        AcademicYear[]
+  academicTerms        AcademicTerm[]
+  subjects             Subject[]
+  classrooms           Classroom[]
+  timetables           Timetable[]
+  timetablePeriods     TimetablePeriod[]
+  timetableSlots       TimetableSlot[]
 }
 
 model User {
@@ -211,6 +218,7 @@ model User {
   notifications              UserNotification[]
   reportedDisciplines        StudentDiscipline[]
   disciplineFollowUps        DisciplineFollowUp[]
+  createdTimetables          Timetable[]
 
   @@index([email])
   @@index([schoolId])
@@ -233,6 +241,8 @@ model Teacher {
   attendance       Attendance[]
   school           School?             @relation(fields: [schoolId], references: [id])
   assignments      TeacherAssignment[]
+  timetableSlots   TimetableSlot[]     @relation("AssignedTeacher")
+  substituteSlots  TimetableSlot[]     @relation("SubstituteTeacher")
 
   @@index([schoolId])
 }
@@ -289,6 +299,8 @@ model Grade {
   toPromotions   StudentPromotion[]  @relation("ToGrade")
   assignments    TeacherAssignment[]
   disciplines    StudentDiscipline[]
+  timetables     Timetable[]
+  timetableSlots TimetableSlot[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -304,6 +316,8 @@ model Section {
   toPromotions   StudentPromotion[]  @relation("ToSection")
   assignments    TeacherAssignment[]
   disciplines    StudentDiscipline[]
+  timetables     Timetable[]
+  timetableSlots TimetableSlot[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -319,6 +333,8 @@ model Stream {
   toPromotions   StudentPromotion[]  @relation("ToStream")
   assignments    TeacherAssignment[]
   disciplines    StudentDiscipline[]
+  timetables     Timetable[]
+  timetableSlots TimetableSlot[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -356,9 +372,6 @@ model Student {
   @@index([gradeId])
   @@index([sectionId])
   @@index([streamId])
-  @@index([schoolId, status])
-  @@index([schoolId, gradeId, sectionId])
-  @@index([schoolId, fullName])
 }
 
 model StudentPromotion {
@@ -410,10 +423,6 @@ model Attendance {
   @@index([date])
   @@index([session])
   @@index([status])
-  @@index([schoolId, date])
-  @@index([schoolId, date, session])
-  @@index([studentId, date])
-  @@index([schoolId, status, date])
 }
 
 model AuditLog {
@@ -891,4 +900,175 @@ model DisciplineFollowUp {
   @@index([disciplineId])
   @@map("discipline_followups")
 }
+
+model AcademicYear {
+  id          String         @id @default(uuid())
+  schoolId    String
+  name        String
+  startDate   DateTime
+  endDate     DateTime
+  isCurrent   Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  school      School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  terms       AcademicTerm[]
+  timetables  Timetable[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@map("academic_years")
+}
+
+model AcademicTerm {
+  id             String       @id @default(uuid())
+  schoolId       String
+  academicYearId String
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  isCurrent      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  timetables     Timetable[]
+
+  @@unique([academicYearId, name])
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@map("academic_terms")
+}
+
+model Subject {
+  id          String          @id @default(uuid())
+  schoolId    String
+  name        String
+  code        String
+  department  String?
+  color       String          @default("#3b82f6")
+  description String?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  slots       TimetableSlot[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+  @@map("subjects")
+}
+
+model Classroom {
+  id        String          @id @default(uuid())
+  schoolId  String
+  name      String
+  code      String?
+  building  String?
+  floor     String?
+  capacity  Int             @default(40)
+  type      String          @default("STANDARD")
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  school    School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  slots     TimetableSlot[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@map("classrooms")
+}
+
+model Timetable {
+  id                 String          @id @default(uuid())
+  schoolId           String
+  title              String
+  academicYearId     String?
+  termId             String?
+  gradeId            String
+  streamId           String?
+  sectionId          String?
+  status             String          @default("DRAFT")
+  version            Int             @default(1)
+  effectiveStartDate DateTime?
+  effectiveEndDate   DateTime?
+  createdById        String?
+  publishedAt        DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
+  term         AcademicTerm? @relation(fields: [termId], references: [id])
+  grade        Grade         @relation(fields: [gradeId], references: [id])
+  stream       Stream?       @relation(fields: [streamId], references: [id])
+  section      Section?      @relation(fields: [sectionId], references: [id])
+  createdBy    User?         @relation(fields: [createdById], references: [id])
+  slots        TimetableSlot[]
+
+  @@index([schoolId])
+  @@index([gradeId])
+  @@index([sectionId])
+  @@index([status])
+  @@map("timetables")
+}
+
+model TimetablePeriod {
+  id           String          @id @default(uuid())
+  schoolId     String
+  name         String
+  periodNumber Int
+  startTime    String
+  endTime      String
+  isBreak      Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  school       School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  slots        TimetableSlot[]
+
+  @@unique([schoolId, periodNumber])
+  @@index([schoolId])
+  @@map("timetable_periods")
+}
+
+model TimetableSlot {
+  id                  String           @id @default(uuid())
+  timetableId         String
+  schoolId            String
+  dayOfWeek           String
+  periodId            String?
+  periodNumber        Int
+  startTime           String
+  endTime             String
+  subjectId           String
+  teacherId           String?
+  classroomId         String?
+  gradeId             String
+  sectionId           String
+  streamId            String?
+  notes               String?
+  isCancelled         Boolean          @default(false)
+  substituteTeacherId String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  timetable         Timetable        @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  school            School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  period            TimetablePeriod? @relation(fields: [periodId], references: [id])
+  subject           Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher           Teacher?         @relation("AssignedTeacher", fields: [teacherId], references: [id])
+  substituteTeacher Teacher?         @relation("SubstituteTeacher", fields: [substituteTeacherId], references: [id])
+  classroom         Classroom?       @relation(fields: [classroomId], references: [id])
+  grade             Grade            @relation(fields: [gradeId], references: [id])
+  section           Section          @relation(fields: [sectionId], references: [id])
+  stream            Stream?          @relation(fields: [streamId], references: [id])
+
+  @@index([timetableId])
+  @@index([schoolId])
+  @@index([teacherId])
+  @@index([classroomId])
+  @@index([dayOfWeek, periodNumber])
+  @@index([gradeId, sectionId])
+  @@map("timetable_slots")
+}
+
 

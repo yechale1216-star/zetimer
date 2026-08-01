@@ -59,41 +59,39 @@ export default function AttendanceHistory() {
       if (student) {
         setSelectedStudent(student)
         
-        // Fetch academic year and attendance mode from settings
-        let currentMode = 'daily';
-        try {
-          const settings = await db.getSettings()
-          if (settings?.attendanceMode) {
-            currentMode = settings.attendanceMode === 'session_based' ? 'session' : 'daily'
-            setAttendanceMode(currentMode as any)
-          }
+        // Fetch academic year/settings and attendance concurrently
+        const [settings] = await Promise.all([
+          db.getSettings().catch((err) => {
+            console.error("Failed to load school settings:", err)
+            return null
+          }),
+          fetchStudentAttendance(student.id)
+        ])
 
-          if (settings?.academicYear) {
-            const yearMatch = settings.academicYear.match(/\d{4}/)
-            if (yearMatch) {
-              const gYear = parseInt(yearMatch[0])
-              if (language === 'am') {
-                // Approximate convert: GC Jan 1st of that year
-                const ec = toEthiopianDate(new Date(gYear, 4, 1)) // May is safe to stay in same EC year mostly
-                setSelectedYear(ec.year)
-              } else {
-                setSelectedYear(gYear)
-              }
-            }
-          } else {
-             // Fallback to current year if no settings
-             const now = new Date()
-             if (language === 'am') {
-               setSelectedYear(toEthiopianDate(now).year)
-             } else {
-               setSelectedYear(now.getFullYear())
-             }
-          }
-        } catch (err) {
-          console.error("Failed to load school settings:", err)
+        if (settings?.attendanceMode) {
+          const currentMode = settings.attendanceMode === 'session_based' ? 'session' : 'daily'
+          setAttendanceMode(currentMode as any)
         }
 
-        await fetchStudentAttendance(student.id, currentMode)
+        if (settings?.academicYear) {
+          const yearMatch = settings.academicYear.match(/\d{4}/)
+          if (yearMatch) {
+            const gYear = parseInt(yearMatch[0])
+            if (language === 'am') {
+              const ec = toEthiopianDate(new Date(gYear, 4, 1))
+              setSelectedYear(ec.year)
+            } else {
+              setSelectedYear(gYear)
+            }
+          }
+        } else {
+          const now = new Date()
+          if (language === 'am') {
+            setSelectedYear(toEthiopianDate(now).year)
+          } else {
+            setSelectedYear(now.getFullYear())
+          }
+        }
       }
     }
     setIsLoading(false)

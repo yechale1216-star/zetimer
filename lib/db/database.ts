@@ -67,42 +67,53 @@ class Database extends BaseDatabase {
   async getAttendanceByDate(date: string): Promise<AttendanceRecord[]> {
     const schoolId = this.getSchoolId()
     if (!schoolId) return []
-    const result = await apiFetch<{ success: boolean; data: any[] }>(
-      `${API_URL}/api/attendance?date=${date}&_t=${Date.now()}`,
-      { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      }
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Addis_Ababa' })
+    const isToday = date === today
+    // Short stale time for today (real-time marking), longer for past dates (historical)
+    const staleTime = isToday ? 20_000 : 300_000
+    return queryCache.fetch(
+      `attendance_date_${schoolId}_${date}`,
+      async () => {
+        const result = await apiFetch<{ success: boolean; data: any[] }>(
+          `${API_URL}/api/attendance?date=${date}`,
+          { headers: this.getApiHeaders() }
+        )
+        return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
+      },
+      { staleTime, persist: false }
     )
-    return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
   }
 
   async getAttendanceByDateAndMode(date: string, session: "morning" | "afternoon" | null): Promise<AttendanceRecord[]> {
     const schoolId = this.getSchoolId()
     if (!schoolId) return []
-    const sessionParam = session ? `&session=${session}` : `&session=none`
-    const url = `${API_URL}/api/attendance?date=${date}${sessionParam}&_t=${Date.now()}`
-    const result = await apiFetch<{ success: boolean; data: any[] }>(
-      url, 
-      { 
-        headers: this.getApiHeaders(), 
-        cache: 'no-store' 
-      }
+    const sessionStr = session || "none"
+    return queryCache.fetch(
+      `attendance_date_session_${schoolId}_${date}_${sessionStr}`,
+      async () => {
+        const sessionParam = session ? `&session=${session}` : `&session=none`
+        const url = `${API_URL}/api/attendance?date=${date}${sessionParam}`
+        const result = await apiFetch<{ success: boolean; data: any[] }>(url, { headers: this.getApiHeaders() })
+        return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
+      },
+      { staleTime: 20_000, persist: false }
     )
-    return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
   }
 
   async getAttendanceByDateRange(startDate: string, endDate: string): Promise<AttendanceRecord[]> {
     const schoolId = this.getSchoolId()
     if (!schoolId) return []
-    const result = await apiFetch<{ success: boolean; data: any[] }>(
-      `${API_URL}/api/attendance?startDate=${startDate}&endDate=${endDate}&_t=${Date.now()}`,
-      { 
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      }
+    return queryCache.fetch(
+      `attendance_range_${schoolId}_${startDate}_${endDate}`,
+      async () => {
+        const result = await apiFetch<{ success: boolean; data: any[] }>(
+          `${API_URL}/api/attendance?startDate=${startDate}&endDate=${endDate}`,
+          { headers: this.getApiHeaders() }
+        )
+        return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
+      },
+      { staleTime: 60_000, persist: false }
     )
-    return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
   }
 
   async getAllAttendance(): Promise<AttendanceRecord[]> {
@@ -154,23 +165,31 @@ class Database extends BaseDatabase {
     return attendance.mapAttendance(result.data, schoolId)
   }
 
-  async getAttendanceByStudent(studentId: string, schoolId: string): Promise<AttendanceRecord[]> {
-    const result = await apiFetch<{ success: boolean; data: any[] }>(
-      `${API_URL}/api/attendance/student/${studentId}?_t=${Date.now()}`,
-      {
-        headers: this.getApiHeaders(),
-        cache: 'no-store'
-      }
+  async getAttendanceByStudent(studentId: string, schoolId?: string): Promise<AttendanceRecord[]> {
+    const activeSchoolId = schoolId || this.getSchoolId()
+    if (!activeSchoolId || !studentId) return []
+    return queryCache.fetch(
+      `attendance_student_${activeSchoolId}_${studentId}`,
+      async () => {
+        const result = await apiFetch<{ success: boolean; data: any[] }>(
+          `${API_URL}/api/attendance/student/${studentId}`,
+          { headers: this.getApiHeaders() }
+        )
+        return result.data.map((r: any) => attendance.mapAttendance(r, activeSchoolId))
+      },
+      { staleTime: 30_000, persist: false }
     )
-    return result.data.map((r: any) => attendance.mapAttendance(r, schoolId))
   }
 
   // ─── SETTINGS ─────────────────────────────────────────────────────────────
   async getSettings(): Promise<any> {
-    const schoolId = this.getSchoolId() || "default"
+    const schoolId = this.getSchoolId()
+    // Security: Never cache settings under a missing/default schoolId.
+    // This prevents stale settings from a previous school leaking to a new context.
+    if (!schoolId) return settings.getSettings(this.getApiHeaders(), "")
     return queryCache.fetch(
       `settings_${schoolId}`,
-      async () => settings.getSettings(this.getApiHeaders(), this.getSchoolId()),
+      async () => settings.getSettings(this.getApiHeaders(), schoolId),
       { staleTime: 120_000 }
     )
   }

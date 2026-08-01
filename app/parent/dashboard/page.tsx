@@ -64,18 +64,6 @@ export default function ParentDashboard() {
       const user = JSON.parse(userStr)
       setCurrentUser(user)
 
-      // Fetch school settings to get default attendance mode
-      let currentMode = 'daily'
-      try {
-        const settings = await db.getSettings()
-        if (settings?.attendanceMode) {
-          currentMode = settings.attendanceMode === 'session_based' ? 'session' : 'daily'
-          setStatsMode(currentMode as any)
-        }
-      } catch (err) {
-        console.error("[Dashboard] Error fetching school settings:", err)
-      }
-
       if (user.name) {
         const nameParts = user.name.trim().split(/\s+/)
         const titles = ['dr', 'dr.', 'mr', 'mr.', 'mrs', 'mrs.', 'ms', 'ms.', 'prof', 'prof.']
@@ -88,22 +76,32 @@ export default function ParentDashboard() {
         setFirstName(user.full_name.split(' ')[0])
       }
 
-      if (studentsStr && studentId) {
-        const students = JSON.parse(studentsStr)
-        const student = students.find((s: any) => s.id === studentId) || students[0]
+      const students = studentsStr ? JSON.parse(studentsStr) : []
+      const student = studentId
+        ? (students.find((s: any) => s.id === studentId) || students[0])
+        : students[0]
 
-        if (student) {
-          setSelectedStudent(student)
-          await fetchStudentAttendance(student.id, currentMode)
-          await fetchNotifications(user.phone)
-        }
-      } else if (studentsStr) {
-        const students = JSON.parse(studentsStr)
-        if (students[0]) {
-          setSelectedStudent(students[0])
-          localStorage.setItem("parent_selected_student_id", students[0].id)
-          await fetchStudentAttendance(students[0].id, currentMode)
-          await fetchNotifications(user.phone)
+      if (student) {
+        setSelectedStudent(student)
+        if (!studentId) localStorage.setItem("parent_selected_student_id", student.id)
+
+        // Fetch settings, attendance, and notifications all in parallel
+        const [settingsData] = await Promise.all([
+          db.getSettings().catch((err: any) => {
+            console.error("[Dashboard] Error fetching school settings:", err)
+            return null
+          }),
+          fetchStudentAttendance(student.id, statsMode),
+          fetchNotifications(user.phone),
+        ])
+
+        if (settingsData?.attendanceMode) {
+          const resolvedMode = settingsData.attendanceMode === 'session_based' ? 'session' : 'daily'
+          setStatsMode(resolvedMode as any)
+          // If mode differs from what we used above, re-fetch attendance with correct mode
+          if (resolvedMode !== statsMode) {
+            fetchStudentAttendance(student.id, resolvedMode)
+          }
         }
       }
     } catch (e) {

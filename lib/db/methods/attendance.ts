@@ -3,6 +3,7 @@
 import { API_URL } from "@/lib/api-config"
 import type { AttendanceRecord } from "../types"
 import { apiFetch } from "@/lib/utils/fetch-with-timeout"
+import { queryCache } from "@/lib/utils/query-cache"
 
 export function mapAttendance(r: any, schoolId: string): AttendanceRecord {
   return {
@@ -16,14 +17,18 @@ export function mapAttendance(r: any, schoolId: string): AttendanceRecord {
 
 export async function getAttendance(headers: any, schoolId: string): Promise<AttendanceRecord[]> {
   if (!schoolId) return []
-  const result = await apiFetch<{ success: boolean; data: any[] }>(
-    `${API_URL}/api/attendance?_t=${Date.now()}`,
-    { 
-      headers,
-      cache: 'no-store'
-    }
+  return queryCache.fetch(
+    `attendance_all_${schoolId}`,
+    async () => {
+      const result = await apiFetch<{ success: boolean; data: any[] }>(
+        `${API_URL}/api/attendance`,
+        { headers }
+      )
+      return result.data.map((r: any) => mapAttendance(r, schoolId))
+    },
+    // Do NOT persist attendance data to localStorage (too large & sensitive)
+    { staleTime: 20_000, persist: false }
   )
-  return result.data.map((r: any) => mapAttendance(r, schoolId))
 }
 
 export async function markAttendance(
@@ -63,6 +68,10 @@ export async function markAttendance(
       }),
     }
   )
+
+  // Invalidate all attendance caches for this school so dashboards get fresh data
+  queryCache.invalidate(`attendance_all_${schoolId}`)
+  queryCache.invalidate(`attendance_date_${schoolId}_`)
 }
 
 export async function createEditRequest(headers: any, payload: { studentId?: string; gradeId?: string; sectionId?: string; date: string; session?: string | null; reason?: string }): Promise<any> {

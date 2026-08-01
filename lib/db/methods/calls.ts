@@ -2,16 +2,21 @@
 
 import { API_URL } from "@/lib/api-config"
 import { apiFetch } from "@/lib/utils/fetch-with-timeout"
+import { queryCache } from "@/lib/utils/query-cache"
 
 export async function getContacts(headers: any): Promise<any[]> {
-  const result = await apiFetch<{ success: boolean; data: any[] }>(
-    `${API_URL}/api/users/contacts`,
-    { 
-      headers,
-      cache: 'no-store'
-    }
+  const schoolId = headers?.["x-school-id"] || "default"
+  return queryCache.fetch(
+    `contacts_${schoolId}`,
+    async () => {
+      const result = await apiFetch<{ success: boolean; data: any[] }>(
+        `${API_URL}/api/users/contacts`,
+        { headers }
+      )
+      return result.data
+    },
+    { staleTime: 60_000 }
   )
-  return result.data
 }
 
 export async function logCall(

@@ -381,10 +381,19 @@ export default function ParentNotifications() {
     const isFemale = notification.student?.gender?.toLowerCase() === "female"
     const suffix = isFemale ? "_f" : ""
     const formattedDate = formatLocalizedDate(notification.createdAt, language, { month: "short", day: "numeric" })
-    switch (notification.type) {
-      case "absent": return { title: t(("alert_absent_title" + suffix) as any, { name: studentName }), message: t(("alert_absent_msg" + suffix) as any, { name: studentName, date: formattedDate }) }
-      case "late": return { title: t(("alert_late_title" + suffix) as any, { name: studentName }), message: t(("alert_late_msg" + suffix) as any, { name: studentName, date: formattedDate }) }
-      case "warning": return { title: t(("alert_warning_title" + suffix) as any, { name: studentName }), message: t(("alert_warning_msg" + suffix) as any, { name: studentName, date: formattedDate }) }
+    const vars = {
+      name: studentName,
+      StudentName: studentName,
+      "Parent Name": "ወላጅ",
+      parentName: "ወላጅ",
+      date: formattedDate,
+      Date: formattedDate,
+    }
+    switch (notification.type as string) {
+      case "absent": return { title: t(("alert_absent_title" + suffix) as any, vars), message: t(("alert_absent_msg" + suffix) as any, vars) }
+      case "late": return { title: t(("alert_late_title" + suffix) as any, vars), message: t(("alert_late_msg" + suffix) as any, vars) }
+      case "excused": return { title: t(("alert_excused_title" + suffix) as any, vars), message: t(("alert_excused_msg" + suffix) as any, vars) }
+      case "warning": return { title: t(("alert_warning_title" + suffix) as any, vars), message: t(("alert_warning_msg" + suffix) as any, vars) }
       default: return { title: notification.title, message: notification.message }
     }
   }

@@ -1,13 +1,16 @@
 import { createServer } from 'http';
 import app from './app';
 import { initSocket } from './socket';
+import { connectRedis } from './redis';
 import prisma from './config/db';
 
 const PORT = Number(process.env.PORT) || 5000;
 const httpServer = createServer(app);
 
-// Initialize Socket.IO
-initSocket(httpServer);
+// Prevent hanging requests and gateway races behind reverse proxies
+httpServer.requestTimeout = 30000;      // 30s max request handling time
+httpServer.headersTimeout = 31000;      // Must be greater than requestTimeout
+httpServer.keepAliveTimeout = 65000;    // > 60s for Cloudflare/ALB/Render keep-alive
 
 // Drop the unique constraint on School.name if it still exists (schema migration workaround)
 async function applyStartupMigrations() {
@@ -19,9 +22,24 @@ async function applyStartupMigrations() {
   }
 }
 
-applyStartupMigrations().then(() => {
+async function start() {
+  // 1. Connect Redis (gracefully falls back if unavailable — socket still works on single instance)
+  await connectRedis();
+
+  // 2. Initialize Socket.IO (with Redis adapter already attached inside initSocket)
+  initSocket(httpServer);
+
+  // 3. Apply startup DB migrations
+  await applyStartupMigrations();
+
+  // 4. Start HTTP server
   httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
   });
+}
+
+start().catch((err) => {
+  console.error('[startup] Fatal error:', err);
+  process.exit(1);
 });
 

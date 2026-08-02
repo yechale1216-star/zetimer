@@ -19,6 +19,8 @@ if (missingEnv.length > 0) {
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
+import prisma from './config/db';
 import studentRoutes from './routes/student.routes';
 import attendanceRoutes from './routes/attendance.routes';
 import schoolRoutes from './routes/school.routes';
@@ -44,7 +46,7 @@ import rolesRoutes from './routes/roles.routes';
 import { tenantMiddleware, subscriptionGuard } from './middleware/tenant.middleware';
 import { maintenanceMiddleware } from './middleware/maintenance.middleware';
 import * as parentController from './controllers/parent.controller';
-import { activeCalls, userSockets, getIO } from './socket';
+import { getActiveCall, deleteActiveCall, getUserSocketIds, getIO } from './socket';
 
 const app = express();
 
@@ -59,15 +61,16 @@ const allowedOrigins = [
   'https://localhost'
 ];
 
+app.use(compression());
 app.use(cors({
   origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1 || origin.startsWith('http://localhost:')) {
       callback(null, true);
-    } else {
-      // In development, we can be more permissive if needed
+    } else if (process.env.NODE_ENV !== 'production') {
       callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
@@ -75,14 +78,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-school-id', 'x-requested-role']
 }));
 app.use(cookieParser());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-  console.log(`[DEBUG] ${req.method} ${req.url}`);
-  next();
-});
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
 // Global Maintenance Guard
 app.use(maintenanceMiddleware);
@@ -107,29 +104,26 @@ app.post('/api/calls/public-reject', async (req, res) => {
   }
 
   console.log(`[PublicReject] Received request to reject call: ${callId}`);
-  if (activeCalls.has(callId)) {
-    const call = activeCalls.get(callId)!;
-    activeCalls.delete(callId);
+  const call = await getActiveCall(callId);
+  if (call) {
+    await deleteActiveCall(callId, call.from, call.to);
 
-    // Notify the caller if online
+    // Notify the caller if online (works across all server instances via Redis)
     const io = getIO();
     if (io) {
-      const callerSocketIds = userSockets.get(call.from);
-      if (callerSocketIds && callerSocketIds.size > 0) {
+      const callerSocketIds = await getUserSocketIds(call.from);
+      if (callerSocketIds.length > 0) {
         console.log(`[PublicReject] Emitting call_rejected to caller ${call.from}`);
-        io.to(Array.from(callerSocketIds)).emit('call_rejected', { from: call.to });
+        io.to(callerSocketIds).emit('call_rejected', { from: call.to });
       }
     }
 
     try {
-      const { PrismaClient } = await import('@prisma/client');
-      const prisma = new PrismaClient();
-      
       const callee = await prisma.user.findUnique({
         where: { id: call.to },
         select: { pushToken: true }
       });
-      
+
       if (callee?.pushToken) {
         const { sendCallCancellation } = await import('./services/notification.service');
         await sendCallCancellation(callee.pushToken, callId);
@@ -180,7 +174,6 @@ app.post('/api/calls/public-reject', async (req, res) => {
             io.to(conversation.id).emit('new_message', textMsg);
           }
 
-          // Send FCM message notification to notify the caller (who is now the recipient of the message)
           const callerUser = await prisma.user.findUnique({
             where: { id: call.from },
             select: { pushToken: true }

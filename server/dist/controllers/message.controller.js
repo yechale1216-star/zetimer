@@ -8,9 +8,11 @@ const db_1 = __importDefault(require("../config/db"));
 const getConversations = async (req, res) => {
     const userId = req.user?.id;
     const schoolId = req.user?.schoolId;
+    const { limit = '30', cursor } = req.query;
     if (!schoolId) {
         return res.status(401).json({ error: 'Unauthorized: School ID missing' });
     }
+    const take = Math.min(Math.max(Number(limit) || 30, 1), 50);
     try {
         const conversations = await db_1.default.conversation.findMany({
             where: {
@@ -19,6 +21,8 @@ const getConversations = async (req, res) => {
                     some: { userId },
                 },
             },
+            take,
+            ...(cursor ? { skip: 1, cursor: { id: String(cursor) } } : {}),
             select: {
                 id: true,
                 name: true,
@@ -31,6 +35,7 @@ const getConversations = async (req, res) => {
                 createdAt: true,
                 updatedAt: true,
                 members: {
+                    take: 10,
                     select: {
                         id: true,
                         userId: true,

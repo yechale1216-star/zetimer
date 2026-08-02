@@ -62,18 +62,15 @@ export const bulkMarkAttendance = async (req: AuthenticatedRequest, res: Respons
       return res.status(400).json({ success: false, message: 'Records must be an array' });
     }
 
-    const results = await Promise.all(records.map(record => 
-      attendanceService.markAttendance({
-        ...record,
-        latitude: record.latitude ?? latitude,
-        longitude: record.longitude ?? longitude,
-        locationVerified: record.locationVerified ?? locationVerified,
-        locationDistance: record.locationDistance ?? locationDistance,
-        userRole: req.user?.role,
-        userId: req.user?.id,
-        teacherId: record.teacherId || (req.user as any)?.teacherId || req.user?.id,
-      }, schoolId)
-    ));
+    const results = await attendanceService.bulkMarkAttendance(records, schoolId, {
+      userRole: req.user?.role,
+      userId: req.user?.id,
+      teacherId: (req.user as any)?.teacherId || req.user?.id,
+      latitude,
+      longitude,
+      locationVerified,
+      locationDistance,
+    });
 
     res.status(200).json({ success: true, data: results });
   } catch (error: any) {

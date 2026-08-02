@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const crypto_1 = __importDefault(require("crypto"));
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const userService = __importStar(require("../services/user.service"));
 const schoolService = __importStar(require("../services/school.service"));
 const onboardingService = __importStar(require("../services/onboarding.service"));
@@ -46,18 +47,35 @@ const jwt_1 = require("../utils/jwt");
 const email_1 = require("../utils/email");
 const validate_1 = require("../middleware/validate");
 const db_1 = __importDefault(require("../config/db"));
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+// Rate limiters — applied per IP to prevent brute force and credential stuffing
+const loginLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 60 * 1000, // 1 minute window
+    max: 10, // Max 10 login attempts per IP per minute
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many login attempts. Please try again in a minute.' },
+    skip: () => process.env.NODE_ENV === 'test',
+});
+const forgotPasswordLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 60 * 1000, // 1 minute window
+    max: 3, // Max 3 password reset emails per IP per minute
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many password reset requests. Please try again in a minute.' },
+    skip: () => process.env.NODE_ENV === 'test',
+});
+const checkEmailLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many requests.' },
+    skip: () => process.env.NODE_ENV === 'test',
+});
 const router = (0, express_1.Router)();
-// Startup Debug
-console.log('Auth Routes Loaded');
-try {
-    fs_1.default.appendFileSync(path_1.default.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Auth Routes Loaded\n`);
-}
-catch (err) { }
 // Check email availability
-router.get('/check-email', async (req, res, next) => {
+router.get('/check-email', checkEmailLimiter, async (req, res, next) => {
     try {
         const { email } = req.query;
         if (!email || typeof email !== 'string') {
@@ -85,14 +103,13 @@ router.get('/check-phone', async (req, res, next) => {
     }
 });
 // Login
-router.post('/login', async (req, res, next) => {
+router.post('/login', loginLimiter, async (req, res, next) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) {
             return res.status(400).json({ success: false, message: 'Email and password are required' });
         }
         console.log(`[LOGIN] Attempt for email: ${email}`);
-        fs_1.default.appendFileSync(path_1.default.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Login attempt for: ${email}\n`);
         const user = await userService.getUserByEmail(email);
         if (!user) {
             console.log(`[LOGIN] User not found: ${email}`);
@@ -267,13 +284,7 @@ router.post('/logout', async (req, res) => {
     });
     res.status(200).json({ success: true, message: 'Logged out successfully' });
 });
-// Forgot Password
-router.post('/forgot-password', async (req, res, next) => {
-    console.log('Forgot password request received:', req.body.email);
-    try {
-        fs_1.default.appendFileSync(path_1.default.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Forgot password request for: ${req.body.email}\n`);
-    }
-    catch (err) { }
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res, next) => {
     try {
         const { email } = req.body;
         if (!email) {

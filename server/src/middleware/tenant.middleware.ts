@@ -2,8 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../config/db';
 import jwt from 'jsonwebtoken';
 import { resolveRoleInSchool } from '../services/auth_resolution.service';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-long-enough';
+import { cacheGet, cacheSetEx, cacheDel } from '../redis';
+import { getJwtSecret } from '../utils/jwt';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -51,7 +51,7 @@ export const tenantMiddleware = async (req: AuthenticatedRequest, res: Response,
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
     
     let schoolId = decoded.schoolId;
     let role = decoded.role;
@@ -60,10 +60,6 @@ export const tenantMiddleware = async (req: AuthenticatedRequest, res: Response,
     const activeSchoolId = (schoolIdHeader as string) || schoolId;
     let requestedRole = req.headers['x-requested-role'] as string | undefined;
 
-    // SITUATIONAL ROLE RESOLUTION:
-    // If the user is accessing a specific portal's API, infer the requested role.
-    // This allows dual-role users (e.g. Teacher + Parent) to use both portals
-    // in different tabs without conflict.
     if (!requestedRole) {
       if (url.startsWith('/api/parent')) {
         requestedRole = 'parent';
@@ -75,46 +71,42 @@ export const tenantMiddleware = async (req: AuthenticatedRequest, res: Response,
     }
 
     if (activeSchoolId) {
-      // Fetch the role for THIS specific school and situational context (requestedRole)
-      const contextRole = await resolveRoleInSchool(decoded.id, activeSchoolId, requestedRole);
-      
-      console.log(`[tenantMiddleware] resolveRole(${decoded.id}, ${activeSchoolId}, ${requestedRole}) => ${contextRole}`);
-      
+      const cacheKey = `role:${decoded.id}:${activeSchoolId}:${requestedRole || ''}`;
+      let contextRole = await cacheGet(cacheKey);
+
+      if (!contextRole) {
+        contextRole = await resolveRoleInSchool(decoded.id, activeSchoolId, requestedRole);
+        if (contextRole) {
+          await cacheSetEx(cacheKey, 300, contextRole); // 5 min TTL
+        }
+      }
+
       if (contextRole) {
         schoolId = activeSchoolId;
         role = contextRole;
       } else if (decoded.role === 'super_admin') {
-        // Super admins are global, role doesn't change
         role = 'super_admin';
       } else {
-        // Context resolution failed.
-        // For identity endpoints (profile), never block - just use token defaults
         const isIdentityEndpoint = url.startsWith('/api/users/profile') || url.startsWith('/api/users/me');
-        
         if (!isIdentityEndpoint && schoolIdHeader && decoded.schoolId && schoolIdHeader !== decoded.schoolId) {
-          console.warn(`[tenantMiddleware] User ${decoded.id} denied access to school ${activeSchoolId} (mismatch)`);
           return res.status(403).json({ 
             success: false, 
             message: 'Access denied: You do not have an active role in the requested school context.' 
           });
         }
-        // Fallback: use decoded values from JWT token
-        console.log(`[tenantMiddleware] Context resolution failed, using JWT defaults: role=${decoded.role}, school=${decoded.schoolId}`);
       }
     }
 
     req.user = {
       id: decoded.id,
       email: decoded.email,
-      role: role, // Now context-aware!
+      role: role,
       schoolId: schoolId,
       customSchoolId: decoded.customSchoolId,
     };
     
-    console.log(`[tenantMiddleware] User: ${decoded.email}, School: ${schoolId}, Role: ${role}`);
     next();
   } catch (error) {
-    console.error('JWT Verification Error:', error);
     return res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 };
@@ -143,13 +135,9 @@ export const authorize = (roles: string[]) => {
   };
 };
 
-// ── Subscription status in-memory cache (90 s TTL) ──────────────────────────
-const _subStatusCache = new Map<string, { status: string; expires: number }>();
-const SUB_CACHE_TTL = 90 * 1000;
-
 /** Call this after a school is suspended/unsuspended to force next request to re-query */
-export const invalidateSchoolStatusCache = (schoolId: string) => {
-  _subStatusCache.delete(schoolId);
+export const invalidateSchoolStatusCache = async (schoolId: string) => {
+  await cacheDel(`substatus:${schoolId}`);
 };
 
 /**
@@ -165,10 +153,6 @@ export const subscriptionGuard = async (req: AuthenticatedRequest, res: Response
   const readMethods = ['GET', 'HEAD', 'OPTIONS'];
   if (readMethods.includes(req.method)) return next();
 
-  // ── Whitelisted write endpoints ──────────────────────────────────────────
-  // These are identity/context operations that don't produce school-owned
-  // data. Parents MUST be able to switch schools even when one is suspended
-  // so they can still read historical data across all their children's schools.
   const url = req.originalUrl.split('?')[0];
   const writeWhitelist = [
     '/api/parent/me/active-school',  // parent school-switching
@@ -182,34 +166,24 @@ export const subscriptionGuard = async (req: AuthenticatedRequest, res: Response
   ];
   if (writeWhitelist.some(path => url.startsWith(path))) return next();
 
-  // ── Determine the school to check ────────────────────────────────────────
-  // Priority: x-school-id header (the school the client is ACTIVELY using)
-  // over req.user.schoolId (which may be the JWT's default school, potentially suspended).
   const headerSchoolId = req.headers['x-school-id'] as string | undefined;
   const schoolId = headerSchoolId || req.user.schoolId;
   if (!schoolId) return next();
 
   try {
-    // Check cache first to avoid DB hit on every write
-    const cached = _subStatusCache.get(schoolId);
-    let status: string;
+    const cacheKey = `substatus:${schoolId}`;
+    let status = await cacheGet(cacheKey);
 
-    if (cached && cached.expires > Date.now()) {
-      status = cached.status;
-    } else {
+    if (!status) {
       const school = await prisma.school.findUnique({
         where: { id: schoolId },
         include: { subscription: true },
       });
       status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
-      _subStatusCache.set(schoolId, { status, expires: Date.now() + SUB_CACHE_TTL });
+      await cacheSetEx(cacheKey, 90, status); // 90s TTL
     }
 
-    console.log(`[subscriptionGuard] Checking school ${schoolId}. Status: ${status}`);
-
     if (status === 'SUSPENDED' || status === 'EXPIRED') {
-      console.log(`[subscriptionGuard] BLOCKING request to ${req.method} ${req.originalUrl} - School ${status}`);
-
       const message = status === 'SUSPENDED'
         ? 'Your school account is suspended. Please contact support.'
         : 'Your school subscription or trial has expired. Please upgrade your plan to continue making changes.';
@@ -240,11 +214,19 @@ export const featureGuard = (featureKey: string) => {
     if (!schoolId) return next();
 
     try {
-      const { resolveSchoolFeatures } = require('../services/subscription.service');
-      const grantedFeatures = await resolveSchoolFeatures(schoolId);
+      const cacheKey = `features:${schoolId}`;
+      let grantedFeaturesRaw = await cacheGet(cacheKey);
+      let grantedFeatures: string[];
+
+      if (grantedFeaturesRaw) {
+        grantedFeatures = JSON.parse(grantedFeaturesRaw);
+      } else {
+        const { resolveSchoolFeatures } = require('../services/subscription.service');
+        grantedFeatures = await resolveSchoolFeatures(schoolId);
+        await cacheSetEx(cacheKey, 600, JSON.stringify(grantedFeatures)); // 10 min TTL
+      }
 
       if (!grantedFeatures.includes(featureKey)) {
-        console.log(`[featureGuard] BLOCKING request to ${req.method} ${req.originalUrl} - Missing feature: ${featureKey}`);
         return res.status(403).json({
           success: false,
           message: `This feature (${featureKey}) is not included in your current plan. Please upgrade to access it.`,
@@ -259,3 +241,4 @@ export const featureGuard = (featureKey: string) => {
     next();
   };
 };
+

@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import * as userService from '../services/user.service';
 import * as schoolService from '../services/school.service';
 import * as onboardingService from '../services/onboarding.service';
@@ -8,20 +9,40 @@ import { generateToken, verifyToken } from '../utils/jwt';
 import { sendResetPasswordEmail, sendVerificationEmail } from '../utils/email';
 import { validateSignup } from '../middleware/validate';
 import prisma from '../config/db';
-import fs from 'fs';
-import path from 'path';
 import jwt from 'jsonwebtoken';
+
+// Rate limiters — applied per IP to prevent brute force and credential stuffing
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000,     // 1 minute window
+  max: 10,                  // Max 10 login attempts per IP per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many login attempts. Please try again in a minute.' },
+  skip: () => process.env.NODE_ENV === 'test',
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 1000,     // 1 minute window
+  max: 3,                   // Max 3 password reset emails per IP per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many password reset requests. Please try again in a minute.' },
+  skip: () => process.env.NODE_ENV === 'test',
+});
+
+const checkEmailLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests.' },
+  skip: () => process.env.NODE_ENV === 'test',
+});
 
 const router = Router();
 
-// Startup Debug
-console.log('Auth Routes Loaded');
-try {
-  fs.appendFileSync(path.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Auth Routes Loaded\n`);
-} catch (err) {}
-
 // Check email availability
-router.get('/check-email', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/check-email', checkEmailLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email } = req.query;
     if (!email || typeof email !== 'string') {
@@ -49,7 +70,7 @@ router.get('/check-phone', async (req: Request, res: Response, next: NextFunctio
 });
 
 // Login
-router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/login', loginLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
     
@@ -58,7 +79,6 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     }
 
     console.log(`[LOGIN] Attempt for email: ${email}`);
-    fs.appendFileSync(path.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Login attempt for: ${email}\n`);
 
     const user = await userService.getUserByEmail(email);
     if (!user) {
@@ -253,12 +273,7 @@ router.post('/logout', async (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: 'Logged out successfully' });
 });
 
-// Forgot Password
-router.post('/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
-  console.log('Forgot password request received:', req.body.email);
-  try {
-    fs.appendFileSync(path.join(process.cwd(), 'server_debug.log'), `[${new Date().toISOString()}] Forgot password request for: ${req.body.email}\n`);
-  } catch (err) {}
+router.post('/forgot-password', forgotPasswordLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email } = req.body;
     if (!email) {

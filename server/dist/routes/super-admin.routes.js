@@ -48,6 +48,15 @@ router.get("/subscription-metrics", async (_req, res) => {
         fail(res, e.message, 500);
     }
 });
+router.get("/system-health", async (_req, res) => {
+    try {
+        const health = await SuperAdminService.getSystemHealth();
+        ok(res, health);
+    }
+    catch (e) {
+        fail(res, e.message, 500);
+    }
+});
 router.get("/users", async (req, res) => {
     try {
         const { q, role, schoolId, page, limit } = req.query;

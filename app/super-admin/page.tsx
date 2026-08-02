@@ -42,7 +42,7 @@ export default function SuperAdminDashboard() {
     mrr: number
     activeSubscriptions: number
     subscriptionGrowthPercent: number
-    revenueTrends: { month: string; revenue: number; subscriptions: number }[]
+    revenueTrends: { month: string; revenue: number; users?: number; schools?: number; subscriptions?: number }[]
     studentsByTier: Record<string, number>
     schoolStats: {
       total: number
@@ -59,20 +59,51 @@ export default function SuperAdminDashboard() {
     }
   } | null>(null)
 
+  const [systemHealth, setSystemHealth] = useState<any>(null)
+  const [activities, setActivities] = useState<any[]>([])
+  const [settings, setSettings] = useState<any>(null)
+
   useEffect(() => {
     ;(async () => {
       try {
-        const res = await fetch(`${getApiUrl()}/api/super-admin/subscription-metrics`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('attendance_token')}`
-          }
-        })
-        const json = await parseJsonResponse<{ success: boolean; data: any }>(res)
-        if (json.success && json.data) {
-          setMetrics(json.data)
+        const [metricsRes, healthRes, logsRes, settingsRes] = await Promise.all([
+          fetch(`${getApiUrl()}/api/super-admin/subscription-metrics`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('attendance_token')}` }
+          }),
+          fetch(`${getApiUrl()}/api/super-admin/system-health`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('attendance_token')}` }
+          }),
+          fetch(`${getApiUrl()}/api/super-admin/audit-logs?limit=5`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('attendance_token')}` }
+          }),
+          fetch(`${getApiUrl()}/api/super-admin/settings`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('attendance_token')}` }
+          })
+        ])
+
+        const metricsJson = await parseJsonResponse<{ success: boolean; data: any }>(metricsRes)
+        if (metricsJson.success && metricsJson.data) setMetrics(metricsJson.data)
+
+        const healthJson = await parseJsonResponse<{ success: boolean; data: any }>(healthRes)
+        if (healthJson.success && healthJson.data) setSystemHealth(healthJson.data)
+
+        const logsJson = await parseJsonResponse<{ success: boolean; data: any }>(logsRes)
+        if (logsJson.success && logsJson.data) {
+          const formattedActivities = logsJson.data.logs.map((log: any) => ({
+            id: log.id,
+            type: 'info',
+            title: log.action,
+            description: `${log.entity} - ${log.user}`,
+            timestamp: new Date(log.timestamp).toLocaleString(),
+            icon: 'Activity'
+          }))
+          setActivities(formattedActivities)
         }
-      } catch {
-        setMetrics(null)
+
+        const settingsJson = await parseJsonResponse<{ success: boolean; data: any }>(settingsRes)
+        if (settingsJson.success && settingsJson.data) setSettings(settingsJson.data)
+      } catch (e) {
+        console.error(e)
       }
     })()
   }, [])
@@ -195,7 +226,7 @@ export default function SuperAdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <RevenueChart />
+          <RevenueChart data={metrics?.revenueTrends || []} />
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -258,14 +289,45 @@ export default function SuperAdminDashboard() {
           </Card>
         </div>
         <div className="space-y-6">
-          <SystemHealth />
           <UserDistributionChart />
+          <SystemHealth overallStatus={systemHealth?.overallStatus || 'degraded'} services={systemHealth?.services || []} />
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle>System & Maintenance</CardTitle>
+              <CardDescription>Platform management tools</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 space-y-3">
+              <Button variant="outline" className="w-full justify-start gap-3 h-12">
+                <Clock className="w-5 h-5 text-blue-500" />
+                <div className="text-left">
+                  <p className="text-xs font-semibold">Scheduled Backups</p>
+                  <p className="text-[10px] text-muted-foreground">{settings?.autoBackup ? 'Enabled' : 'Disabled'}</p>
+                </div>
+              </Button>
+              <Button variant="outline" className="w-full justify-start gap-3 h-12">
+                <AlertCircle className={`w-5 h-5 ${settings?.maintenanceMode ? 'text-red-500' : 'text-yellow-500'}`} />
+                <div className="text-left">
+                  <p className="text-xs font-semibold">Maintenance Mode</p>
+                  <p className="text-[10px] text-muted-foreground">{settings?.maintenanceMode ? 'System is in maintenance' : 'System is currently online'}</p>
+                </div>
+              </Button>
+              <Button variant="outline" className="w-full justify-start gap-3 h-12" asChild>
+                <Link href="/super-admin/communication">
+                  <HelpCircle className="w-5 h-5 text-green-500" />
+                  <div className="text-left">
+                    <p className="text-xs font-semibold">Broadcasting</p>
+                    <p className="text-[10px] text-muted-foreground">Announce updates to all schools</p>
+                  </div>
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      <RecentActivity />
+      <RecentActivity activities={activities} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Usage by Subscription Tier</CardTitle>
@@ -341,35 +403,6 @@ export default function SuperAdminDashboard() {
           </div>
         </Card>
 
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle>System & Maintenance</CardTitle>
-            <CardDescription>Platform management tools</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 space-y-3">
-            <Button variant="outline" className="w-full justify-start gap-3 h-12">
-              <Clock className="w-5 h-5 text-blue-500" />
-              <div className="text-left">
-                <p className="text-xs font-semibold">Scheduled Backups</p>
-                <p className="text-[10px] text-muted-foreground">Next run: Today 11:00 PM</p>
-              </div>
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-3 h-12">
-              <AlertCircle className="w-5 h-5 text-yellow-500" />
-              <div className="text-left">
-                <p className="text-xs font-semibold">Maintenance Mode</p>
-                <p className="text-[10px] text-muted-foreground">System is currently online</p>
-              </div>
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-3 h-12">
-              <HelpCircle className="w-5 h-5 text-green-500" />
-              <div className="text-left">
-                <p className="text-xs font-semibold">Broadcasting</p>
-                <p className="text-[10px] text-muted-foreground">Announce updates to all schools</p>
-              </div>
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

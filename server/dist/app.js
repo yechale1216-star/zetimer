@@ -52,6 +52,8 @@ if (missingEnv.length > 0) {
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
+const compression_1 = __importDefault(require("compression"));
+const db_1 = __importDefault(require("./config/db"));
 const student_routes_1 = __importDefault(require("./routes/student.routes"));
 const attendance_routes_1 = __importDefault(require("./routes/attendance.routes"));
 const school_routes_1 = __importDefault(require("./routes/school.routes"));
@@ -88,17 +90,19 @@ const allowedOrigins = [
     'capacitor://localhost',
     'https://localhost'
 ];
+app.use((0, compression_1.default)());
 app.use((0, cors_1.default)({
     origin: function (origin, callback) {
-        // allow requests with no origin (like mobile apps or curl requests)
         if (!origin)
             return callback(null, true);
         if (allowedOrigins.indexOf(origin) !== -1 || origin.startsWith('http://localhost:')) {
             callback(null, true);
         }
-        else {
-            // In development, we can be more permissive if needed
+        else if (process.env.NODE_ENV !== 'production') {
             callback(null, true);
+        }
+        else {
+            callback(new Error('Not allowed by CORS'));
         }
     },
     credentials: true,
@@ -106,13 +110,8 @@ app.use((0, cors_1.default)({
     allowedHeaders: ['Content-Type', 'Authorization', 'x-school-id', 'x-requested-role']
 }));
 app.use((0, cookie_parser_1.default)());
-app.use(express_1.default.json({ limit: '50mb' }));
-app.use(express_1.default.urlencoded({ limit: '50mb', extended: true }));
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-    console.log(`[DEBUG] ${req.method} ${req.url}`);
-    next();
-});
+app.use(express_1.default.json({ limit: '5mb' }));
+app.use(express_1.default.urlencoded({ limit: '5mb', extended: true }));
 // Global Maintenance Guard
 app.use(maintenance_middleware_1.maintenanceMiddleware);
 // Health check and Auth (Public)
@@ -132,22 +131,20 @@ app.post('/api/calls/public-reject', async (req, res) => {
         return res.status(400).json({ error: 'Missing callId' });
     }
     console.log(`[PublicReject] Received request to reject call: ${callId}`);
-    if (socket_1.activeCalls.has(callId)) {
-        const call = socket_1.activeCalls.get(callId);
-        socket_1.activeCalls.delete(callId);
-        // Notify the caller if online
+    const call = await (0, socket_1.getActiveCall)(callId);
+    if (call) {
+        await (0, socket_1.deleteActiveCall)(callId, call.from, call.to);
+        // Notify the caller if online (works across all server instances via Redis)
         const io = (0, socket_1.getIO)();
         if (io) {
-            const callerSocketIds = socket_1.userSockets.get(call.from);
-            if (callerSocketIds && callerSocketIds.size > 0) {
+            const callerSocketIds = await (0, socket_1.getUserSocketIds)(call.from);
+            if (callerSocketIds.length > 0) {
                 console.log(`[PublicReject] Emitting call_rejected to caller ${call.from}`);
-                io.to(Array.from(callerSocketIds)).emit('call_rejected', { from: call.to });
+                io.to(callerSocketIds).emit('call_rejected', { from: call.to });
             }
         }
         try {
-            const { PrismaClient } = await Promise.resolve().then(() => __importStar(require('@prisma/client')));
-            const prisma = new PrismaClient();
-            const callee = await prisma.user.findUnique({
+            const callee = await db_1.default.user.findUnique({
                 where: { id: call.to },
                 select: { pushToken: true }
             });
@@ -156,7 +153,7 @@ app.post('/api/calls/public-reject', async (req, res) => {
                 await sendCallCancellation(callee.pushToken, callId);
             }
             // Create a "Declined Call" message in the database conversation
-            const conversation = await prisma.conversation.findFirst({
+            const conversation = await db_1.default.conversation.findFirst({
                 where: {
                     isGroup: false,
                     members: {
@@ -168,7 +165,7 @@ app.post('/api/calls/public-reject', async (req, res) => {
                 select: { id: true, schoolId: true }
             });
             if (conversation) {
-                const msg = await prisma.message.create({
+                const msg = await db_1.default.message.create({
                     data: {
                         conversationId: conversation.id,
                         senderId: call.to, // the person who declined
@@ -183,7 +180,7 @@ app.post('/api/calls/public-reject', async (req, res) => {
                 }
                 // If a message was sent as a rejection response, save and broadcast it
                 if (message && typeof message === 'string' && message.trim().length > 0) {
-                    const textMsg = await prisma.message.create({
+                    const textMsg = await db_1.default.message.create({
                         data: {
                             conversationId: conversation.id,
                             senderId: call.to,
@@ -196,8 +193,7 @@ app.post('/api/calls/public-reject', async (req, res) => {
                     if (io) {
                         io.to(conversation.id).emit('new_message', textMsg);
                     }
-                    // Send FCM message notification to notify the caller (who is now the recipient of the message)
-                    const callerUser = await prisma.user.findUnique({
+                    const callerUser = await db_1.default.user.findUnique({
                         where: { id: call.from },
                         select: { pushToken: true }
                     });

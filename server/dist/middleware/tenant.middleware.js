@@ -7,7 +7,8 @@ exports.featureGuard = exports.subscriptionGuard = exports.invalidateSchoolStatu
 const db_1 = __importDefault(require("../config/db"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const auth_resolution_service_1 = require("../services/auth_resolution.service");
-const JWT_SECRET = process.env.JWT_SECRET || 'zetime-secret-key-2024-secure-and-long-enough';
+const redis_1 = require("../redis");
+const jwt_1 = require("../utils/jwt");
 /**
  * Middleware to verify JWT and extract tenant information.
  * Every request must pass through this or a public route.
@@ -39,16 +40,12 @@ const tenantMiddleware = async (req, res, next) => {
         return res.status(401).json({ success: false, message: 'Authorization token required' });
     }
     try {
-        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        const decoded = jsonwebtoken_1.default.verify(token, (0, jwt_1.getJwtSecret)());
         let schoolId = decoded.schoolId;
         let role = decoded.role;
         // Resolve context-specific role
         const activeSchoolId = schoolIdHeader || schoolId;
         let requestedRole = req.headers['x-requested-role'];
-        // SITUATIONAL ROLE RESOLUTION:
-        // If the user is accessing a specific portal's API, infer the requested role.
-        // This allows dual-role users (e.g. Teacher + Parent) to use both portals
-        // in different tabs without conflict.
         if (!requestedRole) {
             if (url.startsWith('/api/parent')) {
                 requestedRole = 'parent';
@@ -61,44 +58,41 @@ const tenantMiddleware = async (req, res, next) => {
             }
         }
         if (activeSchoolId) {
-            // Fetch the role for THIS specific school and situational context (requestedRole)
-            const contextRole = await (0, auth_resolution_service_1.resolveRoleInSchool)(decoded.id, activeSchoolId, requestedRole);
-            console.log(`[tenantMiddleware] resolveRole(${decoded.id}, ${activeSchoolId}, ${requestedRole}) => ${contextRole}`);
+            const cacheKey = `role:${decoded.id}:${activeSchoolId}:${requestedRole || ''}`;
+            let contextRole = await (0, redis_1.cacheGet)(cacheKey);
+            if (!contextRole) {
+                contextRole = await (0, auth_resolution_service_1.resolveRoleInSchool)(decoded.id, activeSchoolId, requestedRole);
+                if (contextRole) {
+                    await (0, redis_1.cacheSetEx)(cacheKey, 300, contextRole); // 5 min TTL
+                }
+            }
             if (contextRole) {
                 schoolId = activeSchoolId;
                 role = contextRole;
             }
             else if (decoded.role === 'super_admin') {
-                // Super admins are global, role doesn't change
                 role = 'super_admin';
             }
             else {
-                // Context resolution failed.
-                // For identity endpoints (profile), never block - just use token defaults
                 const isIdentityEndpoint = url.startsWith('/api/users/profile') || url.startsWith('/api/users/me');
                 if (!isIdentityEndpoint && schoolIdHeader && decoded.schoolId && schoolIdHeader !== decoded.schoolId) {
-                    console.warn(`[tenantMiddleware] User ${decoded.id} denied access to school ${activeSchoolId} (mismatch)`);
                     return res.status(403).json({
                         success: false,
                         message: 'Access denied: You do not have an active role in the requested school context.'
                     });
                 }
-                // Fallback: use decoded values from JWT token
-                console.log(`[tenantMiddleware] Context resolution failed, using JWT defaults: role=${decoded.role}, school=${decoded.schoolId}`);
             }
         }
         req.user = {
             id: decoded.id,
             email: decoded.email,
-            role: role, // Now context-aware!
+            role: role,
             schoolId: schoolId,
             customSchoolId: decoded.customSchoolId,
         };
-        console.log(`[tenantMiddleware] User: ${decoded.email}, School: ${schoolId}, Role: ${role}`);
         next();
     }
     catch (error) {
-        console.error('JWT Verification Error:', error);
         return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
 };
@@ -124,12 +118,9 @@ const authorize = (roles) => {
     };
 };
 exports.authorize = authorize;
-// ── Subscription status in-memory cache (90 s TTL) ──────────────────────────
-const _subStatusCache = new Map();
-const SUB_CACHE_TTL = 90 * 1000;
 /** Call this after a school is suspended/unsuspended to force next request to re-query */
-const invalidateSchoolStatusCache = (schoolId) => {
-    _subStatusCache.delete(schoolId);
+const invalidateSchoolStatusCache = async (schoolId) => {
+    await (0, redis_1.cacheDel)(`substatus:${schoolId}`);
 };
 exports.invalidateSchoolStatusCache = invalidateSchoolStatusCache;
 /**
@@ -145,10 +136,6 @@ const subscriptionGuard = async (req, res, next) => {
     const readMethods = ['GET', 'HEAD', 'OPTIONS'];
     if (readMethods.includes(req.method))
         return next();
-    // ── Whitelisted write endpoints ──────────────────────────────────────────
-    // These are identity/context operations that don't produce school-owned
-    // data. Parents MUST be able to switch schools even when one is suspended
-    // so they can still read historical data across all their children's schools.
     const url = req.originalUrl.split('?')[0];
     const writeWhitelist = [
         '/api/parent/me/active-school', // parent school-switching
@@ -162,31 +149,22 @@ const subscriptionGuard = async (req, res, next) => {
     ];
     if (writeWhitelist.some(path => url.startsWith(path)))
         return next();
-    // ── Determine the school to check ────────────────────────────────────────
-    // Priority: x-school-id header (the school the client is ACTIVELY using)
-    // over req.user.schoolId (which may be the JWT's default school, potentially suspended).
     const headerSchoolId = req.headers['x-school-id'];
     const schoolId = headerSchoolId || req.user.schoolId;
     if (!schoolId)
         return next();
     try {
-        // Check cache first to avoid DB hit on every write
-        const cached = _subStatusCache.get(schoolId);
-        let status;
-        if (cached && cached.expires > Date.now()) {
-            status = cached.status;
-        }
-        else {
+        const cacheKey = `substatus:${schoolId}`;
+        let status = await (0, redis_1.cacheGet)(cacheKey);
+        if (!status) {
             const school = await db_1.default.school.findUnique({
                 where: { id: schoolId },
                 include: { subscription: true },
             });
             status = (school?.subscription?.status || school?.subscriptionStatus || 'ACTIVE').toUpperCase();
-            _subStatusCache.set(schoolId, { status, expires: Date.now() + SUB_CACHE_TTL });
+            await (0, redis_1.cacheSetEx)(cacheKey, 90, status); // 90s TTL
         }
-        console.log(`[subscriptionGuard] Checking school ${schoolId}. Status: ${status}`);
         if (status === 'SUSPENDED' || status === 'EXPIRED') {
-            console.log(`[subscriptionGuard] BLOCKING request to ${req.method} ${req.originalUrl} - School ${status}`);
             const message = status === 'SUSPENDED'
                 ? 'Your school account is suspended. Please contact support.'
                 : 'Your school subscription or trial has expired. Please upgrade your plan to continue making changes.';
@@ -216,10 +194,18 @@ const featureGuard = (featureKey) => {
         if (!schoolId)
             return next();
         try {
-            const { resolveSchoolFeatures } = require('../services/subscription.service');
-            const grantedFeatures = await resolveSchoolFeatures(schoolId);
+            const cacheKey = `features:${schoolId}`;
+            let grantedFeaturesRaw = await (0, redis_1.cacheGet)(cacheKey);
+            let grantedFeatures;
+            if (grantedFeaturesRaw) {
+                grantedFeatures = JSON.parse(grantedFeaturesRaw);
+            }
+            else {
+                const { resolveSchoolFeatures } = require('../services/subscription.service');
+                grantedFeatures = await resolveSchoolFeatures(schoolId);
+                await (0, redis_1.cacheSetEx)(cacheKey, 600, JSON.stringify(grantedFeatures)); // 10 min TTL
+            }
             if (!grantedFeatures.includes(featureKey)) {
-                console.log(`[featureGuard] BLOCKING request to ${req.method} ${req.originalUrl} - Missing feature: ${featureKey}`);
                 return res.status(403).json({
                     success: false,
                     message: `This feature (${featureKey}) is not included in your current plan. Please upgrade to access it.`,

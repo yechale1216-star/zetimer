@@ -5,52 +5,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CheckCircle2, AlertCircle, Clock, Database, Globe, Zap, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils/utils'
 
-const services = [
-  {
-    name: 'Primary Database',
-    status: 'healthy',
-    uptime: '99.99%',
-    latency: '14ms',
-    icon: Database,
-  },
-  {
-    name: 'Authentication API',
-    status: 'healthy',
-    uptime: '100%',
-    latency: '45ms',
-    icon: Globe,
-  },
-  {
-    name: 'Notification Service',
-    status: 'degraded',
-    uptime: '98.5%',
-    latency: '1.2s',
-    icon: Zap,
-  },
-  {
-    name: 'Background Workers',
-    status: 'healthy',
-    uptime: '99.9%',
-    latency: '—',
-    icon: Settings,
-  },
-]
+interface SystemHealthProps {
+  overallStatus: 'healthy' | 'degraded' | 'down'
+  services: {
+    name: string
+    status: string
+    uptime: string
+    latency: string
+    icon: string
+  }[]
+}
 
-export function SystemHealth() {
+export function SystemHealth({ overallStatus = 'degraded', services = [] }: SystemHealthProps) {
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="typography-card-title">System Health</CardTitle>
             <CardDescription>Real-time infrastructure status</CardDescription>
           </div>
-          <Badge status="healthy" />
+          <Badge status={overallStatus} />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {services.map((service) => {
-          const Icon = service.icon
+          const iconMap: Record<string, any> = {
+            Database: Database,
+            Globe: Globe,
+            Zap: Zap,
+            Settings: Settings
+          }
+          const Icon = iconMap[service.icon] || Settings
           const isHealthy = service.status === 'healthy'
           
           return (

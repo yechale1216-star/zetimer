@@ -570,3 +570,140 @@ export const getAttendanceAuditLogs = async (schoolId: string) => {
     take: 100
   });
 };
+
+export const bulkMarkAttendance = async (
+  records: any[],
+  schoolId: string,
+  meta: {
+    userRole?: string;
+    userId?: string;
+    teacherId?: string;
+    latitude?: number;
+    longitude?: number;
+    locationVerified?: boolean;
+    locationDistance?: number;
+  }
+) => {
+  if (!Array.isArray(records) || records.length === 0) return [];
+  if (records.length > 200) {
+    throw new Error('Maximum 200 attendance records allowed per bulk request');
+  }
+
+  const { userRole, userId, teacherId } = meta;
+  const resolvedTeacherId = await resolveTeacherId(schoolId, teacherId || userId);
+
+  // Fetch school settings once
+  const settings = await prisma.schoolSettings.findUnique({ where: { schoolId } });
+
+  // Geofence check once
+  let locVerified = meta.locationVerified ?? false;
+  let locDistance: number | null = meta.locationDistance != null ? Number(meta.locationDistance) : null;
+
+  if (settings?.restrict_location && !settings?.allow_outside_attendance) {
+    if (settings.school_latitude != null && settings.school_longitude != null) {
+      if (meta.latitude == null || meta.longitude == null) {
+        throw new Error("Location verification failed: Device GPS location is required to submit attendance.");
+      }
+      const dist = calculateDistanceMeters(
+        Number(meta.latitude),
+        Number(meta.longitude),
+        settings.school_latitude,
+        settings.school_longitude
+      );
+      const allowedRadius = settings.allowed_radius_meters || 200;
+      if (dist > allowedRadius) {
+        throw new Error(`Attendance submission blocked: You are ${dist}m away from school location (Allowed radius: ${allowedRadius}m).`);
+      }
+      locVerified = true;
+      locDistance = dist;
+    }
+  }
+
+  // Batch query students
+  const studentIds = records.map(r => r.studentId).filter(Boolean);
+  const validStudents = await prisma.student.findMany({
+    where: { id: { in: studentIds }, schoolId },
+    select: { id: true, fullName: true, gender: true }
+  });
+  const studentMap = new Map(validStudents.map(s => [s.id, s]));
+
+  // Standardize date and session
+  const dateSample = records[0]?.date || new Date();
+  const dateStr = typeof dateSample === 'string' ? dateSample.split("T")[0] : new Date(dateSample).toISOString().split("T")[0];
+  const startDate = new Date(`${dateStr}T00:00:00.000Z`);
+  const endDate = new Date(`${dateStr}T23:59:59.999Z`);
+  const session = records[0]?.session ? records[0].session.toLowerCase() : null;
+
+  // Batch query existing attendance records
+  const existingRecords = await prisma.attendance.findMany({
+    where: {
+      schoolId,
+      studentId: { in: Array.from(studentMap.keys()) },
+      date: { gte: startDate, lte: endDate },
+      ...(session ? { session: { equals: session, mode: 'insensitive' } } : { session: null })
+    }
+  });
+  const existingMap = new Map(existingRecords.map(e => [e.studentId, e]));
+
+  // Build atomic transaction queries
+  const txOps: any[] = [];
+  const processedResults: any[] = [];
+
+  for (const record of records) {
+    const student = studentMap.get(record.studentId);
+    if (!student) continue;
+
+    const existing = existingMap.get(record.studentId);
+    const status = record.status;
+    const remarks = record.remarks;
+
+    if (existing) {
+      txOps.push(
+        prisma.attendance.update({
+          where: { id: existing.id },
+          data: {
+            status,
+            remarks,
+            teacherId: resolvedTeacherId,
+            session: session || null,
+            locationVerified: locVerified,
+            locationDistance: locDistance,
+          }
+        })
+      );
+    } else {
+      txOps.push(
+        prisma.attendance.create({
+          data: {
+            studentId: record.studentId,
+            schoolId,
+            teacherId: resolvedTeacherId,
+            date: startDate,
+            status,
+            session: session || null,
+            remarks,
+            locationVerified: locVerified,
+            locationDistance: locDistance,
+          }
+        })
+      );
+    }
+  }
+
+  // Execute all upserts in a single DB round-trip transaction
+  const results = await prisma.$transaction(txOps);
+
+  // Background audit log
+  prisma.auditLog.create({
+    data: {
+      schoolId,
+      user_id: userId || teacherId || null,
+      action: 'BULK_ATTENDANCE_MARKED',
+      entity_type: 'ATTENDANCE',
+      new_values: { count: results.length, dateStr, session }
+    }
+  }).catch(() => {});
+
+  return results;
+};
+

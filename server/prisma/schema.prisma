@@ -436,6 +436,9 @@ model Attendance {
   @@index([date])
   @@index([session])
   @@index([status])
+  @@index([schoolId, date])
+  @@index([schoolId, date, status])
+  @@index([schoolId, teacherId, date])
 }
 
 model AttendanceEditRequest {

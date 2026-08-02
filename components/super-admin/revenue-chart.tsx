@@ -13,22 +13,17 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
-const data = [
-  { month: 'Jan', revenue: 4000, users: 2400, schools: 24 },
-  { month: 'Feb', revenue: 3000, users: 1398, schools: 22 },
-  { month: 'Mar', revenue: 2000, users: 9800, schools: 29 },
-  { month: 'Apr', revenue: 2780, users: 3908, schools: 20 },
-  { month: 'May', revenue: 1890, users: 4800, schools: 21 },
-  { month: 'Jun', revenue: 2390, users: 3800, schools: 25 },
-  { month: 'Jul', revenue: 3490, users: 4300, schools: 27 },
-  { month: 'Aug', revenue: 4200, users: 5100, schools: 32 },
-  { month: 'Sep', revenue: 5100, users: 6200, schools: 35 },
-  { month: 'Oct', revenue: 6200, users: 7100, schools: 40 },
-  { month: 'Nov', revenue: 7100, users: 8200, schools: 42 },
-  { month: 'Dec', revenue: 8200, users: 9300, schools: 45 },
-]
+interface RevenueChartProps {
+  data: {
+    month: string
+    revenue: number
+    users?: number
+    schools?: number
+    subscriptions?: number
+  }[]
+}
 
-export function RevenueChart() {
+export function RevenueChart({ data }: RevenueChartProps) {
   return (
     <Card>
       <CardHeader>

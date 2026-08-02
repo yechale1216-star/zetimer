@@ -39,7 +39,7 @@ export const getPlatformMetrics = async () => {
   };
 };
 
-export const getRevenueMetrics = async () => {
+export const getRevenueMetrics = async (totalUsers: number = 0, totalSchools: number = 0) => {
   const subscriptions = await prisma.schoolSubscription.findMany({
     where: { status: "active" },
     include: { plan: true },
@@ -92,12 +92,12 @@ export const getRevenueMetrics = async () => {
   const totalRevenue = mrr * 12; // Simple projection for total billed in year
 
   const revenueTrends = [
-    { month: "Jan", revenue: mrr * 0.8, subscriptions: Math.floor(subscriptions.length * 0.8) },
-    { month: "Feb", revenue: mrr * 0.85, subscriptions: Math.floor(subscriptions.length * 0.85) },
-    { month: "Mar", revenue: mrr * 0.9, subscriptions: Math.floor(subscriptions.length * 0.9) },
-    { month: "Apr", revenue: mrr * 0.92, subscriptions: Math.floor(subscriptions.length * 0.92) },
-    { month: "May", revenue: mrr * 0.95, subscriptions: Math.floor(subscriptions.length * 0.95) },
-    { month: "Jun", revenue: mrr, subscriptions: subscriptions.length },
+    { month: "Jan", revenue: mrr * 0.8, users: Math.floor(totalUsers * 0.8), schools: Math.floor(totalSchools * 0.8) },
+    { month: "Feb", revenue: mrr * 0.85, users: Math.floor(totalUsers * 0.85), schools: Math.floor(totalSchools * 0.85) },
+    { month: "Mar", revenue: mrr * 0.9, users: Math.floor(totalUsers * 0.9), schools: Math.floor(totalSchools * 0.9) },
+    { month: "Apr", revenue: mrr * 0.92, users: Math.floor(totalUsers * 0.92), schools: Math.floor(totalSchools * 0.92) },
+    { month: "May", revenue: mrr * 0.95, users: Math.floor(totalUsers * 0.95), schools: Math.floor(totalSchools * 0.95) },
+    { month: "Jun", revenue: mrr, users: totalUsers, schools: totalSchools },
   ];
 
   return {
@@ -112,12 +112,62 @@ export const getRevenueMetrics = async () => {
 
 export const getFullDashboardMetrics = async () => {
     const platform = await getPlatformMetrics();
-    const revenue = await getRevenueMetrics();
+    const revenue = await getRevenueMetrics(platform.userStats.total, platform.schoolStats.active);
 
     return {
         ...platform,
         ...revenue,
     };
+};
+
+export const getSystemHealth = async () => {
+  const start = Date.now();
+  let dbStatus = "down";
+  let dbLatency = "—";
+  
+  try {
+    // Simple ping to check DB latency
+    await prisma.$queryRaw`SELECT 1`;
+    dbLatency = `${Date.now() - start}ms`;
+    dbStatus = "healthy";
+  } catch (error) {
+    console.error("DB health check failed", error);
+  }
+
+  // Generate realistic mocked services
+  return {
+    overallStatus: dbStatus === "healthy" ? "healthy" : "degraded",
+    services: [
+      {
+        name: 'Primary Database',
+        status: dbStatus,
+        uptime: '99.99%',
+        latency: dbLatency,
+        icon: 'Database', // The frontend will map this string to an icon component
+      },
+      {
+        name: 'Authentication API',
+        status: 'healthy',
+        uptime: '100%',
+        latency: '45ms',
+        icon: 'Globe',
+      },
+      {
+        name: 'Notification Service',
+        status: 'degraded',
+        uptime: '98.5%',
+        latency: '1.2s',
+        icon: 'Zap',
+      },
+      {
+        name: 'Background Workers',
+        status: 'healthy',
+        uptime: '99.9%',
+        latency: '—',
+        icon: 'Settings',
+      },
+    ]
+  };
 };
 
 export const searchAllUsers = async (params: {
@@ -257,6 +307,18 @@ export const broadcastMessage = async (message: { title: string, content: string
       sentCount,
     }
   });
+
+  if (sentCount > 0) {
+    await prisma.userNotification.createMany({
+      data: adminUsers.map((admin) => ({
+        userId: admin.id,
+        schoolId: admin.schoolId,
+        type: message.type,
+        title: message.title,
+        message: message.content,
+      }))
+    });
+  }
   
   return {
     sentCount,

@@ -3,50 +3,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Activity, AlertCircle, CheckCircle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils/utils'
 
-const activities = [
-  {
-    id: 1,
-    type: 'success',
-    title: 'New school registered',
-    description: 'Springfield High School just joined the platform',
-    timestamp: '2 hours ago',
-    icon: CheckCircle,
-  },
-  {
-    id: 2,
-    type: 'warning',
-    title: 'High API usage detected',
-    description: 'Central District School is using 85% of their quota',
-    timestamp: '4 hours ago',
-    icon: AlertCircle,
-  },
-  {
-    id: 3,
-    type: 'info',
-    title: 'Subscription tier upgraded',
-    description: 'Lincoln Academy upgraded to Premium plan',
-    timestamp: '6 hours ago',
-    icon: Info,
-  },
-  {
-    id: 4,
-    type: 'success',
-    title: 'System maintenance completed',
-    description: 'Database optimization finished successfully',
-    timestamp: '8 hours ago',
-    icon: CheckCircle,
-  },
-  {
-    id: 5,
-    type: 'warning',
-    title: 'Payment failed',
-    description: 'Payment processing failed for 2 schools',
-    timestamp: '12 hours ago',
-    icon: AlertCircle,
-  },
-]
+interface RecentActivityProps {
+  activities: {
+    id: string | number
+    type: 'success' | 'warning' | 'info'
+    title: string
+    description: string
+    timestamp: string
+    icon: any
+  }[]
+}
 
-export function RecentActivity() {
+export function RecentActivity({ activities = [] }: RecentActivityProps) {
   return (
     <Card>
       <CardHeader>

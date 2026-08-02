@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateSchoolStatus = exports.getEnrichedSchools = exports.exportBillingCsv = exports.getBillingHistory = exports.createTicket = exports.updateTicket = exports.getSupportTickets = exports.getBroadcastHistory = exports.broadcastMessage = exports.getAuditLogs = exports.updatePlatformConfig = exports.getPlatformConfig = exports.searchAllUsers = exports.getFullDashboardMetrics = exports.getRevenueMetrics = exports.getPlatformMetrics = void 0;
+exports.updateSchoolStatus = exports.getEnrichedSchools = exports.exportBillingCsv = exports.getBillingHistory = exports.createTicket = exports.updateTicket = exports.getSupportTickets = exports.getBroadcastHistory = exports.broadcastMessage = exports.getAuditLogs = exports.updatePlatformConfig = exports.getPlatformConfig = exports.searchAllUsers = exports.getSystemHealth = exports.getFullDashboardMetrics = exports.getRevenueMetrics = exports.getPlatformMetrics = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const getPlatformMetrics = async () => {
     const [schools, usersByRole, totalStudents] = await Promise.all([
@@ -41,7 +41,7 @@ const getPlatformMetrics = async () => {
     };
 };
 exports.getPlatformMetrics = getPlatformMetrics;
-const getRevenueMetrics = async () => {
+const getRevenueMetrics = async (totalUsers = 0, totalSchools = 0) => {
     const subscriptions = await db_1.default.schoolSubscription.findMany({
         where: { status: "active" },
         include: { plan: true },
@@ -90,12 +90,12 @@ const getRevenueMetrics = async () => {
     // Mocked growth and historical trends for now, but with real current totals
     const totalRevenue = mrr * 12; // Simple projection for total billed in year
     const revenueTrends = [
-        { month: "Jan", revenue: mrr * 0.8, subscriptions: Math.floor(subscriptions.length * 0.8) },
-        { month: "Feb", revenue: mrr * 0.85, subscriptions: Math.floor(subscriptions.length * 0.85) },
-        { month: "Mar", revenue: mrr * 0.9, subscriptions: Math.floor(subscriptions.length * 0.9) },
-        { month: "Apr", revenue: mrr * 0.92, subscriptions: Math.floor(subscriptions.length * 0.92) },
-        { month: "May", revenue: mrr * 0.95, subscriptions: Math.floor(subscriptions.length * 0.95) },
-        { month: "Jun", revenue: mrr, subscriptions: subscriptions.length },
+        { month: "Jan", revenue: mrr * 0.8, users: Math.floor(totalUsers * 0.8), schools: Math.floor(totalSchools * 0.8) },
+        { month: "Feb", revenue: mrr * 0.85, users: Math.floor(totalUsers * 0.85), schools: Math.floor(totalSchools * 0.85) },
+        { month: "Mar", revenue: mrr * 0.9, users: Math.floor(totalUsers * 0.9), schools: Math.floor(totalSchools * 0.9) },
+        { month: "Apr", revenue: mrr * 0.92, users: Math.floor(totalUsers * 0.92), schools: Math.floor(totalSchools * 0.92) },
+        { month: "May", revenue: mrr * 0.95, users: Math.floor(totalUsers * 0.95), schools: Math.floor(totalSchools * 0.95) },
+        { month: "Jun", revenue: mrr, users: totalUsers, schools: totalSchools },
     ];
     return {
         mrr,
@@ -109,13 +109,62 @@ const getRevenueMetrics = async () => {
 exports.getRevenueMetrics = getRevenueMetrics;
 const getFullDashboardMetrics = async () => {
     const platform = await (0, exports.getPlatformMetrics)();
-    const revenue = await (0, exports.getRevenueMetrics)();
+    const revenue = await (0, exports.getRevenueMetrics)(platform.userStats.total, platform.schoolStats.active);
     return {
         ...platform,
         ...revenue,
     };
 };
 exports.getFullDashboardMetrics = getFullDashboardMetrics;
+const getSystemHealth = async () => {
+    const start = Date.now();
+    let dbStatus = "down";
+    let dbLatency = "—";
+    try {
+        // Simple ping to check DB latency
+        await db_1.default.$queryRaw `SELECT 1`;
+        dbLatency = `${Date.now() - start}ms`;
+        dbStatus = "healthy";
+    }
+    catch (error) {
+        console.error("DB health check failed", error);
+    }
+    // Generate realistic mocked services
+    return {
+        overallStatus: dbStatus === "healthy" ? "healthy" : "degraded",
+        services: [
+            {
+                name: 'Primary Database',
+                status: dbStatus,
+                uptime: '99.99%',
+                latency: dbLatency,
+                icon: 'Database', // The frontend will map this string to an icon component
+            },
+            {
+                name: 'Authentication API',
+                status: 'healthy',
+                uptime: '100%',
+                latency: '45ms',
+                icon: 'Globe',
+            },
+            {
+                name: 'Notification Service',
+                status: 'degraded',
+                uptime: '98.5%',
+                latency: '1.2s',
+                icon: 'Zap',
+            },
+            {
+                name: 'Background Workers',
+                status: 'healthy',
+                uptime: '99.9%',
+                latency: '—',
+                icon: 'Settings',
+            },
+        ]
+    };
+};
+exports.getSystemHealth = getSystemHealth;
 const searchAllUsers = async (params) => {
     const { query, role, schoolId, page = 1, limit = 20 } = params;
     const skip = (page - 1) * limit;
@@ -234,6 +283,17 @@ const broadcastMessage = async (message) => {
             sentCount,
         }
     });
+    if (sentCount > 0) {
+        await db_1.default.userNotification.createMany({
+            data: adminUsers.map((admin) => ({
+                userId: admin.id,
+                schoolId: admin.schoolId,
+                type: message.type,
+                title: message.title,
+                message: message.content,
+            }))
+        });
+    }
     return {
         sentCount,
         timestamp: new Date().toISOString()

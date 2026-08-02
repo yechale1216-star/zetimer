@@ -5,10 +5,13 @@ import { AuthenticatedRequest } from '../middleware/tenant.middleware';
 export const getConversations = async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user?.id;
   const schoolId = req.user?.schoolId;
+  const { limit = '30', cursor } = req.query;
 
   if (!schoolId) {
     return res.status(401).json({ error: 'Unauthorized: School ID missing' });
   }
+
+  const take = Math.min(Math.max(Number(limit) || 30, 1), 50);
 
   try {
     const conversations = await prisma.conversation.findMany({
@@ -18,6 +21,8 @@ export const getConversations = async (req: AuthenticatedRequest, res: Response)
           some: { userId },
         },
       },
+      take,
+      ...(cursor ? { skip: 1, cursor: { id: String(cursor) } } : {}),
       select: {
         id: true,
         name: true,
@@ -30,6 +35,7 @@ export const getConversations = async (req: AuthenticatedRequest, res: Response)
         createdAt: true,
         updatedAt: true,
         members: {
+          take: 10,
           select: {
             id: true,
             userId: true,

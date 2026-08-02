@@ -36,7 +36,11 @@ interface RecentActivity {
   section: string
   stream?: string
   session?: string
-  count: number
+  presentCount: number
+  lateCount: number
+  absentCount: number
+  excusedCount: number
+  totalCount: number
   time: string
   date: string
 }
@@ -448,13 +452,23 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           section: student.section,
           stream: student.stream,
           session: record.session,
-          count: 0,
+          presentCount: 0,
+          lateCount: 0,
+          absentCount: 0,
+          excusedCount: 0,
+          totalCount: 0,
           lastTimestamp: new Date(record.created_at || record.attendance_date).getTime(),
           date: record.created_at || record.attendance_date
         }
       }
       
-      classActivityMap[classKey].count++
+      const st = record.status?.toLowerCase()
+      if (st === 'present') classActivityMap[classKey].presentCount++
+      else if (st === 'late') classActivityMap[classKey].lateCount++
+      else if (st === 'absent') classActivityMap[classKey].absentCount++
+      else if (st === 'excused') classActivityMap[classKey].excusedCount++
+      classActivityMap[classKey].totalCount++
+
       const currentTimestamp = new Date(record.created_at || record.attendance_date).getTime()
       if (currentTimestamp > classActivityMap[classKey].lastTimestamp) {
         classActivityMap[classKey].lastTimestamp = currentTimestamp
@@ -463,13 +477,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     })
 
     const activity = Object.values(classActivityMap)
-      .sort((a, b) => b.lastTimestamp - a.lastTimestamp)
+      .sort((a: any, b: any) => b.lastTimestamp - a.lastTimestamp)
       .map((group: any) => ({
         grade: group.grade,
         section: group.section,
         stream: group.stream,
         session: group.session,
-        count: group.count,
+        presentCount: group.presentCount,
+        lateCount: group.lateCount,
+        absentCount: group.absentCount,
+        excusedCount: group.excusedCount,
+        totalCount: group.totalCount,
         time: new Date(group.date).toLocaleTimeString("en-US", {
           hour: "2-digit",
           minute: "2-digit",
@@ -728,56 +746,92 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             Today
           </Badge>
         </div>
-        <div className="space-y-3">
-          {isLoading ? (
-            [1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-white/95 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 gap-4 animate-pulse shadow-sm">
-                <div className="flex items-center space-x-4 w-full">
-                  <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 animate-pulse shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 rounded-2xl bg-slate-200 dark:bg-slate-700 shrink-0" />
                   <div className="space-y-2 w-full">
-                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
-                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/4" />
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-2/3" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
                   </div>
                 </div>
-                <div className="h-6 w-20 bg-slate-200 dark:bg-slate-700 rounded shrink-0" />
+                <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-full" />
               </div>
-            ))
-          ) : recentActivity.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground bg-white/90 dark:bg-slate-900/90 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
-              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
-              <p className="typography-label">No recent attendance activity recorded yet</p>
-            </div>
-          ) : (
-            recentActivity.map((activity, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[24px] shadow-sm transition-all active:scale-[0.99] group">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black border border-primary/20">
-                    {activity.grade.match(/\d+/)?.[0] || '?' }
+            ))}
+          </div>
+        ) : recentActivity.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground bg-white/90 dark:bg-slate-900/90 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+            <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
+            <p className="typography-label">No recent attendance activity recorded yet</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recentActivity.map((activity, index) => (
+              <Card key={index} className="hover:shadow-md transition-all duration-200 border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl overflow-hidden group">
+                <CardContent className="p-4 space-y-3">
+                  {/* Card Header: Grade + Section/Stream/Session + Time */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black border border-primary/20 shrink-0">
+                        {activity.grade.match(/\d+/)?.[0] || '?' }
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-foreground uppercase tracking-tight truncate">
+                          {activity.grade}
+                        </p>
+                        <p className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-tight">
+                          Sec {activity.section} {activity.stream ? `• ${activity.stream}` : ''} {activity.session ? `• ${activity.session}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-semibold text-muted-foreground/80 bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 px-2 py-0.5 shrink-0">
+                      <Clock className="w-3 h-3 inline mr-1 opacity-60" />
+                      {activity.time}
+                    </Badge>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-foreground uppercase leading-none mb-1 truncate">
-                      {activity.grade}
-                    </p>
-                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-tight">
-                      Sec {activity.section} {activity.session ? `• ${activity.session}` : ""}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col items-end">
-                   <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase">
-                        {activity.count} Present
+
+                  {/* Status Breakdown Pills */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {activity.presentCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        {activity.presentCount} Present
                       </span>
-                   </div>
-                   <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-tighter">
-                     {activity.time}
-                   </p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+                    )}
+                    {activity.lateCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        {activity.lateCount} Late
+                      </span>
+                    )}
+                    {activity.absentCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                        {activity.absentCount} Absent
+                      </span>
+                    )}
+                    {activity.excusedCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        {activity.excusedCount} Excused
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Footer Total */}
+                  {activity.totalCount > 0 && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] font-medium text-muted-foreground">
+                      <span>Total Submitted</span>
+                      <span className="font-bold text-foreground">{activity.totalCount} Students</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -239,95 +239,7 @@ export const markAttendance = async (data: any, schoolId: string) => {
   }).catch(err => console.error('[AuditLog] Attendance error:', err));
 
   // Intercept and create parent notification if status is Absent, Late, or Excused
-  if (status && (status.toLowerCase() === 'absent' || status.toLowerCase() === 'late' || status.toLowerCase() === 'excused')) {
-    try {
-      const statusLower = status.toLowerCase();
-      const type = statusLower;
-      const typePush = statusLower === 'absent' ? 'absent_arrival' : statusLower === 'late' ? 'late_arrival' : 'excused_arrival';
-      
-      const isFemale = (student as any).gender?.toLowerCase() === 'female';
-      const isAbsent = statusLower === 'absent';
-      const isLate = statusLower === 'late';
-      const isExcused = statusLower === 'excused';
-      
-      const title = isAbsent
-        ? (isFemale ? `${student.fullName} ዛሬ ቀርታለች` : `${student.fullName} ዛሬ ቀርቷል`)
-        : isLate
-        ? (isFemale ? `${student.fullName} ዛሬ ዘግይታለች` : `${student.fullName} ዛሬ ዘግይቷል`)
-        : (isFemale ? `${student.fullName} ፈቃድ አላት` : `${student.fullName} ፈቃድ አለው`);
-
-      const parentLinks = await prisma.parentStudentLink.findMany({
-        where: { studentId: student.id },
-        include: { parent: true }
-      });
-
-      const firstParentName = parentLinks[0]?.parent?.full_name || 'ወላጅ';
-
-      const message = isAbsent
-        ? (isFemale 
-            ? `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} በትምህርት ቤት አልተገኘችም ። የልጅዎ መደበኛ የትምህርት ተሳትፎ ለትምህርታዊ እድገቷ እጅግ አስፈላጊ በመሆኑ፣ እባክዎ የቀረችበትን ምክንያት ለትምህርት ቤታችን ያሳውቁ። ለትብብርዎ እናመሰግናለን።`
-            : `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} በትምህርት ቤት አልተገኘም። የልጅዎ መደበኛ የትምህርት ተሳትፎ ለትምህርታዊ እድገቱ እጅግ አስፈላጊ በመሆኑ፣ እባክዎ የቀረበትን ምክንያት ለትምህርት ቤታችን ያሳውቁ። ለትብብርዎ እናመሰግናለን።`)
-        : isLate
-        ? (isFemale
-            ? `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} ወደ ትምህርት ቤት ዘግይታ ደርሳለች። በሰዓቱ መገኘት ለትምህርት ጥራትና ለሥነ-ምግባር ከፍተኛ አስተዋጽኦ ስላለው፣ ሁልጊዜ በሰዓቱ እንድትገኝ እንዲያሳስቡልን በአክብሮት እንጠይቃለን። ለትብብርዎ እናመሰግናለን።`
-            : `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} ወደ ትምህርት ቤት በመደበኛው ሰዓት ሳይደርስ ዘግይቶ ተገኝቷል። በሰዓቱ መገኘት ለትምህርት እና ለሥነ-ምግባር ጠቃሚ መሆኑን ለልጅዎ እንዲያስታውሱት በአክብሮት እንጠይቃለን። ለትብብርዎ እናመሰግናለን።`)
-        : (isFemale
-            ? `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} በተሰጠው ፈቃድ መሰረት ከትምህርት ቀርታለች። በሚቀጥለው የትምህርት ቀን በትምህርቷ ላይ እንድትገኝ እንጠብቃለን። ስለ ትብብርዎ እናመሰግናለን።`
-            : `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} በተሰጠው ፈቃድ መሰረት ከትምህርት ቀርቷል። በሚቀጥለው የትምህርት ቀን በትምህርቱ ላይ እንዲገኝ እንጠብቃለን። ለትብብርዎ እናመሰግናለን።`);
-      
-      await prisma.parentNotification.create({
-        data: {
-          schoolId,
-          studentId: student.id,
-          type,
-          title,
-          message,
-          isRead: false
-        }
-      });
-
-      const { sendCategoryNotification } = require('./notification.service');
-
-      const school = await prisma.school.findUnique({
-        where: { id: schoolId },
-        select: { name: true }
-      });
-      const schoolName = school?.name || 'ZeTime School';
-      const categoryLabel = isAbsent ? 'Absent Alert' : isLate ? 'Late Arrival' : 'Excused Absence';
-
-      for (const link of parentLinks) {
-        if (link.parent && link.parent.pushToken) {
-          if (link.parent.phone) {
-            const prefs = await prisma.parentPreferences.findUnique({
-              where: { parentPhone_schoolId: { parentPhone: link.parent.phone, schoolId } }
-            });
-            if (prefs && !prefs.pushNotifications) {
-              continue;
-            }
-          }
-
-          const specificParentName = link.parent.full_name || firstParentName;
-          const parentSpecificMessage = message.replace(firstParentName, specificParentName);
-
-          await sendCategoryNotification(link.parent.pushToken, {
-            type: typePush,
-            title: schoolName,
-            body: parentSpecificMessage,
-            route: `/parent/attendance`,
-            studentId: student.id,
-            schoolId,
-            schoolName,
-            categoryLabel,
-            tag: `attendance-${student.id}`
-          }).catch((err: any) => {
-            console.error(`Failed to dispatch push to parent ${link.parentId}:`, err);
-          });
-        }
-      }
-    } catch (notificationError) {
-      console.error("Failed to create parent notification or send push:", notificationError);
-    }
-  }
+  await sendAttendanceParentNotification(student, status, dateStr, schoolId);
 
   return result;
 };
@@ -571,6 +483,110 @@ export const getAttendanceAuditLogs = async (schoolId: string) => {
   });
 };
 
+export const sendAttendanceParentNotification = async (
+  student: { id: string; fullName: string; gender?: string | null },
+  status: string,
+  dateStr: string,
+  schoolId: string
+) => {
+  if (!status) return;
+  const statusLower = status.toLowerCase();
+  if (statusLower !== 'absent' && statusLower !== 'late' && statusLower !== 'excused') {
+    return;
+  }
+
+  try {
+    const type = statusLower;
+    const typePush = statusLower === 'absent' ? 'absent_arrival' : statusLower === 'late' ? 'late_arrival' : 'excused_arrival';
+    
+    const isFemale = student.gender?.toLowerCase() === 'female';
+    const isAbsent = statusLower === 'absent';
+    const isLate = statusLower === 'late';
+    
+    const title = isAbsent
+      ? (isFemale ? `${student.fullName} ዛሬ ቀርታለች` : `${student.fullName} ዛሬ ቀርቷል`)
+      : isLate
+      ? (isFemale ? `${student.fullName} ዛሬ ዘግይታለች` : `${student.fullName} ዛሬ ዘግይቷል`)
+      : (isFemale ? `${student.fullName} ፈቃድ አላት` : `${student.fullName} ፈቃድ አለው`);
+
+    const parentLinks = await prisma.parentStudentLink.findMany({
+      where: { studentId: student.id },
+      include: { parent: true }
+    });
+
+    if (!parentLinks || parentLinks.length === 0) {
+      console.log(`[ParentNotification] No linked parent found for student ${student.fullName} (${student.id})`);
+      return;
+    }
+
+    const firstParentName = parentLinks[0]?.parent?.full_name || 'ወላጅ';
+
+    const message = isAbsent
+      ? (isFemale 
+          ? `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} በትምህርት ቤት አልተገኘችም ። የልጅዎ መደበኛ የትምህርት ተሳትፎ ለትምህርታዊ እድገቷ እጅግ አስፈላጊ በመሆኑ፣ እባክዎ የቀረችበትን ምክንያት ለትምህርት ቤታችን ያሳውቁ። ለትብብርዎ እናመሰግናለን።`
+          : `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} በትምህርት ቤት አልተገኘም። የልጅዎ መደበኛ የትምህርት ተሳትፎ ለትምህርታዊ እድገቱ እጅግ አስፈላጊ በመሆኑ፣ እባክዎ የቀረበትን ምክንያት ለትምህርት ቤታችን ያሳውቁ። ለትብብርዎ እናመሰግናለን።`)
+      : isLate
+      ? (isFemale
+          ? `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} ወደ ትምህርት ቤት ዘግይታ ደርሳለች። በሰዓቱ መገኘት ለትምህርት ጥራትና ለሥነ-ምግባር ከፍተኛ አስተዋጽኦ ስላለው፣ ሁልጊዜ በሰዓቱ እንድትገኝ እንዲያሳስቡልን በአክብሮት እንጠይቃለን። ለትብብርዎ እናመሰግናለን።`
+          : `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} ወደ ትምህርት ቤት በመደበኛው ሰዓት ሳይደርስ ዘግይቶ ተገኝቷል። በሰዓቱ መገኘት ለትምህርት እና ለሥነ-ምግባር ጠቃሚ መሆኑን ለልጅዎ እንዲያስታውሱት በአክብሮት እንጠይቃለን። ለትብብርዎ እናመሰግናለን።`)
+      : (isFemale
+          ? `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} በተሰጠው ፈቃድ መሰረት ከትምህርት ቀርታለች። በሚቀጥለው የትምህርት ቀን በትምህርቷ ላይ እንድትገኝ እንጠብቃለን። ስለ ትብብርዎ እናመሰግናለን።`
+          : `ውድ ${firstParentName}፣ ልጅዎ ${student.fullName} ዛሬ ${dateStr} በተሰጠው ፈቃድ መሰረት ከትምህርት ቀርቷል። በሚቀጥለው የትምህርት ቀን በትምህርቱ ላይ እንዲገኝ እንጠብቃለን። ለትብብርዎ እናመሰግናለን።`);
+    
+    await prisma.parentNotification.create({
+      data: {
+        schoolId,
+        studentId: student.id,
+        type,
+        title,
+        message,
+        isRead: false
+      }
+    });
+
+    const { sendCategoryNotification } = require('./notification.service');
+
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { name: true }
+    });
+    const schoolName = school?.name || 'ZeTime School';
+    const categoryLabel = isAbsent ? 'Absent Alert' : isLate ? 'Late Arrival' : 'Excused Absence';
+
+    for (const link of parentLinks) {
+      if (link.parent && link.parent.pushToken) {
+        if (link.parent.phone) {
+          const prefs = await prisma.parentPreferences.findUnique({
+            where: { parentPhone_schoolId: { parentPhone: link.parent.phone, schoolId } }
+          });
+          if (prefs && !prefs.pushNotifications) {
+            continue;
+          }
+        }
+
+        const specificParentName = link.parent.full_name || firstParentName;
+        const parentSpecificMessage = message.replace(firstParentName, specificParentName);
+
+        await sendCategoryNotification(link.parent.pushToken, {
+          type: typePush,
+          title: schoolName,
+          body: parentSpecificMessage,
+          route: `/parent/attendance`,
+          studentId: student.id,
+          schoolId,
+          schoolName,
+          categoryLabel,
+          tag: `attendance-${student.id}`
+        }).catch((err: any) => {
+          console.error(`Failed to dispatch push to parent ${link.parentId}:`, err);
+        });
+      }
+    }
+  } catch (notificationError) {
+    console.error("Failed to create parent notification or send push:", notificationError);
+  }
+};
+
 export const bulkMarkAttendance = async (
   records: any[],
   schoolId: string,
@@ -647,7 +663,6 @@ export const bulkMarkAttendance = async (
 
   // Build atomic transaction queries
   const txOps: any[] = [];
-  const processedResults: any[] = [];
 
   for (const record of records) {
     const student = studentMap.get(record.studentId);
@@ -692,6 +707,16 @@ export const bulkMarkAttendance = async (
 
   // Execute all upserts in a single DB round-trip transaction
   const results = await prisma.$transaction(txOps);
+
+  // Asynchronously send notifications for absent, late, or excused students
+  for (const record of records) {
+    const student = studentMap.get(record.studentId);
+    if (student) {
+      sendAttendanceParentNotification(student, record.status, dateStr, schoolId).catch(err => {
+        console.error(`[BulkAttendance] Parent notification dispatch error for student ${student.id}:`, err);
+      });
+    }
+  }
 
   // Background audit log
   prisma.auditLog.create({

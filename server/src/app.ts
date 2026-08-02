@@ -51,26 +51,47 @@ import { getActiveCall, deleteActiveCall, getUserSocketIds, getIO } from './sock
 const app = express();
 
 // Middleware
-const allowedOrigins = [
+const defaultAllowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
+  'http://127.0.0.1:3000',
+  'https://zetime.pro.et',
+  'https://www.zetime.pro.et',
   'https://zetime.vercel.app',
   'https://zetime.app',
   'capacitor://localhost',
   'https://localhost'
 ];
 
+if (process.env.FRONTEND_URL) {
+  defaultAllowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
+}
+if (process.env.APP_URL) {
+  defaultAllowedOrigins.push(process.env.APP_URL.replace(/\/$/, ''));
+}
+if (process.env.ALLOWED_ORIGINS) {
+  process.env.ALLOWED_ORIGINS.split(',').forEach(o => defaultAllowedOrigins.push(o.trim().replace(/\/$/, '')));
+}
+
 app.use(compression());
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, native apps, or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.startsWith('http://localhost:')) {
-      callback(null, true);
-    } else if (process.env.NODE_ENV !== 'production') {
+    
+    // Check allowlist
+    const isAllowed = defaultAllowedOrigins.includes(origin) || 
+                      origin.startsWith('http://localhost:') || 
+                      origin.startsWith('http://127.0.0.1:') ||
+                      origin.startsWith('http://192.168.') ||
+                      origin.startsWith('http://10.') ||
+                      origin.startsWith('http://172.');
+
+    if (isAllowed || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, false);
     }
   },
   credentials: true,

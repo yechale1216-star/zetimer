@@ -708,7 +708,32 @@ export const bulkMarkAttendance = async (
   // Execute all upserts in a single DB round-trip transaction
   const results = await prisma.$transaction(txOps);
 
-  // Asynchronously send notifications for absent, late, or excused students
+  // Build status summary for admin notification
+  const presentCount  = records.filter(r => r.status?.toLowerCase() === 'present').length;
+  const lateCount     = records.filter(r => r.status?.toLowerCase() === 'late').length;
+  const absentCount   = records.filter(r => r.status?.toLowerCase() === 'absent').length;
+  const excusedCount  = records.filter(r => r.status?.toLowerCase() === 'excused').length;
+
+  // Determine grade/section from first valid student record
+  const firstStudent = records.map(r => studentMap.get(r.studentId)).find(Boolean);
+  const gradeLabel   = firstStudent ? `${firstStudent.fullName.split(' ')[0]}'s class` : 'A class';
+
+  // Fire admin notification in background (does not block response)
+  sendAdminAttendanceNotification({
+    schoolId,
+    teacherId: resolvedTeacherId,
+    dateStr,
+    session: session || null,
+    totalCount: results.length,
+    presentCount,
+    lateCount,
+    absentCount,
+    excusedCount,
+  }).catch(err => {
+    console.error('[BulkAttendance] Admin notification dispatch error:', err);
+  });
+
+  // Asynchronously send parent notifications for absent, late, or excused students
   for (const record of records) {
     const student = studentMap.get(record.studentId);
     if (student) {
@@ -730,5 +755,92 @@ export const bulkMarkAttendance = async (
   }).catch(() => {});
 
   return results;
+};
+
+/**
+ * Notifies all school admins (with a registered push token) when a teacher submits attendance.
+ * Sent asynchronously after the bulk upsert — never blocks the teacher's response.
+ */
+export const sendAdminAttendanceNotification = async (params: {
+  schoolId: string;
+  teacherId: string | null;
+  dateStr: string;
+  session: string | null;
+  totalCount: number;
+  presentCount: number;
+  lateCount: number;
+  absentCount: number;
+  excusedCount: number;
+}) => {
+  const { schoolId, teacherId, dateStr, session, totalCount, presentCount, lateCount, absentCount, excusedCount } = params;
+
+  try {
+    const { sendCategoryNotification } = require('./notification.service');
+
+    // Fetch school name and all admin users with a push token in parallel
+    const [school, adminUsers, teacher] = await Promise.all([
+      prisma.school.findUnique({ where: { id: schoolId }, select: { name: true } }),
+      prisma.user.findMany({
+        where: {
+          schoolId,
+          role: 'admin',
+          pushToken: { not: null },
+          is_active: true,
+        },
+        select: { id: true, pushToken: true },
+      }),
+      teacherId
+        ? prisma.teacher.findUnique({ where: { id: teacherId }, select: { name: true } })
+        : null,
+    ]);
+
+    if (!adminUsers || adminUsers.length === 0) return;
+
+    const schoolName  = school?.name || 'School';
+    const teacherName = teacher?.name || 'A teacher';
+    const sessionLabel = session ? ` (${session})` : '';
+
+    // Build compact status summary: e.g. "✅ 28  ⚠️ 2  ❌ 1"
+    const parts: string[] = [];
+    if (presentCount > 0) parts.push(`✅ ${presentCount} Present`);
+    if (lateCount    > 0) parts.push(`⏰ ${lateCount} Late`);
+    if (absentCount  > 0) parts.push(`❌ ${absentCount} Absent`);
+    if (excusedCount > 0) parts.push(`📝 ${excusedCount} Excused`);
+    const summary = parts.join('  ') || `${totalCount} students`;
+
+    const title = `Attendance Submitted — ${schoolName}`;
+    const body  = `${teacherName} submitted attendance for ${dateStr}${sessionLabel}.\n${summary}`;
+
+    const expiredIds: string[] = [];
+
+    for (const admin of adminUsers) {
+      if (!admin.pushToken) continue;
+      const result = await sendCategoryNotification(admin.pushToken, {
+        type:          'attendance_submitted',
+        title,
+        body,
+        route:         '/school/admin',
+        schoolId,
+        schoolName,
+        categoryLabel: 'Attendance Alert',
+        tag:           `attendance-admin-${schoolId}-${dateStr}`,
+      }).catch((err: any) => {
+        console.error(`[AdminNotification] Push error for admin ${admin.id}:`, err);
+        return null;
+      });
+
+      if (result === 'EXPIRED_TOKEN') expiredIds.push(admin.id);
+    }
+
+    // Clear stale tokens
+    if (expiredIds.length > 0) {
+      prisma.user.updateMany({
+        where: { id: { in: expiredIds } },
+        data:  { pushToken: null },
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.error('[AdminNotification] Failed to send admin attendance notification:', err);
+  }
 };
 

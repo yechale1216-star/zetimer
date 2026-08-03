@@ -1391,10 +1391,12 @@ export function StudentManagement() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-slate-200/80 dark:border-slate-800/80">
-                    <TableHead className="w-[40%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">Student Details</TableHead>
-                    <TableHead className="w-[20%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">ID Number</TableHead>
-                    <TableHead className="w-[25%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">Class / Section</TableHead>
-                    <TableHead className="w-[15%] text-right font-semibold uppercase text-xs tracking-wider text-muted-foreground">Actions</TableHead>
+                    <TableHead className="w-[30%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">Student Details</TableHead>
+                    <TableHead className="w-[15%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">ID Number</TableHead>
+                    <TableHead className="w-[18%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">Grade / Section</TableHead>
+                    <TableHead className="w-[15%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">Stream</TableHead>
+                    <TableHead className="w-[12%] font-semibold uppercase text-xs tracking-wider text-muted-foreground">Status</TableHead>
+                    <TableHead className="w-[10%] text-right font-semibold uppercase text-xs tracking-wider text-muted-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1423,10 +1425,43 @@ export function StudentManagement() {
                       <TableCell>
                         <div className="flex flex-col">
                           <p className="text-sm font-semibold text-foreground">{student.grade}</p>
-                          <p className="text-xs font-medium text-primary/80">
-                            {student.section} {student.stream ? `• ${student.stream}` : ""}
+                          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                            Section {student.section}
                           </p>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {student.stream ? (
+                          <Badge variant="outline" className="text-xs font-bold text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800/60 px-2.5 py-0.5">
+                            {student.stream}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-medium">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const status = (student.status || 'ACTIVE').toUpperCase()
+                          if (status === 'GRADUATED') {
+                            return (
+                              <Badge variant="outline" className="text-xs font-bold text-teal-700 dark:text-teal-400 bg-teal-50/60 dark:bg-teal-950/30 border-teal-300 dark:border-teal-800/60">
+                                Graduated
+                              </Badge>
+                            )
+                          }
+                          if (status === 'INACTIVE' || status === 'SUSPENDED') {
+                            return (
+                              <Badge variant="outline" className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50/60 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/60">
+                                {status}
+                              </Badge>
+                            )
+                          }
+                          return (
+                            <Badge variant="outline" className="text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800/60">
+                              Active
+                            </Badge>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
@@ -1472,8 +1507,9 @@ export function StudentManagement() {
               <table className="w-full min-w-[340px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-800">
-                    <th className="px-3 py-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 w-[44%]">Student</th>
-                    <th className="px-2 py-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 w-[28%]">Class</th>
+                    <th className="px-3 py-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 w-[35%]">Student</th>
+                    <th className="px-2 py-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 w-[22%]">Class / Stream</th>
+                    <th className="px-2 py-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 w-[23%]">Status</th>
                     <th className="px-2 py-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1501,12 +1537,19 @@ export function StudentManagement() {
                         </div>
                       </td>
 
-                      {/* Grade / Section */}
+                      {/* Grade / Section / Stream */}
                       <td className="px-2 py-2.5">
-                        <p className="text-[11px] font-bold text-foreground uppercase leading-tight">{student.grade}</p>
-                        <p className="text-[10px] text-primary/70 font-bold uppercase">
-                          {student.section}{student.stream ? ` · ${student.stream}` : ""}
+                        <p className="text-[11px] font-bold text-foreground uppercase leading-tight">{student.grade} - {student.section}</p>
+                        <p className="text-[10px] text-violet-600 dark:text-violet-400 font-bold uppercase truncate">
+                          {student.stream || "—"}
                         </p>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-2 py-2.5">
+                        <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300">
+                          {student.status || 'ACTIVE'}
+                        </Badge>
                       </td>
 
                       {/* Actions */}

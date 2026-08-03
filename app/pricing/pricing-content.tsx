@@ -197,7 +197,8 @@ export default function PricingPage() {
             <div className={`grid gap-8 ${plans.length <= 3 ? "md:grid-cols-3" : "md:grid-cols-2 lg:grid-cols-4"}`}>
               {plans.map((plan) => {
                 const highlighted = !!PLAN_HIGHLIGHT_MAP[plan.slug]
-                const features = STATIC_FEATURES[plan.slug] ?? (plan.features?.map(f => f.feature.name) || [])
+                const dbFeatures = plan.features?.map(f => f.feature.name).filter(Boolean) ?? []
+                const features = dbFeatures.length > 0 ? dbFeatures : (STATIC_FEATURES[plan.slug] ?? [])
                 const price = getPlanPrice(plan)
                 const monthly = getMonthlyRate(plan)
                 const billingMonths = BILLING_PERIODS.find(b => b.value === billing)?.months ?? 1

@@ -30,14 +30,26 @@ export async function getTeacherAssignments(headers: any, schoolId?: string, tea
         `${API_URL}/api/assignments${params}`,
         { headers }
       )
+      const formatField = (val: any) => {
+        if (!val) return ""
+        if (typeof val === "string") return val
+        if (typeof val === "object" && val !== null && val.name) return String(val.name)
+        return ""
+      }
       return result.data.map((a: any) => ({
         id: a.id,
         teacher_id: a.teacher_id,
         schoolId: a.schoolId,
-        grade: a.grade,
-        section: a.section,
-        subject: a.subject,
-        stream: a.stream,
+        gradeId: a.gradeId || (typeof a.grade === "object" ? a.grade?.id : undefined) || "",
+        sectionId: a.sectionId || (typeof a.section === "object" ? a.section?.id : undefined) || "",
+        streamId: a.streamId || (typeof a.stream === "object" ? a.stream?.id : undefined) || "",
+        grade: formatField(a.grade),
+        section: formatField(a.section),
+        subject: formatField(a.subject),
+        stream: formatField(a.stream),
+        gradeObj: typeof a.grade === "object" ? a.grade : undefined,
+        sectionObj: typeof a.section === "object" ? a.section : undefined,
+        streamObj: typeof a.stream === "object" ? a.stream : undefined,
         class_id: a.id,
         teacher: a.teacher ? {
           id: a.teacher.id,

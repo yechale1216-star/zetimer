@@ -72,7 +72,7 @@ export function TeacherView() {
 
           const studentStream = (student.stream || "").toLowerCase().trim()
           const clsStreamId = String(cls.streamId || "").toLowerCase().trim()
-          const clsStreamName = String(cls.stream?.name || cls.class?.stream || "").toLowerCase().trim()
+          const clsStreamName = String(cls.stream?.name || cls.stream || cls.class?.stream || "").toLowerCase().trim()
           
           const streamMatch = !cls.streamId || studentStream === clsStreamId || studentStream === clsStreamName
           
@@ -164,7 +164,7 @@ export function TeacherView() {
                           "text-xl font-black uppercase tracking-tight leading-none",
                           isSelected ? "text-white" : "text-foreground"
                         )}>
-                          Grade {assignment.grade?.name || ""} {assignment.section?.name || ""}
+                          Grade {String(typeof assignment.grade === 'object' ? assignment.grade?.name : (assignment.grade || '')).replace(/^Grade\s+/i, '').trim()} {typeof assignment.section === 'object' ? assignment.section?.name : (assignment.section || '')}
                         </h3>
                       </div>
                       <div className={cn(

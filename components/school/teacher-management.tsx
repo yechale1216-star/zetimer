@@ -746,31 +746,39 @@ export function TeacherManagement() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {assignments.map((assignment) => (
-                      <div 
-                        key={assignment.id} 
-                        className="flex items-center gap-3 p-3 bg-blue-50/20 dark:bg-slate-900/50 rounded-xl border border-blue-100/50 dark:border-slate-800/80 hover:bg-blue-50/40 dark:hover:bg-slate-800 transition-colors"
-                      >
-                        <div className="typography-label w-8 h-8 rounded-lg bg-blue-600/10 dark:bg-blue-400/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                          {assignment.grade}{assignment.section}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="typography-label text-slate-800 dark:text-slate-200">
-                            Grade {assignment.grade} - Section {assignment.section}
-                          </p>
-                          {assignment.stream && assignment.stream !== "General" && (
-                            <p className="typography-label text-[9px] text-slate-400 uppercase mt-0.5">
-                              {assignment.stream}
+                    {assignments.map((assignment) => {
+                      const gradeRaw = typeof assignment.grade === 'object' && assignment.grade !== null ? (assignment.grade as any).name : (assignment.grade || '')
+                      const cleanGrade = String(gradeRaw).replace(/^Grade\s+/i, '').trim()
+                      const sectionStr = typeof assignment.section === 'object' && assignment.section !== null ? (assignment.section as any).name : (assignment.section || '')
+                      const streamStr = typeof assignment.stream === 'object' && assignment.stream !== null ? (assignment.stream as any).name : (assignment.stream || '')
+                      const subjectStr = typeof assignment.subject === 'object' && assignment.subject !== null ? (assignment.subject as any).name : (assignment.subject || '')
+
+                      return (
+                        <div 
+                          key={assignment.id} 
+                          className="flex items-center gap-3 p-3 bg-blue-50/20 dark:bg-slate-900/50 rounded-xl border border-blue-100/50 dark:border-slate-800/80 hover:bg-blue-50/40 dark:hover:bg-slate-800 transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-blue-600/10 dark:bg-blue-400/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                            <BookOpen className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="typography-label text-slate-800 dark:text-slate-200">
+                              Grade {cleanGrade}{sectionStr ? ` - Section ${sectionStr}` : ''}
                             </p>
-                          )}
-                          {assignment.subject && (
-                            <p className="typography-label text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">
-                              {assignment.subject}
-                            </p>
-                          )}
+                            {streamStr && streamStr !== "General" && (
+                              <p className="typography-label text-[9px] text-slate-400 uppercase mt-0.5">
+                                {streamStr}
+                              </p>
+                            )}
+                            {subjectStr && (
+                              <p className="typography-label text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">
+                                {subjectStr}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>

@@ -48,6 +48,7 @@ interface SubscriptionPlan {
   isActive: boolean
   isCustom: boolean
   sortOrder: number
+  features?: PlanFeature[]
   _count?: { subscriptions: number }
 }
 
@@ -70,11 +71,12 @@ const getTierColor = (slug: string) => ({
 
 interface EditPlanDialogProps {
   plan?: SubscriptionPlan | null
+  allFeatures: Feature[]
   onSave: () => void
   onClose: () => void
 }
 
-function EditPlanDialog({ plan, onSave, onClose }: EditPlanDialogProps) {
+function EditPlanDialog({ plan, allFeatures, onSave, onClose }: EditPlanDialogProps) {
   const isNew = !plan
   const [form, setForm] = useState({
     name: plan?.name ?? "",
@@ -89,11 +91,23 @@ function EditPlanDialog({ plan, onSave, onClose }: EditPlanDialogProps) {
     maxStudents: plan?.maxStudents ?? 250,
     maxUsers: plan?.maxUsers ?? 15,
     trialDays: plan?.trialDays ?? 14,
+    sortOrder: plan?.sortOrder ?? 0,
     isActive: plan?.isActive ?? true,
     isCustom: plan?.isCustom ?? false,
   })
+  const [selectedFeatureIds, setSelectedFeatureIds] = useState<string[]>(() => {
+    return plan?.features?.map((f) => f.featureId) ?? []
+  })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+
+  const toggleFeature = (featureId: string) => {
+    setSelectedFeatureIds((prev) =>
+      prev.includes(featureId)
+        ? prev.filter((id) => id !== featureId)
+        : [...prev, featureId]
+    )
+  }
 
   const handleSave = async () => {
     if (!form.name || !form.slug) { setError("Name and slug are required"); return }
@@ -106,6 +120,7 @@ function EditPlanDialog({ plan, onSave, onClose }: EditPlanDialogProps) {
         })
         const json = await res.json()
         if (!json.success) throw new Error(json.error)
+        planId = json.data?.id
       } else {
         const res = await fetch(`${apiBase()}/api/subscriptions/plans/${planId}`, {
           method: "PUT", headers: authHeader(), body: JSON.stringify(form),
@@ -114,6 +129,30 @@ function EditPlanDialog({ plan, onSave, onClose }: EditPlanDialogProps) {
         if (!json.success) throw new Error(json.error)
       }
 
+      // Sync plan features
+      if (planId) {
+        const initialFeatureIds = new Set<string>((plan?.features ?? []).map((f: PlanFeature) => f.featureId))
+        const currentFeatureIds = new Set<string>(selectedFeatureIds)
+
+        const toAdd = selectedFeatureIds.filter((id: string) => !initialFeatureIds.has(id))
+        for (const featureId of toAdd) {
+          await fetch(`${apiBase()}/api/subscriptions/plans/${planId}/features`, {
+            method: "POST",
+            headers: authHeader(),
+            body: JSON.stringify({ featureId }),
+          })
+        }
+
+        const toRemove = Array.from(initialFeatureIds).filter((id: string) => !currentFeatureIds.has(id))
+        for (const featureId of toRemove) {
+          await fetch(`${apiBase()}/api/subscriptions/plans/${planId}/features/${featureId}`, {
+            method: "DELETE",
+            headers: authHeader(),
+          })
+        }
+      }
+
+      notifications.success("Plan Saved", `Plan "${form.name}" has been updated.`)
       onSave()
       onClose()
     } catch (e: any) {
@@ -125,62 +164,87 @@ function EditPlanDialog({ plan, onSave, onClose }: EditPlanDialogProps) {
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-card border border-border/60 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="p-6 border-b border-border">
-          <h2 className="text-xl font-bold">{isNew ? "Create New Plan" : `Edit: ${plan.name}`}</h2>
-          <p className="text-sm text-muted-foreground mt-1">Configure pricing and capacity limits</p>
+      <div className="bg-card border border-border/60 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 border-b border-border flex-shrink-0">
+          <h2 className="text-xl font-bold">{isNew ? "Create New Plan" : `Edit Plan: ${plan.name}`}</h2>
+          <p className="text-sm text-muted-foreground mt-1">Configure plan pricing, student capacity, trial duration, and feature access.</p>
         </div>
-        <div className="p-6 space-y-6">
+
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
           {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg p-3">{error}</p>}
 
           {/* Basics */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5 md:col-span-1">
               <Label>Plan Name</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Standard" />
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Starter, Premium" />
             </div>
-            <div className="space-y-1.5">
-              <Label>Slug (unique ID)</Label>
-              <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/\s+/g, "-") })} placeholder="e.g. standard" />
+            <div className="space-y-1.5 md:col-span-1">
+              <Label>Slug (unique key)</Label>
+              <Input 
+                value={form.slug} 
+                onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/\s+/g, "-") })} 
+                placeholder="e.g. starter, free" 
+                disabled={!isNew && plan?.slug === 'free'}
+              />
+            </div>
+            <div className="space-y-1.5 md:col-span-1">
+              <Label>Display Sort Order</Label>
+              <Input type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })} />
             </div>
           </div>
+
           <div className="space-y-1.5">
             <Label>Description</Label>
-            <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief plan description" />
+            <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Brief plan summary for school administrators" />
           </div>
 
-          {/* Pricing Totals — only for paid plans */}
-          {form.slug !== 'free' ? (
-            <div>
-              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><DollarSign className="w-4 h-4 text-muted-foreground" /> Package Totals (Flat Rates)</h3>
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { label: "Monthly", key: "monthlyTotal" },
-                  { label: "Semester", key: "semesterTotal" },
-                  { label: "Yearly", key: "yearlyTotal" },
-                ].map(({ label, key }) => (
-                  <div key={key} className="space-y-1.5">
-                    <Label>{label}</Label>
-                    <div className="relative">
-                      <Input type="number" className="pr-8" value={(form as any)[key]} onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })} min={0} />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">ETB</span>
-                    </div>
+          {/* Package Flat Rates */}
+          <div>
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-primary" /> Package Flat Rates (0 = Free)
+            </h3>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Monthly Flat (ETB)", key: "monthlyTotal" },
+                { label: "Semester Flat (ETB)", key: "semesterTotal" },
+                { label: "Yearly Flat (ETB)", key: "yearlyTotal" },
+              ].map(({ label, key }) => (
+                <div key={key} className="space-y-1.5">
+                  <Label className="text-xs">{label}</Label>
+                  <div className="relative">
+                    <Input type="number" className="pr-8" value={(form as any)[key]} onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })} min={0} />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">ETB</span>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          ) : (
-            <div>
-              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Calendar className="w-4 h-4 text-muted-foreground" /> Free Trial Settings</h3>
-              <div className="space-y-1.5">
-                <Label>Trial Duration (days)</Label>
-                <Input type="number" value={form.trialDays} onChange={(e) => setForm({ ...form, trialDays: Number(e.target.value) })} min={1} />
-              </div>
-            </div>
-          )}
+          </div>
 
-          {/* Limits */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Per-Student Rates */}
+          <div>
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+              <GraduationCap className="w-4 h-4 text-primary" /> Per-Student Rates (Optional)
+            </h3>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Monthly / Student", key: "pricePerStudentMonthly" },
+                { label: "Semester / Student", key: "pricePerStudentSemester" },
+                { label: "Yearly / Student", key: "pricePerStudentYearly" },
+              ].map(({ label, key }) => (
+                <div key={key} className="space-y-1.5">
+                  <Label className="text-xs">{label}</Label>
+                  <div className="relative">
+                    <Input type="number" className="pr-8" value={(form as any)[key]} onChange={(e) => setForm({ ...form, [key]: Number(e.target.value) })} min={0} />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">ETB</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Capacity Limits & Trial */}
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label>Max Students (-1 = ♾️)</Label>
               <Input type="number" value={form.maxStudents} onChange={(e) => setForm({ ...form, maxStudents: Number(e.target.value) })} min={-1} />
@@ -189,26 +253,65 @@ function EditPlanDialog({ plan, onSave, onClose }: EditPlanDialogProps) {
               <Label>Max Users (-1 = ♾️)</Label>
               <Input type="number" value={form.maxUsers} onChange={(e) => setForm({ ...form, maxUsers: Number(e.target.value) })} min={-1} />
             </div>
+            <div className="space-y-1.5">
+              <Label>Trial Duration (Days)</Label>
+              <Input type="number" value={form.trialDays} onChange={(e) => setForm({ ...form, trialDays: Number(e.target.value) })} min={0} />
+            </div>
           </div>
 
-          <div className="flex items-center gap-4 py-2">
-            <div className="flex items-center gap-3 flex-1">
-              <Label>Status</Label>
-              <button onClick={() => setForm({ ...form, isActive: !form.isActive })} className={`w-10 h-6 rounded-full transition-colors relative ${form.isActive ? "bg-primary" : "bg-muted"}`}>
+          {/* Status Toggles */}
+          <div className="flex items-center gap-6 py-2 border-y border-border">
+            <div className="flex items-center gap-3">
+              <Label>Active Status</Label>
+              <button type="button" onClick={() => setForm({ ...form, isActive: !form.isActive })} className={`w-10 h-6 rounded-full transition-colors relative ${form.isActive ? "bg-primary" : "bg-muted"}`}>
                 <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${form.isActive ? "translate-x-5" : "translate-x-1"}`} />
               </button>
               <span className="text-xs text-muted-foreground">{form.isActive ? "Active" : "Inactive"}</span>
             </div>
             <div className="flex items-center gap-3">
-              <Label>Custom Plan</Label>
-              <button onClick={() => setForm({ ...form, isCustom: !form.isCustom })} className={`w-10 h-6 rounded-full transition-colors relative ${form.isCustom ? "bg-amber-500" : "bg-muted"}`}>
+              <Label>Custom Tier</Label>
+              <button type="button" onClick={() => setForm({ ...form, isCustom: !form.isCustom })} className={`w-10 h-6 rounded-full transition-colors relative ${form.isCustom ? "bg-amber-500" : "bg-muted"}`}>
                 <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${form.isCustom ? "translate-x-5" : "translate-x-1"}`} />
               </button>
             </div>
           </div>
+
+          {/* Included Features Selection */}
+          {allFeatures.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-500" /> Plan Features ({selectedFeatureIds.length} selected)
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border border-border rounded-xl bg-muted/20">
+                {allFeatures.map((feat) => {
+                  const isChecked = selectedFeatureIds.includes(feat.id)
+                  return (
+                    <label
+                      key={feat.id}
+                      onClick={() => toggleFeature(feat.id)}
+                      className={cn(
+                        "flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-colors select-none",
+                        isChecked
+                          ? "bg-primary/10 border-primary/40 text-foreground font-semibold"
+                          : "bg-card border-border/60 text-muted-foreground hover:bg-muted/50"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {}}
+                        className="rounded text-primary focus:ring-primary/20"
+                      />
+                      <span className="truncate">{feat.name}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="p-6 border-t border-border flex gap-3 justify-end">
+        <div className="p-4 border-t border-border flex gap-3 justify-end flex-shrink-0 bg-muted/20">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -231,57 +334,43 @@ interface PlanCardProps {
 
 function PlanCard({ plan, onEdit, onDelete, onToggle }: PlanCardProps) {
   const subscriptions = plan._count?.subscriptions ?? 0
-  const isFree = plan.slug === 'free' || (Number(plan.monthlyTotal) === 0 && Number(plan.semesterTotal) === 0 && Number(plan.yearlyTotal) === 0)
+  const isFree = Number(plan.monthlyTotal) === 0 && Number(plan.semesterTotal) === 0 && Number(plan.yearlyTotal) === 0
+  const assignedFeatures = plan.features?.map((f: PlanFeature) => f.feature.name) ?? []
 
   return (
     <Card 
       className={cn(
-        "transition-all duration-300 relative overflow-hidden cursor-pointer",
+        "transition-all duration-300 relative overflow-hidden cursor-pointer flex flex-col justify-between",
         "border-border/60 hover:border-primary hover:ring-2 hover:ring-primary/20 hover:shadow-lg hover:shadow-primary/20 dark:hover:shadow-primary/10",
         !plan.isActive && "opacity-60"
       )}
       onClick={onEdit}
     >
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="text-base font-bold">{plan.name}</CardTitle>
-              <Badge variant="outline" className={`text-[10px] uppercase ${getTierColor(plan.slug)}`}>{plan.slug}</Badge>
-              {plan.isCustom && <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-500/5">Custom</Badge>}
-              {!plan.isActive && <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>}
+      <div>
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardTitle className="text-base font-bold">{plan.name}</CardTitle>
+                <Badge variant="outline" className={`text-[10px] uppercase ${getTierColor(plan.slug)}`}>{plan.slug}</Badge>
+                {plan.isCustom && <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-500/5">Custom</Badge>}
+                {!plan.isActive && <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>}
+              </div>
+              {plan.description && <CardDescription className="mt-1 text-xs truncate max-w-[260px]">{plan.description}</CardDescription>}
             </div>
-            {plan.description && <CardDescription className="mt-1 text-xs truncate max-w-[200px]">{plan.description}</CardDescription>}
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); onToggle(); }} title={plan.isActive ? "Deactivate" : "Activate"}>
-              {plan.isActive ? <ToggleRight className="w-4 h-4 text-primary" /> : <ToggleLeft className="w-4 h-4 text-muted-foreground" />}
-            </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); onEdit(); }}><Edit className="w-4 h-4" /></Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(); }} disabled={subscriptions > 0 || plan.slug === 'free'} title={plan.slug === 'free' ? "System plan cannot be deleted" : subscriptions > 0 ? "Has active subscriptions" : "Delete"}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-2.5 pb-3">
-        {/* Pricing table — only for paid plans */}
-        {isFree ? (
-          <div className="grid grid-cols-3 gap-1.5 text-center">
-            <div className="bg-green-500/5 rounded-lg p-1.5 border border-green-500/10">
-              <p className="text-[9px] text-muted-foreground uppercase font-semibold tracking-tight">Max Students</p>
-              <p className="text-xs font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.maxStudents === -1 ? '♾️' : plan.maxStudents}</p>
-            </div>
-            <div className="bg-green-500/5 rounded-lg p-1.5 border border-green-500/10">
-              <p className="text-[9px] text-muted-foreground uppercase font-semibold tracking-tight">Max Users</p>
-              <p className="text-xs font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.maxUsers === -1 ? '♾️' : plan.maxUsers}</p>
-            </div>
-            <div className="bg-green-500/5 rounded-lg p-1.5 border border-green-500/10">
-              <p className="text-[9px] text-muted-foreground uppercase font-semibold tracking-tight">Trial Days</p>
-              <p className="text-xs font-bold text-green-600 dark:text-green-400 mt-0.5">{plan.trialDays ?? 14}</p>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); onToggle(); }} title={plan.isActive ? "Deactivate" : "Activate"}>
+                {plan.isActive ? <ToggleRight className="w-4 h-4 text-primary" /> : <ToggleLeft className="w-4 h-4 text-muted-foreground" />}
+              </Button>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); onEdit(); }} title="Edit Plan"><Edit className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(); }} disabled={subscriptions > 0 || plan.slug === 'free'} title={plan.slug === 'free' ? "System plan cannot be deleted" : subscriptions > 0 ? "Has active subscriptions" : "Delete"}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
             </div>
           </div>
-        ) : (
+        </CardHeader>
+        <CardContent className="space-y-3 pb-3">
+          {/* Pricing Rates */}
           <div className="grid grid-cols-3 gap-1.5 text-center">
             {[
               { label: "Monthly", price: plan.monthlyTotal },
@@ -290,31 +379,53 @@ function PlanCard({ plan, onEdit, onDelete, onToggle }: PlanCardProps) {
             ].map(({ label, price }) => (
               <div key={label} className="bg-primary/5 rounded-lg p-1.5 border border-primary/10">
                 <p className="text-[9px] text-muted-foreground uppercase font-semibold tracking-tight">{label}</p>
-                <p className="text-xs font-bold text-primary mt-0.5">{Number(price).toLocaleString()} ETB</p>
-                <p className="text-[8px] text-primary/60 font-medium tracking-tight">Package</p>
+                <p className="text-xs font-bold text-primary mt-0.5">{Number(price) === 0 ? "Free" : `${Number(price).toLocaleString()} ETB`}</p>
               </div>
             ))}
           </div>
-        )}
 
-        {/* Stats */}
-        <div className="space-y-2 pt-0.5">
-          <div className="flex flex-wrap items-center gap-y-1.5 gap-x-3 text-xs text-foreground/80">
-            <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-md">
-              <Users className="w-3 h-3 text-muted-foreground" />
-              <span className="font-semibold">{plan.maxStudents === -1 ? "♾️" : plan.maxStudents.toLocaleString()}</span> Students
+          {/* Stats */}
+          <div className="space-y-2 pt-0.5">
+            <div className="flex flex-wrap items-center gap-y-1.5 gap-x-3 text-xs text-foreground/80">
+              <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-md">
+                <Users className="w-3 h-3 text-muted-foreground" />
+                <span className="font-semibold">{plan.maxStudents === -1 ? "♾️" : plan.maxStudents.toLocaleString()}</span> Students
+              </div>
+              <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-md">
+                <GraduationCap className="w-3 h-3 text-muted-foreground" />
+                <span className="font-semibold">{plan.maxUsers === -1 ? "♾️" : plan.maxUsers.toLocaleString()}</span> Users
+              </div>
+              {plan.trialDays > 0 && (
+                <div className="flex items-center gap-1 bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded-md border border-amber-500/20">
+                  <Calendar className="w-3 h-3" />
+                  <span className="font-semibold">{plan.trialDays}d</span> Trial
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-1 bg-muted/50 px-1.5 py-0.5 rounded-md">
-              <Plus className="w-3 h-3 text-muted-foreground" />
-              <span className="font-semibold">{plan.maxUsers === -1 ? "♾️" : plan.maxUsers.toLocaleString()}</span> Teachers
-            </div>
+
+            {/* Assigned features tags */}
+            {assignedFeatures.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {assignedFeatures.slice(0, 4).map((name: string, i: number) => (
+                  <span key={i} className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/50">
+                    {name}
+                  </span>
+                ))}
+                {assignedFeatures.length > 4 && (
+                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    +{assignedFeatures.length - 4} more
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-          <div className="flex items-center justify-between text-[10px] text-muted-foreground border-t border-border/50 pt-1.5">
-            <span className="flex items-center gap-1"><Check className="w-2.5 h-2.5 text-green-500" /> Core Features</span>
-            <Badge variant="secondary" className="text-[8px] font-normal px-1 h-3.5 leading-none">{subscriptions} schools</Badge>
-          </div>
-        </div>
-      </CardContent>
+        </CardContent>
+      </div>
+
+      <div className="px-6 py-2 border-t border-border/50 bg-muted/10 flex items-center justify-between text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1"><Check className="w-3 h-3 text-green-500" /> {assignedFeatures.length} features assigned</span>
+        <Badge variant="secondary" className="text-[9px] font-normal px-1.5 h-4 leading-none">{subscriptions} active school{subscriptions !== 1 ? 's' : ''}</Badge>
+      </div>
     </Card>
   )
 }
@@ -391,6 +502,7 @@ export function PlanManager() {
       {editingPlan !== undefined && (
         <EditPlanDialog
           plan={editingPlan}
+          allFeatures={allFeatures}
           onSave={fetchData}
           onClose={() => setEditingPlan(undefined)}
         />

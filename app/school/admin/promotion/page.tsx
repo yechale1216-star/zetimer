@@ -175,9 +175,11 @@ export default function StudentPromotionPage() {
         }
       }
 
+      let loadedStreams: Stream[] = []
       if (streamRes.ok) {
         const result = await streamRes.json()
-        setStreams(result.data || [])
+        loadedStreams = result.data || []
+        setStreams(loadedStreams)
       }
 
       let latestGrades: Grade[] = []
@@ -194,13 +196,35 @@ export default function StudentPromotionPage() {
         cohortData.forEach(cohort => {
           const cohortGradeNum = parseInt(cohort.gradeName?.replace(/[^\d]/g, '') || '0') || 0
           const targetGrade = latestGrades.find((g: any) => (parseInt(g.name?.replace(/[^\d]/g, '') || '0') || 0) === cohortGradeNum + 1)
+          const targetGradeNum = targetGrade ? parseInt(targetGrade.name?.replace(/[^\d]/g, '') || '0') || 0 : 0
           
-          rules[cohort.id] = { 
-            gradeId: targetGrade ? targetGrade.id : 'GRADUATE', 
+          const rule: { gradeId: string | 'GRADUATE', sectionName: string, streamId?: string } = {
+            gradeId: targetGrade ? targetGrade.id : 'GRADUATE',
             sectionName: cohort.sectionName || ''
           }
+
+          // If target grade is 11+ and current cohort already has a stream, carry it forward
+          if (targetGradeNum >= 11 && cohort.streamId) {
+            rule.streamId = cohort.streamId
+          }
+          
+          rules[cohort.id] = rule
         })
         setPromotionRules(rules)
+
+        // If school has no dedicated stream records but cohorts DO have stream data, 
+        // reconstruct the streams list from cohort data so the dropdown is populated
+        if (loadedStreams.length === 0) {
+          const cohortStreams: Stream[] = []
+          const seen = new Set<string>()
+          cohortData.forEach(c => {
+            if (c.streamId && c.streamName && !seen.has(c.streamId)) {
+              seen.add(c.streamId)
+              cohortStreams.push({ id: c.streamId, name: c.streamName })
+            }
+          })
+          if (cohortStreams.length > 0) setStreams(cohortStreams)
+        }
       }
       
       if (histRes.ok) {
@@ -330,8 +354,8 @@ export default function StudentPromotionPage() {
       const rule = promotionRules[cohortId]
       if (!rule) return false
       
-      const targetGrade = grades.find(g => g.id === rule.gradeId)
       if (rule.gradeId !== 'GRADUATE') {
+        const targetGrade = grades.find(g => g.id === rule.gradeId)
         const targetGradeNum = parseInt((targetGrade?.name || '').replace(/[^\d]/g, '')) || 0
         if (targetGradeNum >= 11 && !rule.streamId) {
           return false
@@ -1067,23 +1091,52 @@ export default function StudentPromotionPage() {
                                   {/* Destination Stream (if target is Gr 11 or 12) */}
                                   {currentRule.gradeId !== 'GRADUATE' && isStreamRequired ? (
                                     <div className="space-y-1.5">
-                                      <Label className="text-xs font-semibold text-violet-600 dark:text-violet-400 ml-0.5">Mandatory Stream</Label>
-                                      <Select 
-                                        value={currentRule.streamId} 
-                                        onValueChange={(val) => setPromotionRules(prev => ({ 
-                                          ...prev, 
-                                          [cohort.id]: { ...prev[cohort.id]!, streamId: val } 
-                                        }))}
-                                      >
-                                        <SelectTrigger className="w-full bg-violet-50/50 dark:bg-violet-900/10 border border-violet-200 dark:border-violet-800/80 h-11 rounded-xl text-violet-750 dark:text-violet-400 font-bold shadow-sm text-sm">
-                                          <SelectValue placeholder="Choose Stream" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {streams.map(s => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
+                                      <Label className="text-xs font-semibold text-violet-600 dark:text-violet-400 ml-0.5">Stream (Preserved)</Label>
+                                      {cohort.streamName ? (
+                                        <div className="h-11 px-3 rounded-xl bg-violet-50/70 dark:bg-violet-900/20 border border-violet-200/80 dark:border-violet-800 flex items-center justify-between">
+                                          <span className="font-bold text-sm text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
+                                            <ShieldCheck className="w-4 h-4 text-violet-600" />
+                                            {cohort.streamName}
+                                          </span>
+                                          <Badge variant="outline" className="text-[9px] font-bold text-violet-600 border-violet-300">
+                                            Locked
+                                          </Badge>
+                                        </div>
+                                      ) : streams.length === 0 ? (
+                                        <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl">
+                                          <p className="text-xs font-semibold text-amber-800 dark:text-amber-400">No streams configured</p>
+                                          <p className="text-[10px] text-amber-700/70 dark:text-amber-300/60 mt-0.5">Type the stream name to assign for Grade 11:</p>
+                                          <input
+                                            className="mt-2 w-full h-9 px-3 text-xs font-bold rounded-lg border border-violet-200 dark:border-violet-800 bg-white dark:bg-slate-950 text-violet-700 dark:text-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                            placeholder="e.g. Natural, Social Science..."
+                                            value={currentRule.streamId || ''}
+                                            onChange={(e) => {
+                                              const typedVal = e.target.value
+                                              setPromotionRules(prev => ({
+                                                ...prev,
+                                                [cohort.id]: { ...prev[cohort.id]!, streamId: typedVal }
+                                              }))
+                                            }}
+                                          />
+                                        </div>
+                                      ) : (
+                                        <Select 
+                                          value={currentRule.streamId} 
+                                          onValueChange={(val) => setPromotionRules(prev => ({ 
+                                            ...prev, 
+                                            [cohort.id]: { ...prev[cohort.id]!, streamId: val } 
+                                          }))}
+                                        >
+                                          <SelectTrigger className="w-full bg-violet-50/50 dark:bg-violet-900/10 border border-violet-200 dark:border-violet-800/80 h-11 rounded-xl text-violet-750 dark:text-violet-400 font-bold shadow-sm text-sm">
+                                            <SelectValue placeholder="Choose Stream" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {streams.map(s => (
+                                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      )}
                                     </div>
                                   ) : (
                                     <div className="hidden lg:block" />

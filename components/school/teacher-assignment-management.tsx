@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Trash2, Plus, GraduationCap, Users, CheckCircle2, RefreshCw } from "lucide-react"
+import { Trash2, Plus, GraduationCap, Users, CheckCircle2, RefreshCw, Pencil } from "lucide-react"
 
 import { authService } from "@/lib/auth/auth"
 import { notifications } from "@/lib/utils/notifications"
@@ -472,7 +472,7 @@ export function TeacherAssignmentManagement() {
                         </h3>
                         <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1.5 flex items-center gap-1.5 truncate">
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          Grade {assignment.grade?.name || ""} {assignment.section?.name || ""}
+                          Grade {String(typeof assignment.grade === 'object' ? assignment.grade?.name : (assignment.grade || '')).replace(/^Grade\s+/i, '').trim()} {typeof assignment.section === 'object' ? assignment.section?.name : (assignment.section || '')}
                         </p>
                       </div>
                     </div>
@@ -480,8 +480,9 @@ export function TeacherAssignmentManagement() {
                        <button 
                          onClick={(e) => { e.stopPropagation(); handleEditAssignment(assignment); }}
                          className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-primary transition-colors"
+                         title="Edit Assignment"
                        >
-                         <Plus className="w-4 h-4 rotate-45" />
+                         <Pencil className="w-4 h-4" />
                        </button>
                        <button 
                          onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(null, assignment.id); }}
@@ -496,7 +497,9 @@ export function TeacherAssignmentManagement() {
                     <div className="flex items-center gap-3">
                       <div className="flex flex-col">
                         <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest">Stream</span>
-                        <span className="text-xs font-bold text-foreground">{assignment.stream?.name || "General"}</span>
+                        <span className="text-xs font-bold text-foreground">
+                          {assignment.stream?.name || (typeof assignment.stream === 'string' && assignment.stream ? assignment.stream : "General")}
+                        </span>
                       </div>
                     </div>
                     <div className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg">

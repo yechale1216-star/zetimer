@@ -246,7 +246,7 @@ export function AttendanceTracking() {
 
             const studentStream = (student.stream || "").toLowerCase().trim()
             const clsStreamId = String(cls.streamId || "").toLowerCase().trim()
-            const clsStreamName = String(cls.stream?.name || "").toLowerCase().trim()
+            const clsStreamName = String(cls.stream?.name || cls.stream || "").toLowerCase().trim()
             
             const streamMatch = !cls.streamId || studentStream === clsStreamId || studentStream === clsStreamName
             

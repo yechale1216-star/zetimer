@@ -36,6 +36,7 @@ interface StudentReport {
 
 export function Reports() {
   const [students, setStudents] = useState<Student[]>([])
+  const [studentsLoaded, setStudentsLoaded] = useState(false)
   const [reportData, setReportData] = useState<StudentReport[]>([])
   const [filteredReports, setFilteredReports] = useState<StudentReport[]>([])
   const [rawAttendance, setRawAttendance] = useState<any[]>([])
@@ -94,7 +95,11 @@ export function Reports() {
     }
   }, [reportType])
 
+  // Re-generate the report whenever dates, mode, session filter, or the student list changes.
+  // `studentsLoaded` is included so the first report fires only AFTER loadStudents() has resolved,
+  // preventing the race condition where generateReport() would run against an empty students array.
   useEffect(() => {
+    if (!studentsLoaded) return
     if (startDate && endDate) {
       const validation = ValidationService.validateDateRange(startDate, endDate)
       setDateValidationErrors(validation.errors)
@@ -103,7 +108,7 @@ export function Reports() {
         generateReport()
       }
     }
-  }, [startDate, endDate, reportType, sessionFilter, isSessionBased])
+  }, [startDate, endDate, reportType, sessionFilter, isSessionBased, studentsLoaded, students])
 
 
   useEffect(() => {
@@ -140,6 +145,11 @@ export function Reports() {
     } catch (error) {
       console.error("[v0] Error loading students for report:", error)
       notifications.error("Error", "Failed to load students for report")
+    } finally {
+      // Always mark students as loaded so the report generation effect can proceed.
+      // This fires regardless of success or failure — the report will simply show
+      // an empty state when students is [] (e.g. unassigned teacher).
+      setStudentsLoaded(true)
     }
   }
 
@@ -536,7 +546,7 @@ export function Reports() {
 
   if (!mounted) return null
 
-  if (isLoading) {
+  if (isLoading || !studentsLoaded) {
     return <PageSkeleton variant="dashboard" />
   }
 

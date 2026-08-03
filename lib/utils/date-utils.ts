@@ -4,7 +4,16 @@
  */
 
 import { Language } from "../i18n/translations";
-import { toEthiopianDate, ET_MONTHS_AM, ET_MONTHS_EN } from "./ethiopian-calendar";
+import {
+  toEthiopianDate,
+  ET_MONTHS_AM,
+  ET_MONTHS_EN,
+  formatEthiopianDateDMY,
+  formatEthiopianDateTimeDMY,
+} from "./ethiopian-calendar";
+
+export { formatEthiopianDateDMY, formatEthiopianDateTimeDMY };
+
 
 export interface DateOptions {
   month?: "long" | "short" | "numeric";

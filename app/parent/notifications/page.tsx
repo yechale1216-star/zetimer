@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { parentDb, type ParentNotification, type ParentPreferences } from "@/lib/db/parent-db"
 import { useLanguage } from "@/lib/context/language-context"
-import { formatLocalizedDate } from "@/lib/utils/date-utils"
+import { formatLocalizedDate, formatEthiopianDateDMY, formatEthiopianDateTimeDMY } from "@/lib/utils/date-utils"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -25,14 +25,15 @@ function isLoggedIn(): boolean {
 
 function getDayLabel(dateStr: string): string {
   const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return dateStr
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   if (days === 0) return "Today"
   if (days === 1) return "Yesterday"
-  if (days < 7) return date.toLocaleDateString(undefined, { weekday: "long" })
-  return date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
+  return formatEthiopianDateDMY(date)
 }
+
 
 function groupNotificationsByDay(notifications: ParentNotification[]): { label: string; items: ParentNotification[] }[] {
   const groups: { [key: string]: ParentNotification[] } = {}
@@ -151,7 +152,7 @@ function TodayStatusPanel({ notifications }: { notifications: ParentNotification
             <span className="text-xs font-bold text-slate-300 tracking-wide">Today's Snapshot</span>
           </div>
           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
-            {new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+            {formatEthiopianDateDMY(new Date())}
           </span>
         </div>
         {allGood ? (
@@ -287,7 +288,7 @@ export default function ParentNotifications() {
   const [signedOut, setSignedOut] = useState(false)
   const [notificationsList, setNotificationsList] = useState<ParentNotification[]>([])
   const [preferences, setPreferences] = useState<ParentPreferences>({
-    smsAlerts: true,
+    smsAlerts: false,
     emailAlerts: false,
     pushAlerts: true
   })
@@ -374,13 +375,13 @@ export default function ParentNotifications() {
   }
 
   const formatNotificationTime = (dateStr: string) =>
-    formatLocalizedDate(dateStr, language, { hour: "2-digit", minute: "2-digit" })
+    formatEthiopianDateTimeDMY(dateStr)
 
   const localizeNotification = (notification: ParentNotification): { title: string; message: string } => {
     const studentName = notification.student?.fullName?.split(" ")[0] || ""
     const isFemale = notification.student?.gender?.toLowerCase() === "female"
     const suffix = isFemale ? "_f" : ""
-    const formattedDate = formatLocalizedDate(notification.createdAt, language, { month: "short", day: "numeric" })
+    const formattedDate = formatEthiopianDateDMY(notification.createdAt)
     const vars = {
       name: studentName,
       StudentName: studentName,
@@ -593,43 +594,48 @@ export default function ParentNotifications() {
               <Zap className="w-4 h-4 text-indigo-400" />
               Alert Channels
             </h2>
-            <p className="text-xs text-slate-500 mt-1 ml-6">Choose how you receive attendance alerts</p>
+            <p className="text-xs text-slate-500 mt-1 ml-6">All school alerts are delivered directly via In-App Portal Notifications</p>
           </div>
 
           <div className="space-y-3">
             {[
               {
-                key: "smsAlerts" as keyof ParentPreferences,
-                icon: <Smartphone className="w-5 h-5 text-emerald-400" />,
-                iconBg: "from-emerald-500/20 to-teal-500/10 border-emerald-500/20",
-                title: t("sms_alerts"),
-                desc: t("sms_alert_desc"),
-                value: preferences.smsAlerts,
-                tag: "Recommended",
-                tagColor: "bg-emerald-500/15 text-emerald-400",
-              },
-              {
-                key: "emailAlerts" as keyof ParentPreferences,
-                icon: <Mail className="w-5 h-5 text-blue-400" />,
-                iconBg: "from-blue-500/20 to-indigo-500/10 border-blue-500/20",
-                title: t("email_alerts"),
-                desc: t("email_alert_desc"),
-                value: preferences.emailAlerts,
-                tag: null, tagColor: "",
-              },
-              {
                 key: "pushAlerts" as keyof ParentPreferences,
                 icon: <Radio className="w-5 h-5 text-violet-400" />,
                 iconBg: "from-violet-500/20 to-purple-500/10 border-violet-500/20",
                 title: t("push_alerts"),
-                desc: t("push_alert_desc"),
+                desc: "Receive real-time push and in-app portal notifications for attendance alerts and announcements",
                 value: preferences.pushAlerts,
-                tag: null, tagColor: "",
+                tag: "Active",
+                tagColor: "bg-emerald-500/15 text-emerald-400",
+                disabled: false,
+              },
+              {
+                key: "smsAlerts" as keyof ParentPreferences,
+                icon: <Smartphone className="w-5 h-5 text-slate-500" />,
+                iconBg: "from-slate-800 to-slate-900 border-slate-700/30",
+                title: t("sms_alerts"),
+                desc: "SMS alerts disabled (all notices are delivered via in-app portal)",
+                value: false,
+                tag: "Disabled",
+                tagColor: "bg-slate-700/30 text-slate-400",
+                disabled: true,
+              },
+              {
+                key: "emailAlerts" as keyof ParentPreferences,
+                icon: <Mail className="w-5 h-5 text-slate-500" />,
+                iconBg: "from-slate-800 to-slate-900 border-slate-700/30",
+                title: t("email_alerts"),
+                desc: "Email alerts disabled (all notices are delivered via in-app portal)",
+                value: false,
+                tag: "Disabled",
+                tagColor: "bg-slate-700/30 text-slate-400",
+                disabled: true,
               },
             ].map(pref => (
               <div
                 key={pref.key}
-                className="flex items-center justify-between p-4 bg-white/3 border border-white/6 rounded-2xl hover:bg-white/5 transition-all"
+                className={`flex items-center justify-between p-4 bg-white/3 border border-white/6 rounded-2xl transition-all ${pref.disabled ? "opacity-60" : "hover:bg-white/5"}`}
               >
                 <div className="flex items-center gap-3.5">
                   <div className={`h-11 w-11 rounded-2xl bg-gradient-to-br border flex items-center justify-center shrink-0 ${pref.iconBg}`}>
@@ -649,7 +655,8 @@ export default function ParentNotifications() {
                 </div>
                 <Switch
                   checked={Boolean(pref.value)}
-                  onCheckedChange={(checked) => handlePreferenceToggle(pref.key, checked)}
+                  disabled={pref.disabled}
+                  onCheckedChange={(checked) => !pref.disabled && handlePreferenceToggle(pref.key, checked)}
                   className="data-[state=checked]:bg-indigo-600 shrink-0"
                 />
               </div>
@@ -660,7 +667,7 @@ export default function ParentNotifications() {
             <div className="flex gap-3">
               <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
               <p className="text-xs text-slate-500 leading-relaxed">
-                Alert preferences apply to all students linked to your account. Changes take effect immediately.
+                In-app portal notifications are active for your account. You can view all alerts anytime in the Notification Inbox.
               </p>
             </div>
           </div>

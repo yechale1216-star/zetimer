@@ -69,3 +69,35 @@ export function formatEthiopianDate(date: Date, lang: 'en' | 'am' = 'am'): strin
   const monthName = lang === 'am' ? ET_MONTHS_AM[ec.month] : ET_MONTHS_EN[ec.month];
   return `${monthName} ${ec.day} ቀን ${ec.year} ዓ.ም`;
 }
+
+/**
+ * Formats Ethiopian Date in numerical day/month/year format (DD/MM/YYYY)
+ * e.g., 27/11/2018
+ */
+export function formatEthiopianDateDMY(dateInput: Date | string | number): string {
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return String(dateInput);
+  const ec = toEthiopianDate(date);
+  const dayStr = String(ec.day).padStart(2, '0');
+  const monthStr = String(ec.month + 1).padStart(2, '0'); // ec.month is 0-indexed (0=Meskerem)
+  return `${dayStr}/${monthStr}/${ec.year}`;
+}
+
+/**
+ * Formats Ethiopian Date and Time in numerical day/month/year format (DD/MM/YYYY hh:mm AM/PM)
+ */
+export function formatEthiopianDateTimeDMY(dateInput: Date | string | number): string {
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return String(dateInput);
+  const dmy = formatEthiopianDateDMY(date);
+  
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const hourStr = String(hours).padStart(2, '0');
+  
+  return `${dmy} ${hourStr}:${minutes} ${ampm}`;
+}
+
